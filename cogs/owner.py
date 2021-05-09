@@ -31,6 +31,9 @@ class Owner(commands.Cog):
         logging.info(change)
         
         files_to_update = re.findall(r'cogs/.*.py', change)
+        if not files_to_update:  # already up to date
+            return await ctx.send(embed=discord.Embed(color=discord.Color.blue(), description=change))
+        
         files_to_update = [file.replace("/", '.') for file in files_to_update]
         self.bot.dispatch("on_handle_update", files_to_update, ctx.channel)
         
