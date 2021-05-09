@@ -24,6 +24,19 @@ class Owner(commands.Cog):
         self.bot.command_errors = {}
         return await ctx.send("command_errors has been reset, you're all good to go.")
     
+    @commands.command(brief="See any errors found inside of the bot.")
+    @commands.is_owner()
+    async def errors(self, ctx):
+        errors = [error for error in self.bot.command_errors if error.get('count') > 0]
+        if not errors:
+            return await ctx.send("No errors to show.")
+        
+        e = discord.Embed(color=discord.Color.blue())
+        for error in errors:
+            jumps = ', '.join(error.get('jump'))
+            e.add_field(name=error.get('name'), value=f"**Count:** {error.get('count')}\nJump: {jumps}\nTraceback: {error.get('traceback')[0]}")
+        await ctx.send(embed=e)
+    
     @commands.command(brief="Need to update the bot? Use this command.")
     @commands.is_owner()
     async def sync(self, ctx):

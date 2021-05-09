@@ -93,7 +93,7 @@ class Bot(commands.Bot):
         if not hasattr(self, "command_errors"):
             self.command_errors = {}
             for command in self.commands:
-                self.command_errors[command.name] = {"count": 0, "jump": [], 'traceback': []}
+                self.command_errors[command.name] = {"count": 0, "jump": [], 'traceback': [], "name": command.name}
         
         self.command_errors[ctx.command.name]['count'] += 1
         self.command_errors[ctx.command.name]['jump'].append(ctx.message.jump_url)
