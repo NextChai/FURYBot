@@ -57,13 +57,14 @@ class Events(commands.Cog):
         embed.add_field(name="Could DM member:", value=could_dm)
         return await self.bot.send_to_log_channel(embed=embed)
     
-    # @commands.Cog.listener('on_message')
+    
+    @commands.Cog.listener('on_message')
     async def link_checker(self, message):
         member = message.author
         if self.moderator_check(member): # member is a moderator
             return
         
-        urls = self.extractor.gen_urls(message.clean_content)
+        urls = list(self.extractor.gen_urls(message.clean_content))
         if not urls: # no urls in message
             return
         
