@@ -32,6 +32,9 @@ class Events(commands.Cog):
     @commands.Cog.listener("on_message")
     async def profanity_filter(self, message):
         member = message.author
+        if member.bot:
+            return
+        
         could_dm = True
     
         if self.moderator_check(member): # member is a moderator
@@ -61,6 +64,9 @@ class Events(commands.Cog):
     @commands.Cog.listener('on_message')
     async def link_checker(self, message):
         member = message.author
+        if member.bot:
+            return
+        
         if self.moderator_check(member): # member is a moderator
             return
         
