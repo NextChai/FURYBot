@@ -29,6 +29,7 @@ class Bot(commands.Bot):
         print(f"{self.user} ready: {self.user.id}")
         
     async def on_handle_update(self, extensions: list, channel):
+        self.logging(extensions)
         e = discord.Embed(color=discord.Color.blue())
         for extension in extensions:
             try:
