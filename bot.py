@@ -1,8 +1,11 @@
 import discord
 from discord.ext import commands
 import os
+import logging
 
 from cogs.utils import help_command
+
+
 
 initial_extensions = (
     "cogs.moderation",
@@ -29,7 +32,8 @@ class Bot(commands.Bot):
         print(f"{self.user} ready: {self.user.id}")
         
     async def on_handle_update(self, extensions: list, channel):
-        self.logging(extensions)
+        logging.info(extensions)  # I did this here to ensure the event was getting dispatched
+        
         e = discord.Embed(color=discord.Color.blue())
         for extension in extensions:
             try:

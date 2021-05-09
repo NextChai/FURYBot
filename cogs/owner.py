@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 import git
 import re
+import logging
+
 
 
 def update_files(default_base_path: str):
@@ -26,7 +28,7 @@ class Owner(commands.Cog):
     @commands.is_owner()
     async def sync(self, ctx):
         change = update_files(self.bot.DEFAULT_BASE_PATH)
-        self.bot.logging(change)
+        logging.info(change)
         
         files_to_update = re.findall(r'cogs/.*.py', change)
         files_to_update = [file.replace("/", '.') for file in files_to_update]
