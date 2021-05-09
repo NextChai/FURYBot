@@ -88,7 +88,8 @@ class Events(commands.Cog):
             print("Not valid channel.")
             await message.delete()
         else: 
-            check = ["gifyourgame.com/" in url for url in urls]
+            valid_urls = ['gifyourgame.com/', 'playvs']
+            check = [url in valid_urls for url in urls]
             if False in check: # no gif your game messages
                 await message.delete()
             else:  # all links are gif your game
