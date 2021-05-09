@@ -59,6 +59,7 @@ class Events(commands.Cog):
     
     @commands.Cog.listener('on_message')
     async def link_checker(self, message):
+        member = message.author
         if self.moderator_check(member): # member is a moderator
             return
         
@@ -82,7 +83,6 @@ class Events(commands.Cog):
         if is_fine:
             return
         
-        member = message.author
         embed = discord.Embed(color=discord.Color.red(), 
                               title="Nooo!",
                               description=f"We don't use links in this server!")
