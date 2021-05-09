@@ -105,6 +105,9 @@ class Events(commands.Cog):
                               description=f"We don't use links in this server!")
         embed.add_field(name="When can I use links?",
                         value="You can use links when posting from [Gif Your Game](https://www.gifyourgame.com/) in any of the game specific general chats. All other links must stay disabled.")
+        embed.add_field(name="Links sent:",
+                        value=', '.join(urls))
+        
         try:
             await member.send(embed=embed)
         except:
