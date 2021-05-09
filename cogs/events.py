@@ -71,11 +71,12 @@ class Events(commands.Cog):
         is_fine = False
         could_dm = True
         
-        if message.channel.id not in VALID_GIF_CHANNELS: # the user isn't allowed to post links in not main general chats
+        if message.channel.id not in VALID_GIF_CHANNELS: # the user isn't allowed to post links in not main chats
             await message.delete()
         else: 
             check = [url.startswith("https://www.gifyourgame.com/") for url in urls]
-            if False in check: #
+            print(check)
+            if False in check: # no gif your game messages
                 await message.delete()
             else:  # all links are gif your game
                 if message.channel.id not in VALID_GIF_CHANNELS: # channel is not valid
