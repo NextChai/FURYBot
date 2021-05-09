@@ -6,6 +6,8 @@ import re, datetime
 from better_profanity import profanity
 from urlextract import URLExtract
 
+import logging
+
 BYPASS_FURY = 802948019376488511
 VALID_GIF_CHANNELS = ( 
     757664675864248363,
@@ -32,6 +34,8 @@ class Events(commands.Cog):
     @commands.Cog.listener("on_message")
     async def profanity_filter(self, message):
         member = message.author
+        if not isinstance(member, discord.Member):
+            return
         if member.bot:
             return
         
@@ -64,6 +68,8 @@ class Events(commands.Cog):
     @commands.Cog.listener('on_message')
     async def link_checker(self, message):
         member = message.author
+        if not isinstance(member, discord.Member):
+            return
         if member.bot:
             return
         
@@ -80,9 +86,8 @@ class Events(commands.Cog):
         if message.channel.id not in VALID_GIF_CHANNELS: # the user isn't allowed to post links in not main chats
             await message.delete()
         else: 
-            print(urls)
+            logging.info(urls)
             check = ["gifyourgame.com/" in url for url in urls]
-            print(check)
             if False in check: # no gif your game messages
                 await message.delete()
             else:  # all links are gif your game
