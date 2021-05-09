@@ -33,7 +33,7 @@ class BaseMenu(menus.Menu):
         added seperatley.
         
         This needs to be overwritten."""
-        return discord.Embed(color=discord.Color.blurple())
+        return discord.Embed(color=discord.Color.blue())
 
     def build_page_cache(self):
         """Builds the page cache from the self.data var.
@@ -85,7 +85,7 @@ class HelpMenu(BaseMenu):
         self.data = data
 
     def get_embed(self, ctx):
-        e = discord.Embed(color=discord.Color.blurple(),
+        e = discord.Embed(color=discord.Color.blue(),
                           title="Categories",
                           description=f'Use "{ctx.prefix}command" for more info on a command.\n'
                                       f'Use "{ctx.prefix}category" for more info on a category.\n')
@@ -119,7 +119,7 @@ class CogMenu(BaseMenu):
 
     def get_embed(self, ctx):
         """Build the base embed, add fields later."""
-        embed = discord.Embed(color=discord.Color.blurple(),
+        embed = discord.Embed(color=discord.Color.blue(),
                               title=self.data.get("name"),
                               description=self.data.get("description"))
         embed.set_footer(text=f'Use "{ctx.prefix}help command" for more info on a command.')
@@ -192,7 +192,7 @@ class ChaiHelp(commands.HelpCommand):
     # chai help <command>
     async def send_command_help(self, command):
         aliases = ", ".join(list(command.aliases))
-        embed = discord.Embed(color=discord.Color.blurple(),
+        embed = discord.Embed(color=discord.Color.blue(),
                               title=f'{command.qualified_name} [{aliases}] {command.signature}' if aliases else f'{command.qualified_name} {command.signature}',  # ONE LINER YAYY
                               description=f'{command.description}\n\n{command.help}' if command.description else command.help or 'No help found...')
         await self.context.send(embed=embed)
