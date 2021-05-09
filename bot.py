@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import os
 import logging
+import traceback
 
 from cogs.utils import help_command
 
@@ -91,13 +92,16 @@ class Bot(commands.Bot):
 
         if not hasattr(self, "command_errors"):
             self.command_errors = {}
-
-        try:
-            self.command_errors[ctx.command.name]['count'] += 1
-            self.command_errors[ctx.command.name]['jump'].append(ctx.message.jump_url)
-        except KeyError:
-            payload = {"count": 1, "jump": [ctx.message.jump_url]}
-            self.command_errors[ctx.command.name] = payload
+            for command in self.commands:
+                self.command_errors[command.name] = {"count": 0, "jump": [], 'traceback': []}
+        
+        self.command_errors[ctx.command.name]['count'] += 1
+        self.command_errors[ctx.command.name]['jump'].append(ctx.message.jump_url)
+        
+        exc = getattr(error, 'original', error)
+        lines = ''.join(traceback.format_exception(exc.__class__, exc, exc.__traceback__))
+        lines = f'Ignoring exception in command {ctx.command}:\n{lines}'
+        print(lines)
 
         e.description = f"I ran into a new error..\n\n```python\n{str(error)}```"
         return await ctx.send(embed=e)
