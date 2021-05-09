@@ -96,8 +96,8 @@ class Bot(commands.Bot):
             self.command_errors[ctx.command.name]['count'] += 1
             self.command_errors[ctx.command.name]['jump'].append(ctx.message.jump_url)
         except KeyError:
-            self.command_errors[ctx.command.name]['count'] = 1
-            self.command_errors[ctx.command.name]['jump'] = [ctx.message.jump_url]
+            payload = {"count": 1, "jump": [ctx.message.jump_url]}
+            self.command_errors[ctx.command.name] = payload
 
         e.description = f"I ran into a new error..\n\n```python\n{str(error)}```"
         return await ctx.send(embed=e)
