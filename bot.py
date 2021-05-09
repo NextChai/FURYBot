@@ -7,6 +7,7 @@ from cogs.utils import help_command
 initial_extensions = (
     "cogs.moderation",
     "cogs.events",
+    "cogs.owner",
     "jishaku",
 )
 
@@ -22,7 +23,7 @@ class Bot(commands.Bot):
             try:
                 self.load_extension(extension)
             except Exception as E:
-                print(f"Could not load cog: {E}")
+                print(E)
 
     async def on_ready(self):
         print(f"{self.user} ready: {self.user.id}")
