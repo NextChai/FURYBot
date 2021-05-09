@@ -9,7 +9,7 @@ from cogs.utils import help_command
 
 
 initial_extensions = (
-    "cogs.moderation",
+    "cogs.commands",
     "cogs.events",
     "cogs.owner",
     "jishaku",

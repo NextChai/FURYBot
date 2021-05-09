@@ -45,7 +45,7 @@ class Owner(commands.Cog):
             e.add_field(name=error.get('name'), value=f"**Count:** {error.get('count')}\nJump: {jumps}\nTraceback: {error.get('traceback')[0]}")
         await ctx.send(embed=e)
     
-    @commands.command(brief="Need to update the bot? Use this command.")
+    @commands.command(brief="Need to update the bot? Use this command. ")
     @commands.is_owner()
     async def sync(self, ctx):
         change = update_files(self.bot.DEFAULT_BASE_PATH)
