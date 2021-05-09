@@ -55,7 +55,7 @@ class Owner(commands.Cog):
         if not files_to_update:  # already up to date
             return await ctx.send(embed=discord.Embed(color=discord.Color.blue(), description=change))
         
-        files_to_update = [file.replace("/", '.').replace(".py", "") for file in files_to_update]
+        files_to_update = [file.replace("/", '.').replace(".py", "") for file in files_to_update if "utils" not in file]
         self.bot.dispatch("handle_update", files_to_update, ctx.channel, change)
         
     
