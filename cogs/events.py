@@ -16,6 +16,7 @@ VALID_GIF_CHANNELS = (
     807404099095101491,
     807407050685677589,
     809527472609558548,
+    807407098442416139
 )
 
 
@@ -87,8 +88,6 @@ class Events(commands.Cog):
             print("Not valid channel.")
             await message.delete()
         else: 
-            print(urls)
-            print("Urls^")
             check = ["gifyourgame.com/" in url for url in urls]
             if False in check: # no gif your game messages
                 await message.delete()
