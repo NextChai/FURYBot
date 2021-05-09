@@ -12,6 +12,7 @@ def update_files(default_base_path: str):
     
     
 class Owner(commands.Cog):
+    """Owner commands for the bot. Basically manage it"""
     def __init__(self, bot):
         self.bot = bot
 
