@@ -27,9 +27,17 @@ class Owner(commands.Cog):
     @commands.command(brief="See any errors found inside of the bot.")
     @commands.is_owner()
     async def errors(self, ctx):
-        errors = [error for error in self.bot.command_errors if error.get('count') > 0]
-        if not errors:
+        if not hasattr(self.bot, 'command_errors'):
             return await ctx.send("No errors to show.")
+        
+        errors = []
+        for command in self.bot.command_errrors:
+            command = self.bot.command_errors[command]
+            if command.get("count") > 0 :
+                errors.append(command)
+            
+        if not errors:
+            return await ctx.send("No errors to show.") # this technically can't happen, but its chill
         
         e = discord.Embed(color=discord.Color.blue())
         for error in errors:
