@@ -35,7 +35,7 @@ class Owner(commands.Cog):
             return await ctx.send(embed=discord.Embed(color=discord.Color.blue(), description=change))
         
         files_to_update = [file.replace("/", '.').reaplce(".py", "") for file in files_to_update]
-        self.bot.dispatch("handle_update", files_to_update, ctx.channel)
+        self.bot.dispatch("handle_update", files_to_update, ctx.channel, change)
         
     
 

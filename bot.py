@@ -31,10 +31,10 @@ class Bot(commands.Bot):
     async def on_ready(self):
         print(f"{self.user} ready: {self.user.id}")
         
-    async def on_handle_update(self, extensions: list, channel):
+    async def on_handle_update(self, extensions: list, channel, raw_message):
         logging.info(extensions)  # I did this here to ensure the event was getting dispatched
         
-        e = discord.Embed(color=discord.Color.blue())
+        e = discord.Embed(color=discord.Color.blue(), description=f"```py\n{raw_message}```")
         for extension in extensions:
             try:
                 self.reload_extension(extension)
