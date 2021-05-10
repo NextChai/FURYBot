@@ -4,6 +4,9 @@ import os
 import logging
 import traceback
 
+from collections import Counter
+import datetime
+
 from cogs.utils import help_command
 
 
@@ -22,6 +25,10 @@ class Bot(commands.Bot):
         
         self.help_command = help_command.ChaiHelp()
         self.DEFAULT_BASE_PATH = os.path.dirname(os.path.abspath(__file__))
+        
+        # Spam control
+        self.spam_control = commands.CooldownMapping.from_cooldown(10, 12.0, commands.BucketType.user)
+        self._auto_spam_count = Counter()
 
         for extension in initial_extensions:
             try:
@@ -50,6 +57,66 @@ class Bot(commands.Bot):
     async def send_to_log_channel(self, embed: discord.Embed):
         channel = self.get_channel(765631488506200115) or (await self.fetch_channel(765631488506200115))
         await channel.send(embed=embed)
+        
+    async def log_spammer(self, ctx: commands.Context, 
+                          message: discord.Message, 
+                          retry_after, 
+                          autoblock: bool = False):
+        """Edited [RoboDanny](https://github.com/Rapptz/RoboDanny) log_spammer feature.
+        
+        https://github.com/Rapptz/RoboDanny/blob/0dfa21599da76e84c2f8e7fde0c132ec93c840a8/bot.py#L299-L313"""
+        guild_name = getattr(ctx.guild, 'name', 'No Guild (DMs)')
+        guild_id = getattr(ctx.guild, 'id', None)
+        fmt = 'User %s (ID %s) in guild %r (ID %s) spamming, retry_after: %.2fs'
+        logging.warning(fmt, message.author, message.author.id, guild_name, guild_id, retry_after)
+        if not autoblock:
+            return
+        
+        member = ctx.author
+        if not isinstance(member, discord.Member):
+            return
+        
+        embed = discord.Embed(color=discord.Color.red(), title='Auto Blocked Member')
+        embed.add_field(name='Member', value=f'{message.author} (ID: {message.author.id})', inline=False)
+        embed.add_field(name='Guild Info', value=f'{guild_name} (ID: {guild_id})', inline=False)
+        embed.add_field(name='Channel Info', value=f'{message.channel} (ID: {message.channel.id}', inline=False)
+        embed.add_field(name="What to do now?",
+                        value="You've been banned from using the server. Please contact Trevor F. through DM's in order to get your access back.")
+        
+        role = discord.utils.get(ctx.guild.roles, id=802304875266179073)
+        await member.add_roles([role], reason="Auto blocked member from spamming.", atomic=True)
+        try:
+            await member.send(embed=embed)
+            could_dm = True
+        except:
+            could_dm = False
+        await ctx.send(content=f"<@146348630926819328>, someone got banned. I could {'not dm them' if not could_dm else 'could dm them.'}")
+        
+    async def process_commands(self, message):
+        """Edited [RoboDanny](https://github.com/Rapptz/RoboDanny) blacklist feature.
+        
+        https://github.com/Rapptz/RoboDanny/blob/0dfa21599da76e84c2f8e7fde0c132ec93c840a8/bot.py#L315-L347"""
+        ctx = await self.get_context(message)
+
+        if ctx.command is None:
+            return
+
+        bucket = self.spam_control.get_bucket(message)
+        current = message.created_at.replace(tzinfo=datetime.timezone.utc).timestamp()
+        retry_after = bucket.update_rate_limit(current)
+        author_id = message.author.id
+        if retry_after and author_id != self.owner_id:
+            self._auto_spam_count[author_id] += 1
+            if self._auto_spam_count[author_id] >= 5:
+                del self._auto_spam_count[author_id]
+                await self.log_spammer(ctx, message, retry_after, autoblock=True)
+            else:
+                await self.log_spammer(ctx, message, retry_after)
+            return
+        else:
+            self._auto_spam_count.pop(author_id, None)
+
+        await self.invoke(ctx)
         
     async def on_command_error(self, ctx, error):
         if hasattr(ctx.command, 'on_error'):
