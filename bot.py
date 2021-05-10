@@ -105,14 +105,15 @@ class Bot(commands.Bot):
         
         role = discord.utils.get(ctx.guild.roles, id=802948019376488511) # Bypass Fury Role
         if role in ctx.author.roles:
-            return
+            return await self.invoke(ctx)
         
         
         bucket = self.spam_control.get_bucket(message)
         current = message.created_at.replace(tzinfo=datetime.timezone.utc).timestamp()
         retry_after = bucket.update_rate_limit(current)
         author_id = message.author.id
-        if retry_after and author_id != self.owner_id:
+        # if retry_after and author_id != self.owner_id:
+        if retry_after:
             self._auto_spam_count[author_id] += 1
             if self._auto_spam_count[author_id] >= 5:
                 del self._auto_spam_count[author_id]
