@@ -100,7 +100,14 @@ class Bot(commands.Bot):
 
         if ctx.command is None:
             return
-
+        if ctx.guild is None:
+            return await self.invoke(ctx)
+        
+        role = discord.utils.get(ctx.guild.roles, id=802948019376488511) # Bypass Fury Role
+        if role in ctx.author.roles:
+            return
+        
+        
         bucket = self.spam_control.get_bucket(message)
         current = message.created_at.replace(tzinfo=datetime.timezone.utc).timestamp()
         retry_after = bucket.update_rate_limit(current)
