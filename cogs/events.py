@@ -104,7 +104,9 @@ class Events(commands.Cog):
             await message.delete()
         else: 
             valid_urls = ['gifyourgame.com/', 'playvs']
-            check = [url in valid_urls for url in urls]
+            check = [url in valid_urls for url in urls]  # ONE LINER WOO
+            logging.info(f"Check for allowed urls: {check}")
+            
             if False in check: # no gif your game messages
                 await message.delete()
             else:  # all links are gif your game
