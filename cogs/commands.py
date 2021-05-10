@@ -18,7 +18,7 @@ class Commands(commands.Cog):
     async def source(self, ctx, command: str = None):
         """Source command taken from R.Danny.
         
-        Check out the origional command here: https://github.com/Rapptz/RoboDanny/blob/rewrite/cogs/meta.py#L344-L382
+        Check out the original command here: https://github.com/Rapptz/RoboDanny/blob/rewrite/cogs/meta.py#L344-L382
         And check out the bot here: https://github.com/Rapptz/RoboDanny/
         
         The bot owner does not claim the rights or originality to this command, 
