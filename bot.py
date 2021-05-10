@@ -90,7 +90,7 @@ class Bot(commands.Bot):
             could_dm = True
         except:
             could_dm = False
-        await ctx.send(content=f"<@146348630926819328>, someone got banned. I could {'not dm them' if not could_dm else 'could dm them.'}")
+        await ctx.send(content=f"<@146348630926819328>, someone got banned. I could {'not dm them' if not could_dm else 'dm them.'}")
         
     async def process_commands(self, message):
         """Edited [RoboDanny](https://github.com/Rapptz/RoboDanny) blacklist feature.
@@ -98,8 +98,6 @@ class Bot(commands.Bot):
         https://github.com/Rapptz/RoboDanny/blob/0dfa21599da76e84c2f8e7fde0c132ec93c840a8/bot.py#L315-L347"""
         ctx = await self.get_context(message)
 
-        if ctx.command is None:
-            return
         if ctx.guild is None:
             return await self.invoke(ctx)
         
@@ -107,13 +105,12 @@ class Bot(commands.Bot):
         if role in ctx.author.roles:
             return await self.invoke(ctx)
         
-        
         bucket = self.spam_control.get_bucket(message)
         current = message.created_at.replace(tzinfo=datetime.timezone.utc).timestamp()
         retry_after = bucket.update_rate_limit(current)
         author_id = message.author.id
-        # if retry_after and author_id != self.owner_id:
-        if retry_after:
+        
+        if retry_after and author_id != self.owner_id:
             self._auto_spam_count[author_id] += 1
             if self._auto_spam_count[author_id] >= 5:
                 del self._auto_spam_count[author_id]
