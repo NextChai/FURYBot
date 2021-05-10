@@ -79,7 +79,10 @@ class Events(commands.Cog):
         
         urls = list(self.extractor.gen_urls(message.clean_content))
         if not urls: # no urls in message
-            return
+            # we can run a second check LMAO
+            urls = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', message.clean_content.replace(" ", ''))
+            if not urls:
+                return 
         
         is_fine = False
         could_dm = True
