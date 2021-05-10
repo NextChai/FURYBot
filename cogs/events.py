@@ -103,7 +103,7 @@ class Events(commands.Cog):
             print("Not valid channel.")
             await message.delete()
         else: 
-            valid_urls = ['gifyourgame.com/', 'playvs']
+            valid_urls = ['https://www.gifyourgame.com/']
             check = [url in valid_urls for url in urls]  # ONE LINER WOO
             logging.info(f"Check for allowed urls: {check}")
             
