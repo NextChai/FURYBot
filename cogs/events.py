@@ -60,8 +60,7 @@ class Events(commands.Cog):
                             title="Noo!",
                             description=f"You can't be using that language in this server! You need to remember that it is a school discord. Don't say anything here that you wouldn't say in front of your parents or teacher.")
         e.add_field(name=f"Original message:", value=message.clean_content)
-        e.add_field(name="Swear word(s)", value=', '.join([f'`{entry}`' for entry in swears]))  # ONE LINER WOO
-        logging.info("Made it past embed") 
+        e.add_field(name="Clean message:", value=profanity.censor(message.clean_content))
         
         try:
             await member.send(embed=e)
