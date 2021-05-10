@@ -32,7 +32,7 @@ class Events(commands.Cog):
         self.extractor = URLExtract()
         self.extractor.update()
         
-    @commands.comamnd()
+    @commands.command()
     async def temp(self, ctx):
         return await ctx.send(len(profanity.CENSOR_WORDSET))
         
