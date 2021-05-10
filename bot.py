@@ -84,7 +84,7 @@ class Bot(commands.Bot):
                         value="You've been banned from using the server. Please contact Trevor F. through DM's in order to get your access back.")
         
         role = discord.utils.get(ctx.guild.roles, id=802304875266179073)
-        await member.add_roles([role], reason="Auto blocked member from spamming.", atomic=True)
+        await member.add_roles(role, reason="Auto blocked member from spamming.", atomic=True)
         try:
             await member.send(embed=embed)
             could_dm = True
