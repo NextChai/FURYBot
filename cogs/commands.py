@@ -24,7 +24,7 @@ class Commands(commands.Cog):
         The bot owner does not claim the rights or originality to this command, 
         and is in guidance with the [Liscense](https://github.com/Rapptz/RoboDanny/blob/rewrite/LICENSE.txt) put into effect from the R.Danny bot owner."""
         
-        source_url = 'https://github.com/NextChai/FURYBot'
+        source_url = '<https://github.com/NextChai/FURYBot>'
         branch = "main"
         if not command:
             return await ctx.send(source_url)
