@@ -27,7 +27,7 @@ class Bot(commands.Bot):
         self.DEFAULT_BASE_PATH = os.path.dirname(os.path.abspath(__file__))
         
         # Spam control
-        self.spam_control = commands.CooldownMapping.from_cooldown(10, 12.0, commands.BucketType.user)
+        self.spam_control = commands.CooldownMapping.from_cooldown(10, 10, commands.BucketType.member)
         self._auto_spam_count = Counter()
 
         for extension in initial_extensions:
@@ -90,7 +90,7 @@ class Bot(commands.Bot):
             could_dm = True
         except:
             could_dm = False
-        await ctx.send(content=f"<@146348630926819328>, someone got banned. I could {'not dm them' if not could_dm else 'dm them.'}")
+        await ctx.send(content=f"<@146348630926819328>, {member.mention} got locked. I could {'not dm them' if not could_dm else 'dm them.'}")
         
     async def process_commands(self, message):
         """Edited [RoboDanny](https://github.com/Rapptz/RoboDanny) blacklist feature.
