@@ -103,11 +103,10 @@ class Events(commands.Cog):
             print("Not valid channel.")
             await message.delete()
         else: 
-            valid_urls = ['https://www.gifyourgame.com/']
-            check = [url in valid_urls for url in urls]  # ONE LINER WOO
+            check = [url for url in urls if re.findall('gifyourgame', url)] # check for gif your game
             logging.info(f"Check for allowed urls: {check}")
             
-            if False in check: # no gif your game messages
+            if not check: # no gif your game messages
                 await message.delete()
             else:  # all links are gif your game
                 if message.channel.id not in VALID_GIF_CHANNELS: # channel is not valid
