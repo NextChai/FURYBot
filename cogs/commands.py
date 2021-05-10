@@ -21,19 +21,8 @@ class Commands(commands.Cog):
         Check out the origional command here: https://github.com/Rapptz/RoboDanny/blob/rewrite/cogs/meta.py#L344-L382
         And check out the bot here: https://github.com/Rapptz/RoboDanny/
         
-        I do not claim the rights to this command, and is in guidance with the [Liscense](https://github.com/Rapptz/RoboDanny/blob/rewrite/LICENSE.txt) put into effect.
-        
-        
-        Such Covered Software must also be made available in Source Code
-        Form, as described in Section 3.1, and You must inform recipients of
-        the Executable Form how they can obtain a copy of such Source Code
-        Form by reasonable means in a timely manner, at a charge no more
-        than the cost of distribution to the recipient; and
-
-        You may distribute such Executable Form under the terms of this
-        License, or sublicense it under different terms, provided that the
-        license for the Executable Form does not attempt to limit or alter
-        the recipients' rights in the Source Code Form under this License."""
+        The bot owner does not claim the rights or originality to this command, 
+        and is in guidance with the [Liscense](https://github.com/Rapptz/RoboDanny/blob/rewrite/LICENSE.txt) put into effect from the R.Danny bot owner."""
         
         source_url = 'https://github.com/NextChai/FURYBot'
         branch = "main"
