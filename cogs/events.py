@@ -59,6 +59,7 @@ class Events(commands.Cog):
         e = discord.Embed(color=discord.Color.red(),
                             title="Noo!",
                             description=f"You can't be using that language in this server! You need to remember that it is a school discord. Don't say anything here that you wouldn't say in front of your parents or teacher.")
+        e.set_author(name=str(member), icon_url=member.avatar_url)
         e.add_field(name=f"Original message:", value=message.clean_content)
         e.add_field(name="Clean message:", value=profanity.censor(message.clean_content))
         
@@ -69,7 +70,8 @@ class Events(commands.Cog):
             await message.channel.send(content=member.mention, embed=e)
             could_dm = False
         
-        embed = discord.Embed(color=discord.Color.red(), title=f'{str(member)} has used terms that contained profanity.')
+        embed = discord.Embed(color=discord.Color.red(), description=f'{str(member)} ({member.mention}) has used terms that contained profanity.')
+        embed.set_author(name=str(member), icon_url=member.avatar_url)
         embed.add_field(name=f"Original message:", value=message.clean_content)
         embed.add_field(name="Clean message:", value=profanity.censor(message.clean_content))
         embed.add_field(name="Could DM member:", value=could_dm)
