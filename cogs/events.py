@@ -23,6 +23,12 @@ VALID_GIF_CHANNELS = (
 class Events(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        
+        with open(f"{self.bot.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
+            extra_profanity = f.readlines()
+            extra_profanity = list(dict.fromkeys(extra_profanity))  # clear up duplicates
+            profanity.add_censor_words(extra_profanity)
+            
         self.extractor = URLExtract()
         self.extractor.update()
         
