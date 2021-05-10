@@ -50,7 +50,8 @@ class Events(commands.Cog):
     
         if self.moderator_check(member): # member is a moderator
             return
-        if not profanity.contains_profanity(message.clean_content):  # the member said something fine
+        swears = profanity.contains_profanity(message.clean_content.lower())
+        if not swears:  # the member said something fine
             return
         
         await message.delete()
@@ -58,6 +59,9 @@ class Events(commands.Cog):
         e = discord.Embed(color=discord.Color.red(),
                             title="Noo!",
                             description=f"You can't be using that language in this server! You need to remember that it is a school discord. Don't say anything here that you wouldn't say in front of your parents or teacher.")
+        e.add_field(name=f"Original message:", value=message.clean_content)
+        e.add_field(name="Swear word(s)", value=', '.join(f'`{entry}`' for entry in swears))  # ONE LINER WOO
+        
         try:
             await member.send(embed=e)
         except:
