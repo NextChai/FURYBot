@@ -32,6 +32,10 @@ class Events(commands.Cog):
         self.extractor = URLExtract()
         self.extractor.update()
         
+    @commands.comamnd()
+    async def temp(self, ctx):
+        return await ctx.send(len(profanity.CENSOR_WORDSET))
+        
     def moderator_check(self, author):
         author_roles = [role.id for role in author.roles]
         if BYPASS_FURY in author_roles:
