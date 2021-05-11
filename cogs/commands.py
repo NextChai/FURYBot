@@ -18,7 +18,7 @@ class Commands(commands.Cog):
     async def changes(self, ctx):
         embed = discord.Embed(color=discord.Color.blue(), description='')
         
-        commits = self.bot.get_recent_commits()
+        commits = await self.bot.get_recent_commits()
         for commit in commits:
             embed.description += f'```python\nSummary: {commit.summary}\nAuthorized: {time.strftime("%a, %d %b %Y %H:%M", time.gmtime(commit.committed_date))}```'
         return await ctx.send(embed=embed)
