@@ -20,7 +20,7 @@ class Commands(commands.Cog):
         
         commits = await self.bot.get_recent_commits()
         for commit in commits:
-            embed.description += f'```python\nSummary: {commit.summary}\nAuthorized: {time.strftime("%a, %d %b %Y %H:%M", time.gmtime(commit.committed_date))}```'
+            embed.description += f'```python\nSummary: {commit.summary}\nAuthorized: {time.strftime("%a, %d %b %Y %H:%M", time.gmtime(commit.committed_date))} ({commit.author})```'
         return await ctx.send(embed=embed)
         
     @commands.command(brief="View the source code for the bot.")
