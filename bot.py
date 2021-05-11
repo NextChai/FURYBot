@@ -9,6 +9,8 @@ import datetime
 
 from cogs.utils import help_command
 
+import git
+
 
 
 initial_extensions = (
@@ -39,6 +41,7 @@ class Bot(commands.Bot):
     async def on_ready(self):
         print(f"{self.user} ready: {self.user.id}")
         
+        
     async def on_handle_update(self, extensions: list, channel, raw_message):
         logging.info(extensions)  # I did this here to ensure the event was getting dispatched
         
@@ -53,6 +56,14 @@ class Bot(commands.Bot):
         
     async def on_message(self, message):
         await self.process_commands(message)
+        
+    async def sync(self):
+        change = git.cmd.Git(self.DEFAULT_BASE_PATH).pull('https://github.com/NextChai/FURYBot','main')
+        return change
+    
+    async def get_recent_commits(self):
+        return [commit for commit in git.Repo(self.DEFAULT_BASE_PATH).iter_commits(max_count=10)]
+
         
     async def send_to_log_channel(self, embed: discord.Embed):
         channel = self.get_channel(765631488506200115) or (await self.fetch_channel(765631488506200115))

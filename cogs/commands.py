@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 
-import inspect, os
+import inspect, os, time
 
 
 
@@ -13,6 +13,15 @@ class Commands(commands.Cog):
     @commands.command(brief="Ping the bot.")
     async def ping(self, ctx):
         await ctx.send("Pong.")
+        
+    @commands.command(brief="Get the recent changes to the bot!")
+    async def changes(self, ctx):
+        embed = discord.Embed(color=discord.Color.blue(), description='')
+        
+        commits = self.bot.get_recent_commits()
+        for commit in commits:
+            embed.description += f'```python\nSummary: {commit.summary}\nAuthorized: {time.strftime("%a, %d %b %Y %H:%M", time.gmtime(commit.committed_date))}```'
+        return await ctx.send(embed=embed)
         
     @commands.command(brief="View the source code for the bot.")
     async def source(self, ctx, command: str = None):

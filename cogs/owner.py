@@ -49,7 +49,7 @@ class Owner(commands.Cog):
     @commands.command(brief="Need to update the bot? Use this command. ")
     @commands.is_owner()
     async def sync(self, ctx):
-        change = update_files(self.bot.DEFAULT_BASE_PATH)
+        change = await self.bot.sync()
         logging.info(change)
         
         files_to_update = re.findall(r'cogs/.*.py', change)
