@@ -1,8 +1,9 @@
+import inspect
+import os
+import time
+
 import discord
 from discord.ext import commands
-
-import inspect, os, time
-
 
 
 class Commands(commands.Cog):
@@ -31,7 +32,7 @@ class Commands(commands.Cog):
         And check out the bot here: https://github.com/Rapptz/RoboDanny/
         
         The bot owner does not claim the rights or originality to this command, 
-        and is in guidance with the [Liscense](https://github.com/Rapptz/RoboDanny/blob/rewrite/LICENSE.txt) put into effect from the R.Danny bot owner."""
+        and is in guidance with the [License](https://github.com/Rapptz/RoboDanny/blob/rewrite/LICENSE.txt) put into effect from the R.Danny bot owner."""
         
         source_url = '<https://github.com/NextChai/FURYBot>'
         branch = "main"
@@ -53,15 +54,16 @@ class Commands(commands.Cog):
             module = obj.callback.__module__
             filename = src.co_filename
 
-        lines, firstlineno = inspect.getsourcelines(src)
+        lines, first_line = inspect.getsourcelines(src)
         if not module.startswith('discord'):
             # not a built-in command
             location = os.path.relpath(filename).replace('\\', '/')
         else:
             location = module.replace('.', '/') + '.py'
 
-        final_url = f'<{source_url}/blob/{branch}/{location}#L{firstlineno}-L{firstlineno + len(lines) - 1}>'
+        final_url = f'<{source_url}/blob/{branch}/{location}#L{first_line}-L{first_line + len(lines) - 1}>'
         await ctx.send(final_url)
-    
+
+
 def setup(bot):
     bot.add_cog(Commands(bot))
