@@ -45,8 +45,10 @@ class Events(commands.Cog):
     async def pingree(self, message):
         if str(message.channel.id) not in IGNORED_CHANNELS:
             return
-        if message.content != '<:PingReee:790368150704619550>':
-            await message.delete()
+        words = message.content.split(' ')
+        for word in words:
+            if word != '<:PingReee:790368150704619550>':
+                await message.delete()
 
     @commands.Cog.listener("on_message")
     async def profanity_filter(self, message):
