@@ -10,9 +10,6 @@ from discord.ext import commands
 
 from cogs.utils import help_command
 
-IGNORED_CHANNELS = (
-    844322773349302302
-)
 
 initial_extensions = (
     "cogs.commands",
@@ -118,10 +115,7 @@ class Bot(commands.Bot):
         role = discord.utils.get(ctx.guild.roles, id=802948019376488511)  # Bypass Fury Role
         if role in ctx.author.roles:
             return await self.invoke(ctx)
-        
-        if ctx.guild.id in IGNORED_CHANNELS:
-            return
-
+    
         
         bucket = self.spam_control.get_bucket(message)
         current = message.created_at.replace(tzinfo=datetime.timezone.utc).timestamp()
