@@ -5,6 +5,7 @@ import discord
 import better_profanity
 from discord.ext import commands
 import urlextract
+import bot
 
 BYPASS_FURY = 802948019376488511
 VALID_GIF_CHANNELS = (
@@ -30,10 +31,18 @@ class Events(commands.Cog):
 
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
+        
 
     @staticmethod
     def moderator_check(member):
         return True if BYPASS_FURY in [role.id for role in member.roles] else False
+    
+    @commands.Cog.listener("on_message")
+    async def pingree(self, message):
+        if message.channel.id not in bot.IGNORED_CHANNELS:
+            return
+        if message.content != '<:PingReee:790368150704619550>':
+            await message.delete()
 
     @commands.Cog.listener("on_message")
     async def profanity_filter(self, message):
@@ -134,6 +143,8 @@ class Events(commands.Cog):
         embed.add_field(name="Links sent:", value=', '.join([f'`{entry}`' for entry in urls]))
         embed.add_field(name="Could DM member:", value=str(could_dm))
         return await self.bot.send_to_log_channel(embed=embed)
+    
+    
 
 
 def setup(bot):
