@@ -17,12 +17,6 @@ VALID_GIF_CHANNELS = (
     807407098442416139
 )
 
-
-IGNORED_CHANNELS = (
-    '844322773349302302'
-)
-
-
 class Events(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -40,15 +34,6 @@ class Events(commands.Cog):
     @staticmethod
     def moderator_check(member):
         return True if BYPASS_FURY in [role.id for role in member.roles] else False
-    
-    @commands.Cog.listener("on_message")
-    async def pingree(self, message):
-        if str(message.channel.id) not in IGNORED_CHANNELS:
-            return
-        words = message.content.split(' ')
-        for word in words:
-            if word != '<:PingReee:790368150704619550>':
-                await message.delete()
 
     @commands.Cog.listener("on_message")
     async def profanity_filter(self, message):
