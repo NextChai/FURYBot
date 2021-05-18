@@ -19,7 +19,7 @@ VALID_GIF_CHANNELS = (
 
 
 IGNORED_CHANNELS = (
-    844322773349302302
+    '844322773349302302'
 )
 
 
@@ -43,7 +43,7 @@ class Events(commands.Cog):
     
     @commands.Cog.listener("on_message")
     async def pingree(self, message):
-        if message.channel.id not in IGNORED_CHANNELS:
+        if str(message.channel.id) not in IGNORED_CHANNELS:
             return
         if message.content != '<:PingReee:790368150704619550>':
             await message.delete()
