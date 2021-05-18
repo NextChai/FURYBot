@@ -5,7 +5,6 @@ import discord
 import better_profanity
 from discord.ext import commands
 import urlextract
-import bot
 
 BYPASS_FURY = 802948019376488511
 VALID_GIF_CHANNELS = (
@@ -16,6 +15,11 @@ VALID_GIF_CHANNELS = (
     807407050685677589,
     809527472609558548,
     807407098442416139
+)
+
+
+IGNORED_CHANNELS = (
+    844322773349302302
 )
 
 
@@ -39,7 +43,7 @@ class Events(commands.Cog):
     
     @commands.Cog.listener("on_message")
     async def pingree(self, message):
-        if message.channel.id not in bot.IGNORED_CHANNELS:
+        if message.channel.id not in IGNORED_CHANNELS:
             return
         if message.content != '<:PingReee:790368150704619550>':
             await message.delete()
