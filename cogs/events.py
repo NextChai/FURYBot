@@ -17,6 +17,7 @@ VALID_GIF_CHANNELS = (
     807407098442416139
 )
 
+
 class Events(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -25,12 +26,10 @@ class Events(commands.Cog):
         with open(f"{self.bot.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
             extra_profanity = f.readlines()
             extra_profanity = list(dict.fromkeys(extra_profanity))  # clear up duplicates
-            # self.profanity.add_censor_words(extra_profanity)
-            self.profanity.load_censor_words(extra_profanity, whitelist_words=['omg', 'lmao'])
+            self.profanity.add_censor_words(extra_profanity)
 
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
-
 
     @staticmethod
     def moderator_check(member):
@@ -133,8 +132,6 @@ class Events(commands.Cog):
         embed.add_field(name="Links sent:", value=', '.join([f'`{entry}`' for entry in urls]))
         embed.add_field(name="Could DM member:", value=str(could_dm))
         return await self.bot.send_to_log_channel(embed=embed)
-
-
 
 
 def setup(bot):
