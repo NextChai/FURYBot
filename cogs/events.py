@@ -17,6 +17,7 @@ VALID_GIF_CHANNELS = (
     807407098442416139
 )
 
+
 class Events(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -29,7 +30,6 @@ class Events(commands.Cog):
 
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
-        
 
     @staticmethod
     def moderator_check(member):
@@ -38,9 +38,7 @@ class Events(commands.Cog):
     @commands.Cog.listener("on_message")
     async def profanity_filter(self, message):
         member = message.author
-        if not isinstance(member, discord.Member) \
-                or member.bot \
-                or self.moderator_check(member):
+        if not isinstance(member, discord.Member) or member.bot or self.moderator_check(member):
             return
 
         if self.moderator_check(member):  # member is a moderator
@@ -134,8 +132,6 @@ class Events(commands.Cog):
         embed.add_field(name="Links sent:", value=', '.join([f'`{entry}`' for entry in urls]))
         embed.add_field(name="Could DM member:", value=str(could_dm))
         return await self.bot.send_to_log_channel(embed=embed)
-    
-    
 
 
 def setup(bot):
