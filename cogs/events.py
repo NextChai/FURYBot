@@ -25,7 +25,7 @@ class Events(commands.Cog):
         with open(f"{self.bot.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
             extra_profanity = f.readlines()
             extra_profanity = list(dict.fromkeys(extra_profanity))  # clear up duplicates
-            self.profanity.add_censor_words(extra_profanity)
+            self.profanity.load_censor_words(extra_profanity, whitelist=['omg', 'lmao'])
 
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
