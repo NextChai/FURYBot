@@ -1,4 +1,4 @@
-# FURYBot
+# Fury Bot
 The Discord Bot for the FLVS Fury School Discord. The FURY bot allows works to lock down a school discord, now allowing any links or profanity.
 
 Unfortunately, I am including the list of profanity based words in the repo. This is strictly for educational purposes, and is not something that should be used to be abused.
