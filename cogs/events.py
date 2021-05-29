@@ -1,3 +1,4 @@
+import enum
 import logging
 import re
 
@@ -30,9 +31,15 @@ class Events(commands.Cog):
 
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
-
+        
+        whitelist = ['omg', 'god', 'lmao']  # Custom whitelist.
+        for index, string in enumerate(self.profanity.CENSOR_WORDSET): 
+            if string._original in whitelist:
+                self.profanity.CENSOR_WORDSET.pop(index)
+         
+         
     @staticmethod
-    def moderator_check(member):
+    def moderator_check(member): 
         return True if BYPASS_FURY in [role.id for role in member.roles] else False
 
     @commands.Cog.listener("on_message")
