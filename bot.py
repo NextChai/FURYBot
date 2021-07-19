@@ -1,14 +1,23 @@
-import datetime
-import logging
 import os
+import logging
+import datetime
 import traceback
 from collections import Counter
 
 import discord
-import git
 from discord.ext import commands
 
+import git
+
 from cogs.utils import help_command
+from cogs.utils.constants import (
+    LOGGING_CHANNEL, 
+    COACH_ROLE, 
+    MOD_ROLE,
+    BYPASS_FURY
+)
+
+from typing import Union
 
 
 initial_extensions = (
@@ -18,9 +27,20 @@ initial_extensions = (
     "jishaku",
 )
 
+def Embed(**kwargs):
+    """
+    Used to set a default bot color for our embeds.
+    """
+    color = discord.Color.blue()
+    if kwargs.get('color'):
+        color = kwargs.pop('color')
+    elif kwargs.get('colour'):
+        color = kwargs.pop('colour')
+    
+    return discord.Embed(color=color, **kwargs)
 
 class Bot(commands.Bot):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(command_prefix=["!"], intents=discord.Intents.all(),
                          description=f"The helper bot to assist FLVS Staff.")
 
@@ -31,50 +51,48 @@ class Bot(commands.Bot):
         self.spam_control = commands.CooldownMapping.from_cooldown(10, 10, commands.BucketType.member)
         self._auto_spam_count = Counter()
         self.command_errors = {}
+        
+        self.Embed = Embed
 
         for extension in initial_extensions:
             try:
                 self.load_extension(extension)
             except Exception as E:
-                print(E)
-
-    async def on_ready(self):
+                traceback.print_exc()
+                print()
+                
+    async def on_ready(self) -> None:
         print(f"{self.user} ready: {self.user.id}")
 
-    async def on_message(self, message):
+    async def on_message(
+        self, 
+        message: discord.Message
+    ) -> None:
         await self.process_commands(message)
-
-    async def on_handle_update(self, extensions: list, channel, raw_message):
-        logging.info(extensions)  # I did this here to ensure the event was getting dispatched
-
-        e = discord.Embed(color=discord.Color.blue(), description=f"```py\n{raw_message}```")
-        for extension in extensions:
-            try:
-                self.reload_extension(extension)
-                e.add_field(name=extension, value="Reloded")
-            except Exception as exc:
-                e.add_field(name=extension, value=f'```python\n{exc}```')
-        return await channel.send(embed=e)
-
-    async def sync(self):
-        change = git.cmd.Git(self.DEFAULT_BASE_PATH).pull('https://github.com/NextChai/FURYBot', 'main')
-        return change
 
     async def get_recent_commits(self):
         return [commit for commit in git.Repo(self.DEFAULT_BASE_PATH).iter_commits(max_count=10)]
 
-    async def send_to_log_channel(self, embed: discord.Embed):
-        channel = self.get_channel(765631488506200115) or (await self.fetch_channel(765631488506200115))
-        await channel.send(embed=embed)
+    async def send_to_log_channel(
+        self, 
+        *args, 
+        **kwargs
+    ) -> discord.Message:
+        channel = self.get_channel(LOGGING_CHANNEL) or (await self.fetch_channel(LOGGING_CHANNEL))
+        return await channel.send(*args, **kwargs)
 
-    @staticmethod
-    async def log_spammer(ctx: commands.Context,
-                          message: discord.Message,
-                          retry_after,
-                          autoblock: bool = False):
-        """Edited [RoboDanny](https://github.com/Rapptz/RoboDanny) log_spammer feature.
+    async def log_spammer(
+        self,
+        ctx: commands.Context,
+        message: discord.Message,
+        retry_after: float,
+        autoblock: bool = False
+    ) -> Union[discord.Message, None]:
+        """
+        Edited [RoboDanny](https://github.com/Rapptz/RoboDanny) log_spammer feature.
         
-        https://github.com/Rapptz/RoboDanny/blob/0dfa21599da76e84c2f8e7fde0c132ec93c840a8/bot.py#L299-L313"""
+        https://github.com/Rapptz/RoboDanny/blob/0dfa21599da76e84c2f8e7fde0c132ec93c840a8/bot.py#L299-L313
+        """
         guild_name = getattr(ctx.guild, 'name', 'No Guild (DMs)')
         guild_id = getattr(ctx.guild, 'id', None)
         fmt = 'User %s (ID %s) in guild %r (ID %s) spamming, retry_after: %.2fs'
@@ -84,7 +102,7 @@ class Bot(commands.Bot):
 
         member = ctx.author
         if not isinstance(member, discord.Member):
-            return
+            return None
 
         embed = discord.Embed(color=discord.Color.red(), title='Auto Blocked Member')
         embed.add_field(name='Member', value=f'{message.author} (ID: {message.author.id})', inline=False)
@@ -100,10 +118,12 @@ class Bot(commands.Bot):
             could_dm = True
         except (discord.Forbidden, discord.HTTPException):
             could_dm = False
-        await ctx.send(
-            content=f"<@146348630926819328>, {member.mention} got locked. I could {'not dm them' if not could_dm else 'dm them.'}")
+        return await ctx.send(f"<@​&{COACH_ROLE}>, <@​&{MOD_ROLE}>, {member.mention} got locked for spamming commands. I could {'not dm them' if not could_dm else 'dm them.'}")
 
-    async def process_commands(self, message):
+    async def process_commands(
+        self, 
+        message: discord.Message
+    ) -> None:
         """Edited [RoboDanny](https://github.com/Rapptz/RoboDanny) blacklist feature.
         
         https://github.com/Rapptz/RoboDanny/blob/0dfa21599da76e84c2f8e7fde0c132ec93c840a8/bot.py#L315-L347"""
@@ -112,7 +132,7 @@ class Bot(commands.Bot):
         if ctx.guild is None:
             return await self.invoke(ctx)
 
-        role = discord.utils.get(ctx.guild.roles, id=802948019376488511)  # Bypass Fury Role
+        role = discord.utils.get(ctx.guild.roles, id=BYPASS_FURY)  # Bypass Fury Role
         if role in ctx.author.roles:
             return await self.invoke(ctx)
     
@@ -135,7 +155,11 @@ class Bot(commands.Bot):
 
         await self.invoke(ctx)
 
-    async def on_command_error(self, ctx, error):
+    async def on_command_error(
+        self, 
+        ctx: commands.Context, 
+        error: Union[commands.CommandError, Exception]  # It can be both idk
+    ) -> Union[discord.Message, None]:
         if hasattr(ctx.command, 'on_error'):
             return
 
@@ -149,7 +173,7 @@ class Bot(commands.Bot):
         if isinstance(error, ignored):
             return
 
-        e = discord.Embed(color=discord.Color.blue())
+        e = self.bot.Embed()
 
         if isinstance(error, commands.MissingRequiredArgument):
             e.description = f"{error.param} is a required argument that's missing."
