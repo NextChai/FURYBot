@@ -1,9 +1,11 @@
-import inspect
 import os
 import time
+import inspect
 
 import discord
 from discord.ext import commands
+
+from typing import Optional
 
 
 class Commands(commands.Cog):
@@ -11,12 +13,20 @@ class Commands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(brief="Ping the bot.")
-    async def ping(self, ctx):
-        await ctx.send("Pong.")
+    @commands.command(
+        brief="Ping the bot.")
+    async def ping(
+        self, 
+        ctx: commands.Context
+    ) -> discord.Message:
+        return await ctx.send("Pong.")
         
-    @commands.command(brief="Get the recent changes to the bot!")
-    async def changes(self, ctx):
+    @commands.command(
+        brief="Get the recent changes to the bot!")
+    async def changes(
+        self, 
+        ctx: commands.Context
+    ) -> discord.Message:
         embed = discord.Embed(color=discord.Color.blue(), description='')
         
         commits = await self.bot.get_recent_commits()
@@ -24,15 +34,22 @@ class Commands(commands.Cog):
             embed.description += f'```python\nSummary: {commit.summary}\nAuthorized: {time.strftime("%a, %d %b %Y %H:%M", time.gmtime(commit.committed_date))} ({commit.author})```'
         return await ctx.send(embed=embed)
         
-    @commands.command(brief="View the source code for the bot.")
-    async def source(self, ctx, command: str = None):
-        """Source command taken from R.Danny.
+    @commands.command(
+        brief="View the source code for the bot.")
+    async def source(
+        self, 
+        ctx: commands.Context, 
+        command: Optional[str] = None
+    ) -> discord.Message:
+        """
+        Source command taken from R.Danny.
         
         Check out the original command here: https://github.com/Rapptz/RoboDanny/blob/rewrite/cogs/meta.py#L344-L382
         And check out the bot here: https://github.com/Rapptz/RoboDanny/
         
         The bot owner does not claim the rights or originality to this command, 
-        and is in guidance with the [License](https://github.com/Rapptz/RoboDanny/blob/rewrite/LICENSE.txt) put into effect from the R.Danny bot owner."""
+        and is in guidance with the [License](https://github.com/Rapptz/RoboDanny/blob/rewrite/LICENSE.txt) put into effect from the R.Danny bot owner.
+        """
         
         source_url = '<https://github.com/NextChai/FURYBot>'
         branch = "main"
