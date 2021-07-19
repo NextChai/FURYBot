@@ -30,6 +30,7 @@ class LockedOut(TypedDict):
 
 class Events(commands.Cog):
     locked_out: ClassVar[LockedOut] = {}
+    custom_words: ClassVar[List[str]] = ['chode']
     
     def __init__(self, bot):
         self.bot = bot
@@ -38,6 +39,7 @@ class Events(commands.Cog):
         with open(f"{self.bot.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
             extra_profanity = f.readlines()
             extra_profanity = list(dict.fromkeys(extra_profanity))  # clear up duplicates
+            extra_profanity += self.custom_words
             self.profanity.add_censor_words(extra_profanity)
 
         self.extractor = urlextract.URLExtract()
