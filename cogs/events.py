@@ -1,25 +1,36 @@
-import enum
-import logging
 import re
+import asyncio
 
 import discord
-import better_profanity
 from discord.ext import commands
+
+import better_profanity
 import urlextract
 
-BYPASS_FURY = 802948019376488511
-VALID_GIF_CHANNELS = (
-    757664675864248363,
-    757665839263514705,
-    807407126275686430,
-    807404099095101491,
-    807407050685677589,
-    809527472609558548,
-    807407098442416139
+from typing import (
+    Union, 
+    List, 
+    ClassVar, 
+    TypedDict
 )
 
+from cogs.utils.constants import (
+    BYPASS_FURY,
+    VALID_GIF_CHANNELS,
+    COACH_ROLE,
+    MOD_ROLE,
+)
+
+def moderator_check(member): 
+    return True if BYPASS_FURY in [role.id for role in member.roles] else False
+
+class LockedOut(TypedDict):
+    member_id: int
+    bad_status: str
 
 class Events(commands.Cog):
+    locked_out: ClassVar[LockedOut] = {}
+    
     def __init__(self, bot):
         self.bot = bot
         self.profanity = better_profanity.profanity
@@ -32,103 +43,124 @@ class Events(commands.Cog):
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
         
-        whitelist = ['omg', 'god', 'lmao']  # Custom whitelist.
+        whitelist = ['omg', 'god', 'lmao']
         for index, string in enumerate(self.profanity.CENSOR_WORDSET): 
             if string._original in whitelist:
                 self.profanity.CENSOR_WORDSET.pop(index)
-         
-         
-    @staticmethod
-    def moderator_check(member): 
-        return True if BYPASS_FURY in [role.id for role in member.roles] else False
+    
+    async def contains_profanity(
+        self, 
+        message: str
+    ) -> bool:
+        """Verify is a str contains profanity."""
+        data = await asyncio.gather(*[self.bot.loop.run_in_executor(None, self.profanity.contains_profanity, message)])
+        return data[0] if data else False
+    
+    async def censor(
+        self, 
+        message: str
+    ) -> str:
+        """Censor a str."""
+        data = await asyncio.gather(*[self.bot.loop.run_in_executor(None, self.profanity.censor, message)])
+        return data[0]
+    
+    async def get_links(
+        self,
+        message: str
+    ) -> Union[None, List[str]]:
+        """Check if a message has link"""
+        data = await asyncio.gather(*[self.bot.loop.run_in_executor(None, self.extractor.gen_urls, message)])
+        return data[0] if data else None
+        
 
     @commands.Cog.listener("on_message")
-    async def profanity_filter(self, message):
+    async def profanity_filter(
+        self, 
+        message: discord.Message
+    ) -> Union[discord.Message, None]:
+        """
+        Catch for any profanity sent by users.
+        """
         member = message.author
-        if not isinstance(member, discord.Member) or member.bot or self.moderator_check(member):
-            return
+        if not isinstance(member, discord.Member) or member.bot or moderator_check(member):
+            return 
 
-        if self.moderator_check(member):  # member is a moderator
-            return
+        if not await self.contains_profanity(message.clean_content.lower()):  # the member said something fine
+            return 
+        
+        await message.delete(reason='Profanity found')
 
-        swears = self.profanity.contains_profanity(message.clean_content.lower())
-        if not swears:  # the member said something fine
-            return
-        await message.delete()
-
-        could_dm = True
-        e = discord.Embed(color=discord.Color.red(),
-                          title="Noo!",
-                          description=f"You can't be using that language in this server! You need to remember that it is a school discord. Don't say anything here that you wouldn't say in front of your parents or teacher.")
+        e = self.bot.Embed(
+            title="Noo!",
+            description=f"You can't be using that language in this server! You need to remember " \
+                "that it is a school discord. Don't say anything here that you wouldn't say in front of your parents or teacher."
+        )
         e.set_author(name=str(member), icon_url=member.avatar_url)
         e.add_field(name=f"Original message:", value=message.clean_content)
         e.add_field(name="Clean message:", value=self.profanity.censor(message.clean_content))
 
         try:
             await member.send(embed=e)
+            could_dm = True
         except (discord.HTTPException, discord.Forbidden):
             e.add_field(name="DMs", value="Your DM's are not open, so I was unable to DM you.")
             await message.channel.send(content=member.mention, embed=e)
             could_dm = False
 
-        embed = discord.Embed(color=discord.Color.red(),
-                              description=f'{str(member)} ({member.mention}) has used terms that contained profanity.\n**Channel:** {message.channel.mention}\n**Member nick:** {member.nick}')
-        embed.set_author(name=str(member), icon_url=member.avatar_url)
-        embed.add_field(name=f"Original message:", value=message.clean_content)
-        embed.add_field(name="Clean message:", value=self.profanity.censor(message.clean_content))
-        embed.add_field(name="Could DM member:", value=str(could_dm))
-        return await self.bot.send_to_log_channel(embed=embed)
+        logEmbed = self.bot.Embed(
+            description=f'{str(member)} ({member.mention}) has used terms that contained profanity.\n' \
+                f'**Channel:** {message.channel.mention}\n**Member nick:** {member.nick}'
+        )
+        logEmbed.set_author(name=str(member), icon_url=member.avatar_url)
+        logEmbed.add_field(name=f"Original message:", value=message.clean_content)
+        logEmbed.add_field(name="Clean message:", value=self.profanity.censor(message.clean_content))
+        logEmbed.add_field(name="Could DM member:", value=str(could_dm))
+        return await self.bot.send_to_log_channel(f'<@​&{COACH_ROLE}>, <@​&{MOD_ROLE}>', embed=logEmbed)
 
     @commands.Cog.listener('on_message')
-    async def link_checker(self, message):
+    async def link_checker(
+        self, 
+        message: discord.Message
+    ) -> Union[discord.Message, None]:
+        """
+        Catch links sent by users. If a link is detected it will be deleted automatically.
+        """
         member = message.author
-        if not isinstance(member, discord.Member):
-            return
-        if member.bot:
+        if not isinstance(member, discord.Member) or member.bot or moderator_check(member):
             return
 
-        if self.moderator_check(member):  # member is a moderator
+        urls = await self.get_links(message.clean_content) or re.findall(
+            r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',
+            message.clean_content.replace(" ", '')
+        )
+        if not urls:  # no urls in message, run a second check
             return
-
-        urls = list(self.extractor.gen_urls(message.clean_content))
-        if not urls:  # no urls in message
-            # we can run a second check LMAO
-            urls = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',
-                              message.clean_content.replace(" ", ''))
-            if not urls:
-                return
-
-        is_fine = False
-        could_dm = True
 
         if message.channel.id not in VALID_GIF_CHANNELS:  # the user isn't allowed to post links in not main chats
-            print("Not valid channel.")
             await message.delete()
         else:
             check = [url for url in urls if re.findall('gifyourgame', url)]  # check for gif your game
-            logging.info(f"Check for allowed urls: {check}")
-
             if not check:  # no gif your game messages
                 await message.delete()
             else:  # all links are gif your game
                 if message.channel.id not in VALID_GIF_CHANNELS:  # channel is not valid
                     await message.delete()
                 else:
-                    is_fine = True
+                    return
 
-        if is_fine:
-            return
-
-        embed = discord.Embed(color=discord.Color.red(),
-                              title="Nooo!",
-                              description=f"We don't use links in this server!")
-        embed.add_field(name="When can I use links?",
-                        value="You can use links when posting from [Gif Your Game](https://www.gifyourgame.com/) in any of the game specific general chats. All other links must stay disabled.")
-        embed.add_field(name="Links sent:",
-                        value=', '.join(urls))
+        embed = self.bot.Embed(
+            title="Nooo!",
+            description=f"We don't use links in this server!"
+        )
+        embed.add_field(
+            name="When can I use links?", 
+            value="You can use links when posting from [Gif Your Game](https://www.gifyourgame.com/) in " \
+            "any of the game specific general chats. All other links must stay disabled.")
+        embed.add_field(name="Links sent:", value=', '.join(urls))
 
         try:
             await member.send(embed=embed)
+            could_dm = True
         except (discord.HTTPException, discord.Forbidden):
             embed.add_field(name="DMs", value="Your DM's are not open, so I was unable to DM you.")
             await message.channel.send(content=member.mention, embed=embed)
@@ -139,7 +171,110 @@ class Events(commands.Cog):
         embed.add_field(name="Links sent:", value=', '.join([f'`{entry}`' for entry in urls]))
         embed.add_field(name="Could DM member:", value=str(could_dm))
         return await self.bot.send_to_log_channel(embed=embed)
+    
+    async def handle_roles(
+        self, 
+        operation: str,
+        member: discord.Member, 
+        reason: str = None, 
+        atomic: bool = True
+    ) -> None:
+        attr = getattr(member, operation)
+        role = discord.utils.get(member.guild.roles, name='Lockdown')
+        return await attr(*[role], reason=reason, atomic=atomic)
+    
+    
+    async def remove_lockdown_for(
+        self, 
+        member: discord.Member
+    ) -> discord.Embed:
+        del self.locked_out[member.id]
+        await self.handle_roles('remove_roles', member, reason='Member updated status', atomic=False)
+        
+        e = self.bot.Embed()
+        e.title = "Member fixed their status."
+        e.description = f'{str(member)} has fixed their status. Their access to the server has been fixed.'
+        await self.bot.send_to_log_channel(embed=e, content=f'<@​&{COACH_ROLE}>, <@​&{MOD_ROLE}>')
+        
+        e.title = 'Thank you.'
+        e.description = 'Your lockdown role was removed.'
+        return e
+    
+    @commands.Cog.listener('on_member_update')
+    async def status_checker(
+        self, 
+        before: discord.Member,
+        member: discord.Member
+    ) -> Union[discord.Message, None]:
+        """
+        Check users status' as they update. 
+        
+        If a status is not "PG", they will be locked down and the staff will be alerted. Once the status is cleared,
+        their access to the server will be fixed.
+        """
+        if not member.activities and self.locked_out.get(member.id):
+            e = await self.remove_lockdown_for(member)
+            try:
+                await member.send(embed=e)
+            except (discord.HTTPException, discord.Forbidden):
+                return None
+        if not member.activities:
+            return
+        
+    
+        ignored = (discord.Spotify, discord.Activity, discord.Game, discord.Streaming)
+        for activity in member.activities:
+            if isinstance(activity, ignored):
+                return
 
+            if not activity.name:
+                return  
+            
+            e = self.bot.Embed()
+            
+            if not (await self.contains_profanity(activity.name)):  # Check to unban the member
+                if self.locked_out.get(member.id):
+                    e = await self.remove_lockdown_for(member)
+                    try:
+                        return await member.send(embed=e)
+                    except (discord.HTTPException, discord.Forbidden):
+                        return None
+                return None
+                
+            censored = await self.censor(activity.name)
+            
+            e.title = "Noo!"
+            e.description = 'Your status can not contain profanity! I have revoked your access to the server.\n\nFeel this is incorrect? Contact Trevor F.!'
+            e.add_field(name='Original activity:', value=activity.name)
+            e.add_field(name='Censored', value=censored)
+            
+            whatToDo = self.bot.Embed(
+                title='How to get access back?',
+                description='View how to get your access back.'
+            )
+            whatToDo.add_field(name='Change your status!', value="After you've changed your status I will give you your server perms back again.")
+            try:
+                await member.send(embed=e)
+                await member.send(embed=whatToDo)
+            except (discord.HTTPException, discord.Forbidden):
+                pass
+            
+            e.title = 'Bad status'
+            e.description = f'I have detected a bad status on {member.mention}'
+            await self.bot.send_to_log_channel(embed=e, content=f'<@​&{COACH_ROLE}>, <@​&{MOD_ROLE}>')
+            
+            await self.handle_roles('add_roles', member, reason='Bad status', atomic=False)
+            self.locked_out[member.id] = {
+                'member_id': member.id,
+                'bad_status': censored
+            }
+            
+
+
+            
+        
+            
+            
 
 def setup(bot):
     bot.add_cog(Events(bot))
