@@ -1,12 +1,10 @@
-import logging
 import os
-
+import logging
 from dotenv import load_dotenv
 
 from bot import Bot
 
 load_dotenv()
-
 
 logging.basicConfig(level=logging.INFO)
 
