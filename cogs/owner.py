@@ -40,20 +40,6 @@ class Owner(commands.Cog):
             e.add_field(name=error.get('name'), value=f"**Count:** {error.get('count')}\nJump: {jumps}\nTraceback: {error.get('traceback')[0]}")
         await ctx.send(embed=e)
     
-    @commands.command(brief="Need to update the bot? Use this command. ")
-    @commands.is_owner()
-    async def sync(self, ctx):
-        change = await self.bot.sync()
-        logging.info(change)
-        
-        files_to_update = re.findall(r'cogs/.*.py', change)
-        if not files_to_update:  # already up to date
-            return await ctx.send(embed=discord.Embed(color=discord.Color.blue(), description=change))
-        
-        files_to_update = [file.replace("/", '.').replace(".py", "") for file in files_to_update if "utils" not in file]
-        self.bot.dispatch("handle_update", files_to_update, ctx.channel, change)
-        
-    
 
     
 def setup(bot):
