@@ -1,7 +1,7 @@
 import discord
 from discord.ext import menus, commands
 import enum
-from typing import Optional, Union
+from typing import Optional, Union, Any
 
 
 class Types(enum.Enum):
@@ -13,7 +13,12 @@ class Types(enum.Enum):
 
 
 class BaseMenu(menus.Menu):
-    def __init__(self, data: Union[dict, list], menu_type: Types, inline=True):
+    def __init__(
+        self, 
+        data: Union[dict, list], 
+        menu_type: Types, 
+        inline=True
+    ) -> None:
         super().__init__(timeout=60, clear_reactions_after=True)
         self.data = data
         self.menu_type = menu_type
@@ -28,20 +33,26 @@ class BaseMenu(menus.Menu):
             self.add_button(menus.Button(emoji='\U000025b6', action=self.on_arrow_forward))
             self.add_button(menus.Button(emoji='\U000023f9', action=self.on_stop_button))
 
-    def get_embed(self, ctx: Optional[commands.Context]):
+    def get_embed(
+        self, 
+        ctx: Optional[commands.Context]
+    ) -> discord.Embed:
         """Gets an embed object. This does not include the fields, that gets
         added seperatley.
         
         This needs to be overwritten."""
         return discord.Embed(color=discord.Color.blue())
 
-    def build_page_cache(self):
+    def build_page_cache(self) -> None:
         """Builds the page cache from the self.data var.
 
         This needs to be overwritten."""
         return None
 
-    def build_embed(self, ctx):
+    def build_embed(
+        self, 
+        ctx: commands.Context
+    ) -> discord.Embed:
         """Build an embed. Is written for the default help, you may want to remove this."""
         embed = self.get_embed(ctx)
         fields = self.pages[self.current_page]
@@ -49,23 +60,33 @@ class BaseMenu(menus.Menu):
             embed.add_field(name=field.get("name"), value=field.get("value"), inline=self.inline)
         return embed
 
-    async def send_initial_message(self, ctx, channel):
+    async def send_initial_message(
+        self, 
+        ctx: commands.Context, 
+        channel: discord.TextChannel
+    ) -> discord.Message:
         if self.pages == {}:
             self.build_page_cache()
 
         embed = self.build_embed(ctx)
         return await channel.send(embed=embed)
 
-    async def on_arrow_backward(self, payload):
+    async def on_arrow_backward(
+        self, 
+        payload: discord.RawReactionActionEvent
+    ) -> discord.Message:
         if self.current_page == 0:  # go to top page
             self.current_page = len(self.pages) - 1
         else:
             self.current_page -= 1
 
         embed = self.build_embed(self.ctx)
-        await self.message.edit(embed=embed)
+        return await self.message.edit(embed=embed)
 
-    async def on_arrow_forward(self, payload):
+    async def on_arrow_forward(
+        self, 
+        payload: discord.RawReactionActionEvent
+    ) -> discord.Message:
         if self.current_page == len(self.pages) - 1:
             self.current_page = 0
         else:
@@ -74,17 +95,26 @@ class BaseMenu(menus.Menu):
         embed = self.build_embed(self.ctx)
         await self.message.edit(embed=embed)
 
-    async def on_stop_button(self, payload):
+    async def on_stop_button(
+        self, 
+        payload: discord.RawReactionActionEvent
+    ) -> discord.Message:
         await self.message.delete()
         self.stop()
 
 
 class HelpMenu(BaseMenu):
-    def __init__(self, data):
+    def __init__(
+        self, 
+        data
+    ) -> None:
         super().__init__(data, menu_type=Types.HELP)
         self.data = data
 
-    def get_embed(self, ctx):
+    def get_embed(
+        self, 
+        ctx: commands.Context
+    ) -> discord.Embed:
         e = discord.Embed(color=discord.Color.blue(),
                           title="Categories",
                           description=f'Use "{ctx.prefix}command" for more info on a command.\n'
@@ -93,7 +123,7 @@ class HelpMenu(BaseMenu):
             text=f"Page {self.current_page + 1}/{len(self.pages)} -> {len(self.ctx.bot.commands)} commands total.")
         return e
 
-    def build_page_cache(self):
+    def build_page_cache(self) -> None:
         # we need to sort the cog data to be alphabetical
         self.data = dict(sorted(self.data.items(), key=lambda x: x[0].qualified_name))
         
@@ -113,11 +143,18 @@ class HelpMenu(BaseMenu):
 
 
 class CogMenu(BaseMenu):
-    def __init__(self, data, inline=False):
+    def __init__(
+        self, 
+        data, 
+        inline=False
+    ) -> None:
         super().__init__(data, menu_type=Types.COG, inline=inline)
         self.data = data
 
-    def get_embed(self, ctx):
+    def get_embed(
+        self, 
+        ctx: commands.Context
+    ) -> discord.Embed:
         """Build the base embed, add fields later."""
         embed = discord.Embed(color=discord.Color.blue(),
                               title=self.data.get("name"),
@@ -126,7 +163,7 @@ class CogMenu(BaseMenu):
         embed.set_author(name=f"Page {self.current_page + 1}/{len(self.pages)} ({len(self.data.get('commands'))})")
         return embed
 
-    def build_page_cache(self):
+    def build_page_cache(self) -> None:
         """Builds the page cache in the self.pages var."""
         commands = self.data.get("commands")
         for command in commands:
@@ -141,7 +178,11 @@ class CogMenu(BaseMenu):
             else:
                 highest_page.append({"name": name, "value": value})
 
-    async def send_initial_message(self, ctx, channel):
+    async def send_initial_message(
+        self, 
+        ctx: commands.Context, 
+        channel: discord.TextChannel
+    ) -> discord.Message:
         if self.pages == {}:
             self.build_page_cache()
 
@@ -156,11 +197,17 @@ class ChaiHelp(commands.HelpCommand):
             'help': 'Shows some help about the bot, its commands, or its command groups.'
         })
 
-    async def on_help_command_error(self, ctx, error):
-        if isinstance(error, commands.CommandInvokeError):
-            await ctx.send(str(error.original))
+    async def on_help_command_error(
+        self, 
+        ctx: commands.Context, 
+        error: Union[commands.CommandError, Exception]
+    ) -> discord.Message: 
+        return await ctx.bot.on_command_error(ctx, error)  # Pass it onto the main error handler.
 
-    def get_command_signature(self, command):
+    def get_command_signature(
+        self, 
+        command: commands.Command
+    ) -> str:
         parent = command.full_parent_name
         if len(command.aliases) > 0:
             aliases = ", ".join(command.aliases)
@@ -173,7 +220,10 @@ class ChaiHelp(commands.HelpCommand):
         return f'{alias} {command.signature}'
 
     # chai help
-    async def send_bot_help(self, mapping):
+    async def send_bot_help(
+        self, 
+        mapping: Any # I don't know the type
+    ) -> Any:  # Idk what it returns as well
         bot = self.context.bot
         commands = await self.filter_commands(bot.commands, sort=True)
 
@@ -187,29 +237,38 @@ class ChaiHelp(commands.HelpCommand):
                 all_commands[command.cog] = [command]
 
         menu = HelpMenu(all_commands)
-        await menu.start(self.context)
+        return await menu.start(self.context)
 
     # chai help <command>
-    async def send_command_help(self, command):
+    async def send_command_help(
+        self, 
+        command: commands.Command
+    ) -> discord.Message:
         aliases = ", ".join(list(command.aliases))
-        embed = discord.Embed(color=discord.Color.blue(),
-                              title=f'{command.qualified_name} [{aliases}] {command.signature}' if aliases else f'{command.qualified_name} {command.signature}',  # ONE LINER YAYY
-                              description=f'{command.description}\n\n{command.help}' if command.description else command.help or 'No help found...')
-        await self.context.send(embed=embed)
-
+        embed = self.context.bot.Embed(
+            title=f'{command.qualified_name} [{aliases}] {command.signature}' if aliases else f'{command.qualified_name} {command.signature}',  # ONE LINER YAYY
+            description=f'{command.description}\n\n{command.help}' if command.description else command.help or 'No help found...')
+        return await self.context.send(embed=embed)
 
     # chai help <cog>
-    async def send_cog_help(self, cog):
-        commands = cog.get_commands()
-        package = {"name": cog.qualified_name,
-                   'description': cog.description or "No description given.",
-                   "commands": commands}
+    async def send_cog_help(
+        self, 
+        cog: commands.Cog
+    ) -> Any:
+        package = {
+            "name": cog.qualified_name,
+            'description': cog.description or "No description given.",
+            "commands": cog.get_commands()
+        }
         menu = CogMenu(data=package)
-        await menu.start(self.context)
+        return await menu.start(self.context)
                 
 
     # chai help <group>
-    async def send_group_help(self, group):
+    async def send_group_help(
+        self, 
+        group: commands.Group
+    ) -> Any:
         subcommands = group.commands
         if len(subcommands) == 0:
             return await self.send_command_help(subcommands)
@@ -218,8 +277,10 @@ class ChaiHelp(commands.HelpCommand):
         if len(entries) == 0:
             return await self.send_command_help(group)
 
-        package = {"name": f'{group.qualified_name} Commands',
-                   "description": group.description or "No description given.",
-                   "commands": entries}
+        package = {
+            "name": f'{group.qualified_name} Commands',
+            "description": group.description or "No description given.",
+            "commands": entries
+        }
         menu = CogMenu(data=package)
         await menu.start(self.context)
