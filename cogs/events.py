@@ -27,9 +27,6 @@ def moderator_check(member):
     return True if BYPASS_FURY in [role.id for role in member.roles] else False
 
 def mention_staff(guild):
-    # REMMOVE THIS
-    return ''
-    
     croleClass = discord.utils.get(guild.roles, id=COACH_ROLE)
     mroleClass = discord.utils.get(guild.roles, id=MOD_ROLE)
     return f'{croleClass.mention}, {mroleClass.mention}'
@@ -265,7 +262,7 @@ class Events(commands.Cog):
         self, 
         before: discord.Member,
         member: discord.Member
-    ) -> Union[discord.Message, None]:
+    ) -> Union[discord.Message, discord.Embed, None]:
         """
         Check users status' as they update. 
         
@@ -275,11 +272,7 @@ class Events(commands.Cog):
         if before.activities == member.activities: return
         
         if not member.activities and self.locked_out.get(member.id):
-            e = await self.remove_lockdown_for(member)
-            try:
-                await member.send(embed=e)
-            except (discord.HTTPException, discord.Forbidden):
-                return None
+            return await self.remove_lockdown_for(member)
         if not member.activities:
             return
         
@@ -289,11 +282,7 @@ class Events(commands.Cog):
         
             if not (await self.contains_profanity(activity.name)):  # Check to unban the member
                 if self.locked_out.get(member.id):
-                    e = await self.remove_lockdown_for(member)
-                    try:
-                        return await member.send(embed=e)
-                    except (discord.HTTPException, discord.Forbidden):
-                        return None
+                    return await self.remove_lockdown_for(member)
                 return None
                 
             return await self.handle_bad_status(member, activity)
