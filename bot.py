@@ -137,9 +137,10 @@ class Bot(commands.Bot):
         if ctx.guild is None:
             return await self.invoke(ctx)
 
-        role = discord.utils.get(ctx.guild.roles, id=BYPASS_FURY)  # Bypass Fury Role
-        if role in ctx.author.roles:
-            return await self.invoke(ctx)
+        if not isinstance(ctx.author, discord.User):
+            role = discord.utils.get(ctx.guild.roles, id=BYPASS_FURY)  # Bypass Fury Role
+            if role in ctx.author.roles:
+                return await self.invoke(ctx)
     
         
         bucket = self.spam_control.get_bucket(message)
