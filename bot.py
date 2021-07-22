@@ -57,8 +57,9 @@ class Bot(commands.Bot):
         
         # Status stuff so I can easily change it
         self.ACTIVITY_MESSAGE = 'over the server.'
-        self.ACTIVITY_TYPE = discord.Activity.watching
-
+        self.ACTIVITY_TYPE = discord.ActivityType.watching
+        
+        
         for extension in initial_extensions:
             try:
                 self.load_extension(extension)
