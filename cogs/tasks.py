@@ -13,7 +13,7 @@ class Tasks(commands.Cog):
     async def update_status(self) -> None:
         await self.bot.change_presence(activity=discord.Activity(type=self.bot.ACTIVITY_TYPE, name=self.bot.ACTIVITY_MESSAGE))
         
-    @update_status.before_loop()
+    @update_status.before_loop
     async def update_status_before_loop(self) -> None:
         logging.info("TASK WAIT: Waiting for task update_status inside of tasks.py")
         await self.bot.wait_until_ready()
