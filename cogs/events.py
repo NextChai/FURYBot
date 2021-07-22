@@ -305,7 +305,7 @@ class Events(commands.Cog):
         
         ignored = (discord.Spotify, discord.Activity, discord.Game, discord.Streaming)
         async for member in guild.fetch_members(limit=None):
-            for activity in member.activties:
+            for activity in member.activities:
                 if isinstance(activity, ignored) or not activity.name: continue  # ONE LINER WOOO
                 if not (await self.contains_profanity(activity.name)): continue
                 
