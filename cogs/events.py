@@ -272,6 +272,8 @@ class Events(commands.Cog):
         If a status is not "PG", they will be locked down and the staff will be alerted. Once the status is cleared,
         their access to the server will be fixed.
         """
+        if before.activities != after.activities: return
+        
         if not member.activities and self.locked_out.get(member.id):
             e = await self.remove_lockdown_for(member)
             try:
@@ -281,7 +283,6 @@ class Events(commands.Cog):
         if not member.activities:
             return
         
-    
         ignored = (discord.Spotify, discord.Activity, discord.Game, discord.Streaming)
         for activity in member.activities:
             if isinstance(activity, ignored) or not activity.name: continue
