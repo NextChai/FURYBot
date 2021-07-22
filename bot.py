@@ -24,7 +24,7 @@ initial_extensions = (
     "cogs.commands",
     "cogs.events",
     "cogs.owner",
-    'cogs.tasks'
+    'cogs.tasks',
     "jishaku",
 )
 
