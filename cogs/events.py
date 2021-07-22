@@ -284,7 +284,7 @@ class Events(commands.Cog):
     
         ignored = (discord.Spotify, discord.Activity, discord.Game, discord.Streaming)
         for activity in member.activities:
-            if isinstance(activity, ignored) or not activity.name: return
+            if isinstance(activity, ignored) or not activity.name: continue
         
             if not (await self.contains_profanity(activity.name)):  # Check to unban the member
                 if self.locked_out.get(member.id):
