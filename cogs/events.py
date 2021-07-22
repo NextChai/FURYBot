@@ -1,8 +1,9 @@
 import re
+import logging
 import asyncio
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 import better_profanity
 import urlextract
@@ -19,6 +20,7 @@ from cogs.utils.constants import (
     VALID_GIF_CHANNELS,
     COACH_ROLE,
     MOD_ROLE,
+    FURY_GUILD
 )
 
 def moderator_check(member): 
@@ -49,6 +51,13 @@ class Events(commands.Cog):
         for index, string in enumerate(self.profanity.CENSOR_WORDSET): 
             if string._original in whitelist:
                 self.profanity.CENSOR_WORDSET.pop(index)
+                
+        self.member_check.start()
+        self.member_check.before_loop(self.before_loop)
+        
+    async def before_loop(self):
+        logging.info("TASK WAIT: Waiting for member_check inside of events.py")
+        await self.bot.wait_until_ready()
     
     async def contains_profanity(
         self, 
@@ -202,6 +211,36 @@ class Events(commands.Cog):
         e.description = 'Your lockdown role was removed.'
         return e
     
+    async def handle_bad_status(self, member: discord.Member, activity: discord.CustomActivity) -> discord.Message:
+        censored = await self.censor(activity.name)
+        
+        e = self.bot.Embed()  
+        e.title = "Noo!"
+        e.description = 'Your status can not contain profanity! I have revoked your access to the server.\n\nFeel this is incorrect? Contact Trevor F.!'
+        e.add_field(name='Original activity:', value=activity.name)
+        e.add_field(name='Censored', value=censored)
+        
+        whatToDo = self.bot.Embed(
+            title='How to get access back?',
+            description='View how to get your access back.'
+        )
+        whatToDo.add_field(name='Change your status!', value="After you've changed your status I will give you your server perms back again.")
+        try:
+            await member.send(embed=e)
+            await member.send(embed=whatToDo)
+        except (discord.HTTPException, discord.Forbidden):
+            pass
+        
+        await self.handle_roles('add_roles', member, reason='Bad status', atomic=False)
+        self.locked_out[member.id] = {
+            'member_id': member.id,
+            'bad_status': censored
+        }
+        
+        e.title = 'Bad status'
+        e.description = f'I have detected a bad status on {member.mention}'
+        return await self.bot.send_to_log_channel(embed=e, content=f'<@​&{COACH_ROLE}>, <@​&{MOD_ROLE}>')
+    
     @commands.Cog.listener('on_member_update')
     async def status_checker(
         self, 
@@ -226,14 +265,8 @@ class Events(commands.Cog):
     
         ignored = (discord.Spotify, discord.Activity, discord.Game, discord.Streaming)
         for activity in member.activities:
-            if isinstance(activity, ignored):
-                return
-
-            if not activity.name:
-                return  
-            
-            e = self.bot.Embed()
-            
+            if isinstance(activity, ignored) or not activity.name: return
+        
             if not (await self.contains_profanity(activity.name)):  # Check to unban the member
                 if self.locked_out.get(member.id):
                     e = await self.remove_lockdown_for(member)
@@ -243,34 +276,25 @@ class Events(commands.Cog):
                         return None
                 return None
                 
-            censored = await self.censor(activity.name)
+            return await self.handle_bad_status(member, activity)
             
-            e.title = "Noo!"
-            e.description = 'Your status can not contain profanity! I have revoked your access to the server.\n\nFeel this is incorrect? Contact Trevor F.!'
-            e.add_field(name='Original activity:', value=activity.name)
-            e.add_field(name='Censored', value=censored)
-            
-            whatToDo = self.bot.Embed(
-                title='How to get access back?',
-                description='View how to get your access back.'
-            )
-            whatToDo.add_field(name='Change your status!', value="After you've changed your status I will give you your server perms back again.")
-            try:
-                await member.send(embed=e)
-                await member.send(embed=whatToDo)
-            except (discord.HTTPException, discord.Forbidden):
-                pass
-            
-            e.title = 'Bad status'
-            e.description = f'I have detected a bad status on {member.mention}'
-            await self.bot.send_to_log_channel(embed=e, content=f'<@​&{COACH_ROLE}>, <@​&{MOD_ROLE}>')
-            
-            await self.handle_roles('add_roles', member, reason='Bad status', atomic=False)
-            self.locked_out[member.id] = {
-                'member_id': member.id,
-                'bad_status': censored
-            }
-            
+    @tasks.loop(count=1)
+    async def member_check(self) -> None:
+        """
+        Check for bad status' upon loading. If the status is bad,
+        """
+        guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
+        await guild.query_members(limit=guild.member_count+5, cache=True)  # +5 to be safe ;)
+        
+        ignored = (discord.Spotify, discord.Activity, discord.Game, discord.Streaming)
+        for member in guild.members:
+            for activity in member.activties:
+                if isinstance(activity, ignored) or not activity.name: continue  # ONE LINER WOOO
+                if not (await self.contains_profanity(activity.name)): continue
+                await self.handle_bad_status(member, activity)
+                
+                
+                
 
 
             
