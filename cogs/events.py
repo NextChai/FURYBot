@@ -308,6 +308,8 @@ class Events(commands.Cog):
             for activity in member.activties:
                 if isinstance(activity, ignored) or not activity.name: continue  # ONE LINER WOOO
                 if not (await self.contains_profanity(activity.name)): continue
+                
+                logging.info(f"BAD STATUS: Bad status detected on {str(member)}")
                 await self.handle_bad_status(member, activity)
     
     @member_check.before_loop   
