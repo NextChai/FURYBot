@@ -198,7 +198,6 @@ class Events(commands.Cog):
         role = discord.utils.get(member.guild.roles, name='Lockdown')
         return await attr(*[role], reason=reason, atomic=atomic)
     
-    
     async def remove_lockdown_for(
         self, 
         member: discord.Member
