@@ -1,3 +1,4 @@
+from asyncio.tasks import Task
 import logging
 
 import discord
@@ -17,3 +18,6 @@ class Tasks(commands.Cog):
     async def update_status_before_loop(self) -> None:
         logging.info("TASK WAIT: Waiting for task update_status inside of tasks.py")
         await self.bot.wait_until_ready()
+        
+def setup(bot):
+    bot.add_cog(Tasks(bot))
