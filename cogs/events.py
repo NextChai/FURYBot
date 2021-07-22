@@ -52,12 +52,7 @@ class Events(commands.Cog):
             if string._original in whitelist:
                 self.profanity.CENSOR_WORDSET.pop(index)
 
-        self.member_check.before_loop(self.before_loop)
         self.member_check.start()
-        
-    async def before_loop(self):
-        logging.info("TASK WAIT: Waiting for member_check inside of events.py")
-        await self.bot.wait_until_ready()
     
     async def contains_profanity(
         self, 
@@ -292,9 +287,11 @@ class Events(commands.Cog):
                 if isinstance(activity, ignored) or not activity.name: continue  # ONE LINER WOOO
                 if not (await self.contains_profanity(activity.name)): continue
                 await self.handle_bad_status(member, activity)
-                
-                
-                
+    
+    @member_check.before_loop()       
+    async def before_loop(self):
+        logging.info("TASK WAIT: Waiting for member_check inside of events.py")
+        await self.bot.wait_until_ready()
 
 
             
