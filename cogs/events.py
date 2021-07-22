@@ -169,7 +169,7 @@ class Events(commands.Cog):
             name="When can I use links?", 
             value="You can use links when posting from [Gif Your Game](https://www.gifyourgame.com/) in " \
             "any of the game specific general chats. All other links must stay disabled.")
-        embed.add_field(name="Links sent:", value=', '.join(urls))
+        embed.add_field(name="Links sent:", value=', '.join(urls) or "No links found?")
 
         try:
             await member.send(embed=embed)
