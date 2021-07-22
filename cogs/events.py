@@ -279,10 +279,9 @@ class Events(commands.Cog):
         Check for bad status' upon loading. If the status is bad,
         """
         guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
-        await guild.query_members(limit=guild.member_count+5, cache=True)  # +5 to be safe ;)
         
         ignored = (discord.Spotify, discord.Activity, discord.Game, discord.Streaming)
-        for member in guild.members:
+        async for member in guild.fetch_members(limit=None):
             for activity in member.activties:
                 if isinstance(activity, ignored) or not activity.name: continue  # ONE LINER WOOO
                 if not (await self.contains_profanity(activity.name)): continue
