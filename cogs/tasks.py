@@ -9,6 +9,9 @@ class Tasks(commands.Cog):
     def __init__(self, bot) -> None:
         self.bot = bot
         self.update_status.start()
+        
+    def cog_unload(self):
+        self.update_status.cancel()
 
     @tasks.loop(minutes=30) 
     async def update_status(self) -> None:

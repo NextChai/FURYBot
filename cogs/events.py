@@ -53,6 +53,10 @@ class Events(commands.Cog):
                 self.profanity.CENSOR_WORDSET.pop(index)
 
         self.member_check.start()
+        
+    def cog_unload(self):
+        if self.member_check.is_running():
+            self.member_check.cancel()
     
     async def contains_profanity(
         self, 
