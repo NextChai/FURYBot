@@ -18,8 +18,7 @@ from typing import (
 from cogs.utils.constants import (
     BYPASS_FURY,
     VALID_GIF_CHANNELS,
-    COACH_ROLE,
-    MOD_ROLE,
+    LOCKDOWN_NOTIFICATIONS_ROLE,
     FURY_GUILD
 )
 
@@ -27,9 +26,8 @@ def moderator_check(member):
     return True if BYPASS_FURY in [role.id for role in member.roles] else False
 
 def mention_staff(guild):
-    croleClass = discord.utils.get(guild.roles, id=COACH_ROLE)
-    mroleClass = discord.utils.get(guild.roles, id=MOD_ROLE)
-    return f'{croleClass.mention}, {mroleClass.mention}'
+    notisRole = discord.utils.get(guild.roles, id=LOCKDOWN_NOTIFICATIONS_ROLE)
+    return notisRole.mention
 
 class LockedOut(TypedDict):
     member_id: int
