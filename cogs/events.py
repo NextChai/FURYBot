@@ -26,6 +26,11 @@ from cogs.utils.constants import (
 def moderator_check(member): 
     return True if BYPASS_FURY in [role.id for role in member.roles] else False
 
+def mention_staff(guild):
+    croleClass = discord.utils.get(guild.roles, id=COACH_ROLE)
+    mroleClass = discord.utils.get(guild.roles, id=MOD_ROLE)
+    return f'{croleClass.mention}, {mroleClass.mention}'
+
 class LockedOut(TypedDict):
     member_id: int
     bad_status: str
@@ -125,7 +130,7 @@ class Events(commands.Cog):
         logEmbed.add_field(name=f"Original message:", value=message.clean_content)
         logEmbed.add_field(name="Clean message:", value=self.profanity.censor(message.clean_content))
         logEmbed.add_field(name="Could DM member:", value=str(could_dm))
-        return await self.bot.send_to_log_channel(f'<@​&{COACH_ROLE}>, <@​&{MOD_ROLE}>', embed=logEmbed)
+        return await self.bot.send_to_log_channel(content=mention_staff(member.guild), embed=logEmbed)
 
     @commands.Cog.listener('on_message')
     async def link_checker(
@@ -202,12 +207,22 @@ class Events(commands.Cog):
         await self.handle_roles('remove_roles', member, reason='Member updated status', atomic=False)
         
         e = self.bot.Embed()
-        e.title = "Member fixed their status."
-        e.description = f'{str(member)} has fixed their status. Their access to the server has been fixed.'
-        await self.bot.send_to_log_channel(embed=e, content=f'<@​&{COACH_ROLE}>, <@​&{MOD_ROLE}>')
         
         e.title = 'Thank you.'
         e.description = 'Your lockdown role was removed.'
+        try:
+            await member.send(embed=e)
+            could_dm = True
+        except (discord.Forbidden, discord.HTTPException):
+            could_dm = False
+            
+        
+        e.title = "Member fixed their status."
+        e.description = f'{str(member)} has fixed their status. Their access to the server has been fixed.'
+        e.add_field(name='Could DM?', value=could_dm)
+        await self.bot.send_to_log_channel(embed=e, content=mention_staff(member.guild))
+        
+        logging.info(f"REMOVED LOCKDOWN: Lockdown removed from {str(member)} after fixing their status.")
         return e
     
     async def handle_bad_status(self, member: discord.Member, activity: discord.CustomActivity) -> discord.Message:
@@ -227,8 +242,11 @@ class Events(commands.Cog):
         try:
             await member.send(embed=e)
             await member.send(embed=whatToDo)
+            could_dm = True
         except (discord.HTTPException, discord.Forbidden):
-            pass
+            could_dm = False
+        
+        logging.info(f"ADDED LOCKDOWN: Lockdown added to {str(member)} for having a bad status.")
         
         await self.handle_roles('add_roles', member, reason='Bad status', atomic=False)
         self.locked_out[member.id] = {
@@ -238,7 +256,8 @@ class Events(commands.Cog):
         
         e.title = 'Bad status'
         e.description = f'I have detected a bad status on {member.mention}'
-        return await self.bot.send_to_log_channel(embed=e, content=f'<@​&{COACH_ROLE}>, <@​&{MOD_ROLE}>')
+        e.add_field(name='Could DM?', value=could_dm)
+        return await self.bot.send_to_log_channel(embed=e, content=mention_staff(member.guild))
     
     @commands.Cog.listener('on_member_update')
     async def status_checker(
