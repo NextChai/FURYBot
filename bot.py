@@ -24,6 +24,7 @@ initial_extensions = (
     "cogs.commands",
     "cogs.events",
     "cogs.owner",
+    'cogs.tasks'
     "jishaku",
 )
 
@@ -53,6 +54,10 @@ class Bot(commands.Bot):
         self.command_errors = {}
         
         self.Embed = Embed
+        
+        # Status stuff so I can easily change it
+        self.ACTIVITY_MESSAGE = 'over the server.'
+        self.ACTIVITY_TYPE = discord.Activity.watching
 
         for extension in initial_extensions:
             try:
