@@ -83,7 +83,7 @@ class Events(commands.Cog):
     ) -> Union[None, List[str]]:
         """Check if a message has link"""
         data = await asyncio.gather(*[self.bot.loop.run_in_executor(None, self.extractor.gen_urls, message)])
-        return data[0] if data else None
+        return list(data[0]) if data else None
         
 
     @commands.Cog.listener("on_message")
@@ -195,6 +195,20 @@ class Events(commands.Cog):
         attr = getattr(member, operation)
         role = discord.utils.get(member.guild.roles, name='Lockdown')
         return await attr(*[role], reason=reason, atomic=atomic)
+    
+    async def handle_failed_dm(self, member):
+        """
+        We'll use this func for alerting the member their status is not fit for the server.
+        To do this, we'll create a private textchannel and @ them letting them know.
+        After 10 minutes, the channel will be deleted to avoid clutter.
+        """
+        guild = member.guild
+        
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False, view_channel=False, send_messages=False),
+            member: discord.PermissionOverwrite(read_messages=True, view_channel=True, send_messages=False)
+        }
+        await guild.create_text_channel(name=f'{member.name}-bad-status', overwrites=overwrites)
     
     async def remove_lockdown_for(
         self, 
