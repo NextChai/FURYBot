@@ -272,7 +272,7 @@ class Events(commands.Cog):
         If a status is not "PG", they will be locked down and the staff will be alerted. Once the status is cleared,
         their access to the server will be fixed.
         """
-        if before.activities != member.activities: return
+        if before.activities == member.activities: return
         
         if not member.activities and self.locked_out.get(member.id):
             e = await self.remove_lockdown_for(member)
