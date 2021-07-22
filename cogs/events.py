@@ -27,6 +27,9 @@ def moderator_check(member):
     return True if BYPASS_FURY in [role.id for role in member.roles] else False
 
 def mention_staff(guild):
+    # REMMOVE THIS
+    return ''
+    
     croleClass = discord.utils.get(guild.roles, id=COACH_ROLE)
     mroleClass = discord.utils.get(guild.roles, id=MOD_ROLE)
     return f'{croleClass.mention}, {mroleClass.mention}'
@@ -192,7 +195,7 @@ class Events(commands.Cog):
         operation: str,
         member: discord.Member, 
         reason: str = None, 
-        atomic: bool = True
+        atomic: bool = False
     ) -> None:
         attr = getattr(member, operation)
         role = discord.utils.get(member.guild.roles, name='Lockdown')
@@ -214,7 +217,6 @@ class Events(commands.Cog):
             could_dm = True
         except (discord.Forbidden, discord.HTTPException):
             could_dm = False
-            
         
         e.title = "Member fixed their status."
         e.description = f'{str(member)} has fixed their status. Their access to the server has been fixed.'
