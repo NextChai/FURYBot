@@ -121,7 +121,7 @@ class Events(commands.Cog):
             could_dm = False
 
         logEmbed = self.bot.Embed(
-            description=f'{str(member)} ({member.mention}) has used terms that contained profanity.\n' \
+            description=f'**{str(member)}** ({member.mention}) has used terms that contained profanity.\n' \
                 f'**Channel:** {message.channel.mention}\n**Member nick:** {member.nick}'
         )
         logEmbed.set_author(name=str(member), icon_url=member.avatar_url)
@@ -179,7 +179,7 @@ class Events(commands.Cog):
             await message.channel.send(content=member.mention, embed=embed)
             could_dm = False
 
-        embed = discord.Embed(color=discord.Color.red(), title=f'{str(member)} has sent messages that contain links.')
+        embed = discord.Embed(color=discord.Color.red(), title=f'**{str(member)} ({member.mention})** has sent messages that contain links.')
         embed.add_field(name=f"Original message:", value=message.clean_content)
         embed.add_field(name="Links sent:", value=', '.join([f'`{entry}`' for entry in urls]))
         embed.add_field(name="Could DM member:", value=str(could_dm))
@@ -214,7 +214,7 @@ class Events(commands.Cog):
             could_dm = False
         
         e.title = "Member fixed their status."
-        e.description = f'{str(member)} has fixed their status. Their access to the server has been fixed.'
+        e.description = f'**{str(member)} ({member.mention})** has fixed their status. Their access to the server has been fixed.'
         e.add_field(name='Could DM?', value=could_dm)
         await self.bot.send_to_log_channel(embed=e, content=mention_staff(member.guild))
         
