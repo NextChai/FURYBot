@@ -51,9 +51,9 @@ class Events(commands.Cog):
         for index, string in enumerate(self.profanity.CENSOR_WORDSET): 
             if string._original in whitelist:
                 self.profanity.CENSOR_WORDSET.pop(index)
-                
-        self.member_check.start()
+
         self.member_check.before_loop(self.before_loop)
+        self.member_check.start()
         
     async def before_loop(self):
         logging.info("TASK WAIT: Waiting for member_check inside of events.py")
