@@ -1,9 +1,9 @@
 import logging
-from dotenv import dotenv_values
+from dotenv import Dotenv
 
 from bot import Bot
 
-temp = dotenv_values(".env")
+temp = Dotenv(".env")
 
 logging.basicConfig(level=logging.INFO)
 
