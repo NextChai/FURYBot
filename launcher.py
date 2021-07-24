@@ -1,12 +1,13 @@
+import os
 import logging
-from dotenv import Dotenv
+from dotenv import load_dotenv
 
 from bot import Bot
 
-temp = Dotenv(".env")
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 
 if __name__ == "__main__":
     bot = Bot()
-    bot.run(temp["BOT_TOKEN"], reconnect=True)
+    bot.run(os.environ.get("BOT_TOKEN"), reconnect=True)
