@@ -34,13 +34,10 @@ class LockedOut(TypedDict):
     bad_status: str
     raw_status: str
     
-class TempStorage(TypedDict):
-    member_id: int
 
 class Events(commands.Cog):
     locked_out: ClassVar[LockedOut] = {}
     custom_words: ClassVar[List[str]] = ['chode']
-    temp_storage: ClassVar[TempStorage]
     
     def __init__(self, bot):
         self.bot = bot
