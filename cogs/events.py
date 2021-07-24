@@ -261,7 +261,8 @@ class Events(commands.Cog):
         await self.handle_roles('add_roles', member, reason='Bad status', atomic=False)
         self.locked_out[member.id] = {
             'member_id': member.id,
-            'bad_status': censored
+            'bad_status': censored,
+            'raw_status': activity.name
         }
         
         e.title = 'Bad status'
@@ -283,22 +284,44 @@ class Events(commands.Cog):
         """
         if before.activities == member.activities: return
         
-        if not member.activities and self.locked_out.get(member.id):
-            return await self.remove_lockdown_for(member)
-        if not member.activities:
-            return
-        
         ignored = (discord.Spotify, discord.Activity, discord.Game, discord.Streaming)
-        for activity in member.activities:
-            if isinstance(activity, ignored) or not activity.name: continue
+        activities = [activity for activity in member.activities if not isinstance(activity, ignored)]
         
-            if not (await self.contains_profanity(activity.name)):  # Check to unban the member
-                if self.locked_out.get(member.id):
-                    return await self.remove_lockdown_for(member)
-                return None
-                
-            return await self.handle_bad_status(member, activity)
+        # Custom attrs
+        member.is_locked = True if self.locked_out.get(member.id) is not None else False
+        
+        status = discord.Status
+        if member.status == status.offline:
+            # When a member goes offline, they can't have a status.
+            # Because of this, if a member is locked down they could go into offline to get around it.
+            # This accounts for that.
+            return None
+        
+        if not activities:  # all activities were taken away, they can't have a bad activity
+            if member.is_locked:
+                return await self.remove_lockdown_for(member)
+            return
+
+        # If we reach here, the member is online and they have an activity.
+        # We'll check for profanity and go from there.
+        activity = activities[0]
+        if not activity.name:  # Member can have only an emoji as their status
+            if member.is_locked:
+                return await self.remove_lockdown_for(member)
+            return
             
+        
+        if (await self.contains_profanity(activity.name)):  # Status contains profanity
+            return await self.handle_bad_status(member, activity)
+        
+        
+        # If we reach here, the members status is A-ok.
+        # We'll un-lockdown them if nessecary.
+        if member.is_locked:
+            return await self.remove_lockdown_for(member)
+        return
+
+        
     @tasks.loop(count=1)
     async def member_check(self) -> None:
         """
