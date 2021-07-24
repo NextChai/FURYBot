@@ -32,10 +32,15 @@ def mention_staff(guild):
 class LockedOut(TypedDict):
     member_id: int
     bad_status: str
+    raw_status: str
+    
+class TempStorage(TypedDict):
+    member_id: int
 
 class Events(commands.Cog):
     locked_out: ClassVar[LockedOut] = {}
     custom_words: ClassVar[List[str]] = ['chode']
+    temp_storage: ClassVar[TempStorage]
     
     def __init__(self, bot):
         self.bot = bot
@@ -287,8 +292,8 @@ class Events(commands.Cog):
         ignored = (discord.Spotify, discord.Activity, discord.Game, discord.Streaming)
         activities = [activity for activity in member.activities if not isinstance(activity, ignored)]
         
-        # Custom attrs
-        member.is_locked = True if self.locked_out.get(member.id) is not None else False
+        def is_locked():   # This can easily be a var but I want it as a method
+            return True if self.locked_out.get(member.id) is not None else False
         
         status = discord.Status
         if member.status == status.offline:
@@ -298,26 +303,32 @@ class Events(commands.Cog):
             return None
         
         if not activities:  # all activities were taken away, they can't have a bad activity
-            if member.is_locked:
+            if is_locked():
                 return await self.remove_lockdown_for(member)
             return
 
         # If we reach here, the member is online and they have an activity.
         # We'll check for profanity and go from there.
         activity = activities[0]
+        
         if not activity.name:  # Member can have only an emoji as their status
-            if member.is_locked:
+            if is_locked():
                 return await self.remove_lockdown_for(member)
             return
-            
         
-        if (await self.contains_profanity(activity.name)):  # Status contains profanity
+        contains_profanity = await self.contains_profanity(activity.name)
+        
+        if contains_profanity and is_locked():
+            return
+        
+        # The Member was online and did not switch during the before and after
+        # The Member has a status
+        if contains_profanity:  # Status contains profanity
             return await self.handle_bad_status(member, activity)
-        
         
         # If we reach here, the members status is A-ok.
         # We'll un-lockdown them if nessecary.
-        if member.is_locked:
+        if is_locked():
             return await self.remove_lockdown_for(member)
         return
 
