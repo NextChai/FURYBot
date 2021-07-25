@@ -373,8 +373,6 @@ class Events(commands.Cog):
                 return
             
             data = await resp.json()
-            from pprint import pprint
-            pprint(data)
         
         if any((
             float(data['offensive']['prob']),
