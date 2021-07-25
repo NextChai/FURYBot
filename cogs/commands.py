@@ -27,7 +27,7 @@ class Commands(commands.Cog):
         self, 
         ctx: commands.Context
     ) -> discord.Message:
-        embed = discord.Embed(color=discord.Color.blue(), description='')
+        embed = self.bot.Embed(color=discord.Color.blue(), description='')
         
         commits = await self.bot.get_recent_commits()
         for commit in commits:
