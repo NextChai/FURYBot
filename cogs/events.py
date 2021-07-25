@@ -231,7 +231,9 @@ class Events(commands.Cog):
         member: Union[discord.Member, discord.User],
         *,
         reason: Optional[str] = "Bad status",
-        guild: Optional[discord.Guild] = None
+        guild: Optional[discord.Guild] = None,
+        bad_status: Optional[str] =  None,
+        raw_status: Optional[str] = None
     ) -> None:
         logging.info(f"ADDED LOCKDOWN: Lockdown added to {str(member)} for: {reason}")
         
@@ -242,8 +244,8 @@ class Events(commands.Cog):
         
         self.locked_out[member.id] = {
             'member_id': member.id,
-            'bad_status': None,
-            'raw_status': None
+            'bad_status': bad_status,
+            'raw_status': raw_status
         }
         return
     
@@ -272,7 +274,7 @@ class Events(commands.Cog):
         except (discord.HTTPException, discord.Forbidden):
             could_dm = False
             
-        await self.add_lockdown_for(member)
+        await self.add_lockdown_for(member, bad_status=censored, raw_status=activity.name)
         
         e.title = 'Bad status'
         e.description = f'I have detected a bad status on {member.mention}'
