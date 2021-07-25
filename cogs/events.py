@@ -23,7 +23,7 @@ from cogs.utils.constants import (
     FURY_GUILD
 )
 
-NUDITY_FILTER_CONSTANT = 0.3
+NSFW_FILTER_CONSTANT = 0.3
 
 
 class LockedOut(TypedDict):
@@ -37,6 +37,7 @@ def moderator_check(member):
 def mention_staff(guild):
     notisRole = discord.utils.get(guild.roles, id=LOCKDOWN_NOTIFICATIONS_ROLE)
     return notisRole.mention
+
     
 class Events(commands.Cog):
     locked_out: ClassVar[LockedOut] = {}
@@ -65,6 +66,9 @@ class Events(commands.Cog):
     def cog_unload(self):
         if self.member_check.is_running():
             self.member_check.cancel()
+            
+    def is_locked(self, member):   # This can easily be a var but I want it as a method
+        return True if self.locked_out.get(member.id) is not None else False
     
     async def contains_profanity(
         self, 
@@ -90,7 +94,6 @@ class Events(commands.Cog):
         data = await asyncio.gather(*[self.bot.loop.run_in_executor(None, self.extractor.gen_urls, message)])
         return list(data[0]) if data else None
         
-
     @commands.Cog.listener("on_message")
     async def profanity_filter(
         self, 
@@ -203,10 +206,16 @@ class Events(commands.Cog):
     
     async def remove_lockdown_for(
         self, 
-        member: discord.Member
+        member: Union[discord.Member, discord.User],
+        *,
+        guild: Optional[discord.Guild] = None,
+        reason: Optional[str] = 'status'
     ) -> discord.Embed:
+        if isinstance(member, discord.User):
+            member = guild.get_member(member.id) or (await guild.fetch_member(member.id))
+        
         del self.locked_out[member.id]
-        await self.handle_roles('remove_roles', member, reason='Member updated status', atomic=False)
+        await self.handle_roles('remove_roles', member, reason=f'Member fixed {reason}', atomic=False)
         
         e = self.bot.Embed()
         
@@ -219,11 +228,11 @@ class Events(commands.Cog):
             could_dm = False
         
         e.title = "Member fixed their status."
-        e.description = f'**{str(member)} ({member.mention})** has fixed their status. Their access to the server has been fixed.'
+        e.description = f'**{str(member)} ({member.mention})** has fixed their {reason}. Their access to the server has been fixed.'
         e.add_field(name='Could DM?', value=could_dm)
         await self.bot.send_to_log_channel(embed=e, content=mention_staff(member.guild))
         
-        logging.info(f"REMOVED LOCKDOWN: Lockdown removed from {str(member)} after fixing their status.")
+        logging.info(f"REMOVED LOCKDOWN: Lockdown removed from {str(member)} after fixing their {reason}.")
         return e
     
     async def add_lockdown_for(
@@ -298,9 +307,6 @@ class Events(commands.Cog):
         ignored = (discord.Spotify, discord.Activity, discord.Game, discord.Streaming)
         activities = [activity for activity in member.activities if not isinstance(activity, ignored)]
         
-        def is_locked():   # This can easily be a var but I want it as a method
-            return True if self.locked_out.get(member.id) is not None else False
-        
         status = discord.Status
         if member.status == status.offline:
             # When a member goes offline, they can't have a status.
@@ -309,7 +315,7 @@ class Events(commands.Cog):
             return None
         
         if not activities:  # all activities were taken away, they can't have a bad activity
-            if is_locked():
+            if self.is_locked(member):
                 return await self.remove_lockdown_for(member)
             return
 
@@ -318,13 +324,13 @@ class Events(commands.Cog):
         activity = activities[0]
         
         if not activity.name:  # Member can have only an emoji as their status
-            if is_locked():
+            if self.is_locked(member):
                 return await self.remove_lockdown_for(member)
             return
         
         contains_profanity = await self.contains_profanity(activity.name)
         
-        if contains_profanity and is_locked():
+        if contains_profanity and self.is_locked(member):
             return
         
         # The Member was online and did not switch during the before and after
@@ -334,7 +340,7 @@ class Events(commands.Cog):
         
         # If we reach here, the members status is A-ok.
         # We'll un-lockdown them if nessecary.
-        if is_locked():
+        if self.is_locked(member):
             return await self.remove_lockdown_for(member)
         return
     
@@ -370,45 +376,44 @@ class Events(commands.Cog):
             from pprint import pprint
             pprint(data)
         
-        continue_if = True
-        if float(data['nudity']['safe']) < 0.7:  # Asset is NOT safe, has nudity
-            continue_if = False
-        if float(data['alcohol']) > NUDITY_FILTER_CONSTANT and continue_if:  # Asset is not safe, has alcohol
-            continue_if = False
-        if float(data['drugs']) > NUDITY_FILTER_CONSTANT and continue_if:  # Asset is not safe, has drugs
-            continue_if = False
-        if float(data['gore']['prob']) > NUDITY_FILTER_CONSTANT and continue_if:  # Asset is not safe, has gore
-            continue_if = False
-        if float(data['offensive']['prob']) > NUDITY_FILTER_CONSTANT and continue_if:  # Asset is "offensive"
-            continue_if = False
+        if any((
+            float(data['offensive']['prob']),
+            float(data['nudity']['raw']),
+            float(data['gore']['prob']),
+            float(data['alcohol']),
+            float(data['drugs'])
+        )) > NSFW_FILTER_CONSTANT:  # Asset is BAD, handle it.
+            if self.is_locked(user):  # Member is already locked, do nothing.
+                return
         
-        if continue_if is True:  # Asset was fine.    
-            return
+            logging.info(f"MEMBER NSFW: {str(user)} has a NSFW pfp, locking them out.")
             
-        
-        logging.info(f"MEMBER NSFW: {str(user)} has a NSFW pfp, locking them out.")
-        
-        e = self.bot.Embed()
-        e.title = 'NSFW Pfp Detected'
-        e.description = "I've detected your new Pfp to be NSFW. Please change it to be unlocked from FLVS Fury."
-        e.add_field(name='How to get it removed?', value='**Change your Pfp!**')
-        e.add_field(name='Feel this is incorrect?', value='Contact Trevor F. to get it fixed.')
-        try:
-            await user.send(embed=e)
-            could_dm = True
-        except:
-            could_dm = False
-        
-        guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
-        await self.add_lockdown_for(user, reason='Bad PFP, NSFW', guild=guild)
-        
-        e.remove_field(1)
-        e.fields[0].name = 'Could DM?'
-        e.fields[0].value = could_dm
-        e.description = f"I've detected a NSFW pfp on {user.mention}"
-        return await self.bot.send_to_log_channel(embed=e, content=mention_staff())
+            e = self.bot.Embed()
+            e.title = 'NSFW Pfp Detected'
+            e.description = "I've detected your new Pfp to be NSFW. Please change it to be unlocked from FLVS Fury."
+            e.add_field(name='How to get it removed?', value='**Change your Pfp!**')
+            e.add_field(name='Feel this is incorrect?', value='Contact Trevor F. to get it fixed.')
+            try:
+                await user.send(embed=e)
+                could_dm = True
+            except:
+                could_dm = False
             
+            guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
+            await self.add_lockdown_for(user, reason='Bad PFP, NSFW', guild=guild)
+            
+            e.remove_field(1)
+            e.fields[0].name = 'Could DM?'
+            e.fields[0].value = could_dm
+            e.description = f"I've detected a NSFW pfp on {user.mention}"
+            return await self.bot.send_to_log_channel(embed=e, content=mention_staff())
         
+        
+        # If we reach here, the asset is fine.
+        if self.is_locked(user):  # User is locked, remove it.
+            guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
+            await self.remove_lockdown_for(user, guild=guild, reason='pfp')
+         
         
     @tasks.loop(count=1)
     async def member_check(self) -> None:
