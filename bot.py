@@ -182,7 +182,7 @@ class Bot(commands.Bot):
         if isinstance(error, ignored):
             return
 
-        e = self.bot.Embed()
+        e = self.Embed()
 
         if isinstance(error, commands.MissingRequiredArgument):
             e.description = f"{error.param} is a required argument that's missing."
