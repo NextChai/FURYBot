@@ -355,11 +355,8 @@ class Events(commands.Cog):
         If a NSFW pfp is detected they will be locked and moderators will be noticed.
         """
         if before.avatar == user.avatar: 
-            logging.info("USER AVATAR IS THE SAME")
             return
         
-        logging.info(f'MEMBER AVATAR UPDATE')
-
         params = {
             'url': str(user.avatar_url),
             'models': 'nudity,wad,offensive,text-content,gore',
