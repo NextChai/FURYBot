@@ -67,7 +67,10 @@ class Events(commands.Cog):
         if self.member_check.is_running():
             self.member_check.cancel()
             
-    def is_locked(self, member):   # This can easily be a var but I want it as a method
+    def is_locked(
+        self, 
+        member: Union[discord.Member, discord.User]
+    ) -> bool:   # This can easily be a var but I want it as a method
         return True if self.locked_out.get(member.id) is not None else False
     
     async def contains_profanity(
