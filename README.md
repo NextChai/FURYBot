@@ -3,6 +3,15 @@ The Discord Bot for the FLVS Fury School Discord. The FURY bot allows works to l
 
 Unfortunately, I am including the list of profanity based words in the repo. This is strictly for educational purposes, and is not something that should be used to be abused.
 
+# Features
+Auto moderation of members who:
+
+- Have a bad status,
+- have a NSFW pfp,
+- or post links.
+
+
+
 
 # Credit
 - [Source](https://github.com/NextChai/FURYBot/blob/main/cogs/commands.py#L26-L64) command, and [Message Auto Blocking](https://github.com/NextChai/FURYBot/blob/main/bot.py#L72-L135) used from [Robo Danny](https://github.com/Rapptz/RoboDanny/)
