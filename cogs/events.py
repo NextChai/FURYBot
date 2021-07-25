@@ -396,9 +396,9 @@ class Events(commands.Cog):
             guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
             await self.add_lockdown_for(user, reason='Bad PFP, NSFW', guild=guild)
             
-            e.remove_field(1)
             e.fields[0].name = 'Could DM?'
             e.fields[0].value = could_dm
+            e.remove_field(1)
             e.description = f"I've detected a NSFW pfp on {user.mention}"
             return await self.bot.send_to_log_channel(embed=e, content=mention_staff())
         
