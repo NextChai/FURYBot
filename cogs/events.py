@@ -12,7 +12,8 @@ from typing import (
     Union, 
     List, 
     ClassVar, 
-    TypedDict
+    TypedDict,
+    Optional
 )
 
 from cogs.utils.constants import (
@@ -22,19 +23,21 @@ from cogs.utils.constants import (
     FURY_GUILD
 )
 
+NUDITY_FILTER_CONSTANT = 0.3
+
+
+class LockedOut(TypedDict):
+    member_id: int
+    bad_status: str
+    raw_status: str
+
 def moderator_check(member): 
     return True if BYPASS_FURY in [role.id for role in member.roles] else False
 
 def mention_staff(guild):
     notisRole = discord.utils.get(guild.roles, id=LOCKDOWN_NOTIFICATIONS_ROLE)
     return notisRole.mention
-
-class LockedOut(TypedDict):
-    member_id: int
-    bad_status: str
-    raw_status: str
     
-
 class Events(commands.Cog):
     locked_out: ClassVar[LockedOut] = {}
     custom_words: ClassVar[List[str]] = ['chode']
@@ -223,7 +226,32 @@ class Events(commands.Cog):
         logging.info(f"REMOVED LOCKDOWN: Lockdown removed from {str(member)} after fixing their status.")
         return e
     
-    async def handle_bad_status(self, member: discord.Member, activity: discord.CustomActivity) -> discord.Message:
+    async def add_lockdown_for(
+        self,
+        member: Union[discord.Member, discord.User],
+        *,
+        reason: Optional[str] = "Bad status",
+        guild: Optional[discord.Guild] = None
+    ) -> None:
+        logging.info(f"ADDED LOCKDOWN: Lockdown added to {str(member)} for: {reason}")
+        
+        if isinstance(member, discord.User):
+            member = guild.get_member(member.id) or (await guild.fetch_member(member.id))
+        
+        await self.handle_roles('add_roles', member, reason=reason, atomic=False)
+        
+        self.locked_out[member.id] = {
+            'member_id': member.id,
+            'bad_status': None,
+            'raw_status': None
+        }
+        return
+    
+    async def handle_bad_status(
+        self, 
+        member: discord.Member, 
+        activity: discord.CustomActivity
+    ) -> discord.Message:
         censored = await self.censor(activity.name)
         
         e = self.bot.Embed()  
@@ -243,15 +271,8 @@ class Events(commands.Cog):
             could_dm = True
         except (discord.HTTPException, discord.Forbidden):
             could_dm = False
-        
-        logging.info(f"ADDED LOCKDOWN: Lockdown added to {str(member)} for having a bad status.")
-        
-        await self.handle_roles('add_roles', member, reason='Bad status', atomic=False)
-        self.locked_out[member.id] = {
-            'member_id': member.id,
-            'bad_status': censored,
-            'raw_status': activity.name
-        }
+            
+        await self.add_lockdown_for(member)
         
         e.title = 'Bad status'
         e.description = f'I have detected a bad status on {member.mention}'
@@ -314,7 +335,78 @@ class Events(commands.Cog):
         if is_locked():
             return await self.remove_lockdown_for(member)
         return
+    
+    @commands.Cog.listener('on_user_update')
+    async def nsfw_pfp_checker(
+        self,
+        before: discord.User,
+        user: discord.User
+    ) -> Union[None, discord.Message]:
+        """
+        Looks for Nudity and NSFW within a users' pfp. 
+        If a NSFW pfp is detected they will be locked and moderators will be noticed.
+        """
+        if before.avatar == user.avatar: 
+            logging.info("USER AVATAR IS THE SAME")
+            return
+        
+        logging.info(f'MEMBER AVATAR UPDATE')
 
+        params = {
+            'url': str(user.avatar_url),
+            'models': 'nudity,wad,offensive,text-content,gore',
+            'api_user': '35525582',
+            'api_secret': self.bot.nsfwAPI
+        }
+        
+        async with self.bot.session.get('https://api.sightengine.com/1.0/check.json', params=params) as resp:
+            if resp.status != 200:
+                logging.info("STATUS IS NOT 200.")
+                return
+            
+            data = await resp.json()
+            from pprint import pprint
+            pprint(data)
+        
+        continue_if = True
+        if float(data['nudity']['safe']) < 0.7:  # Asset is NOT safe, has nudity
+            continue_if = False
+        if float(data['alcohol']) > NUDITY_FILTER_CONSTANT and continue_if:  # Asset is not safe, has alcohol
+            continue_if = False
+        if float(data['drugs']) > NUDITY_FILTER_CONSTANT and continue_if:  # Asset is not safe, has drugs
+            continue_if = False
+        if float(data['gore']['prob']) > NUDITY_FILTER_CONSTANT and continue_if:  # Asset is not safe, has gore
+            continue_if = False
+        if float(data['offensive']['prob']) > NUDITY_FILTER_CONSTANT and continue_if:  # Asset is "offensive"
+            continue_if = False
+        
+        if continue_if is True:  # Asset was fine.    
+            return
+            
+        
+        logging.info(f"MEMBER NSFW: {str(user)} has a NSFW pfp, locking them out.")
+        
+        e = self.bot.Embed()
+        e.title = 'NSFW Pfp Detected'
+        e.description = "I've detected your new Pfp to be NSFW. Please change it to be unlocked from FLVS Fury."
+        e.add_field(name='How to get it removed?', value='**Change your Pfp!**')
+        e.add_field(name='Feel this is incorrect?', value='Contact Trevor F. to get it fixed.')
+        try:
+            await user.send(embed=e)
+            could_dm = True
+        except:
+            could_dm = False
+        
+        guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
+        await self.add_lockdown_for(user, reason='Bad PFP, NSFW', guild=guild)
+        
+        e.remove_field(1)
+        e.fields[0].name = 'Could DM?'
+        e.fields[0].value = could_dm
+        e.description = f"I've detected a NSFW pfp on {user.mention}"
+        return await self.bot.send_to_log_channel(embed=e, content=mention_staff())
+            
+        
         
     @tasks.loop(count=1)
     async def member_check(self) -> None:

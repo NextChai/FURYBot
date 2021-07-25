@@ -2,6 +2,7 @@ import os
 import logging
 import datetime
 import traceback
+import aiohttp
 from collections import Counter
 
 import discord
@@ -54,6 +55,7 @@ class Bot(commands.Bot):
         self.command_errors = {}
         
         self.Embed = Embed
+        self.session = aiohttp.ClientSession()
         
         # Status stuff so I can easily change it
         self.ACTIVITY_MESSAGE = 'over the server.'
