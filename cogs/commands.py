@@ -39,6 +39,7 @@ class Commands(commands.Cog):
     async def source(
         self, 
         ctx: commands.Context, 
+        *,
         command: Optional[str] = None
     ) -> discord.Message:
         """
