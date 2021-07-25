@@ -368,7 +368,6 @@ class Events(commands.Cog):
             if resp.status != 200:
                 logging.info("STATUS IS NOT 200.")
                 return
-            
             data = await resp.json()
         
         if any((
