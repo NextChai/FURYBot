@@ -158,7 +158,7 @@ class Events(commands.Cog):
             'raw_status': raw_status
         }
     
-        logging.info(f"ADDED LOCKDOWN: Lockdown added to {str(member)} for: {reason}")
+        logging.warning(f"ADDED LOCKDOWN: Lockdown added to {str(member)} for: {reason}")
         return
     
     async def handle_bad_status(
@@ -192,7 +192,7 @@ class Events(commands.Cog):
         e.description = f'I have detected a bad status on {member.mention}'
         e.add_field(name='Could DM?', value=could_dm)
         
-        logging.info(f"BAD STATUS: Bad status detected on {str(member)}")
+        logging.warning(f"BAD STATUS: Bad status detected on {str(member)}")
         return await self.bot.send_to_log_channel(embed=e, content=mention_staff(member.guild))
     
     async def handle_bad_name(
@@ -226,7 +226,7 @@ class Events(commands.Cog):
         else:
             guild = user.guild
             
-        logging.info(f"BAD NAME: {str(user)} has a name that contains profanity.")
+        logging.warning(f"BAD NAME: {str(user)} has a name that contains profanity.")
         
         await self.add_lockdown_for(user, reason='Invalid name', guild=guild, bad_status=censored, raw_status=user.name)
         await self.bot.send_to_log_channel(content=mention_staff(guild), embed=modEmbed)
@@ -490,17 +490,13 @@ class Events(commands.Cog):
         
         This could easily not be a func, but I didn't want to invade on the member_check func too much.
         """
-        logging.info(f"LOOKING FOR BAD NAME in {member.name}")
         
         is_locked = self.is_locked(member)
         contains_profanity = await self.contains_profanity(member.name)
-        logging.info(f"CONTAINS PROANITY: {contains_profanity}")
         
         if contains_profanity:
-            logging.info("BAD NAME FOUND.")
             if is_locked:  # Member was already flagged, do nothing.
                 return
-            logging.info("HANDLING BAD NAME.")
             return await self.handle_bad_name(member)
         
         # User name is fine
@@ -516,8 +512,6 @@ class Events(commands.Cog):
         
         ignored = (discord.Spotify, discord.Activity, discord.Game, discord.Streaming)
         async for member in guild.fetch_members(limit=None):
-            logging.info(f"MEMBER CHECK: Checking for member {str(member)}")
-            
             # Member check for bad name before anything else
             await self.check_for_bad_name(member)
             
