@@ -41,7 +41,7 @@ def mention_staff(guild):
     
 class Events(commands.Cog):
     locked_out: ClassVar[LockedOut] = {}
-    custom_words: ClassVar[List[str]] = ['chode', 'dick']
+    custom_words: ClassVar[List[str]] = ['chode', 'dick', 'dickandmorty']
     
     def __init__(self, bot):
         self.bot = bot
@@ -244,7 +244,7 @@ class Events(commands.Cog):
         if not await self.contains_profanity(message.clean_content.lower()):  # the member said something fine
             return 
         
-        logging.info(f"PROFANITY FOUND: Profanity found from {str(message.author)}")
+        logging.warning(f"PROFANITY FOUND: Profanity found from {str(message.author)}")
         
         await message.delete()
 
@@ -417,7 +417,7 @@ class Events(commands.Cog):
         
         async with self.bot.session.get('https://api.sightengine.com/1.0/check.json', params=params) as resp:
             if resp.status != 200:
-                logging.info("STATUS IS NOT 200.")
+                logging.warning("STATUS: Api request status not 200.")
                 return
             data = await resp.json()
         
@@ -431,7 +431,7 @@ class Events(commands.Cog):
             if self.is_locked(user):  # Member is already locked, do nothing.
                 return
         
-            logging.info(f"MEMBER NSFW: {str(user)} has a NSFW pfp, locking them out.")
+            logging.warning(f"MEMBER NSFW: {str(user)} has a NSFW pfp, locking them out.")
             
             e = self.bot.Embed()
             e.title = 'NSFW Pfp Detected'
