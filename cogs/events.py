@@ -332,7 +332,10 @@ class Events(commands.Cog):
             await message.channel.send(content=member.mention, embed=embed)
             could_dm = False
 
-        embed = self.bot.Embed(color=discord.Color.red(), title=f'**{str(member)} ({member.mention})** has sent messages that contain links.')
+        embed = self.bot.Embed(
+            color=discord.Color.red(), 
+            description=f'**{str(member)} ({member.mention})** has sent messages that contain links.',
+            title='Links detected')
         embed.add_field(name=f"Original message:", value=message.clean_content)
         embed.add_field(name="Links sent:", value=', '.join([f'`{entry}`' for entry in urls]))
         embed.add_field(name="Could DM member:", value=str(could_dm))
