@@ -246,7 +246,7 @@ class Events(commands.Cog):
         
         logging.info(f"PROFANITY FOUND: Profanity found from {str(message.author)}")
         
-        await message.delete(reason='Profanity found')
+        await message.delete()
 
         e = self.bot.Embed(
             title="Noo!",
