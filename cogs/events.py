@@ -215,9 +215,11 @@ class Events(commands.Cog):
         except (discord.HTTPException, discord.Forbidden):
             could_dm = False
         
-        e.fields[2].name = 'Could DM?'
-        e.fields[2].value = could_dm
-        e.description = f"{str(user)}'s name contains profanity. I've locked them out from the server."
+        modEmbed = self.bot.Embed(
+            title="Profanity Name",
+            description=f"{str(user)}'s {(user.mention)} name contains profanity. I've locked them out from the server."
+        )
+        modEmbed.add_field(name='Could DM', value=could_dm)
         
         if isinstance(user, discord.User):
             guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
@@ -227,7 +229,7 @@ class Events(commands.Cog):
         logging.info(f"BAD NAME: {str(user)} has a name that contains profanity.")
         
         await self.add_lockdown_for(user, reason='Invalid name', guild=guild, bad_status=censored, raw_status=user.name)
-        await self.bot.send_to_log_channel(content=mention_staff(guild), embed=e)
+        await self.bot.send_to_log_channel(content=mention_staff(guild), embed=modEmbed)
         
     @commands.Cog.listener("on_message")
     async def profanity_filter(
