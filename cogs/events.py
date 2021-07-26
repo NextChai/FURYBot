@@ -223,6 +223,8 @@ class Events(commands.Cog):
             guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
         else:
             guild = user.guild
+            
+        logging.info(f"BAD NAME: {str(user)} has a name that contains profanity.")
         
         await self.add_lockdown_for(user, reason='Invalid name', guild=guild, bad_status=censored, raw_status=user.name)
         await self.bot.send_to_log_channel(content=mention_staff(), embed=e)
