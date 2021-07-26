@@ -504,6 +504,9 @@ class Events(commands.Cog):
         async for member in guild.fetch_members(limit=None):
             logging.info(f"MEMBER CHECK: Checking for member {str(member)}")
             
+            # Member check for bad name before anything else
+            await self.check_for_bad_name(member)
+            
             activity = [activity for activity in member.activities if not isinstance(activity, ignored)]
             if not activity:
                 continue
@@ -512,9 +515,6 @@ class Events(commands.Cog):
             if not (await self.contains_profanity(activity.name)): continue
             
             await self.handle_bad_status(member, activity)
-            
-            # Member check for bad name
-            await self.check_for_bad_name(member)
     
     @member_check.before_loop   
     async def before_loop(self):
