@@ -217,7 +217,7 @@ class Events(commands.Cog):
         
         e.fields[2].name = 'Could DM?'
         e.fields[2].value = could_dm
-        e.description=f"{str(user)}'s name contains profanity. I've locked them out from the server."
+        e.description = f"{str(user)}'s name contains profanity. I've locked them out from the server."
         
         if isinstance(user, discord.User):
             guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
@@ -483,10 +483,13 @@ class Events(commands.Cog):
         
         This could easily not be a func, but I didn't want to invade on the member_check func too much.
         """
+        logging.info(f"LOOKING FOR BAD NAME in {member.name}")
         is_locked = self.is_locked(member)
         if await self.contains_profanity(member.name):
+            logging.info("BAD NAME FOUND.")
             if is_locked:  # Member was already flagged, do nothing.
                 return
+            logging.info("HANDLING BAD NAME.")
             return await self.handle_bad_name(member)
         
         # User name is fine
