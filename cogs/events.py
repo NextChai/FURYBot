@@ -502,6 +502,8 @@ class Events(commands.Cog):
         
         ignored = (discord.Spotify, discord.Activity, discord.Game, discord.Streaming)
         async for member in guild.fetch_members(limit=None):
+            logging.info(f"MEMBER CHECK: Checking for member {str(member)}")
+            
             activity = [activity for activity in member.activities if not isinstance(activity, ignored)]
             if not activity:
                 continue
