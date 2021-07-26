@@ -244,6 +244,8 @@ class Events(commands.Cog):
         if not await self.contains_profanity(message.clean_content.lower()):  # the member said something fine
             return 
         
+        logging.info(f"PROFANITY FOUND: Profanity found from {str(message.author)}")
+        
         await message.delete(reason='Profanity found')
 
         e = self.bot.Embed(
