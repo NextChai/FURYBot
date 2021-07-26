@@ -227,7 +227,7 @@ class Events(commands.Cog):
         logging.info(f"BAD NAME: {str(user)} has a name that contains profanity.")
         
         await self.add_lockdown_for(user, reason='Invalid name', guild=guild, bad_status=censored, raw_status=user.name)
-        await self.bot.send_to_log_channel(content=mention_staff(), embed=e)
+        await self.bot.send_to_log_channel(content=mention_staff(guild), embed=e)
         
     @commands.Cog.listener("on_message")
     async def profanity_filter(
