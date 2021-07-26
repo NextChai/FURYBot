@@ -41,7 +41,7 @@ def mention_staff(guild):
     
 class Events(commands.Cog):
     locked_out: ClassVar[LockedOut] = {}
-    custom_words: ClassVar[List[str]] = ['chode']
+    custom_words: ClassVar[List[str]] = ['chode', 'dick']
     
     def __init__(self, bot):
         self.bot = bot
