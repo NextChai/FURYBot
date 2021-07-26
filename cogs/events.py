@@ -70,7 +70,7 @@ class Events(commands.Cog):
     def is_locked(
         self, 
         member: Union[discord.Member, discord.User]
-    ) -> bool:   # This can easily be a var but I want it as a method
+    ) -> bool: 
         return True if self.locked_out.get(member.id) is not None else False
     
     async def contains_profanity(
@@ -96,6 +96,136 @@ class Events(commands.Cog):
         """Check if a message has link"""
         data = await asyncio.gather(*[self.bot.loop.run_in_executor(None, self.extractor.gen_urls, message)])
         return list(data[0]) if data else None
+    
+    async def handle_roles(
+        self, 
+        operation: str,
+        member: discord.Member, 
+        reason: Optional[str] = None, 
+        atomic: Optional[bool] = False
+    ) -> None:
+        attr = getattr(member, operation)
+        role = discord.utils.get(member.guild.roles, name='Lockdown')
+        return await attr(*[role], reason=reason, atomic=atomic)
+    
+    async def remove_lockdown_for(
+        self, 
+        member: Union[discord.Member, discord.User],
+        *,
+        guild: Optional[discord.Guild] = None,
+        reason: Optional[str] = 'status'
+    ) -> discord.Embed:
+        if isinstance(member, discord.User):
+            member = guild.get_member(member.id) or (await guild.fetch_member(member.id))
+        
+        del self.locked_out[member.id]
+        await self.handle_roles('remove_roles', member, reason=f'Member fixed {reason}', atomic=False)
+        
+        e = self.bot.Embed()
+        
+        e.title = 'Thank you.'
+        e.description = 'Your lockdown role was removed.'
+        try:
+            await member.send(embed=e)
+            could_dm = True
+        except (discord.Forbidden, discord.HTTPException):
+            could_dm = False
+        
+        e.title = "Member fixed their status."
+        e.description = f'**{str(member)} ({member.mention})** has fixed their {reason}. Their access to the server has been fixed.'
+        e.add_field(name='Could DM?', value=could_dm)
+        await self.bot.send_to_log_channel(embed=e, content=mention_staff(member.guild))
+        
+        logging.info(f"REMOVED LOCKDOWN: Lockdown removed from {str(member)} after fixing their {reason}.")
+        return e
+    
+    async def add_lockdown_for(
+        self,
+        member: Union[discord.Member, discord.User],
+        *,
+        reason: Optional[str] = "Bad status",
+        guild: Optional[discord.Guild] = None,
+        bad_status: Optional[str] =  None,
+        raw_status: Optional[str] = None
+    ) -> None:
+        if isinstance(member, discord.User):
+            member = guild.get_member(member.id) or (await guild.fetch_member(member.id))
+        
+        await self.handle_roles('add_roles', member, reason=reason, atomic=False)
+        self.locked_out[member.id] = {
+            'member_id': member.id,
+            'bad_status': bad_status,
+            'raw_status': raw_status
+        }
+    
+        logging.info(f"ADDED LOCKDOWN: Lockdown added to {str(member)} for: {reason}")
+        return
+    
+    async def handle_bad_status(
+        self, 
+        member: discord.Member, 
+        activity: discord.CustomActivity
+    ) -> discord.Message:
+        censored = await self.censor(activity.name)
+        
+        e = self.bot.Embed()  
+        e.title = "Noo!"
+        e.description = 'Your status can not contain profanity! I have revoked your access to the server.\n\nFeel this is incorrect? Contact Trevor F.!'
+        e.add_field(name='Original activity:', value=activity.name)
+        e.add_field(name='Censored', value=censored)
+        
+        whatToDo = self.bot.Embed(
+            title='How to get access back?',
+            description='View how to get your access back.'
+        )
+        whatToDo.add_field(name='Change your status!', value="After you've changed your status I will give you your server perms back again.")
+        try:
+            await member.send(embed=e)
+            await member.send(embed=whatToDo)
+            could_dm = True
+        except (discord.HTTPException, discord.Forbidden):
+            could_dm = False
+            
+        await self.add_lockdown_for(member, bad_status=censored, raw_status=activity.name)
+        
+        e.title = 'Bad status'
+        e.description = f'I have detected a bad status on {member.mention}'
+        e.add_field(name='Could DM?', value=could_dm)
+        
+        logging.info(f"BAD STATUS: Bad status detected on {str(member)}")
+        return await self.bot.send_to_log_channel(embed=e, content=mention_staff(member.guild))
+    
+    async def handle_bad_name(
+        self, 
+        user: Union[discord.Member, discord.User]
+    ) -> None:
+        censored = await self.censor(user.name)
+        
+        e = self.bot.Embed(
+            title='Noo!',
+            description='Your new name can not contain bad words.\n\n**Because of this I am locking you out of FLVS Fury. To get unlocked change your name to be PG.**'
+        )
+        e.add_field(name='Name', value=user.name)
+        e.add_field(name='Censored', value=censored)
+        e.add_field(name='How to get it removed?', value='**Change your Name!**')
+        
+        try:
+            await user.send(embed=e)
+            could_dm = True
+        except (discord.HTTPException, discord.Forbidden):
+            could_dm = False
+        
+        e.fields[2].name = 'Could DM?'
+        e.fields[2].value = could_dm
+        e.description=f"{str(user)}'s name contains profanity. I've locked them out from the server."
+        
+        if isinstance(user, discord.User):
+            guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
+        else:
+            guild = user.guild
+        
+        await self.add_lockdown_for(user, reason='Invalid name', guild=guild, bad_status=censored, raw_status=user.name)
+        await self.bot.send_to_log_channel(content=mention_staff(), embed=e)
         
     @commands.Cog.listener("on_message")
     async def profanity_filter(
@@ -157,19 +287,27 @@ class Events(commands.Cog):
             r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',
             message.clean_content.replace(" ", '')
         )
-        if not urls:  # no urls in message, run a second check
+        if not urls: # No urls within the user's message, do nothing.
             return
 
-        if message.channel.id not in VALID_GIF_CHANNELS:  # the user isn't allowed to post links in not main chats
+        if message.channel.id not in VALID_GIF_CHANNELS:  # The user posted a link in a non-valid channel
             await message.delete()
         else:
-            check = [url for url in urls if re.findall('gifyourgame', url)]  # check for gif your game
-            if not check:  # no gif your game messages
+            # The user posted a link, but we need to check if it's in a valid channel, and
+            # if the link is a valid link.
+            
+            check = [url for url in urls if re.findall('gifyourgame', url)]  # check for gif your game links
+            if not check:  # no gif your game links were sent
                 await message.delete()
-            else:  # all links are gif your game
-                if message.channel.id not in VALID_GIF_CHANNELS:  # channel is not valid
+            elif len(check) != len(urls):  # The user sent a non-valid link alongside a gif your game link, delete it.
+                await message.delete()
+            else:  
+                # We can confirm that all links sent in the users message has gifyourgame in it. 
+                # Now we'll check if the channel is valid.
+                if message.channel.id not in VALID_GIF_CHANNELS: # The channel is valid, delete message.
                     await message.delete()
-                else:
+                else: 
+                    # Everything is ok, do nothing.
                     return
 
         embed = self.bot.Embed(
@@ -190,108 +328,11 @@ class Events(commands.Cog):
             await message.channel.send(content=member.mention, embed=embed)
             could_dm = False
 
-        embed = discord.Embed(color=discord.Color.red(), title=f'**{str(member)} ({member.mention})** has sent messages that contain links.')
+        embed = self.bot.Embed(color=discord.Color.red(), title=f'**{str(member)} ({member.mention})** has sent messages that contain links.')
         embed.add_field(name=f"Original message:", value=message.clean_content)
         embed.add_field(name="Links sent:", value=', '.join([f'`{entry}`' for entry in urls]))
         embed.add_field(name="Could DM member:", value=str(could_dm))
         return await self.bot.send_to_log_channel(embed=embed)
-    
-    async def handle_roles(
-        self, 
-        operation: str,
-        member: discord.Member, 
-        reason: str = None, 
-        atomic: bool = False
-    ) -> None:
-        attr = getattr(member, operation)
-        role = discord.utils.get(member.guild.roles, name='Lockdown')
-        return await attr(*[role], reason=reason, atomic=atomic)
-    
-    async def remove_lockdown_for(
-        self, 
-        member: Union[discord.Member, discord.User],
-        *,
-        guild: Optional[discord.Guild] = None,
-        reason: Optional[str] = 'status'
-    ) -> discord.Embed:
-        if isinstance(member, discord.User):
-            member = guild.get_member(member.id) or (await guild.fetch_member(member.id))
-        
-        del self.locked_out[member.id]
-        await self.handle_roles('remove_roles', member, reason=f'Member fixed {reason}', atomic=False)
-        
-        e = self.bot.Embed()
-        
-        e.title = 'Thank you.'
-        e.description = 'Your lockdown role was removed.'
-        try:
-            await member.send(embed=e)
-            could_dm = True
-        except (discord.Forbidden, discord.HTTPException):
-            could_dm = False
-        
-        e.title = "Member fixed their status."
-        e.description = f'**{str(member)} ({member.mention})** has fixed their {reason}. Their access to the server has been fixed.'
-        e.add_field(name='Could DM?', value=could_dm)
-        await self.bot.send_to_log_channel(embed=e, content=mention_staff(member.guild))
-        
-        logging.info(f"REMOVED LOCKDOWN: Lockdown removed from {str(member)} after fixing their {reason}.")
-        return e
-    
-    async def add_lockdown_for(
-        self,
-        member: Union[discord.Member, discord.User],
-        *,
-        reason: Optional[str] = "Bad status",
-        guild: Optional[discord.Guild] = None,
-        bad_status: Optional[str] =  None,
-        raw_status: Optional[str] = None
-    ) -> None:
-        logging.info(f"ADDED LOCKDOWN: Lockdown added to {str(member)} for: {reason}")
-        
-        if isinstance(member, discord.User):
-            member = guild.get_member(member.id) or (await guild.fetch_member(member.id))
-        
-        await self.handle_roles('add_roles', member, reason=reason, atomic=False)
-        
-        self.locked_out[member.id] = {
-            'member_id': member.id,
-            'bad_status': bad_status,
-            'raw_status': raw_status
-        }
-        return
-    
-    async def handle_bad_status(
-        self, 
-        member: discord.Member, 
-        activity: discord.CustomActivity
-    ) -> discord.Message:
-        censored = await self.censor(activity.name)
-        
-        e = self.bot.Embed()  
-        e.title = "Noo!"
-        e.description = 'Your status can not contain profanity! I have revoked your access to the server.\n\nFeel this is incorrect? Contact Trevor F.!'
-        e.add_field(name='Original activity:', value=activity.name)
-        e.add_field(name='Censored', value=censored)
-        
-        whatToDo = self.bot.Embed(
-            title='How to get access back?',
-            description='View how to get your access back.'
-        )
-        whatToDo.add_field(name='Change your status!', value="After you've changed your status I will give you your server perms back again.")
-        try:
-            await member.send(embed=e)
-            await member.send(embed=whatToDo)
-            could_dm = True
-        except (discord.HTTPException, discord.Forbidden):
-            could_dm = False
-            
-        await self.add_lockdown_for(member, bad_status=censored, raw_status=activity.name)
-        
-        e.title = 'Bad status'
-        e.description = f'I have detected a bad status on {member.mention}'
-        e.add_field(name='Could DM?', value=could_dm)
-        return await self.bot.send_to_log_channel(embed=e, content=mention_staff(member.guild))
     
     @commands.Cog.listener('on_member_update')
     async def status_checker(
@@ -300,7 +341,7 @@ class Events(commands.Cog):
         member: discord.Member
     ) -> Union[discord.Message, discord.Embed, None]:
         """
-        Check users status' as they update. 
+        Check users status as they update. 
         
         If a status is not "PG", they will be locked down and the staff will be alerted. Once the status is cleared,
         their access to the server will be fixed.
@@ -393,7 +434,7 @@ class Events(commands.Cog):
             try:
                 await user.send(embed=e)
                 could_dm = True
-            except:
+            except (discord.HTTPException, discord.Forbidden):
                 could_dm = False
             
             guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
@@ -410,23 +451,66 @@ class Events(commands.Cog):
         if self.is_locked(user):  # User is locked, remove it.
             guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
             await self.remove_lockdown_for(user, guild=guild, reason='pfp')
-         
+            
+    @commands.Cog.listener('on_user_update')
+    async def nsfw_name_checker(
+        self,
+        before: discord.User,
+        user: discord.User
+    ) -> Union[None, discord.Message]:
+        """
+        When a user updates their name check for it containing NSFW. If it contains NSFW Lock the user out.
+        """
+        if before.name == user.name: return
+        
+        if not await self.contains_profanity(user.name):  # username is fine.
+            if self.is_locked(user):
+                guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
+                await self.remove_lockdown_for(user, guild=guild, reason='Member fixed their name.')
+            return
+        
+        return await self.handle_bad_name(user)
+    
+    async def check_for_bad_name(
+        self, 
+        member: discord.Member
+    ) -> None:
+        """
+        Check for NSFW name on a member. 
+        If one is detected then we'll lock them out and alert the user.
+        
+        This could easily not be a func, but I didn't want to invade on the member_check func too much.
+        """
+        is_locked = self.is_locked(member)
+        if self.contains_profanity(member.name):
+            if is_locked:  # Member was already flagged, do nothing.
+                return
+            return await self.handle_bad_name(member)
+        
+        # User name is fine
+        if is_locked:
+            await self.remove_lockdown_for(member)
         
     @tasks.loop(count=1)
     async def member_check(self) -> None:
         """
-        Check for bad status' upon loading. If the status is bad,
+        Check for bad status upon loading. If the status is bad, lock them out.
         """
         guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
         
         ignored = (discord.Spotify, discord.Activity, discord.Game, discord.Streaming)
         async for member in guild.fetch_members(limit=None):
-            for activity in member.activities:
-                if isinstance(activity, ignored) or not activity.name: continue  # ONE LINER WOOO
-                if not (await self.contains_profanity(activity.name)): continue
-                
-                logging.info(f"BAD STATUS: Bad status detected on {str(member)}")
-                await self.handle_bad_status(member, activity)
+            activity = [activity for activity in member.activities if not isinstance(activity, ignored)]
+            if not activity:
+                continue
+            
+            activity = activity[0]
+            if not (await self.contains_profanity(activity.name)): continue
+            
+            await self.handle_bad_status(member, activity)
+            
+            # Member check for bad name
+            await self.check_for_bad_name(member)
     
     @member_check.before_loop   
     async def before_loop(self):
