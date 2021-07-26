@@ -25,11 +25,14 @@ from cogs.utils.constants import (
 
 NSFW_FILTER_CONSTANT = 0.3
 
-
 class LockedOut(TypedDict):
     member_id: int
     bad_status: str
     raw_status: str
+    
+
+class NotLocked(Exception):
+    ...
 
 def moderator_check(member): 
     return True if BYPASS_FURY in [role.id for role in member.roles] else False
@@ -118,7 +121,11 @@ class Events(commands.Cog):
         if isinstance(member, discord.User):
             member = guild.get_member(member.id) or (await guild.fetch_member(member.id))
         
-        del self.locked_out[member.id]
+        try:
+            del self.locked_out[member.id]
+        except KeyError:
+            raise NotLocked(f'{member.mention} is not locked, can not unlock them')
+        
         await self.handle_roles('remove_roles', member, reason=f'Member fixed {reason}', atomic=False)
         
         e = self.bot.Embed()
