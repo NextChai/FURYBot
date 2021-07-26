@@ -484,8 +484,12 @@ class Events(commands.Cog):
         This could easily not be a func, but I didn't want to invade on the member_check func too much.
         """
         logging.info(f"LOOKING FOR BAD NAME in {member.name}")
+        
         is_locked = self.is_locked(member)
-        if await self.contains_profanity(member.name):
+        contains_profanity = await self.contains_profanity(member.name)
+        logging.info(f"CONTAINS PROANITY: {contains_profanity}")
+        
+        if contains_profanity:
             logging.info("BAD NAME FOUND.")
             if is_locked:  # Member was already flagged, do nothing.
                 return
