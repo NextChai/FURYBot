@@ -24,6 +24,7 @@ from cogs.utils.constants import (
     LOCKDOWN_NOTIFICATIONS_ROLE,
     FURY_GUILD
 )
+from cogs.utils.errors import NotLocked, AlreadyExtra
 
 NSFW_FILTER_CONSTANT = 0.3
 
@@ -40,12 +41,6 @@ class LockedOutInner(TypedDict):
     
 class LockedOut(TypedDict):
     member_id: LockedOutInner
-     
-class NotLocked(Exception):
-    pass
-
-class AlreadyExtra(Exception):
-    pass
 
 def moderator_check(member): 
     return True if BYPASS_FURY in [role.id for role in member.roles] else False
