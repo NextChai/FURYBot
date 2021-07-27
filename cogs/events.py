@@ -141,6 +141,15 @@ class Events(commands.Cog):
             return True
         return False
     
+    def increment_extra_if_necessary_for(
+        self,
+        member: Union[discord.Member, discord.User],
+        reason: Reasons
+    ) -> None:
+        data = self.locked_out[member.id]['extra']
+        if reason not in data:
+            self.locked_out[member.id]['extra'].append(reason)
+    
     async def handle_roles(
         self, 
         operation: str,
@@ -236,7 +245,7 @@ class Events(commands.Cog):
             member = guild.get_member(member.id) or (await guild.fetch_member(member.id))
         
         if self.is_locked(member):  # Member is already locked, increment their data.
-            return await self.increment_extra_if_necessary_for(member, reason)
+            return self.increment_extra_if_necessary_for(member, reason)
         
         # Member is not locked if we get here.
         await self.add_lockdown_for(
@@ -262,15 +271,6 @@ class Events(commands.Cog):
                 await self.remove_lockdown_for(member, reason=raw_reason)
             else:  # Member is locked for more then one reason, we need to remove this specific one.
                 self.locked_out[member.id]['extra'].remove(reason)  # remove the reason
-                
-    async def increment_extra_if_necessary_for(
-        self,
-        member: Union[discord.Member, discord.User],
-        reason: Reasons
-    ) -> None:
-        data = self.locked_out[member.id]['extra']
-        if reason not in data:
-            self.locked_out[member.id]['extra'].append(reason)
                 
     async def handle_bad_status(
         self, 
@@ -512,7 +512,7 @@ class Events(commands.Cog):
         contains_profanity = await self.contains_profanity(activity.name)
         
         if contains_profanity and self.is_locked(member):  # Has profanity and is already locked, increment extra
-            return await self.increment_extra_if_necessary_for(member, Reasons.activity)
+            return self.increment_extra_if_necessary_for(member, Reasons.activity)
 
         if contains_profanity:  # Status contains profanity
             return await self.handle_bad_status(member, activity)
@@ -559,7 +559,7 @@ class Events(commands.Cog):
             float(data['drugs'])
         )) > NSFW_FILTER_CONSTANT:  # Asset is BAD, handle it.
             if self.is_locked(user):  # Member is already locked, add this to the reason of locks.
-                return await self.increment_extra_if_necessary_for(user, Reasons.pfp)
+                return self.increment_extra_if_necessary_for(user, Reasons.pfp)
         
             logging.warning(f"MEMBER NSFW: {str(user)} has a NSFW pfp, locking them out.")
             
@@ -635,7 +635,7 @@ class Events(commands.Cog):
         
         if (await self.contains_profanity(member.name)):
             if is_locked:  # Member was already flagged, do nothing.
-                return await self.increment_extra_if_necessary_for(member, Reasons.name)
+                return self.increment_extra_if_necessary_for(member, Reasons.name)
             return await self.handle_bad_name(member)
         
         # User name is fine
