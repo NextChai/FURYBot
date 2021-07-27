@@ -12,6 +12,7 @@ from discord.ext import commands
 import git
 
 from cogs.utils import help_command
+from cogs.utils.types import LockedOut
 from cogs.utils.constants import (
     LOGGING_CHANNEL, 
     COACH_ROLE, 
@@ -62,12 +63,13 @@ class Bot(commands.Bot):
         self.ACTIVITY_MESSAGE = 'over the server.'
         self.ACTIVITY_TYPE = discord.ActivityType.watching
         
+        self.locked_out: LockedOut = {}
         
         for extension in initial_extensions:
             try:
                 self.load_extension(extension)
             except Exception as E:
-                traceback.print_exc()
+                trace_lib.print_exc()
                 print()
                 
     async def on_ready(self) -> None:

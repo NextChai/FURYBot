@@ -25,7 +25,8 @@ from cogs.utils.constants import (
     FURY_GUILD,
     NSFW_FILTER_CONSTANT
 )
-from cogs.utils.errors import NotLocked, AlreadyExtra
+from cogs.utils.types import Reasons
+from cogs.utils.errors import NotLocked
 
 
 def moderator_check(member): 
@@ -34,23 +35,6 @@ def moderator_check(member):
 def mention_staff(guild):
     notisRole = discord.utils.get(guild.roles, id=LOCKDOWN_NOTIFICATIONS_ROLE)
     return notisRole.mention
-
-class Reasons(Enum):
-    activity = 1
-    pfp = 2
-    name = 3
-
-
-class LockedOutInner(TypedDict):
-    member_id: int
-    bad_status: str
-    raw_status: str
-    extra: List[Reasons]
-    
-    
-class LockedOut(TypedDict):
-    member_id: LockedOutInner
-
 
 class Events(commands.Cog):
     """
@@ -65,12 +49,12 @@ class Events(commands.Cog):
     If a person gets put into the `locked_out` var, the extra section will be empty. If the extra section is not empty
     they can not get unlocked.
     """
-    locked_out: ClassVar[LockedOut] = {}
     custom_words: ClassVar[List[str]] = ['chode', 'dick', 'dickandmorty']
     
     def __init__(self, bot):
         self.bot = bot
         self.profanity = better_profanity.profanity
+        self.locked_out = self.bot.locked_out
 
         with open(f"{self.bot.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
             extra_profanity = f.readlines()
@@ -89,6 +73,7 @@ class Events(commands.Cog):
         self.member_check.start()
         
     def cog_unload(self):
+        self.bot.locked_out = self.locked_out
         if self.member_check.is_running():
             self.member_check.cancel()
             
