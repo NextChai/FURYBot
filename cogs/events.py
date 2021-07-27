@@ -258,7 +258,8 @@ class Events(commands.Cog):
             if self.is_valid_unlock(member, reason):  # Member has no outstanding locks OR the only lock they have is the one they're getting removed for.
                 await self.remove_lockdown_for(member, reason=raw_reason)
             else:  # Member is locked for more then one reason, we need to remove this specific one.
-                self.locked_out[member.id]['extra'].remove(reason)  # remove the reason
+                if reason in self.locked_out[member.id]['extra']:
+                    self.locked_out[member.id]['extra'].remove(reason)  # remove the reason
                 
     async def handle_bad_status(
         self, 
@@ -630,12 +631,11 @@ class Events(commands.Cog):
             return await self.handle_bad_name(member)
         
         # User name is fine
-        if self.is_locked(member):
-            await self.remove_lockdown_if_necessary_for(
-                member, 
-                reason=Reasons.name,
-                raw_reason='name'
-            )
+        await self.remove_lockdown_if_necessary_for(
+            member, 
+            reason=Reasons.name,
+            raw_reason='name'
+        )
         
     @tasks.loop(count=1)
     async def member_check(self) -> None:
