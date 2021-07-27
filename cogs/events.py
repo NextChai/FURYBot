@@ -223,7 +223,7 @@ class Events(commands.Cog):
         except (discord.Forbidden, discord.HTTPException):
             could_dm = False
         
-        e.title = "Member fixed their status."
+        e.title = f"Member fixed their {reason}."
         e.description = f'**{str(member)} ({member.mention})** has fixed their {reason}. Their access to the server has been fixed.'
         e.add_field(name='Could DM?', value=could_dm)
         await self.bot.send_to_log_channel(embed=e, content=mention_staff(member.guild))
