@@ -611,7 +611,7 @@ class Events(commands.Cog):
         if before.name == user.name: return
         
         
-        if not await self.contains_profanity(user.name):  # username is fine.
+        if (await self.contains_profanity(user.name)):  # username is NOT fine.
             return await self.handle_bad_name(user)
         
         return await self.remove_lockdown_if_necessary_for(
