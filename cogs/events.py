@@ -40,17 +40,18 @@ class Reasons(Enum):
     pfp = 2
     name = 3
 
+
 class LockedOutInner(TypedDict):
     member_id: int
     bad_status: str
     raw_status: str
     extra: List[Reasons]
     
+    
 class LockedOut(TypedDict):
     member_id: LockedOutInner
 
 
-    
 class Events(commands.Cog):
     """
     The base Events cog.
@@ -122,30 +123,6 @@ class Events(commands.Cog):
         member = member.id if isinstance(member, (discord.Member, discord.User)) else member
         return True if self.locked_out.get(member) is not None else False
 
-    def add_extra_for(
-        self,
-        member: Union[discord.Member, discord.User, int],
-        reason: Reasons
-    ) -> None:
-        member = member.id if isinstance(member, (discord.Member, discord.User)) else member
-        if not self.is_locked(member):
-            raise NotLocked(f'Member is not locked, could not add extra to their lock data.')
-        if reason in self.locked_out[member]['extra']:
-            raise AlreadyExtra("Member is already locked out for this reason.")
-            
-        self.locked_out[member]['extra'].append(reason)
-    
-    def remove_extra_for(
-        self,
-        member: Union[discord.Member, discord.User, int],
-        reason: Reasons
-    ) -> None:
-        member = member.id if isinstance(member, (discord.Member, discord.User)) else member      
-        try:
-            self.locked_out[member]['extra'].remove(reason)
-        except ValueError:
-            pass
-        
     def is_valid_unlock(
         self,
         member: Union[discord.Member, discord.User, int],
@@ -187,7 +164,6 @@ class Events(commands.Cog):
     ) -> None:
         """
         Lock a member out for the first time. 
-        
         This func can never get called if the member is already locked out.
         """
         if isinstance(member, discord.User):
@@ -215,6 +191,9 @@ class Events(commands.Cog):
         guild: Optional[discord.Guild] = None,
         reason: Optional[str] = 'status'
     ) -> discord.Embed:
+        """
+        Remove a lockdown for a member.
+        """
         if isinstance(member, discord.User):
             member = guild.get_member(member.id) or (await guild.fetch_member(member.id))
         
@@ -282,7 +261,7 @@ class Events(commands.Cog):
             if self.is_valid_unlock(member, reason):  # Member has no outstanding locks OR the only lock they have is the one they're getting removed for.
                 await self.remove_lockdown_for(member, reason=raw_reason)
             else:  # Member is locked for more then one reason, we need to remove this specific one.
-                self.remove_extra_for(member, reason)
+                self.locked_out[member.id]['extra'].remove(reason)  # remove the reason
                 
     async def increment_extra_if_necessary_for(
         self,
