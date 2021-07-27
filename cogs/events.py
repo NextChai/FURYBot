@@ -266,8 +266,6 @@ class Events(commands.Cog):
             guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
             member = guild.get_member(member.id) or (await guild.fetch_member(member.id))
         
-        logging.info(f"LOCKDOWN REMOVE: Removing lockdown for {str(member)}, {reason}")
-        logging.info(self.locked_out[member.id]['extra'])
         if self.is_locked(member):
             if self.is_valid_unlock(member, reason):  # Member has no outstanding locks OR the only lock they have is the one they're getting removed for.
                 await self.remove_lockdown_for(member, reason=raw_reason)
@@ -613,7 +611,7 @@ class Events(commands.Cog):
         if before.name == user.name: return
         
         
-        if await self.contains_profanity(user.name):  # username is fine.
+        if not await self.contains_profanity(user.name):  # username is fine.
             return await self.handle_bad_name(user)
         
         return await self.remove_lockdown_if_necessary_for(
