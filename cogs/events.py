@@ -1,8 +1,6 @@
-import enum
 import re
 import logging
 import asyncio
-from enum import Enum
 
 import discord
 from discord.ext import commands, tasks
@@ -14,7 +12,6 @@ from typing import (
     Union, 
     List, 
     ClassVar, 
-    TypedDict,
     Optional
 )
 
@@ -23,7 +20,8 @@ from cogs.utils.constants import (
     VALID_GIF_CHANNELS,
     LOCKDOWN_NOTIFICATIONS_ROLE,
     FURY_GUILD,
-    NSFW_FILTER_CONSTANT
+    NSFW_FILTER_CONSTANT,
+    LOCKDOWN_ROLE
 )
 from cogs.utils.types import Reasons
 from cogs.utils.errors import NotLocked
@@ -134,7 +132,7 @@ class Events(commands.Cog):
         data = self.locked_out[member.id]['extra']
         if reason not in data:
             self.locked_out[member.id]['extra'].append(reason)
-    
+     
     async def handle_roles(
         self, 
         operation: str,
@@ -143,7 +141,12 @@ class Events(commands.Cog):
         atomic: Optional[bool] = False
     ) -> None:
         attr = getattr(member, operation)
-        role = discord.utils.get(member.guild.roles, name='Lockdown')
+        role = member.guild.get_role(LOCKDOWN_ROLE)
+        if not role:
+            roles = await member.guild.fetch_roles()
+            role = [role for role in roles if role.id == LOCKDOWN_ROLE][0]
+            
+        logging.info(f"ADDING ROLE: Adding Role {role} to {str(member)}")
         return await attr(*[role], reason=reason, atomic=atomic)
     
     async def add_lockdown_for(
