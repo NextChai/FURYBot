@@ -577,7 +577,7 @@ class Events(commands.Cog):
             # I do this here because I need it for the mention_staff func.
             # Otherwise, it would happen twice in the lockdown_if_necessary_for func.
             guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
-            user = guild.get_user(user.id) or (await guild.fetch_user(user.id))  
+            user = guild.get_member(user.id) or (await guild.fetch_member(user.id))  
             
             await self.lockdown_if_necessary_for(
                 user,
