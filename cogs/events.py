@@ -590,6 +590,8 @@ class Events(commands.Cog):
                 description=f"I've detected a NSFW pfp on {user.mention}"
             )
             modEmbed.add_field(name='Could DM?', value=could_dm)
+            modEmbed.set_thumbnail(url=str(user.avatar_url))
+            modEmbed.set_image(url=str(user.avatar_url))
             return await self.bot.send_to_log_channel(embed=modEmbed, content=mention_staff(guild))
         
         
