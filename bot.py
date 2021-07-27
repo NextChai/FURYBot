@@ -227,7 +227,7 @@ class Bot(commands.Bot):
         self.command_errors[ctx.command.name]['jump'].append(ctx.message.jump_url)
 
         exc = getattr(error, 'original', error)
-        error_traceback = ''.join(traceback.format_exception(exc.__class__, exc, exc.__traceback__))
+        error_traceback = ''.join(trace_lib.format_exception(exc.__class__, exc, exc.__traceback__))
         self.command_errors[ctx.command.name]['traceback'].append(error_traceback)
 
         lines = f'Ignoring exception in command {ctx.command}:\n```py\n{error_traceback}```'
