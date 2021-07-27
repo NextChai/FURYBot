@@ -22,11 +22,18 @@ from cogs.utils.constants import (
     BYPASS_FURY,
     VALID_GIF_CHANNELS,
     LOCKDOWN_NOTIFICATIONS_ROLE,
-    FURY_GUILD
+    FURY_GUILD,
+    NSFW_FILTER_CONSTANT
 )
 from cogs.utils.errors import NotLocked, AlreadyExtra
 
-NSFW_FILTER_CONSTANT = 0.3
+
+def moderator_check(member): 
+    return True if BYPASS_FURY in [role.id for role in member.roles] else False
+
+def mention_staff(guild):
+    notisRole = discord.utils.get(guild.roles, id=LOCKDOWN_NOTIFICATIONS_ROLE)
+    return notisRole.mention
 
 class Reasons(Enum):
     activity = 1
@@ -42,12 +49,6 @@ class LockedOutInner(TypedDict):
 class LockedOut(TypedDict):
     member_id: LockedOutInner
 
-def moderator_check(member): 
-    return True if BYPASS_FURY in [role.id for role in member.roles] else False
-
-def mention_staff(guild):
-    notisRole = discord.utils.get(guild.roles, id=LOCKDOWN_NOTIFICATIONS_ROLE)
-    return notisRole.mention
 
     
 class Events(commands.Cog):
