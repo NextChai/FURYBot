@@ -182,7 +182,7 @@ class Events(commands.Cog):
 
         packet = {
             'member_id': member.id,
-            'reason': [enum_reason]
+            'extra': [enum_reason]
         }
         if bad_status:
             packet['bad_status'] = bad_status
