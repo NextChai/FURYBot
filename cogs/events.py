@@ -1,6 +1,8 @@
+import enum
 import re
 import logging
 import asyncio
+from enum import Enum
 
 import discord
 from discord.ext import commands, tasks
@@ -25,14 +27,25 @@ from cogs.utils.constants import (
 
 NSFW_FILTER_CONSTANT = 0.3
 
-class LockedOut(TypedDict):
+class Reasons(Enum):
+    activity = 1
+    pfp = 2
+    name = 3
+
+class LockedOutInner(TypedDict):
     member_id: int
     bad_status: str
     raw_status: str
+    extra: List[Reasons]
     
-
+class LockedOut(TypedDict):
+    member_id: LockedOutInner
+     
 class NotLocked(Exception):
-    ...
+    pass
+
+class AlreadyExtra(Exception):
+    pass
 
 def moderator_check(member): 
     return True if BYPASS_FURY in [role.id for role in member.roles] else False
@@ -43,6 +56,18 @@ def mention_staff(guild):
 
     
 class Events(commands.Cog):
+    """
+    The base Events cog.
+    
+    This cog is dedicated to the protection of the server, and maintaining it's "PG" status.
+    
+    We'll assign each member an entry in the `locked_out` var.
+    This will have their id, the reason they were locked, and if they have any extra things to be locked for.
+    The extra things will be from the Reasons class.
+    
+    If a person gets put into the `locked_out` var, the extra section will be empty. If the extra section is not empty
+    they can not get unlocked.
+    """
     locked_out: ClassVar[LockedOut] = {}
     custom_words: ClassVar[List[str]] = ['chode', 'dick', 'dickandmorty']
     
@@ -70,12 +95,6 @@ class Events(commands.Cog):
         if self.member_check.is_running():
             self.member_check.cancel()
             
-    def is_locked(
-        self, 
-        member: Union[discord.Member, discord.User]
-    ) -> bool: 
-        return True if self.locked_out.get(member.id) is not None else False
-    
     async def contains_profanity(
         self, 
         message: str
@@ -99,6 +118,55 @@ class Events(commands.Cog):
         """Check if a message has link"""
         data = await asyncio.gather(*[self.bot.loop.run_in_executor(None, self.extractor.gen_urls, message)])
         return list(data[0]) if data else None
+            
+    def is_locked(
+        self, 
+        member: Union[discord.Member, discord.User, int]
+    ) -> bool: 
+        member = member.id if isinstance(member, (discord.Member, discord.User)) else member
+        return True if self.locked_out.get(member) is not None else False
+
+    def add_extra_for(
+        self,
+        member: Union[discord.Member, discord.User, int],
+        reason: Reasons
+    ) -> None:
+        member = member.id if isinstance(member, (discord.Member, discord.User)) else member
+        if not self.is_locked(member):
+            raise NotLocked(f'Member is not locked, could not add extra to their lock data.')
+        if reason in self.locked_out[member]['extra']:
+            raise AlreadyExtra("Member is already locked out for this reason.")
+            
+        self.locked_out[member]['extra'].append(reason)
+    
+    def remove_extra_for(
+        self,
+        member: Union[discord.Member, discord.User, int],
+        reason: Reasons
+    ) -> None:
+        member = member.id if isinstance(member, (discord.Member, discord.User)) else member      
+        try:
+            self.locked_out[member]['extra'].remove(reason)
+        except ValueError:
+            pass
+        
+    def is_valid_unlock(
+        self,
+        member: Union[discord.Member, discord.User, int],
+        reason: Reasons
+    ) -> bool:
+        """
+        Returns true if the extra section on the users lock data is None.
+        """
+        member = member.id if isinstance(member, (discord.Member, discord.User)) else member
+        
+        extra = self.locked_out[member]['extra']
+        if not extra: 
+            return True
+        if len(extra) == 1 and extra[0] == reason:  # The only thing to unlock is the reason we're unlocking.
+            self.locked_out[member]['extra'] = []
+            return True
+        return False
     
     async def handle_roles(
         self, 
@@ -110,6 +178,39 @@ class Events(commands.Cog):
         attr = getattr(member, operation)
         role = discord.utils.get(member.guild.roles, name='Lockdown')
         return await attr(*[role], reason=reason, atomic=atomic)
+    
+    async def add_lockdown_for(
+        self,
+        member: Union[discord.Member, discord.User],
+        *,
+        enum_reason: Reasons,
+        reason: Optional[str] = "Bad status",
+        guild: Optional[discord.Guild] = None,
+        bad_status: Optional[str] =  None,
+        raw_status: Optional[str] = None
+    ) -> None:
+        """
+        Lock a member out for the first time. 
+        
+        This func can never get called if the member is already locked out.
+        """
+        if isinstance(member, discord.User):
+            member = guild.get_member(member.id) or (await guild.fetch_member(member.id))
+        
+        await self.handle_roles('add_roles', member, reason=reason, atomic=False)
+
+        packet = {
+            'member_id': member.id,
+            'reason': [enum_reason]
+        }
+        if bad_status:
+            packet['bad_status'] = bad_status
+        if raw_status:
+            packet['raw_status'] = raw_status
+        self.locked_out[member.id] = packet
+ 
+        logging.warning(f"ADDED LOCKDOWN: Lockdown added to {str(member)} for: {reason}")
+        return
     
     async def remove_lockdown_for(
         self, 
@@ -146,28 +247,56 @@ class Events(commands.Cog):
         logging.info(f"REMOVED LOCKDOWN: Lockdown removed from {str(member)} after fixing their {reason}.")
         return e
     
-    async def add_lockdown_for(
+    async def lockdown_if_necessary_for(
         self,
         member: Union[discord.Member, discord.User],
         *,
-        reason: Optional[str] = "Bad status",
-        guild: Optional[discord.Guild] = None,
+        reason: Reasons,
+        raw_reason: str = None,
         bad_status: Optional[str] =  None,
         raw_status: Optional[str] = None
     ) -> None:
         if isinstance(member, discord.User):
+            guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
             member = guild.get_member(member.id) or (await guild.fetch_member(member.id))
         
-        await self.handle_roles('add_roles', member, reason=reason, atomic=False)
-        self.locked_out[member.id] = {
-            'member_id': member.id,
-            'bad_status': bad_status,
-            'raw_status': raw_status
-        }
+        if self.is_locked(member):  # Member is already locked, increment their data.
+            return await self.increment_extra_if_necessary_for(member, reason)
+        
+        # Member is not locked if we get here.
+        await self.add_lockdown_for(
+            member, 
+            enum_reason=reason, 
+            reason=raw_reason,
+            bad_status=bad_status,
+            raw_status=raw_status
+        )
     
-        logging.warning(f"ADDED LOCKDOWN: Lockdown added to {str(member)} for: {reason}")
-        return
-    
+    async def remove_lockdown_if_necessary_for(
+        self,
+        member: Union[discord.Member, discord.User],
+        reason: Reasons,
+        raw_reason: str = None
+    ) -> None:
+        if isinstance(member, discord.User):
+            guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
+            member = guild.get_member(member.id) or (await guild.fetch_member(member.id))
+        
+        if self.is_locked(member):
+            if self.is_valid_unlock(member, reason):  # Member has no outstanding locks OR the only lock they have is the one they're getting removed for.
+                await self.remove_lockdown_for(member, reason=raw_reason)
+            else:  # Member is locked for more then one reason, we need to remove this specific one.
+                self.remove_extra_for(member, reason)
+                
+    async def increment_extra_if_necessary_for(
+        self,
+        member: Union[discord.Member, discord.User],
+        reason: Reasons
+    ) -> None:
+        data = self.locked_out[member.id]['extra']
+        if reason not in data:
+            self.locked_out[member.id]['extra'].append(reason)
+                
     async def handle_bad_status(
         self, 
         member: discord.Member, 
@@ -192,8 +321,14 @@ class Events(commands.Cog):
             could_dm = True
         except (discord.HTTPException, discord.Forbidden):
             could_dm = False
-            
-        await self.add_lockdown_for(member, bad_status=censored, raw_status=activity.name)
+        
+        await self.lockdown_if_necessary_for(
+            member, 
+            reason=Reasons.activity, 
+            raw_reason='status',
+            bad_status=censored,
+            raw_status=activity.name
+        )
         
         e.title = 'Bad status'
         e.description = f'I have detected a bad status on {member.mention}'
@@ -230,12 +365,19 @@ class Events(commands.Cog):
         
         if isinstance(user, discord.User):
             guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
+            user = guild.get_member(user.id) or (await guild.fetch_member(user.id))
         else:
             guild = user.guild
             
         logging.warning(f"BAD NAME: {str(user)} has a name that contains profanity.")
         
-        await self.add_lockdown_for(user, reason='Invalid name', guild=guild, bad_status=censored, raw_status=user.name)
+        await self.lockdown_if_necessary_for(
+            user,
+            reason=Reasons.name,
+            raw_reason='name',
+            bad_status=censored,
+            raw_status=user.name,
+        )
         await self.bot.send_to_log_channel(content=mention_staff(guild), embed=modEmbed)
         
     @commands.Cog.listener("on_message")
@@ -375,35 +517,39 @@ class Events(commands.Cog):
             return None
         
         if not activities:  # all activities were taken away, they can't have a bad activity
-            if self.is_locked(member):
-                return await self.remove_lockdown_for(member)
-            return
+            return await self.remove_lockdown_if_necessary_for(
+                member, 
+                reason=Reasons.activity, 
+                raw_reason='activity'
+            )
 
         # If we reach here, the member is online and they have an activity.
         # We'll check for profanity and go from there.
         activity = activities[0]
         
         if not activity.name:  # Member can have only an emoji as their status
-            if self.is_locked(member):
-                return await self.remove_lockdown_for(member)
-            return
+            return await self.remove_lockdown_if_necessary_for(
+                member, 
+                reason=Reasons.activity, 
+                raw_reason='activity'
+            )
         
         contains_profanity = await self.contains_profanity(activity.name)
         
-        if contains_profanity and self.is_locked(member):
-            return
-        
-        # The Member was online and did not switch during the before and after
-        # The Member has a status
+        if contains_profanity and self.is_locked(member):  # Has profanity and is already locked, increment extra
+            return await self.increment_extra_if_necessary_for(member, Reasons.activity)
+
         if contains_profanity:  # Status contains profanity
             return await self.handle_bad_status(member, activity)
         
         # If we reach here, the members status is A-ok.
         # We'll un-lockdown them if nessecary.
-        if self.is_locked(member):
-            return await self.remove_lockdown_for(member)
-        return
-    
+        return await self.remove_lockdown_if_necessary_for(
+            member, 
+            reason=Reasons.activity, 
+            raw_reason='activity'
+        )
+        
     @commands.Cog.listener('on_user_update')
     async def nsfw_pfp_checker(
         self,
@@ -437,8 +583,8 @@ class Events(commands.Cog):
             float(data['alcohol']),
             float(data['drugs'])
         )) > NSFW_FILTER_CONSTANT:  # Asset is BAD, handle it.
-            if self.is_locked(user):  # Member is already locked, do nothing.
-                return
+            if self.is_locked(user):  # Member is already locked, add this to the reason of locks.
+                return await self.increment_extra_if_necessary_for(user, Reasons.pfp)
         
             logging.warning(f"MEMBER NSFW: {str(user)} has a NSFW pfp, locking them out.")
             
@@ -453,21 +599,31 @@ class Events(commands.Cog):
             except (discord.HTTPException, discord.Forbidden):
                 could_dm = False
             
+            # I do this here because I need it for the mention_staff func.
+            # Otherwise, it would happen twice in the lockdown_if_necessary_for func.
             guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
-            await self.add_lockdown_for(user, reason='Bad PFP, NSFW', guild=guild)
+            user = guild.get_user(user.id) or (await guild.fetch_user(user.id))  
+            
+            await self.lockdown_if_necessary_for(
+                user,
+                reason=Reasons.pfp,
+                raw_reason='pfp'
+            )
             
             e.fields[0].name = 'Could DM?'
             e.fields[0].value = could_dm
             e.remove_field(1)
             e.description = f"I've detected a NSFW pfp on {user.mention}"
-            return await self.bot.send_to_log_channel(embed=e, content=mention_staff())
+            return await self.bot.send_to_log_channel(embed=e, content=mention_staff(guild))
         
         
         # If we reach here, the asset is fine.
-        if self.is_locked(user):  # User is locked, remove it.
-            guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
-            await self.remove_lockdown_for(user, guild=guild, reason='pfp')
-            
+        return await self.remove_lockdown_if_necessary_for(
+            user,
+            reason=Reasons.pfp,
+            raw_reason='pfp'
+        )
+                
     @commands.Cog.listener('on_user_update')
     async def nsfw_name_checker(
         self,
@@ -479,14 +635,16 @@ class Events(commands.Cog):
         """
         if before.name == user.name: return
         
-        if not await self.contains_profanity(user.name):  # username is fine.
-            if self.is_locked(user):
-                guild = self.bot.get_guild(FURY_GUILD) or (await self.bot.fetch_guild(FURY_GUILD))
-                await self.remove_lockdown_for(user, guild=guild, reason='Member fixed their name.')
-            return
         
-        return await self.handle_bad_name(user)
-    
+        if await self.contains_profanity(user.name):  # username is fine.
+            return await self.handle_bad_name(user)
+        
+        return await self.remove_lockdown_if_necessary_for(
+            user, 
+            reason=Reasons.name, 
+            raw_reason='username.'
+        )
+        
     async def check_for_bad_name(
         self, 
         member: discord.Member
@@ -499,16 +657,18 @@ class Events(commands.Cog):
         """
         
         is_locked = self.is_locked(member)
-        contains_profanity = await self.contains_profanity(member.name)
         
-        if contains_profanity:
+        if (await self.contains_profanity(member.name)):
             if is_locked:  # Member was already flagged, do nothing.
-                return
+                return await self.increment_extra_if_necessary_for(member, Reasons.name)
             return await self.handle_bad_name(member)
         
         # User name is fine
-        if is_locked:
-            await self.remove_lockdown_for(member)
+        return await self.remove_lockdown_if_necessary_for(
+            member, 
+            reason=Reasons.name,
+            raw_reason='name'
+        )
         
     @tasks.loop(count=1)
     async def member_check(self) -> None:
