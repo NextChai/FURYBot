@@ -584,12 +584,13 @@ class Events(commands.Cog):
                 reason=Reasons.pfp,
                 raw_reason='pfp'
             )
-            
-            e.fields[0].name = 'Could DM?'
-            e.fields[0].value = could_dm
-            e.remove_field(1)
-            e.description = f"I've detected a NSFW pfp on {user.mention}"
-            return await self.bot.send_to_log_channel(embed=e, content=mention_staff(guild))
+
+            modEmbed = self.bot.Embed(
+                title='NSFW Pfp Detected',
+                description=f"I've detected a NSFW pfp on {user.mention}"
+            )
+            modEmbed.add_field(name='Could DM?', value=could_dm)
+            return await self.bot.send_to_log_channel(embed=modEmbed, content=mention_staff(guild))
         
         
         # If we reach here, the asset is fine.
