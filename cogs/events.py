@@ -630,11 +630,12 @@ class Events(commands.Cog):
             return await self.handle_bad_name(member)
         
         # User name is fine
-        return await self.remove_lockdown_if_necessary_for(
-            member, 
-            reason=Reasons.name,
-            raw_reason='name'
-        )
+        if self.is_locked(member):
+            await self.remove_lockdown_if_necessary_for(
+                member, 
+                reason=Reasons.name,
+                raw_reason='name'
+            )
         
     @tasks.loop(count=1)
     async def member_check(self) -> None:
