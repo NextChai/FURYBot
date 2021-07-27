@@ -1,8 +1,9 @@
 import os
+import sys
 import logging
 import datetime
-import traceback
 import aiohttp
+import traceback as trace_lib
 from collections import Counter
 
 import discord
@@ -77,10 +78,19 @@ class Bot(commands.Bot):
         message: discord.Message
     ) -> None:
         await self.process_commands(message)
+        
+    async def on_error(self, event, *args, **kwargs):
+        type, value, traceback_str = sys.exc_info()
+        if not type:
+            raise 
+            
+        traceback = ''.join(trace_lib.format_exception(type, value, traceback_str))
+        print(traceback)
+        await self.send_to_log_channel(f'```python\n{traceback}\n```')
 
     async def get_recent_commits(self):
         return [commit for commit in git.Repo(self.DEFAULT_BASE_PATH).iter_commits(max_count=10)]
-
+    
     async def send_to_log_channel(
         self, 
         *args, 
