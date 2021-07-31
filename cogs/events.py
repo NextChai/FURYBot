@@ -145,7 +145,10 @@ class Events(commands.Cog):
         if not role:
             roles = await member.guild.fetch_roles()
             role = [role for role in roles if role.id == LOCKDOWN_ROLE][0]
-            
+        
+        if role in member.roles:  # Member is already locked down.
+            return None
+        
         logging.info(f"ADDING ROLE: Adding Role {role} to {str(member)}")
         return await attr(*[role], reason=reason, atomic=atomic)
     
