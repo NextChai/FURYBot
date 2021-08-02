@@ -7,6 +7,7 @@ Unfortunately, I am including the list of profanity based words in the repo. Thi
 Auto moderation of members who:
 
 - Have a bad status,
+- Have a bad Discord name,
 - Have a NSFW pfp,
 - Post non-authorized links,
 - Use swears or any non PG-related terms
