@@ -543,13 +543,14 @@ class Events(commands.Cog):
                 return
             data = await resp.json()
         
+        check = lambda entry: entry > NSFW_FILTER_CONSTANT
         if any((
-            float(data['offensive']['prob']),
-            float(data['nudity']['raw']),
-            float(data['gore']['prob']),
-            float(data['alcohol']),
-            float(data['drugs'])
-        )) > NSFW_FILTER_CONSTANT:  # Asset is BAD, handle it.
+            check(data['offensive']['prob']),
+            check(data['nudity']['raw']),
+            check(data['gore']['prob']),
+            check(data['alcohol']),
+            check(data['drugs']),
+        )):  # Asset is BAD, handle it.
             if self.is_locked(user):  # Member is already locked, add this to the reason of locks.
                 return self.increment_extra_if_necessary_for(user, Reasons.pfp)
         
