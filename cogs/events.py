@@ -21,7 +21,8 @@ from cogs.utils.constants import (
     LOCKDOWN_NOTIFICATIONS_ROLE,
     FURY_GUILD,
     NSFW_FILTER_CONSTANT,
-    LOCKDOWN_ROLE
+    LOCKDOWN_ROLE,
+    GENERAL_CHANNEL
 )
 from cogs.utils.types import Reasons
 from cogs.utils.errors import NotLocked
@@ -80,16 +81,14 @@ class Events(commands.Cog):
         message: str
     ) -> bool:
         """Verify is a str contains profanity."""
-        data = await asyncio.gather(*[self.bot.loop.run_in_executor(None, self.profanity.contains_profanity, message)])
-        return data[0] if data else False
+        return await self.bot.loop.run_in_executor(None, self.profanity.contains_profanity, message)
     
     async def censor(
         self, 
         message: str
     ) -> str:
         """Censor a str."""
-        data = await asyncio.gather(*[self.bot.loop.run_in_executor(None, self.profanity.censor, message)])
-        return data[0]
+        return await self.bot.loop.run_in_executor(None, self.profanity.censor, message)
     
     async def get_links(
         self,
@@ -668,10 +667,17 @@ class Events(commands.Cog):
         await self.bot.wait_until_ready()
 
 
-            
+    @commands.Cog.listener()
+    async def on_member_join(self, member: discord.Member):
+        channel = self.bot.get_channel(GENERAL_CHANNEL)
         
-            
-            
+        e = self.bot.Embed(
+            title='Welcome!',
+            description=f'Welcome {str(member)}! What do you need to do right now?'
+        )
+        e.add_field(name='Change your nickname!', value='**Change your server nickname to your first name last initial!**\n\nExample: Trevor F.')
+        e.add_field(name="Don't know how to change your nickname?", value=f'Type any message in the {channel.mention} chat, right click your name, and select "Change Nickname."')
+        await channel.send(embed=e, content=member.mention)
 
 def setup(bot):
     bot.add_cog(Events(bot))
