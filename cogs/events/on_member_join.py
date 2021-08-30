@@ -35,7 +35,7 @@ class OnMemberJoin(BaseEvent, command_attrs=dict(hidden=True)):
             name="Don't know how to change your nickname?",
             value=f'Type any message in the {channel.mention} chat, right click your name, and select "Change Nickname."')
         
-        thursday = datetime(year=2021, month=9, day=2, hour=14, minute=0, second=0)
+        thursday = datetime(year=2021, month=9, day=2, hour=17, minute=0, second=0)
         four = thursday + timedelta(days=0, hours=23)
         fourthirty = four + timedelta(minutes=30)
         five = four + timedelta(hours=1)
@@ -48,7 +48,7 @@ class OnMemberJoin(BaseEvent, command_attrs=dict(hidden=True)):
                     '**Friday:**\n' \
                     f'**{discord.utils.format_dt(four)} (30 mins long)** Super Smash Players' \
                     f'\n**{discord.utils.format_dt(fourthirty)} (30 mins long)** League of Legends Players' \
-                    f'\n**{discord.utils.format_dt(five)}** (1 hour long)** Overwatch and Fortnite players' \
+                    f'\n**{discord.utils.format_dt(five)} (1 hour long)** Overwatch and Fortnite players' \
                     f'\n**{discord.utils.format_dt(six)} (30 mins long)** Rocket League Players',
             inline=False
         )
