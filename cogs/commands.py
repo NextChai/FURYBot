@@ -13,46 +13,13 @@ class Commands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         
-    @commands.command(brief='Create a team and have the category get automatically assigned.')
-    @commands.is_owner()
-    async def createteam(self, ctx: commands.Context, team_name: str, members: commands.Greedy[discord.Member] = None) -> Optional[discord.Message]:
-        role = await ctx.guild.create_role(
-            name=team_name,
-            hoist=False,
-            mentionable=False,
-            reason='Create team via command'
-        )
-        
-        category = await ctx.guild.create_category(
-            name='Team Chat',
-            overwrites={
-                ctx.guild.default_role: discord.PermissionOverwrite(
-                    read_messages=False, 
-                    view_channel=False, 
-                    connect=False
-                ),
-                role: discord.PermissionOverwrite(
-                    read_messages=True, 
-                    view_channel=True, 
-                    connect=True, 
-                    mention_everyone=False, 
-                    embed_links=False
-                )
-            },
-            reason='Create team via command.'
-        )
-        
-        await category.create_text_channel(
-            name='team-chat',
-            reason='Create team via command.'
-        )
-        
-        await category.create_voice_channel(
-            name='Voice Chat',
-            reason='Create team via command.'
-        )
-        return None
-
+    @commands.command(aliases=['clear'])
+    @commands.has_permissions(manage_messages=True)
+    async def purge(self, ctx, limit: Optional[int]):
+        async for message in ctx.channel.history(limit=limit):
+            await message.delete()
+    
+    
     @commands.command(
         brief="Ping the bot.")
     async def ping(
@@ -96,7 +63,7 @@ class Commands(commands.Cog):
         branch = "main"
         if not command:
             return await ctx.send(source_url)
-        
+    
         if command == 'help':
             src = type(self.bot.help_command)
             module = src.__module__
