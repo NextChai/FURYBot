@@ -370,7 +370,7 @@ class OWCog(commands.Cog, name='Overwatch'):
         e = self.bot.Embed()
         e.title = 'Done!'
         e.description = 'Thank you!'
-        e.add_field(name='What can I do now?', value='Try out **!overwatch** in the <#763430906161528902> channel \:)')
+        e.add_field(name='What can I do now?', value='Try out **!overwatch** in the <#881935961972436992> channel \:)')
         await channel.send(embed=e)
 
         _orig_embed.title = 'Success!'

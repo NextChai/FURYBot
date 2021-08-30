@@ -53,6 +53,12 @@ class OnMemberJoin(BaseEvent, command_attrs=dict(hidden=True)):
             inline=False
         )
         
+        e.add_field(
+            name='Reaction roles!',
+            value='Head on over to <#880939814898249799> and click on the button that corresponds with your game! **You must do this, it is not optional.**',
+            inline=False
+        )
+        
         try:
             await member.send(embed=e)
         except:
