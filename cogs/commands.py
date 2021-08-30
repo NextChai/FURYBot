@@ -17,7 +17,10 @@ class Commands(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     async def purge(self, ctx, limit: Optional[int], oldest_first: Optional[bool] = False):
         async for message in ctx.channel.history(limit=limit, oldest_first=oldest_first):
-            await message.delete()
+            try:
+                await message.delete()
+            except:
+                continue
     
     
     @commands.command(
