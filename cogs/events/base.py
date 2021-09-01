@@ -38,7 +38,7 @@ class BaseEvent(commands.Cog):
 
         self.profanity = better_profanity.profanity
         custom_words: List[str] = ['chode', 'dick']
-        whitelist = ['omg', 'god', 'lmao', 'hell', 'suck', 'sucks', 'gun', 'screw', 'screwed', 'stupid', 'stroke', 'dumb', 'dummy']
+        whitelist = ['omg', 'god', 'lmao', 'hell', 'suck', 'sucks', 'gun', 'screw', 'screwed', 'stupid', 'stroke', 'dumb', 'dummy', 'sniper']
 
         with open(f"{self.bot.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
             extra_profanity = f.readlines()
