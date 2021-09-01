@@ -48,7 +48,7 @@ class BaseEvent(commands.Cog):
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
 
-        whitelist = ['omg', 'god', 'lmao', 'hell']
+        whitelist = ['omg', 'god', 'lmao', 'hell', 'suck']
         for index, string in enumerate(self.profanity.CENSOR_WORDSET):
             if string._original in whitelist:
                 self.profanity.CENSOR_WORDSET.pop(index)
