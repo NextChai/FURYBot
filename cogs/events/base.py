@@ -37,18 +37,18 @@ class BaseEvent(commands.Cog):
         self.bot: 'FuryBot' = bot
 
         self.profanity = better_profanity.profanity
-        self.custom_words: List[str] = ['chode', 'dick']
+        custom_words: List[str] = ['chode', 'dick']
+        whitelist = ['omg', 'god', 'lmao', 'hell', 'suck', 'sucks', 'gun', 'screw', 'screwed', 'stupid', 'stroke']
 
         with open(f"{self.bot.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
             extra_profanity = f.readlines()
             extra_profanity = list(dict.fromkeys(extra_profanity))  # clear up duplicates
-            extra_profanity += self.custom_words
+            extra_profanity += custom_words
             self.profanity.add_censor_words(extra_profanity)
 
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
 
-        whitelist = ['omg', 'god', 'lmao', 'hell', 'suck']
         for index, string in enumerate(self.profanity.CENSOR_WORDSET):
             if string._original in whitelist:
                 self.profanity.CENSOR_WORDSET.pop(index)
