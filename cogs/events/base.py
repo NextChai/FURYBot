@@ -38,12 +38,18 @@ class BaseEvent(commands.Cog):
 
 
     async def contains_profanity(self, message: str) -> bool:
+        if not self.profanity:
+            return False
         return await self.bot.loop.run_in_executor(None, self.profanity.contains_profanity, message)
 
     async def censor(self, message: str) -> str:
+        if not self.profanity:
+            return 'Profanity filter not loaded'
         return await self.bot.loop.run_in_executor(None, self.profanity.censor, message)
 
     async def get_links(self, message: str) -> Union[None, List[str]]:
+        if not self.extractor:
+            return None
         data = await asyncio.gather(*[self.bot.loop.run_in_executor(None, self.extractor.gen_urls, message)])
         return list(data[0]) if data else None
 
