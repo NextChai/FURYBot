@@ -6,12 +6,15 @@ import aiohttp
 import traceback as trace_lib
 from collections import Counter
 
+import urlextract
+import better_profanity
+
 from typing import (
     Optional,
-    Tuple,
     Union,
     Dict,
-    Any
+    Any,
+    List
 )
 
 import discord
@@ -130,6 +133,31 @@ class FuryBot(commands.Bot):
             except Exception:
                 trace_lib.print_exc()
                 print()
+                
+        self._load_filters()
+                
+    def _load_filters(self):
+        self.profanity = better_profanity.profanity
+        custom_words: List[str] = ['chode', 'dick']
+        
+        with open(f"{self.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
+            extra_profanity = f.readlines()
+            extra_profanity = list(dict.fromkeys(extra_profanity))  # clear up duplicates
+            extra_profanity += custom_words
+            self.profanity.add_censor_words(extra_profanity)
+            
+        with open(f"{self.DEFAULT_BASE_PATH}/txt/whitelist.txt", 'r') as f:
+            whitelist = f.readlines()
+            
+
+        self.extractor = urlextract.URLExtract()
+        self.extractor.update()
+
+        for index, string in enumerate(self.profanity.CENSOR_WORDSET):
+            if self.profanity.CENSOR_WORDSET[index].isdigit():
+                self.profanity.CENSOR_WORDSET.pop(index)
+            if string._original in whitelist:
+                self.profanity.CENSOR_WORDSET.pop(index)
 
     async def on_ready(self) -> None:
         print(f"{self.user} ready: {self.user.id}")
