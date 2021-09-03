@@ -126,6 +126,8 @@ class FuryBot(commands.Bot):
 
         self.trnAPIHeaders = None
         self.nsfwAPI = None
+        self.profanity = None
+        self.extractor = None
 
         for extension in initial_extensions:
             try:
@@ -149,7 +151,6 @@ class FuryBot(commands.Bot):
         with open(f"{self.DEFAULT_BASE_PATH}/txt/whitelist.txt", 'r') as f:
             whitelist = f.readlines()
             
-
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
 
