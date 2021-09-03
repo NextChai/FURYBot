@@ -33,24 +33,21 @@ class BaseEvent(commands.Cog):
 
     def __init__(self, bot: 'FuryBot') -> None:
         self.bot: FuryBot = bot
-        self.profanity = bot.profanity
-        self.extractor = bot.extractor
-
 
     async def contains_profanity(self, message: str) -> bool:
-        if not self.profanity:
+        if not self.bot.profanity:
             return False
-        return await self.bot.loop.run_in_executor(None, self.profanity.contains_profanity, message)
+        return await self.bot.loop.run_in_executor(None, self.bot.profanity.contains_profanity, message)
 
     async def censor(self, message: str) -> str:
-        if not self.profanity:
+        if not self.bot.profanity:
             return 'Profanity filter not loaded'
-        return await self.bot.loop.run_in_executor(None, self.profanity.censor, message)
+        return await self.bot.loop.run_in_executor(None, self.bot.profanity.censor, message)
 
     async def get_links(self, message: str) -> Union[None, List[str]]:
         if not self.extractor:
             return None
-        data = await asyncio.gather(*[self.bot.loop.run_in_executor(None, self.extractor.gen_urls, message)])
+        data = await asyncio.gather(*[self.bot.loop.run_in_executor(None, self.bot.extractor.gen_urls, message)])
         return list(data[0]) if data else None
 
     def is_locked(self, member: Union[discord.Member, discord.User, int]) -> bool:
