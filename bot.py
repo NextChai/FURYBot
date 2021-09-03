@@ -155,7 +155,7 @@ class FuryBot(commands.Bot):
         self.extractor.update()
 
         for index, string in enumerate(self.profanity.CENSOR_WORDSET):
-            if self.profanity.CENSOR_WORDSET[index].isdigit():
+            if self.profanity.CENSOR_WORDSET[index]._original.isdigit():
                 self.profanity.CENSOR_WORDSET.pop(index)
             if string._original in whitelist:
                 self.profanity.CENSOR_WORDSET.pop(index)
