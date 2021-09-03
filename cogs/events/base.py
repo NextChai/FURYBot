@@ -45,7 +45,7 @@ class BaseEvent(commands.Cog):
         return await self.bot.loop.run_in_executor(None, self.bot.profanity.censor, message)
 
     async def get_links(self, message: str) -> Union[None, List[str]]:
-        if not self.bot.ACTIVITY_MESSAGEextractor:
+        if not self.bot.extractor:
             return None
         data = await asyncio.gather(*[self.bot.loop.run_in_executor(None, self.bot.extractor.gen_urls, message)])
         return list(data[0]) if data else None
