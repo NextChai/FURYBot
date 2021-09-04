@@ -176,6 +176,10 @@ class FuryBot(commands.Bot):
         traceback = ''.join(trace_lib.format_exception(type, value, traceback_str))
         print(traceback)
         await self.send_to_log_channel(f'```python\n{traceback}\n```')
+        
+    async def on_guild_join(self, guild: discord.Guild) -> None:
+        if guild.id not in {757664675864248360, 851939009144029224}:
+            await guild.leave()
 
     async def send_to_log_channel(
         self,
