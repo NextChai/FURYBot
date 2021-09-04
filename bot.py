@@ -148,17 +148,20 @@ class FuryBot(commands.Bot):
             extra_profanity += custom_words
             self.profanity.add_censor_words(extra_profanity)
             
-        with open(f"{self.DEFAULT_BASE_PATH}/txt/whitelist.txt", 'r') as f:
-            whitelist = f.readlines()
+        f = open(f"{self.DEFAULT_BASE_PATH}/txt/whitelist.txt", 'r')
+        whitelist = f.readlines()
+        logging.info(f'Whitelist: {whitelist}')
             
-        self.extractor = urlextract.URLExtract()
-        self.extractor.update()
-
         for index, string in enumerate(self.profanity.CENSOR_WORDSET):
             if self.profanity.CENSOR_WORDSET[index]._original.isdigit():
                 self.profanity.CENSOR_WORDSET.pop(index)
             if string._original in whitelist:
                 self.profanity.CENSOR_WORDSET.pop(index)
+        
+        f.close()
+                
+        self.extractor = urlextract.URLExtract()
+        self.extractor.update()
 
     async def on_ready(self) -> None:
         print(f"{self.user} ready: {self.user.id}")

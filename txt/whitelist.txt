@@ -13,3 +13,6 @@ dumb
 dummy
 sniper
 kill
+god
+suck
+crap
