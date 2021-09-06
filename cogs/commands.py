@@ -39,7 +39,7 @@ class Commands(commands.Cog):
         if not command:
             return await ctx.send(source_url)
     
-        obj = self.bot.get_pending_command(command.replace('.', ' '), guild_specific=True)
+        obj = self.bot.get_pending_command(command.replace('.', ' '), only_guild=True)
         if obj is None:
             return await ctx.send('Could not find command.')
 
