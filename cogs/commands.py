@@ -15,7 +15,7 @@ class Commands(commands.Cog):
         
     @commands.slash()
     @commands.has_permissions(manage_messages=True)
-    async def purge(self, ctx, limit: Optional[int], oldest_first: Optional[bool] = False):
+    async def purge(self, ctx, limit: Optional[int] = 0, oldest_first: Optional[bool] = False):
         async for message in ctx.channel.history(limit=limit, oldest_first=oldest_first):
             try:
                 await message.delete()
@@ -28,17 +28,7 @@ class Commands(commands.Cog):
         return await ctx.send("Pong.")
         
     @commands.slash()
-    async def changes(self, ctx: commands.Context) -> discord.Message:
-        """Get the recent changes to the bot!"""
-        embed = self.bot.Embed(color=discord.Color.blue(), description='')
-        
-        commits = await self.bot.get_recent_commits()
-        for commit in commits:
-            embed.description += f'```python\nSummary: {commit.summary}\nAuthorized: {time.strftime("%a, %d %b %Y %H:%M", time.gmtime(commit.committed_date))} ({commit.author})```'
-        return await ctx.send(embed=embed)
-        
-    @commands.slash()
-    async def source(self, ctx: commands.Context, *, command: Optional[str] = None) -> None:
+    async def source(self, ctx: commands.Context, command: Optional[str] = None) -> None:
         """View the Source code for the bot."""
         
         source_url = '<https://github.com/NextChai/FURYBot>'
