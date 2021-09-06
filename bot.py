@@ -21,7 +21,6 @@ import discord
 from discord.ext import commands
 from discord.ext.commands.cooldowns import CooldownMapping
 
-from cogs.utils.help_command import ChaiHelpCommand
 from cogs.reactions import ReactionView
 from cogs.utils.context import Context
 from cogs.utils.types import LockedOut
@@ -42,7 +41,6 @@ initial_extensions = (
     'cogs.events.on_member_join',
     'cogs.events.profanity_filter',
     'cogs.events.status_checker',
-    "jishaku",
 )
 
 
@@ -101,10 +99,9 @@ async def log_spammer(
 class FuryBot(commands.Bot):
     def __init__(self) -> None:
         super().__init__(
-            command_prefix=["!"],
             intents=discord.Intents.all(),
             description=f"The helper bot to assist FLVS Staff.",
-            help_command=ChaiHelpCommand()
+            guild_ids=[757664675864248360]
         )
 
         self.DEFAULT_BASE_PATH: str = os.path.dirname(os.path.abspath(__file__))
