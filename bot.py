@@ -53,49 +53,6 @@ def Embed(**kwargs) -> discord.Embed:
 
     return discord.Embed(color=color, **kwargs)
 
-
-async def log_spammer(
-    ctx: commands.Context,
-    message: discord.Message,
-    retry_after: float,
-    autoblock: bool = False
-) -> Union[discord.Message, None]:
-    """
-    Edited [RoboDanny](https://github.com/Rapptz/RoboDanny) log_spammer feature.
-    
-    https://github.com/Rapptz/RoboDanny/blob/0dfa21599da76e84c2f8e7fde0c132ec93c840a8/bot.py#L299-L313
-    """
-    guild_name = getattr(ctx.guild, 'name', 'No Guild (DMs)')
-    guild_id = getattr(ctx.guild, 'id', None)
-    fmt = 'User %s (ID %s) in guild %r (ID %s) spamming, retry_after: %.2fs'
-    logging.warning(fmt, message.author, message.author.id, guild_name, guild_id, retry_after)
-    if not autoblock:
-        return
-
-    member = ctx.author
-    if not isinstance(member, discord.Member):
-        return None
-
-    embed = Embed(title='Auto Blocked Member')
-    embed.add_field(name='Member', value=f'{message.author} (ID: {message.author.id})', inline=False)
-    embed.add_field(name='Guild Info', value=f'{guild_name} (ID: {guild_id})', inline=False)
-    embed.add_field(name='Channel Info', value=f'{message.channel} (ID: {message.channel.id}', inline=False)
-    embed.add_field(
-        name="What to do now?",
-        value="You've been banned from using the server. Please contact Trevor F. through DM's in order to get your "
-              "access back.")
-
-    role = discord.utils.get(ctx.guild.roles, id=802304875266179073)
-    await member.add_roles(role, reason="Auto blocked member from spamming.", atomic=True)
-    try:
-        await member.send(embed=embed)
-        could_dm = True
-    except (discord.Forbidden, discord.HTTPException):
-        could_dm = False
-    return await ctx.send(
-        f"<@​&{COACH_ROLE}>, <@​&{MOD_ROLE}>, {member.mention} got locked for spamming commands. I could {'not dm them' if not could_dm else 'dm them.'}")
-
-
 class FuryBot(commands.Bot):
     def __init__(self) -> None:
         super().__init__(
@@ -161,10 +118,7 @@ class FuryBot(commands.Bot):
         print(f"{self.user} ready: {self.user.id}")
         if not self.persistent_views:
             self.add_view(ReactionView(), message_id=880941707791839252)
-
-    async def on_message(self, message: discord.Message) -> None:
-        await self.process_commands(message)
-
+            
     async def on_error(self, event, *args, **kwargs):
         type, value, traceback_str = sys.exc_info()
         if not type:
@@ -185,43 +139,9 @@ class FuryBot(commands.Bot):
     ) -> discord.Message:
         channel = self.get_channel(LOGGING_CHANNEL) or (await self.fetch_channel(LOGGING_CHANNEL))
         return await channel.send(*args, **kwargs)
-
-    async def get_context(self, message, *, cls=Context):
-        return await super().get_context(message, cls=cls)
-
-    async def process_commands(self, message: discord.Message) -> None:
-        """
-        Edited [RoboDanny](https://github.com/Rapptz/RoboDanny) blacklist feature.
-        
-        https://github.com/Rapptz/RoboDanny/blob/0dfa21599da76e84c2f8e7fde0c132ec93c840a8/bot.py#L315-L347
-        """
-        ctx = await self.get_context(message)
-
-        if ctx.guild is None:
-            return await self.invoke(ctx)
-
-        if not isinstance(ctx.author, discord.User):
-            role = discord.utils.get(ctx.guild.roles, id=BYPASS_FURY)  # Bypass Fury Role
-            if role in ctx.author.roles:
-                return await self.invoke(ctx)
-
-        bucket = self.spam_control.get_bucket(message)
-        current = message.created_at.replace(tzinfo=datetime.timezone.utc).timestamp()
-        retry_after = bucket.update_rate_limit(current)
-        author_id = message.author.id
-
-        if retry_after and author_id != self.owner_id:
-            self._auto_spam_count[author_id] += 1
-            if self._auto_spam_count[author_id] >= 5:
-                del self._auto_spam_count[author_id]
-                await log_spammer(ctx, message, retry_after, autoblock=True)
-            else:
-                await log_spammer(ctx, message, retry_after)
-            return
-        else:
-            self._auto_spam_count.pop(author_id, None)
-
-        await self.invoke(ctx)
+    
+    async def get_context(self, interaction: discord.Interaction, *, cls=Context):
+        return await super().get_context(interaction, cls=cls)
 
     async def on_command_error(self, ctx: commands.Context, error: Union[commands.CommandError, Exception]) -> Optional[
         discord.Message]:
