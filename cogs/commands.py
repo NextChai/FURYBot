@@ -40,9 +40,10 @@ class Commands(commands.Cog):
             return await ctx.send(source_url)
     
         obj = self.bot.get_pending_command(command.replace('.', ' '), only_guild=True)
-        if obj is None:
+        if not obj:
             return await ctx.send('Could not find command.')
-
+        obj = obj[0]
+        
         # since we found the command we're looking for, presumably anyway, let's
         # try to access the code itself
         src = obj.callback.__code__
