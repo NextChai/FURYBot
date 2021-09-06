@@ -5,13 +5,16 @@ import inspect
 import discord
 from discord.ext import commands
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from bot import FuryBot
 
 
 class Commands(commands.Cog):
     """General commands"""
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: FuryBot = bot
         
     @commands.slash()
     @commands.has_permissions(manage_messages=True)
@@ -36,7 +39,7 @@ class Commands(commands.Cog):
         if not command:
             return await ctx.send(source_url)
     
-        obj = self.bot.get_command(command.replace('.', ' '))
+        obj = self.bot.get_command(command.replace('.', ' '), guild_specific=True)
         if obj is None:
             return await ctx.send('Could not find command.')
 
@@ -49,7 +52,7 @@ class Commands(commands.Cog):
         lines, first_line = inspect.getsourcelines(src)
         if not module.startswith('discord'):
             # not a built-in command
-            location = os.path.relpath(filename).replace('\\', '/')
+            location = os.path.relpath(filename).replace('\\', '/') # type: ignore
         else:
             location = module.replace('.', '/') + '.py'
 
