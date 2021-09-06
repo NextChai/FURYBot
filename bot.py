@@ -34,7 +34,6 @@ from cogs.utils.constants import (
 
 initial_extensions = (
     "cogs.commands",
-    'cogs.overwatch',
     "cogs.owner",
     'cogs.tasks',
     'cogs.events.link_checker',

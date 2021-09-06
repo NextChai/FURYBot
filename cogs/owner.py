@@ -7,7 +7,7 @@ class Owner(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
     
-    @commands.command(brief="See any errors found inside of the bot.")
+    @commands.slash(description="See any errors found inside of the bot.")
     @commands.is_owner()
     async def errors(self, ctx):
         if not hasattr(self.bot, 'command_errors'):
@@ -28,7 +28,7 @@ class Owner(commands.Cog):
             e.add_field(name=error.get('name'), value=f"**Count:** {error.get('count')}\nJump: {jumps}\nTraceback: {error.get('traceback')[0]}")
         await ctx.send(embed=e)
         
-    @commands.command(brief="Reset the errors found inside of the bot.")
+    @commands.slash(description="Reset the errors found inside of the bot.")
     @commands.is_owner()
     async def reset_errors(self, ctx):
         if not hasattr(self.bot, "command_errors"):
