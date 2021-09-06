@@ -66,7 +66,6 @@ class FuryBot(commands.Bot):
         # Spam control
         self.spam_control: CooldownMapping = CooldownMapping.from_cooldown(10, 10, commands.BucketType.member)
         self._auto_spam_count: Counter = Counter()
-        self.command_errors: Dict[Any, Any] = {}
 
         self.Embed: discord.Embed = Embed
         self.session: aiohttp.ClientSession = aiohttp.ClientSession()
@@ -183,17 +182,8 @@ class FuryBot(commands.Bot):
             e.description = f"You have too many arguments in this command! Try **{ctx.prefix}help {ctx.command.name}** for some more info on how to use this command."
             return await ctx.send(embed=e)
 
-        try:
-            self.command_errors[ctx.command.name]['count'] += 1
-            self.command_errors[ctx.command.name]['jump'].append(ctx.message.jump_url)
-        except KeyError:
-            self.command_errors[ctx.command.name] = {'count': 0, 'jump': [], 'traceback': []}
-            self.command_errors[ctx.command.name]['count'] += 1
-            self.command_errors[ctx.command.name]['jump'].append(ctx.message.jump_url)
-
         exc = getattr(error, 'original', error)
         error_traceback = ''.join(trace_lib.format_exception(exc.__class__, exc, exc.__traceback__))
-        self.command_errors[ctx.command.name]['traceback'].append(error_traceback)
 
         lines = f'Ignoring exception in command {ctx.command}:\n```py\n{error_traceback}```'
         await self.send_to_log_channel(embed=discord.Embed(description=lines))
