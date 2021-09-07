@@ -26,9 +26,6 @@ from cogs.utils.context import Context
 from cogs.utils.types import LockedOut
 from cogs.utils.constants import (
     LOGGING_CHANNEL,
-    COACH_ROLE,
-    MOD_ROLE,
-    BYPASS_FURY
 )
 
 initial_extensions = (
@@ -74,7 +71,7 @@ class FuryBot(commands.Bot):
         self.ACTIVITY_MESSAGE = 'over the server.'
         self.ACTIVITY_TYPE = discord.ActivityType.watching
 
-        self.locked_out: LockedOut = {}
+        self.locked_out: LockedOut = {} # type: ignore
 
         self.trnAPIHeaders = None
         self.nsfwAPI = None
