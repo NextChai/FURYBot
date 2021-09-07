@@ -26,7 +26,7 @@ class Owner(commands.Cog):
     ) -> None:
         members = [m for m in ctx.args if isinstance(m, discord.Member)]
         overwrites = {m: discord.PermissionOverwrite(connect=True, send_messages=True, view_channel=True) for m in members}
-        overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(connect=False, send_messages=False, view_channel=True)
+        overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(connect=False, send_messages=False, view_channel=False)
         
         category = await ctx.guild.create_category(category_name)
         text = await category.create_text_channel(text_name, overwrites=overwrites)
