@@ -14,9 +14,7 @@ class Owner(commands.Cog):
     async def createteam(
         self, 
         ctx: commands.Context, 
-        category_name: str,
-        text_name: str,
-        voice_name: str,
+        team_name: str,
         mem1: discord.Member,
         mem2: discord.Member,
         mem3: discord.Member,
@@ -28,9 +26,10 @@ class Owner(commands.Cog):
         overwrites = {m: discord.PermissionOverwrite(connect=True, send_messages=True, view_channel=True) for m in members}
         overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(connect=False, send_messages=False, view_channel=False)
         
-        category = await ctx.guild.create_category(category_name)
-        text = await category.create_text_channel(text_name, overwrites=overwrites)
-        voice = await category.create_voice_channel(voice_name, overwrites=overwrites)
+        
+        category = await ctx.guild.create_category(team_name)
+        text = await category.create_text_channel(team_name.replace(' ', '-'), overwrites=overwrites)
+        voice = await category.create_voice_channel(f'{team_name} Voice', overwrites=overwrites)
 
         embed = discord.Embed(
             title='Done!',
