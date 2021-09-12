@@ -21,6 +21,7 @@ import discord
 from discord.ext import commands
 from discord.ext.commands.cooldowns import CooldownMapping
 
+from cogs.utils.profanity import Profanity
 from cogs.reactions import ReactionView
 from cogs.utils.context import Context
 from cogs.utils.types import LockedOut
@@ -92,14 +93,9 @@ class FuryBot(commands.Bot):
         custom_words: List[str] = ['chode', 'dick']
         
         with open(f"{self.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
-            extra_profanity = f.readlines()
-            extra_profanity = list(dict.fromkeys(extra_profanity))  # clear up duplicates
+            extra_profanity = [word.replace('\n', '') for word in f.readlines()]
             extra_profanity += custom_words
             self.profanity.add_censor_words(extra_profanity)
-            
-        with open(f"{self.DEFAULT_BASE_PATH}/txt/whitelist.txt", 'r') as f:
-            whitelist = [entry.replace('\n', '') for entry in f.readlines()]
-        logging.info(f'Whitelist: {whitelist}')
             
         for index, string in enumerate(self.profanity.CENSOR_WORDSET):
             if self.profanity.CENSOR_WORDSET[index]._original.isdigit():
@@ -128,11 +124,7 @@ class FuryBot(commands.Bot):
         if guild.id not in {757664675864248360, 851939009144029224}:
             await guild.leave()
 
-    async def send_to_log_channel(
-        self,
-        *args,
-        **kwargs
-    ) -> discord.Message:
+    async def send_to_log_channel(self, *args, **kwargs) -> discord.Message:
         channel = self.get_channel(LOGGING_CHANNEL) or (await self.fetch_channel(LOGGING_CHANNEL))
         return await channel.send(*args, **kwargs)
     
