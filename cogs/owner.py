@@ -93,7 +93,7 @@ class Owner(commands.Cog):
         
     @commands.slash()
     @commands.has_permissions(manage_channels=True)
-    async def cog_reload(self, ctx, extension: str) -> None:
+    async def reload_ext(self, ctx, extension: str) -> None:
         try:
             self.bot.reload_extension(extension)
         except Exception as exc:
