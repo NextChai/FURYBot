@@ -42,14 +42,14 @@ class Owner(commands.Cog):
     async def filter(self):
         pass
     
-    @filter.command()
+    @filter.slash()
     @commands.has_permissions(manage_channels=True)
     async def add(self, ctx, word: str) -> None:
         async with aiofile.async_open('txt/profanity.txt', 'a') as f:
             await f.write(f'\n{word}')
         return await ctx.send("Added {word} to the whitelist.", empheral=True)
     
-    @filter.command()
+    @filter.slash()
     @commands.has_permissions(manage_channels=True)
     async def remove(self, ctx, word: str) -> None:
         async with aiofile.async_open('txt/profanity.txt', 'r') as f:
