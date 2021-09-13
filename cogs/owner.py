@@ -37,8 +37,14 @@ class Owner(commands.Cog):
         return await ctx.send(embed=embed)
     
     @commands.slash()
-    async def testcensor(self, ctx, message: str):
+    @commands.is_owner()
+    async def contains_profanity(self, ctx, message: str):
         return await ctx.send(str(await self.bot.profanity.contains_profanity(message)))
+    
+    @commands.slash()
+    @commands.is_owner()
+    async def censor(self, ctx, message: str):
+        return await ctx.send(str(await self.bot.profanity.censor(message)))
     
 def setup(bot):
     bot.add_cog(Owner(bot))
