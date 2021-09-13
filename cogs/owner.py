@@ -52,7 +52,11 @@ class Owner(commands.Cog):
         except commands.ExtensionNotLoaded:
             self.bot.load_extension(module)
             
-    @commands.slash(description='Update the version of dpy')
+    @commands.group()
+    async def jsk(self):
+        pass
+    
+    @jsk.slash(description='Update the version of dpy')
     @commands.is_owner()
     async def dpy(self, ctx):
         async with ctx.typing():
@@ -65,9 +69,12 @@ class Owner(commands.Cog):
             return await ctx.send(stdout or 'Updated')
         except Exception:
             return await ctx.send("Updated.")
-        
-        
-    @commands.slash(description='Git pull to update the bot.')
+    
+    @jsk.group()
+    async def git(self):
+        pass
+    
+    @git.slash(description='Git pull to update the bot.')
     @commands.has_permissions(kick_members=True)
     async def pull(self, ctx):
         async with ctx.typing():
@@ -106,12 +113,8 @@ class Owner(commands.Cog):
                     statuses.append((ctx.tick(True), module))
 
         await ctx.send('\n'.join(f'{status}: `{module}`' for status, module in statuses))
-        
-    @commands.group()
-    async def extension(self):
-        pass
-        
-    @extension.slash()
+
+    @jsk.slash()
     @commands.has_permissions(manage_channels=True)
     async def reload(self, ctx, extension: str) -> None:
         try:
@@ -122,7 +125,7 @@ class Owner(commands.Cog):
             return await ctx.send(lines)
         return await ctx.send(f'Reloaded {extension} sucessfully.')
     
-    @extension.slash()
+    @jsk.slash()
     @commands.has_permissions(manage_channels=True)
     async def unload(self, ctx, extension: str) -> None:
         try:
@@ -133,7 +136,7 @@ class Owner(commands.Cog):
             return await ctx.send(lines)
         return await ctx.send(f'Unloaded {extension} sucessfully.')
     
-    @extension.slash()
+    @jsk.slash()
     @commands.has_permissions(manage_channels=True)
     async def load(self, ctx, extension: str) -> None:
         try:
@@ -200,12 +203,14 @@ class Owner(commands.Cog):
     @commands.slash()
     @commands.is_owner()
     async def contains_profanity(self, ctx, message: str):
-        return await ctx.send(str(self.bot.profanity.is_profane(message)))
+        msg = await self.bot.loop.run_in_executor(None, self.bot.profanity.is_profane, message)
+        return await ctx.send(str(msg))
     
     @commands.slash()
     @commands.is_owner()
     async def censor(self, ctx, message: str):
-        return await ctx.send(str(self.bot.profanity.censor(message)))
+        msg = await self.bot.loop.run_in_executor(None, self.bot.profanity.censor, message)
+        return await ctx.send(str(msg))
     
 def setup(bot):
     bot.add_cog(Owner(bot))

@@ -18,6 +18,7 @@ import discord
 from discord.ext import commands
 from discord.ext.commands.cooldowns import CooldownMapping
 
+from cogs.utils import profanity
 from cogs.reactions import ReactionView
 from cogs.utils.context import Context
 from cogs.utils.types import LockedOut
@@ -84,13 +85,11 @@ class FuryBot(commands.Bot):
         self._load_filters()
                 
     def _load_filters(self):
-        
-        # whitelist = ['omg', 'lmfao', 'lmao', 'a ', 'i ']
         with open(f"{self.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
-            profanity = [word.replace('\n', '') for word in f.readlines()]
+            extra_profanity = [word.replace('\n', '') for word in f.readlines()]
+            updated = profanity.Profanity(swears=extra_profanity, loop=self.loop)  # We use this to build mapping.
         
-        #self.profanity = ProfanityFilter(extra_censor_list=profanity) 
-        self.profanity = ProfanityFilter() 
+        self.profanity = ProfanityFilter(extra_censor_list=updated.swears) 
             
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
