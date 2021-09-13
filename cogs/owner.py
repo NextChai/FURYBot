@@ -1,9 +1,13 @@
 import discord
 from discord.ext import commands
 
+import sys
+import importlib
+import re
+import os
 import traceback
+import asyncio
 import subprocess
-import functools
 import aiofile
 
 from typing import Optional
@@ -14,12 +18,78 @@ class Owner(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         
+    async def run_process(self, command):
+        try:
+            process = await asyncio.create_subprocess_shell(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            result = await process.communicate()
+        except NotImplementedError:
+            process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            result = await self.bot.loop.run_in_executor(None, process.communicate)
+
+        return [output.decode() for output in result]
+    
+    def find_modules_from_git(self, output):
+        files = self._GIT_PULL_REGEX.findall(output)
+        ret = []
+        for file in files:
+            root, ext = os.path.splitext(file)
+            if ext != '.py':
+                continue
+
+            if root.startswith('cogs/'):
+                # A submodule is a directory inside the main cog directory for
+                # my purposes
+                ret.append((root.count('/') - 1, root.replace('/', '.')))
+
+        # For reload order, the submodules should be reloaded first
+        ret.sort(reverse=True)
+        return ret
+    
+    def reload_or_load_extension(self, module):
+        try:
+            self.bot.reload_extension(module)
+        except commands.ExtensionNotLoaded:
+            self.bot.load_extension(module)
+        
     @commands.slash(description='Git pull to update the bot.')
     @commands.has_permissions(kick_members=True)
     async def pull(self, ctx):
-        func = functools.partial(subprocess.run, ["git", "pull"], check=True, stdout=subprocess.PIPE)
-        result = await self.bot.loop.run_in_executor(None, func)
-        return await ctx.send(f'```python\n{result.stdout}\n```')
+        async with ctx.typing():
+            stdout, stderr = await self.run_process('git pull')
+            
+        if stdout.startswith('Already up-to-date.'):
+            return await ctx.send(stdout)
+        
+        modules = self.find_modules_from_git(stdout)
+        mods_text = '\n'.join(f'{index}. `{module}`' for index, (_, module) in enumerate(modules, start=1))
+        prompt_text = f'This will update the following modules, are you sure?\n{mods_text}'
+        confirm = await ctx.prompt(prompt_text, reacquire=False)
+        if not confirm:
+            return await ctx.send('Aborting.')
+        
+        statuses = []
+        for is_submodule, module in modules:
+            if is_submodule:
+                try:
+                    actual_module = sys.modules[module]
+                except KeyError:
+                    statuses.append((ctx.tick(None), module))
+                else:
+                    try:
+                        importlib.reload(actual_module)
+                    except Exception as e:
+                        statuses.append((ctx.tick(False), module))
+                    else:
+                        statuses.append((ctx.tick(True), module))
+            else:
+                try:
+                    self.reload_or_load_extension(module)
+                except commands.ExtensionError:
+                    statuses.append((ctx.tick(False), module))
+                else:
+                    statuses.append((ctx.tick(True), module))
+
+        await ctx.send('\n'.join(f'{status}: `{module}`' for status, module in statuses))
         
     @commands.slash()
     @commands.has_permissions(manage_channels=True)
