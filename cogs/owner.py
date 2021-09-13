@@ -18,8 +18,8 @@ class Owner(commands.Cog):
     @commands.has_permissions(kick_members=True)
     async def pull(self, ctx):
         func = functools.partial(subprocess.run, ["git", "pull"], check=True, stdout=subprocess.PIPE)
-        result = await self.bot.loop.run_in_executor(None, func).stdout
-        return await ctx.send(f'```python\n{result}\n```')
+        result = await self.bot.loop.run_in_executor(None, func)
+        return await ctx.send(f'```python\n{result.stdout}\n```')
         
     @commands.slash()
     @commands.has_permissions(manage_channels=True)
@@ -61,24 +61,24 @@ class Owner(commands.Cog):
         return await ctx.send(embed=embed)
     
     @commands.group()
-    async def filter(self):
+    async def whitelist(self):
         pass
     
-    @filter.slash()
+    @whitelist.slash()
     @commands.has_permissions(manage_channels=True)
     async def add(self, ctx, word: str) -> None:
         async with aiofile.async_open('txt/profanity.txt', 'a') as f:
             await f.write(f'\n{word}')
-        return await ctx.send("Added {word} to the whitelist.", ephemeral=True)
+        return await ctx.send(f"Added {word} to the whitelist.", ephemeral=True)
     
-    @filter.slash()
+    @whitelist.slash()
     @commands.has_permissions(manage_channels=True)
     async def remove(self, ctx, word: str) -> None:
         async with aiofile.async_open('txt/profanity.txt', 'r') as f:
             data = await f.read()
             words = [w.replace('\n', '') for w in data]
         
-        cleaned = [w for w in words if w.lower() != word.lower()]
+        cleaned = [w for w in words if w != word]
         async with aiofile.async_open('txt/profanity.txt', 'w') as f:
             await f.write('\n'.join(cleaned))  
         
