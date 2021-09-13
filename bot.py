@@ -5,6 +5,7 @@ import traceback as trace_lib
 from collections import Counter
 
 import urlextract
+import better_profanity
 
 from typing import (
     Optional,
@@ -82,10 +83,15 @@ class FuryBot(commands.Bot):
         self._load_filters()
                 
     def _load_filters(self):
+        self.profanity = better_profanity.profanity
+        
         with open(f"{self.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
             profanity = [word.replace('\n', '') for word in f.readlines()]
-            
-        self.profanity = Profanity(swears=profanity, loop=self.loop)
+            self.profanity.add_censor_words(profanity)
+        
+        for index, string in enumerate(self.profanity.CENSOR_WORDSET):
+            if self.profanity.CENSOR_WORDSET[index]._original.isdigit():
+                self.profanity.CENSOR_WORDSET.pop(index)
             
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
