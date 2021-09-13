@@ -37,12 +37,12 @@ class BaseEvent(commands.Cog):
     async def contains_profanity(self, message: str) -> bool:
         if not self.bot.profanity:
             return False
-        return await self.bot.loop.run_in_executor(None, self.bot.profanity.contains_profanity, message)
+        return await self.profanity.contains_profanity(message)
 
     async def censor(self, message: str) -> str:
         if not self.bot.profanity:
             return 'Profanity filter not loaded'
-        return await self.bot.loop.run_in_executor(None, self.bot.profanity.censor, message)
+        return await self.profanity.censor(message)
 
     async def get_links(self, message: str) -> Union[None, List[str]]:
         if not self.bot.extractor:
