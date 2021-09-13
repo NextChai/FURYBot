@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Dict, Iterable, List, Set, Union
+from typing import Any, ClassVar, Dict, Iterable, List, Set, Union, Tuple
 import asyncio
 
 class Profanity:
@@ -8,7 +8,8 @@ class Profanity:
         'd': ['b'],
         't': ['7'],
         'o': ['0'],
-        's': ['$']
+        's': ['$'],
+        'y': ['i', 'ie']
     }  
     
     def __init__(self, *, swears: Iterable[Any], loop):
@@ -38,18 +39,41 @@ class Profanity:
     def is_set(self) -> bool:
         return self.event.is_set()
     
-    async def contains_profanity(self, message: str) -> bool:
+    async def get_data(self, message: str, *, want_bool: bool = True, want_censor: bool = False, want_packet: bool = False) -> Union[bool, str, Tuple[bool, str]]:
         await self.event.wait()
         
+        placeholder = message
+        has_failed = False
         cleaned = message.replace(' ', '')
         temp = ''
+        
         for tries in range(len(cleaned)):
             for char in cleaned:
                 temp += char
                 if temp in self.swears:
-                    return True
+                    if want_bool:
+                        return True
+                    elif want_censor or want_packet:
+                        placeholder = placeholder.replace(temp, '*'*len(temp))
+                        has_failed = True
+                    
             temp = ''
             cleaned = cleaned[1:]
-        return False
-
             
+        if want_bool:
+            return False
+        if want_censor:
+            return placeholder
+        
+        # want packet
+        return has_failed, placeholder
+    
+    async def contains_profanity(self, message: str) -> bool:
+        return await self.get_data(message, want_bool=True) # type: ignore
+
+    async def censor(self, message: str) -> bool:
+        return await self.get_data(message, want_censor=True, want_bool=False) # type: ignore
+    
+    async def contains_and_censor(self, message: str) -> Tuple[bool, str]:
+        return await self.get_data(message, want_packet=True, want_bool=False) # type: ignore
+    

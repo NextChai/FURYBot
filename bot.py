@@ -1,20 +1,14 @@
 import os
 import sys
-import logging
-import datetime
 import aiohttp
 import traceback as trace_lib
 from collections import Counter
 
 import urlextract
-import better_profanity
 
 from typing import (
     Optional,
     Union,
-    Dict,
-    Any,
-    List
 )
 
 import discord
@@ -89,20 +83,11 @@ class FuryBot(commands.Bot):
         self._load_filters()
                 
     def _load_filters(self):
-        self.profanity = better_profanity.profanity
-        custom_words: List[str] = ['chode', 'dick']
-        
         with open(f"{self.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
-            extra_profanity = [word.replace('\n', '') for word in f.readlines()]
-            extra_profanity += custom_words
-            self.profanity.add_censor_words(extra_profanity)
+            profanity = [word.replace('\n', '') for word in f.readlines()]
             
-        for index, string in enumerate(self.profanity.CENSOR_WORDSET):
-            if self.profanity.CENSOR_WORDSET[index]._original.isdigit():
-                self.profanity.CENSOR_WORDSET.pop(index)
-            if string._original in whitelist:
-                self.profanity.CENSOR_WORDSET.pop(index)
-                
+        self.profanity = Profanity(swears=profanity, loop=self.loop)
+            
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
 
