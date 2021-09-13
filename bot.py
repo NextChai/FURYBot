@@ -89,7 +89,8 @@ class FuryBot(commands.Bot):
         with open(f"{self.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
             profanity = [word.replace('\n', '') for word in f.readlines()]
         
-        self.profanity = ProfanityFilter(extra_censor_list=profanity) 
+        #self.profanity = ProfanityFilter(extra_censor_list=profanity) 
+        self.profanity = ProfanityFilter() 
             
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
