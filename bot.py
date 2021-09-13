@@ -93,6 +93,9 @@ class FuryBot(commands.Bot):
             if self.profanity.CENSOR_WORDSET[index]._original.isdigit():
                 self.profanity.CENSOR_WORDSET.pop(index)
             
+            if self.profanity.CENSOR_WORDSET[index]._original not in profanity:
+                self.profanity.CENSOR_WORDSET.pop(index)
+            
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
 
