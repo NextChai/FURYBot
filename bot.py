@@ -98,7 +98,7 @@ class FuryBot(commands.Bot):
             if string._original not in profanity:
                 self.profanity.CENSOR_WORDSET.pop(index)
         
-        for index, string in enum(self.profanity.CENSOR_WORDSET):
+        for index, string in enumerate(self.profanity.CENSOR_WORDSET):
             if string._original in whitelist:
                 self.profanity.CENSOR_WORDSET.pop(index)
             
