@@ -92,9 +92,13 @@ class Owner(commands.Cog):
 
         await ctx.send('\n'.join(f'{status}: `{module}`' for status, module in statuses))
         
-    @commands.slash()
+    @commands.group()
+    async def extension(self):
+        pass
+        
+    @extension.slash()
     @commands.has_permissions(manage_channels=True)
-    async def reload_ext(self, ctx, extension: str) -> None:
+    async def reload(self, ctx, extension: str) -> None:
         try:
             self.bot.reload_extension(extension)
         except Exception as exc:
@@ -102,6 +106,28 @@ class Owner(commands.Cog):
             lines = f'Ignoring exception in command {ctx.command}:\n```py\n{trace}```'
             return await ctx.send(lines)
         return await ctx.send(f'Reloaded {extension} sucessfully.')
+    
+    @extension.slash()
+    @commands.has_permissions(manage_channels=True)
+    async def unload(self, ctx, extension: str) -> None:
+        try:
+            self.bot.unload_extension(extension)
+        except Exception as exc:
+            trace = ''.join(traceback.format_exception(exc.__class__, exc, exc.__traceback__))
+            lines = f'Ignoring exception in command {ctx.command}:\n```py\n{trace}```'
+            return await ctx.send(lines)
+        return await ctx.send(f'Unloaded {extension} sucessfully.')
+    
+    @extension.slash()
+    @commands.has_permissions(manage_channels=True)
+    async def load(self, ctx, extension: str) -> None:
+        try:
+            self.bot.load_extension(extension)
+        except Exception as exc:
+            trace = ''.join(traceback.format_exception(exc.__class__, exc, exc.__traceback__))
+            lines = f'Ignoring exception in command {ctx.command}:\n```py\n{trace}```'
+            return await ctx.send(lines)
+        return await ctx.send(f'Loaded {extension} sucessfully.')
         
     
     @commands.slash()
