@@ -57,6 +57,8 @@ class Owner(commands.Cog):
     async def dpy(self, ctx):
         async with ctx.typing():
             stdout, stderr = await self.run_process('python -m pip install git+https://github.com/NextChai/discord.py --upgrade')
+            
+        print(stdout)
         
         try:
             return await ctx.send(stdout or 'Updated')
