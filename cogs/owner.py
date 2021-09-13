@@ -114,7 +114,7 @@ class Owner(commands.Cog):
             self.bot.unload_extension(extension)
         except Exception as exc:
             trace = ''.join(traceback.format_exception(exc.__class__, exc, exc.__traceback__))
-            lines = f'Ignoring exception in command {ctx.command}:\n```py\n{trace}```'
+            lines = f'Ignoring exception in command {ctx.command.name}:\n```py\n{trace}```'
             return await ctx.send(lines)
         return await ctx.send(f'Unloaded {extension} sucessfully.')
     
@@ -125,7 +125,7 @@ class Owner(commands.Cog):
             self.bot.load_extension(extension)
         except Exception as exc:
             trace = ''.join(traceback.format_exception(exc.__class__, exc, exc.__traceback__))
-            lines = f'Ignoring exception in command {ctx.command}:\n```py\n{trace}```'
+            lines = f'Ignoring exception in command {ctx.command.name}:\n```py\n{trace}```'
             return await ctx.send(lines)
         return await ctx.send(f'Loaded {extension} sucessfully.')
         
