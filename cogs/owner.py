@@ -166,7 +166,7 @@ class Owner(commands.Cog):
     async def add(self, ctx, word: str) -> None:
         async with aiofile.async_open('txt/profanity.txt', 'a') as f:
             await f.write(f'\n{word}')
-        return await ctx.send(f"Added {word} to the whitelist.", ephemeral=True)
+        return await ctx.send(f"Added '{word}' to the whitelist.", ephemeral=True)
     
     @whitelist.slash()
     @commands.has_permissions(manage_channels=True)
@@ -180,7 +180,7 @@ class Owner(commands.Cog):
         async with aiofile.async_open('txt/profanity.txt', 'w') as f:
             await f.write('\n'.join(cleaned))  
         
-        return await ctx.send(f"Removed {to_remove} from the whitelist.")            
+        return await ctx.send(f"Removed '{to_remove}' from the whitelist.")            
     
     @commands.slash()
     @commands.is_owner()
