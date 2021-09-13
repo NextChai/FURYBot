@@ -91,6 +91,10 @@ class FuryBot(commands.Bot):
             self.profanity.add_censor_words(profanity)
         
         for index, string in enumerate(self.profanity.CENSOR_WORDSET):
+            if string._original == 'lmao':
+                print("we found lmao")
+                
+                
             if string._original.isdigit():
                 self.profanity.CENSOR_WORDSET.pop(index)
             
@@ -99,8 +103,6 @@ class FuryBot(commands.Bot):
             
             if string._original in whitelist:
                 self.profanity.CENSOR_WORDSET.pop(index)
-                 
-            
             
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
