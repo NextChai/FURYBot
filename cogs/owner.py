@@ -1,6 +1,8 @@
 import discord
 from discord.ext import commands
 
+import aiofile
+
 from typing import Optional
 
 
@@ -35,6 +37,30 @@ class Owner(commands.Cog):
             title='Done!',
             description=f'Created a category called {category.mention}, a text chanel called {text.mention}, and a voice channel called {voice.mention}')
         return await ctx.send(embed=embed)
+    
+    @commands.group()
+    async def filter(self):
+        pass
+    
+    @filter.command()
+    @commands.has_permissions(manage_channels=True)
+    async def add(self, ctx, word: str) -> None:
+        async with aiofile.async_open('txt/profanity.txt', 'a') as f:
+            await f.write(f'\n{word}')
+        return await ctx.send("Added {word} to the whitelist.", empheral=True)
+    
+    @filter.command()
+    @commands.has_permissions(manage_channels=True)
+    async def remove(self, ctx, word: str) -> None:
+        async with aiofile.async_open('txt/profanity.txt', 'r') as f:
+            data = await f.read()
+            words = [w.replace('\n', '') for w in data]
+        
+        cleaned = [w for w in words if w.lower() != word.lower()]
+        async with aiofile.async_open('txt/profanity.txt', 'w') as f:
+            await f.write('\n'.join(cleaned))  
+        
+        return await ctx.send(f"Removed {word} from the whitelist.")            
     
     @commands.slash()
     @commands.is_owner()
