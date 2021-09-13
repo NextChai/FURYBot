@@ -39,7 +39,7 @@ class ProfanityFilter(BaseEvent, command_attrs=dict(hidden=True)):
         )
         e.set_author(name=str(member), icon_url=member.display_avatar.url)
         e.add_field(name=f"Original message:", value=message.clean_content)
-        e.add_field(name="Clean message:", value=await self.bot.profanity.censor(message.clean_content))
+        e.add_field(name="Clean message:", value=self.bot.profanity.censor(message.clean_content))
 
         try:
             await member.send(embed=e)
@@ -55,6 +55,6 @@ class ProfanityFilter(BaseEvent, command_attrs=dict(hidden=True)):
         )
         log_embed.set_author(name=str(member), icon_url=member.display_avatar.url)
         log_embed.add_field(name=f"Original message:", value=message.clean_content)
-        log_embed.add_field(name="Clean message:", value=await self.bot.profanity.censor(message.clean_content))
+        log_embed.add_field(name="Clean message:", value=self.bot.profanity.censor(message.clean_content))
         log_embed.add_field(name="Could DM member:", value=str(could_dm))
         return await self.bot.send_to_log_channel(content=mention_staff(member.guild), embed=log_embed)
