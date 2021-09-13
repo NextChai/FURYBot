@@ -32,7 +32,7 @@ initial_extensions = (
     'cogs.events.link_checker',
     'cogs.events.nsfw_pfp_checker',
     'cogs.events.on_member_join',
-    'cogs.events.profanity_filter',
+    # 'cogs.events.profanity_filter',
     'cogs.events.status_checker',
 )
 
