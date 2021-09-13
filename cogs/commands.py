@@ -15,7 +15,7 @@ class Commands(commands.Cog):
     """General commands"""
     def __init__(self, bot):
         self.bot: FuryBot = bot
-        
+
     @commands.slash()
     @commands.has_permissions(manage_messages=True)
     async def purge(self, ctx, limit: Optional[int] = 0, oldest_first: Optional[bool] = False):
@@ -57,7 +57,7 @@ class Commands(commands.Cog):
         else:
             location = module.replace('.', '/') + '.py'
 
-        final_url = f'<{source_url}/blob/{branch}/{location}#L{first_line}-L{first_line + len(lines) - 1}>'
+        final_url = f'{source_url}/blob/{branch}/{location}#L{first_line}-L{first_line + len(lines) - 1}'
         await ctx.send(final_url)
 
 

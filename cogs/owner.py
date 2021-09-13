@@ -1,6 +1,9 @@
 import discord
 from discord.ext import commands
 
+import traceback
+import subprocess
+import functools
 import aiofile
 
 from typing import Optional
@@ -10,6 +13,25 @@ class Owner(commands.Cog):
     """Owner commands for the bot. Basically manage it"""
     def __init__(self, bot):
         self.bot = bot
+        
+    @commands.slash(description='Git pull to update the bot.')
+    @commands.has_permissions(kick_members=True)
+    async def pull(self, ctx):
+        func = functools.partial(subprocess.run, ["git", "pull"], check=True, stdout=subprocess.PIPE)
+        result = await self.bot.loop.run_in_executor(None, func).stdout
+        return await ctx.send(f'```python\n{result}\n```')
+        
+    @commands.slash()
+    @commands.has_permissions(manage_channels=True)
+    async def reload(self, ctx, extension: str) -> None:
+        try:
+            self.bot.reload_extension(extension)
+        except Exception as exc:
+            trace = ''.join(traceback.format_exception(exc.__class__, exc, exc.__traceback__))
+            lines = f'Ignoring exception in command {ctx.command}:\n```py\n{trace}```'
+            return await ctx.send(lines)
+        return await ctx.send(f'Reloaded {extension} sucessfully.')
+        
     
     @commands.slash()
     @commands.has_permissions(manage_channels=True)
