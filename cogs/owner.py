@@ -17,6 +17,7 @@ class Owner(commands.Cog):
     """Owner commands for the bot. Basically manage it"""
     def __init__(self, bot):
         self.bot = bot
+        self._GIT_PULL_REGEX = re.compile(r'\s*(?P<filename>.+?)\s*\|\s*[0-9]+\s*[+-]+')
         
     async def run_process(self, command):
         try:
