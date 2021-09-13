@@ -35,8 +35,10 @@ class Owner(commands.Cog):
             title='Done!',
             description=f'Created a category called {category.mention}, a text chanel called {text.mention}, and a voice channel called {voice.mention}')
         return await ctx.send(embed=embed)
-        
-
+    
+    @commands.slash()
+    async def testcensor(self, ctx, message: str):
+        return await ctx.send(str(await self.bot.profanity.contains_profanity(message)))
     
 def setup(bot):
     bot.add_cog(Owner(bot))
