@@ -85,16 +85,22 @@ class FuryBot(commands.Bot):
     def _load_filters(self):
         self.profanity = better_profanity.profanity
         
+        whitelist = ['omg', 'lmfao', 'lmao']
         with open(f"{self.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
             profanity = [word.replace('\n', '') for word in f.readlines()]
             self.profanity.add_censor_words(profanity)
         
         for index, string in enumerate(self.profanity.CENSOR_WORDSET):
-            if self.profanity.CENSOR_WORDSET[index]._original.isdigit():
+            if string._original.isdigit():
                 self.profanity.CENSOR_WORDSET.pop(index)
             
-            if self.profanity.CENSOR_WORDSET[index]._original not in profanity:
+            if string._original not in profanity:
                 self.profanity.CENSOR_WORDSET.pop(index)
+            
+            if string._original in whitelist:
+                self.profanity.CENSOR_WORDSET.pop(index)
+                 
+            
             
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
