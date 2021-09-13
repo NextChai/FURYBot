@@ -6,7 +6,8 @@ import traceback as trace_lib
 from collections import Counter
 
 import urlextract
-import better_profanity
+from profanityfilter import ProfanityFilter
+
 
 from typing import (
     Optional,
@@ -17,7 +18,6 @@ import discord
 from discord.ext import commands
 from discord.ext.commands.cooldowns import CooldownMapping
 
-from cogs.utils.profanity import Profanity
 from cogs.reactions import ReactionView
 from cogs.utils.context import Context
 from cogs.utils.types import LockedOut
@@ -84,20 +84,13 @@ class FuryBot(commands.Bot):
         self._load_filters()
                 
     def _load_filters(self):
-        self.profanity = better_profanity.profanity
         
-        whitelist = ['omg', 'lmfao', 'lmao', 'a ', 'i ']
+        # whitelist = ['omg', 'lmfao', 'lmao', 'a ', 'i ']
         with open(f"{self.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
             profanity = [word.replace('\n', '') for word in f.readlines()]
-            self.profanity.add_censor_words(profanity)
         
-        for index, string in enumerate(self.profanity.CENSOR_WORDSET):
-            if string._original.isdigit():
-                self.profanity.CENSOR_WORDSET.pop(index)
+        self.profanity = ProfanityFilter(extra_censor_list=profanity) 
             
-            if string._original not in profanity:
-                self.profanity.CENSOR_WORDSET.pop(index)
-        
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
 
