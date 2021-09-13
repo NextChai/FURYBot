@@ -28,7 +28,6 @@ initial_extensions = (
     "cogs.owner",
     'cogs.tasks',
     'cogs.events.link_checker',
-    'cogs.events.nsfw_name_checker',
     'cogs.events.nsfw_pfp_checker',
     'cogs.events.on_member_join',
     'cogs.events.profanity_filter',
