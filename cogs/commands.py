@@ -34,7 +34,7 @@ class Commands(commands.Cog):
     async def source(self, ctx: commands.Context, command: Optional[str] = None) -> None:
         """View the Source code for the bot."""
         
-        source_url = '<https://github.com/NextChai/FURYBot>'
+        source_url = 'https://github.com/NextChai/FURYBot'
         branch = "main"
         if not command:
             return await ctx.send(source_url)
@@ -57,7 +57,7 @@ class Commands(commands.Cog):
         else:
             location = module.replace('.', '/') + '.py'
 
-        final_url = f'{source_url}/blob/{branch}/{location}#L{first_line}-L{first_line + len(lines) - 1}'
+        final_url = f'<{source_url}/blob/{branch}/{location}#L{first_line}-L{first_line + len(lines) - 1}>'
         await ctx.send(final_url)
 
 
