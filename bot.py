@@ -1,3 +1,4 @@
+import enum
 import os
 import sys
 import aiohttp
@@ -91,16 +92,13 @@ class FuryBot(commands.Bot):
             self.profanity.add_censor_words(profanity)
         
         for index, string in enumerate(self.profanity.CENSOR_WORDSET):
-            if string._original == 'lmao':
-                print("we found lmao")
-                
-                
             if string._original.isdigit():
                 self.profanity.CENSOR_WORDSET.pop(index)
             
             if string._original not in profanity:
                 self.profanity.CENSOR_WORDSET.pop(index)
-            
+        
+        for index, string in enum(self.profanity.CENSOR_WORDSET):
             if string._original in whitelist:
                 self.profanity.CENSOR_WORDSET.pop(index)
             
