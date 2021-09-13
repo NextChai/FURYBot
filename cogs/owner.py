@@ -23,7 +23,7 @@ class Owner(commands.Cog):
         
     @commands.slash()
     @commands.has_permissions(manage_channels=True)
-    async def reload(self, ctx, extension: str) -> None:
+    async def cog_reload(self, ctx, extension: str) -> None:
         try:
             self.bot.reload_extension(extension)
         except Exception as exc:
@@ -78,11 +78,12 @@ class Owner(commands.Cog):
             data = await f.read()
             words = [w.replace('\n', '') for w in data]
         
-        cleaned = [w for w in words if w != word]
+        to_remove = [w for w in words if w == word]
+        cleaned = [w for w in words if w not in to_remove]
         async with aiofile.async_open('txt/profanity.txt', 'w') as f:
             await f.write('\n'.join(cleaned))  
         
-        return await ctx.send(f"Removed {word} from the whitelist.")            
+        return await ctx.send(f"Removed {to_remove} from the whitelist.")            
     
     @commands.slash()
     @commands.is_owner()
