@@ -200,12 +200,14 @@ class Owner(commands.Cog):
     @commands.slash()
     @commands.is_owner()
     async def contains_profanity(self, ctx, message: str):
-        return await ctx.send(str(self.bot.profanity.is_profane(message)))
+        msg = await self.bot.loop.run_in_executor(None, self.bot.profanity.is_profane, message)
+        return await ctx.send(str(msg))
     
     @commands.slash()
     @commands.is_owner()
     async def censor(self, ctx, message: str):
-        return await ctx.send(str(self.bot.profanity.censor(message)))
+        msg = await self.bot.loop.run_in_executor(None, self.bot.profanity.censor, message)
+        return await ctx.send(str(msg))
     
 def setup(bot):
     bot.add_cog(Owner(bot))

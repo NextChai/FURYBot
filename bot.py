@@ -85,6 +85,7 @@ class FuryBot(commands.Bot):
                 
     def _load_filters(self):
         
+        
         # whitelist = ['omg', 'lmfao', 'lmao', 'a ', 'i ']
         with open(f"{self.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
             profanity = [word.replace('\n', '') for word in f.readlines()]
