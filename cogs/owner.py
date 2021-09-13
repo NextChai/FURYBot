@@ -191,7 +191,7 @@ class Owner(commands.Cog):
     async def remove(self, ctx, word: str) -> None:
         async with aiofile.async_open('txt/profanity.txt', 'r') as f:
             data = await f.read()
-            words = [w.replace('\n', '') for w in data]
+            words = data.split('\n')
         
         to_remove = [w for w in words if w == word]
         cleaned = [w for w in words if w not in to_remove]
