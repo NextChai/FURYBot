@@ -59,7 +59,7 @@ class Owner(commands.Cog):
             stdout, stderr = await self.run_process('python -m pip install git+https://github.com/NextChai/discord.py --upgrade')
         
         try:
-            return await ctx.send(stdout)
+            return await ctx.send(stdout or 'Updated')
         except Exception:
             return await ctx.send("Updated.")
         
