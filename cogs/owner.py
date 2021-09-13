@@ -51,6 +51,18 @@ class Owner(commands.Cog):
             self.bot.reload_extension(module)
         except commands.ExtensionNotLoaded:
             self.bot.load_extension(module)
+            
+    @commands.slash(description='Update the version of dpy')
+    @commands.is_owner()
+    async def dpy(self, ctx):
+        async with ctx.typing():
+            stdout, stderr = await self.run_process('python -m pip install git+https://github.com/NextChai/discord.py --upgrade')
+        
+        try:
+            return await ctx.send(stdout)
+        except Exception:
+            return await ctx.send("Updated.")
+        
         
     @commands.slash(description='Git pull to update the bot.')
     @commands.has_permissions(kick_members=True)
