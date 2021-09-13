@@ -200,7 +200,7 @@ class Owner(commands.Cog):
     @commands.slash()
     @commands.is_owner()
     async def contains_profanity(self, ctx, message: str):
-        return await ctx.send(str(self.bot.profanity.contains_profanity(message)))
+        return await ctx.send(str(self.bot.profanity.is_profane(message)))
     
     @commands.slash()
     @commands.is_owner()
