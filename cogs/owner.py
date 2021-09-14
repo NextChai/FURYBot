@@ -172,7 +172,7 @@ class Owner(commands.Cog):
         env.update(globals())
 
         stdout = io.StringIO()
-        to_compile = f'async def func():\n{textwrap.indent(body, "  ")}'
+        to_compile = f'async def func():\n{textwrap.indent(clean, "  ")}'
 
         try:
             exec(to_compile, env)
