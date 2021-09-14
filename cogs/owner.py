@@ -174,17 +174,17 @@ class Owner(commands.Cog):
         return await ctx.send(embed=embed)
     
     @commands.group()
-    async def whitelist(self):
+    async def wordset(self):
         pass
     
-    @whitelist.slash()
+    @wordset.slash(description='Add a word to the profanity checker.')
     @commands.has_permissions(manage_channels=True)
     async def add(self, ctx, word: str) -> None:
         async with aiofile.async_open('txt/profanity.txt', 'a') as f:
             await f.write(f'\n{word}')
         return await ctx.send(f"Added '{word}' to the whitelist.", ephemeral=True)
     
-    @whitelist.slash()
+    @wordset.slash(description='Remove a word to the profanity checker.')
     @commands.has_permissions(manage_channels=True)
     async def remove(self, ctx, word: str) -> None:
         async with aiofile.async_open('txt/profanity.txt', 'r') as f:
