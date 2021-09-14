@@ -83,14 +83,18 @@ class FuryBot(commands.Bot):
             except Exception:
                 trace_lib.print_exc()
                 print()
-        
+
     async def _load_filters(self):
         async with aiofile.async_open('txt/profanity.txt', 'r') as f:
             data = await f.read()
             extra_profanity = data.split('\n')
             
         updated = profanity.Profanity(swears=extra_profanity, loop=self.loop)  # We use this to build mapping.
-        self.profanity = ProfanityFilter(extra_censor_list=updated.swears) 
+        
+        pro = ProfanityFilter() 
+        pro.append_words(updated.swears)
+        self.profanity = pro
+        
         log.info(f"Censor wordset set: {len(updated.swears)} swears loaded.")
             
         self.extractor = urlextract.URLExtract()

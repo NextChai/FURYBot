@@ -37,7 +37,7 @@ class BaseEvent(commands.Cog):
     async def contains_profanity(self, message: str) -> bool:
         if not self.bot.profanity:
             return False
-        return await self.bot.loop.run_in_executor(None, self.bot.profanity.is_profane, message)
+        return await self.bot.loop.run_in_executor(None, self.bot.profanity.has_bad_word, message)
 
     async def censor(self, message: str) -> str:
         if not self.bot.profanity:
