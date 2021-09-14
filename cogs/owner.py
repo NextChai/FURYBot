@@ -182,6 +182,8 @@ class Owner(commands.Cog):
     async def add(self, ctx, word: str) -> None:
         async with aiofile.async_open('txt/profanity.txt', 'a') as f:
             await f.write(f'\n{word}')
+            
+        await self.bot._load_filters()
         return await ctx.send(f"Added '{word}' to the whitelist.", ephemeral=True)
     
     @wordset.slash(description='Remove a word to the profanity checker.')
@@ -196,6 +198,7 @@ class Owner(commands.Cog):
         async with aiofile.async_open('txt/profanity.txt', 'w') as f:
             await f.write('\n'.join(cleaned))  
         
+        await self.bot._load_filters()
         return await ctx.send(f"Removed '{to_remove}' from the whitelist.")            
     
     @commands.slash()

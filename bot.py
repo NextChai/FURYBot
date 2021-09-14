@@ -5,6 +5,7 @@ import aiohttp
 import traceback as trace_lib
 from collections import Counter
 
+import aiofile
 import urlextract
 from profanityfilter import ProfanityFilter
 
@@ -54,6 +55,7 @@ class FuryBot(commands.Bot):
             description=f"The helper bot to assist FLVS Staff.",
             guild_ids=[757664675864248360]
         )
+        self.loop.create_task(self._load_filters()) # Do this first so it can finish faster.
 
         self.DEFAULT_BASE_PATH: str = os.path.dirname(os.path.abspath(__file__))
 
@@ -81,14 +83,13 @@ class FuryBot(commands.Bot):
             except Exception:
                 trace_lib.print_exc()
                 print()
-                
-        self._load_filters()
-                
-    def _load_filters(self):
-        with open(f"{self.DEFAULT_BASE_PATH}/txt/profanity.txt", 'r') as f:
-            extra_profanity = [word.replace('\n', '') for word in f.readlines()]
-            updated = profanity.Profanity(swears=extra_profanity, loop=self.loop)  # We use this to build mapping.
         
+    async def _load_filters(self):
+        async with aiofile.async_open('txt/profanity.txt', 'r') as f:
+            data = await f.read()
+            extra_profanity = data.split('\n')
+            
+        updated = profanity.Profanity(swears=extra_profanity, loop=self.loop)  # We use this to build mapping.
         self.profanity = ProfanityFilter(extra_censor_list=updated.swears) 
             
         self.extractor = urlextract.URLExtract()
