@@ -199,19 +199,30 @@ class Owner(commands.Cog):
             await f.write('\n'.join(cleaned))  
         
         await self.bot._load_filters()
-        return await ctx.send(f"Removed '{to_remove}' from the whitelist.")            
+        return await ctx.send(f"Removed '{to_remove}' from the whitelist.")      
     
-    @commands.slash()
+    @wordset.slash(description='Check if a sentence contains profanity.')
     @commands.is_owner()
     async def contains_profanity(self, ctx, message: str):
         msg = await self.bot.loop.run_in_executor(None, self.bot.profanity.is_profane, message)
         return await ctx.send(str(msg))
     
-    @commands.slash()
+    @wordset.slash(description='Censor a sentence.')
     @commands.is_owner()
     async def censor(self, ctx, message: str):
         msg = await self.bot.loop.run_in_executor(None, self.bot.profanity.censor, message)
         return await ctx.send(str(msg))
+    
+    @wordset.slash(description='Check if a word is found within the profanity list.')
+    @commands.is_owner()
+    async def check(self, ctx, word: str):
+        async with aiofile.async_open('txt/profanity.txt', 'r') as f:
+            data = await f.read()
+            words = set(data.split('\n'))
+        
+        fmt = ' not' if word not in words else ''
+        return await ctx.send(f'I could{fmt} find the word you requested (`{word}`)')
+            
     
 def setup(bot):
     bot.add_cog(Owner(bot))

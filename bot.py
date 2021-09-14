@@ -1,7 +1,7 @@
-import enum
 import os
 import sys
 import aiohttp
+import logging
 import traceback as trace_lib
 from collections import Counter
 
@@ -23,9 +23,9 @@ from cogs.utils import profanity
 from cogs.reactions import ReactionView
 from cogs.utils.context import Context
 from cogs.utils.types import LockedOut
-from cogs.utils.constants import (
-    LOGGING_CHANNEL,
-)
+from cogs.utils.constants import LOGGING_CHANNEL
+
+log = logging.getLogger(__name__)
 
 initial_extensions = (
     "cogs.commands",
@@ -91,6 +91,7 @@ class FuryBot(commands.Bot):
             
         updated = profanity.Profanity(swears=extra_profanity, loop=self.loop)  # We use this to build mapping.
         self.profanity = ProfanityFilter(extra_censor_list=updated.swears) 
+        log.info(f"Censor wordset set: {len(updated.swears)} swears loaded.")
             
         self.extractor = urlextract.URLExtract()
         self.extractor.update()
