@@ -5,6 +5,7 @@ import sys
 import importlib
 import re
 import os
+import textwrap
 import traceback
 import asyncio
 import subprocess
@@ -144,8 +145,7 @@ class Owner(commands.Cog):
             lines = f'Ignoring exception in command {ctx.command.name}:\n```py\n{trace}```'
             return await ctx.send(lines)
         return await ctx.send(f'Loaded {extension} sucessfully.')
-        
-    
+
     @commands.slash()
     @commands.has_permissions(manage_channels=True)
     async def createteam(
