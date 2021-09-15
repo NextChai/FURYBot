@@ -15,6 +15,10 @@ class Commands(commands.Cog):
     """General commands"""
     def __init__(self, bot):
         self.bot: FuryBot = bot
+    
+    @commands.slash(description='View the stages')
+    async def stagelist(self, ctx):
+        return await ctx.send('https://images-ext-1.discordapp.net/external/Jz1pHtpbiWbvLZRUkPzgavrmuVnpC8yA2q_xwIrTnTo/%3Fwidth%3D1202%26height%3D676/https/media.discordapp.net/attachments/874333625305399406/887497243664466010/FLVS_Fury_Stagelist.png')
 
     @commands.slash()
     @commands.has_permissions(manage_messages=True)
