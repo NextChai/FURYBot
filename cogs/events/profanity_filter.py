@@ -12,6 +12,10 @@ def setup(bot):
 class ProfanityFilter(BaseEvent, command_attrs=dict(hidden=True)):
     def __init__(self, bot):
         super().__init__(bot)
+        
+    @commands.Cog.listener()
+    async def on_message_edit(self, before, after):
+        await self.profanity_filter(after)
     
     @commands.Cog.listener("on_message")
     async def profanity_filter(
