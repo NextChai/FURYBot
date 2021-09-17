@@ -40,7 +40,7 @@ class LinkChecker(BaseEvent, command_attrs=dict(hidden=True)):
             # The user posted a link, but we need to check if it's in a valid channel, and
             # if the link is a valid link.
             
-            check = [url for url in urls if re.findall(r'gifyourgame|streamable', url)]  # check for gif your game links
+            check = [url for url in urls if re.findall(r'gifyourgame|streamable|lowkey.gg', url)]  # check for gif your game links
             if not check:  # no gif your game links were sent
                 await message.delete()
             elif len(check) != len(urls):  # The user sent a non-valid link alongside a gif your game link, delete it.
