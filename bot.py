@@ -50,7 +50,7 @@ class DiscordBot(commands.Bot):
             help_command=None,
             description='The Discord bot for the FLVS Fury server.',
             intents=discord.Intents.all(),
-            guild_ids=[895024582241693756, 757664675864248360]
+            guild_ids=[757664675864248360]
         )
         
         for ext in initial_extensions:
