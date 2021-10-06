@@ -1,18 +1,14 @@
-import os
-import logging
-from dotenv import load_dotenv
-
 from bot import FuryBot
+import logging
 
+import os
+from dotenv import load_dotenv
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format='[%(asctime)-15s] %(message)s')
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     bot = FuryBot()
-    
-    bot.nsfwAPI = os.environ.get('NUDITY_TOKEN')
-    bot.trnAPIHeaders = {'TRN-Api-Key': os.environ.get('TRN-Api-Key')}
-    
-    bot.run(os.environ.get("BOT_TOKEN"), reconnect=True)
+    bot.run(os.environ.get('TOKEN'), reconnect=True)
     
