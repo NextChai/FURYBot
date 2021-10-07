@@ -154,12 +154,14 @@ class Safety(commands.Cog):
             if valid is True:
                 return
             
+            formatted = [f'<{link}>' for link in links]
+            
             e = self.bot.Embed(
                 title='Oh no!',
                 description="Links are not enabled in this server!"
             )
             e.add_field(name="Why aren't links enabled?", value='Due to FLVS Fury being a School Discord, we limit links to keep the server as PG as possible!')
-            e.add_field(name='Invalid Links', value=', '.join([f'<{link}>' for link in links]))
+            e.add_field(name='Invalid Links', value=', '.join(formatted))
             await self.bot.send_to(message.author, embed=e)
             
             # I'm creating a new embed here because I wont want to handle removing fields 
@@ -168,7 +170,7 @@ class Safety(commands.Cog):
                 title='Link detected',
                 description=f'{message.author.mention} has posted a link in {message.channel.mention}!'
             )
-            e.add_field(name='Invalid Links', value=', '.join([f'<{link}>' for link in links]))
+            e.add_field(name='Invalid Links', value=', '.join(formatted))
             await self.bot.send_to_logging_channel(embed=e)
             
     @commands.Cog.listener('on_user_update')
