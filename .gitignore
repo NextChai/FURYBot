@@ -3,3 +3,6 @@ __pycache__/
 .vscode/
 .env
 config.py
+txt/
+clean.txt
+profanity.txt
