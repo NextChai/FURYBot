@@ -112,6 +112,13 @@ class DiscordBot(commands.Bot):
         -------
         :class:`discord.Message`"""
         channel = self.get_channel(constants.LOGGING_CHANNEL) or (await self.fetch_channel(constants.LOGGING_CHANNEL))
+        
+        if args:
+            content = args[0]
+            content = '<@&867901004728762399>\n' + content
+        else:
+            args = ['<@&867901004728762399>']
+            
         return await channel.send(*args, **kwargs)
     
     async def update_activity(self) -> None:
