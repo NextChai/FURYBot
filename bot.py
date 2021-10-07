@@ -196,7 +196,7 @@ class Security(CustomProfanity, URLExtract):
     def __init__(self):
         URLExtract.__init__(self)
         super().__init__()
-        
+        self.update()
         self.session: aiohttp.ClientSession = aiohttp.ClientSession()
         
     async def setup_profanity(self) -> None:
@@ -257,7 +257,7 @@ class Security(CustomProfanity, URLExtract):
         List[:class:`str`]
             The list of url's extracted from a message.
         """
-        links = await self.wrap(self.gen_urls, message)
+        links = await self.wrap(self.find_urls, message)
         if not links:
             links = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', message)
         return links
