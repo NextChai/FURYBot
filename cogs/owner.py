@@ -51,7 +51,7 @@ class Owner(commands.Cog):
         ]
     )
     @commands.is_owner()
-    async def python(ctx, code: str):
+    async def python(self, ctx, code: str):
         globalns = {
             'ctx': ctx,
             'guild': ctx.guild,
