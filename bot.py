@@ -155,7 +155,7 @@ class DiscordBot(commands.Bot):
             if cog._get_overridden_method(cog.cog_command_error) is not None:
                 return
             
-        e = self.bot.Embed(title='Oh no!')
+        e = self.Embed(title='Oh no!')
             
         if isinstance(error, commands.MissingPermissions):
             e.description = 'You do not have the permissions to do this command!'
