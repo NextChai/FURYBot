@@ -168,6 +168,7 @@ class Safety(commands.Cog):
                 title='Link detected',
                 description=f'{message.author.mention} has posted a link in {message.channel.mention}!'
             )
+            e.add_field(name='Invalid Links', value=', '.join([f'<{link}>' for link in links]))
             await self.bot.send_to_logging_channel(embed=e)
             
     @commands.Cog.listener('on_user_update')
