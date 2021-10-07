@@ -84,9 +84,14 @@ class Safety(commands.Cog):
                     description='You can not upload an image that contains profanity!'
                 )
                 e.set_image(url=attachment.url)
+                e.set_thumbnail(url=attachment.url)
+                e.set_author(name=str(message.author), icon_url=message.author.display_avatar.url)
                 await self.bot.send_to(message.author, embed=e)
+                
+                e.title = 'Profane Image detected!'
+                e.description = f'{message.author.mention} has uploaded an image that is profane.'
+                await self.bot.send_to_logging_channel(embed=e)
                     
-        
     @commands.Cog.listener('on_message')
     async def profanity_checker(self, message: discord.Message) -> None:
         """Used to check if a message contains profanity.
@@ -115,6 +120,10 @@ class Safety(commands.Cog):
             e.add_field(name='Message:', value=message.clean_content)
             e.add_field(name='Censored:', value=censored)
             await self.bot.send_to(message.author, embed=e)
+            
+            e.title = 'Profanity Found'
+            e.description = f'{message.author.mention} has said a word that contains profanity.'
+            await self.bot.send_to_logging_channel(embed=e)
         
     @commands.Cog.listener('on_message')
     async def link_checker(self, message: discord.Message) -> None:
@@ -149,8 +158,17 @@ class Safety(commands.Cog):
                 title='Oh no!',
                 description="Links are not enabled in this server!"
             )
-            e.add_field(name="Why aren't links enabled?", value='Due to FLVS Fury being a School Discord, it needs to remain PG!')
+            e.add_field(name="Why aren't links enabled?", value='Due to FLVS Fury being a School Discord, we limit links to keep the server as PG as possible!')
+            e.add_field(name='Invalid Links', value=', '.join([f'<{link}>' for link in links]))
             await self.bot.send_to(message.author, embed=e)
+            
+            # I'm creating a new embed here because I wont want to handle removing fields 
+            # from the previous embed.
+            e = self.bot.Embed(
+                title='Link detected',
+                description=f'{message.author.mention} has posted a link in {message.channel.mention}!'
+            )
+            await self.bot.send_to_logging_channel(embed=e)
             
     @commands.Cog.listener('on_user_update')
     async def user_username_update(self, before: discord.User, after: discord.User) -> None:
@@ -210,7 +228,7 @@ class Safety(commands.Cog):
 
     @tasks.loop(count=1)
     async def name_checker(self) -> None:
-        """Used to pool members and check for bad names. 
+        """Used to pool members and check for bad names and activities.
         
         .. note::
         
@@ -229,12 +247,28 @@ class Safety(commands.Cog):
                 
                 censored = await self.bot.censor_message(member.display_name)
                 e = self.bot.Embed(
-                    title='Oh no!',
+                    title='Lockdown Incoming!',
                     description=f'Member {member.mention} has been locked down for {Reasons.type_to_string(Reasons.displayname)}'
                 )
                 e.add_field(name='Name:', value=member.display_name)
                 e.add_field(name='Censored:', value=censored)
                 await self.bot.send_to_logging_channel(embed=e)
+                
+            if member.activities:
+                activity = discord.utils.find(lambda activity: isinstance(activity, discord.CustomActivity), member.activities)
+                if activity and activity.name:
+                    if (await self.bot.contains_profanity(activity.name)):
+                        await self.bot.lockdown(member, reason=Reasons.activity)
+                        
+                        censored = await self.bot.censor_message(activity.name)
+                        e = self.bot.Embed(
+                            title='We got a live one!',
+                            description=f'{member.mention} has been locked down for a bad status.'
+                        )
+                        e.add_field(name='Status', value=activity.name)
+                        e.add_field(name='Censored', value=censored)
+                        await self.bot.send_to_logging_channel(embed=e)
+                
                 
     @name_checker.before_loop
     async def name_checker_before_loop(self) -> None:

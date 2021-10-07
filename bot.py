@@ -124,6 +124,9 @@ class DiscordBot(commands.Bot):
         await self.wait_until_ready()
         await self.change_presence(activity=discord.Activity(type=self.activity_type, name=self.activity_message))
         
+    async def on_ready(self):
+        print(f"{self.user.name} has come online.")
+        
     async def on_guild_join(self, guild: discord.Guild) -> None:
         """This ensures that Fury bot can't be invited to other discord servers and stay in them.
         
@@ -173,9 +176,6 @@ class DiscordBot(commands.Bot):
         else:
             e.description = f'I ran into an error when doing this command!\n\n**{str(error)}**'
             return await ctx.send(embed=e)
-        
-    async def on_ready(self):
-        print(f"{self.user.name} has come online.")
         
     async def on_member_lockdown(self, member: discord.Member, reason: Reasons) -> None:
         e = self.Embed(
@@ -327,6 +327,7 @@ class Security(CustomProfanity, URLExtract):
         data = await self.get_nsfw(url)
         return data['data']['is_nsfw']
         
+        
 class Lockdown:
     """The Lockdown implementation of the bot.
     
@@ -424,11 +425,8 @@ class Lockdown:
         current['roles'] = [role.id for role in member.roles]
         current['reasons'] = [reason]
         
-        # NOTE: This raises discord.errors.NotFound: 404 Not Found (error code: 10011): Unknown Role
-        await member.edit(roles=[], reason='Member is getting locked down.')
-        
         lr = self.get_lockdown_role(member.guild)
-        await member.add_roles(lr, reason='Member locked down.')
+        await member.edit(roles=[lr], reason='Member is getting locked down.')
         
         e = Embed(
             title='Oh no!',
@@ -438,6 +436,8 @@ class Lockdown:
         
         reasons = ', '.join([f'**{Reasons.type_to_string(reason)}**' for reason in current['reasons']])
         e.add_field(name='Why am I locked down?', value=f'Locked down for: {reasons}')
+        e.add_field(name='What to do now?', value='Fix what locked you out and your ')
+        
         await self.send_to(member, embed=e)
         return True
         
