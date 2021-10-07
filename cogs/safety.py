@@ -155,6 +155,7 @@ class Safety(commands.Cog):
                 return
             
             formatted = [f'<{link}>' for link in links]
+            await self.bot.send_to_logging_channel(str(formatted))
             
             e = self.bot.Embed(
                 title='Oh no!',
