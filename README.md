@@ -14,5 +14,9 @@ Auto moderation of members who:
 
 
 # Credit
-- [Source](https://github.com/NextChai/FURYBot/blob/main/cogs/commands.py#L26-L64) command, and [Message Auto Blocking](https://github.com/NextChai/FURYBot/blob/main/bot.py#L72-L135) used from [Robo Danny](https://github.com/Rapptz/RoboDanny/)
-- Profanity list used from: [Google-profanity-words](https://github.com/RobertJGabriel/Google-profanity-words), [List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words](https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words), and [Banned word list](http://www.bannedwordlist.com/), 
+Some code used from [Robo Danny](https://github.com/Rapptz/RoboDanny/), made by [Rapptz](https://github.com/Rapptz/).
+
+- `cogs.utils.context.Context.tick` 
+- `cogs.moderation.Moderation.reload_or_load_extension`
+- `cogs.moderation.Moderation.find_modules_from_git`
+- `cogs.moderation.Moderation.git_pull`
