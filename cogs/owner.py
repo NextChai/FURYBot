@@ -14,6 +14,7 @@ class Owner(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         
+        
     @commands.slash(
         name='debug',
         description='Toggle the debug feature of the bot.',
