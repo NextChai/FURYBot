@@ -2,9 +2,12 @@ import io
 import os
 import re
 import sys
+import asyncio
 import textwrap
+import subprocess
 import traceback
 import importlib
+
 from typing import List
 from contextlib import redirect_stdout
 
@@ -21,6 +24,16 @@ class Owner(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self._GIT_PULL_REGEX = re.compile(r'\s*(?P<filename>.+?)\s*\|\s*[0-9]+\s*[+-]+')
+        
+    async def run_process(self, command):
+        try:
+            process = await asyncio.create_subprocess_shell(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            result = await process.communicate()
+        except NotImplementedError:
+            process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            result = await self.bot.loop.run_in_executor(None, process.communicate)
+
+        return [output.decode() for output in result]
         
     def find_modules_from_git(self, output: str) -> List[str]:
         """Used to find modules from a git pull resp.
