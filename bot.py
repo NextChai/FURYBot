@@ -350,7 +350,7 @@ class Security(CustomProfanity, URLExtract):
         channel: Optional[:class:`discord.Guild.Channel`]
             Pass in a channel to determine if the link is in a valid gif channel.
         """
-        check = re.findall(r'gifyourgame|streamable|lowkey.gg', link)
+        check = re.findall(r'gifyourgame.com|streamable.com|lowkey.gg', link)
         if not check:
             return False
         if channel is not None:
