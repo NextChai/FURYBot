@@ -353,6 +353,7 @@ class Security(CustomProfanity, URLExtract):
         check = re.findall(r'gifyourgame.com|streamable.com|lowkey.gg', link)
         if not check:
             return False
+        
         if channel is not None:
             if channel not in constants.VALID_GIF_CHANNELS:
                 return False
