@@ -4,12 +4,11 @@ import os
 import re
 import sys
 import importlib
+import dateparser
+from typing import TYPE_CHECKING, Optional, List
 
 import discord
 from discord.ext import commands
-
-import dateparser
-from typing import TYPE_CHECKING, Optional
 
 from cogs.utils.enums import Reasons
 from cogs.utils.checks import is_captain, is_mod, is_coach
@@ -23,7 +22,19 @@ class Moderation(commands.Cog):
         self.bot: FuryBot = bot
         self._GIT_PULL_REGEX = re.compile(r'\s*(?P<filename>.+?)\s*\|\s*[0-9]+\s*[+-]+')
         
-    def find_modules_from_git(self, output):
+    def find_modules_from_git(self, output: str) -> List[str]:
+        """Used to find modules from a git pull resp.
+        
+        Parameters
+        ---------
+        output: :class:`str`
+            The output from the `git pull` command.
+        
+        Returns
+        -------
+        List[:class:`str`]
+            Any modules found to reload.
+        """
         files = self._GIT_PULL_REGEX.findall(output)
         ret = []
         for file in files:
@@ -40,14 +51,33 @@ class Moderation(commands.Cog):
         ret.sort(reverse=True)
         return ret
 
-    def reload_or_load_extension(self, module):
+    def reload_or_load_extension(self, module: str) -> None:
+        """Used to reload or load the extension given.
+        
+        Parameters
+        ----------
+        module: :class:`str`
+            The module to reload or load.
+        
+        Returns
+        -------
+        None
+        """
         try:
             self.bot.reload_extension(module)
         except commands.ExtensionNotLoaded:
             self.bot.load_extension(module)
             
-    @commands.group(name='git')
+    @commands.group(name='git', description='Handle git interactions.')
     async def git(self) -> None:
+        """A command group to use and manage git interactions.
+        
+        
+        Subcommands
+        -----------
+        pull: `/git pull`
+            A simple command used to pull from the repo and recieve updates.
+        """
         pass
     
     @git.slash(
@@ -98,8 +128,22 @@ class Moderation(commands.Cog):
 
     @commands.group(name='profanity', description='Handle the profanity filter')
     @commands.check_any(is_captain(), is_coach(), is_mod())
-    async def profanity(self):
-        pass
+    async def profanity(self) -> None:
+        """A command group to handle and interact with the profanity filter.
+        
+        
+        Subcommands
+        -----------
+        remove: `/provanity remove <word>`
+            Used to remove a word from the profanity filter making it a good word.
+        add: `/profanity add <word>`
+            Used to add a word to the profanity filter making a good word a bad word.
+        contains_profanity: `/profanity contains_profanity <word>`
+            Used to determine if a word / phrase contains profanity.
+        censor: `/profanity censor <word>`
+            Used to censor a word or sentence.
+        """
+        return
     
     @profanity.slash(
         name='remove',
@@ -167,8 +211,17 @@ class Moderation(commands.Cog):
         description='Lock down commands.'
     )
     @commands.check_any(is_captain(), is_coach(), is_mod())
-    async def lockdown(self):
-        pass
+    async def lockdown(self) -> None:
+        """A command group to interact with locking down members.
+        
+        Subcommands
+        -----------
+        member: `/lockdown member <member> <reason> <time> <datetime>`
+            Lockdown a member for a reason and an optional time frame.
+        freedom: `/lockdown freedom <member> <reason>`
+            Free a member from lockdown and restore their permission to the server.
+        """
+        return
         
     @lockdown.slash(
         name='member',
