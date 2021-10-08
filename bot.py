@@ -71,6 +71,21 @@ class DiscordBot(commands.Bot):
     
     @activity_message.setter
     def activity_message(self, message: str) -> None:
+        """Set the bots activity and update its message within the Discord API.
+        
+        .. note::
+
+            This should not be called before the bot is ready.
+        
+        Parameters
+        ----------
+        message: :class:`str`
+            The message to display.
+        
+        Returns
+        -------
+        None
+        """
         self._activity_message = message
         self.loop.create_task(self.update_activity())
     
@@ -80,10 +95,38 @@ class DiscordBot(commands.Bot):
     
     @activity_type.setter
     def activity_type(self, activity: discord.ActivityType) -> None:
+        """Changes the bots activity when a this attr is set.
+        
+        .. note::
+
+            This should not be called before the bot is ready.
+        
+        Parameters
+        ----------
+        activity: :class:`discord.ActivityType`
+            The new activity type.
+        
+        Returns
+        -------
+        None
+        """
         self._activity_type = activity
         self.loop.create_task(self.update_activity())
         
     async def get_context(self, interaction: discord.Interaction, *, cls=context.Context):
+        """Used to get context when invoking a command.
+        
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction for the command.
+        cls: :class:`context.Context`
+            The subclassed context to pass onto the command.
+            
+        Returns
+        --------
+        :class:`context.Context`
+        """
         return await super().get_context(interaction, cls=cls)
     
     async def send_to_logging_channel(self, *args, **kwargs) -> discord.Mesasage:
