@@ -85,7 +85,7 @@ class CustomProfanity(ProfanityFilter):
         self.clean_wordset = data.split('\n')
         
     async def reload_words(self, wrapper: Callable) -> None:
-        await wrapper(self.restore_words())
+        await wrapper(self.restore_words)
         await self.load_dirty_words()
         await self.load_clean_words()
             
