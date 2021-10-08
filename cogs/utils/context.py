@@ -49,3 +49,13 @@ class Context(commands.Context):
         
         return view.value
         
+    def tick(self, opt, label=None):
+        lookup = {
+            True: '✅',
+            False: '❌',
+            None: '❔',
+        }
+        emoji = lookup.get(opt, '❌')
+        if label is not None:
+            return f'{emoji}: {label}'
+        return emoji
