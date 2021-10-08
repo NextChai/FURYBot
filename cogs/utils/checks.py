@@ -24,4 +24,4 @@ def is_coach():
 def should_ignore(member: discord.Member) -> bool:
     """Determines if Fury Bot should ignore this member for Security"""
     roles = [r.id for r in member.roles]
-    return BYPASS_FURY in roles and not member.bot
+    return BYPASS_FURY in roles or member.bot
