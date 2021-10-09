@@ -1,5 +1,6 @@
 from typing import Callable, ClassVar, Dict, Iterable, List, Literal
 import aiofile
+import re
 
 from profanityfilter import ProfanityFilter
 
@@ -57,6 +58,13 @@ class CustomProfanity(ProfanityFilter):
     """
     def __init__(self) -> None:
         super().__init__() 
+        self.invalid_regex = (
+            '.',
+            '^',
+            '$',
+            '.'
+        )
+        
 
     async def load_dirty_words(self) -> None:
         """Loads the dirty words from our custom wordset and adds it to the profanity filter.
@@ -65,11 +73,12 @@ class CustomProfanity(ProfanityFilter):
         -------
         None
         """
-        async with aiofile.async_open('txt/profanity.txt', 'r') as f:
-            data = (await f.read()).split('\n')
+        async with aiofile.async_open('txt/profanity.txt', 'rb') as f:
+            data = (await f.read()).decode('utf-8').split('\n')
             
         cleaned = [i for n, i in enumerate(data) if i not in data[:n]]  # Clean duplicates
         swears = await PermeateProfanity(swears=cleaned)
+        
         self.append_words(swears)
             
     async def load_clean_words(self) -> None:
@@ -79,10 +88,10 @@ class CustomProfanity(ProfanityFilter):
         -------
         None
         """
-        async with aiofile.async_open('txt/clean.txt', 'r') as f:
-            data = await f.read()
+        async with aiofile.async_open('txt/clean.txt', 'rb') as f:
+            data = (await f.read()).decode('utf-8').split('\n')
             
-        self.clean_wordset = data.split('\n')
+        self.clean_wordset = data
         
     async def reload_words(self, wrapper: Callable) -> None:
         await wrapper(self.restore_words)
@@ -104,19 +113,30 @@ class CustomProfanity(ProfanityFilter):
         words = super().get_profane_words()
         
         if not hasattr(self, 'clean_wordset'):
-            print("Notattr self.clean_wordset")
             return words
-        
+
         clean = []
         for word in words:
             if word not in self.clean_wordset:
+                for invalid in self.invalid_regex:
+                    word = word.replace(invalid, r'\{0}'.format(invalid))
+                    
                 clean.append(word)
         
         return clean
+    
+    def censor(self, input_text: str) -> str:
+        bad_words = self.get_profane_words()
+        res = input_text
+        
+        for word in bad_words:
+            regex_string = re.compile(fr'{word}')
+            res = regex_string.sub('*' * len(word), res)
+        
+        return res
     
     async def add_word_to(self, filename: Literal['profanity', 'clean'], word: str, *, wrapper: Callable) -> None:
         async with aiofile.async_open(f'txt/{filename}.txt', 'a') as f:
             await f.write(f'\n{word}')
         
         await self.reload_words(wrapper=wrapper)
-    
