@@ -104,6 +104,7 @@ class CustomProfanity(ProfanityFilter):
         words = super().get_profane_words()
         
         if not hasattr(self, 'clean_wordset'):
+            print("Notattr self.clean_wordset")
             return words
         
         clean = []
@@ -111,6 +112,7 @@ class CustomProfanity(ProfanityFilter):
             if word not in self.clean_wordset:
                 clean.append(word)
         
+        print('scooby' in clean)
         return clean
     
     async def add_word_to(self, filename: Literal['profanity', 'clean'], word: str, *, wrapper: Callable) -> None:
