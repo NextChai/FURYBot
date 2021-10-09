@@ -112,7 +112,6 @@ class CustomProfanity(ProfanityFilter):
             if word not in self.clean_wordset:
                 clean.append(word)
         
-        print('scooby' in clean)
         return clean
     
     async def add_word_to(self, filename: Literal['profanity', 'clean'], word: str, *, wrapper: Callable) -> None:
