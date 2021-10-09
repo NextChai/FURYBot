@@ -89,19 +89,33 @@ class CustomProfanity(ProfanityFilter):
         await self.load_dirty_words()
         await self.load_clean_words()
             
-    def get_profane_words(self):
-        """A workaround to adding a whitelist to FURY Bot."""
+    def get_profane_words(self) -> List[str]:
+        """A workaround to adding a whitelist to FURY Bot.
+        
+        .. note::
+
+            If the bot's custom profanity hasn't been loaded the default one
+            will be returned.
+        
+        Returns
+        -------
+        None
+        """
         words = super().get_profane_words()
         
         if not hasattr(self, 'clean_wordset'):
             return words
         
-        cleaned = [w for w in words if w not in self.clean_wordset]
-        return cleaned
+        clean = []
+        for word in words:
+            if word not in self.clean_wordset:
+                clean.append(word)
+        
+        return clean
     
     async def add_word_to(self, filename: Literal['profanity', 'clean'], word: str, *, wrapper: Callable) -> None:
         async with aiofile.async_open(f'txt/{filename}.txt', 'a') as f:
             await f.write(f'\n{word}')
         
         await self.reload_words(wrapper=wrapper)
-        
+    
