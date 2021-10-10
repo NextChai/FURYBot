@@ -279,7 +279,7 @@ class Security(CustomProfanity, URLExtract):
         """
         return await self.wrap(self.has_bad_word, message)
     
-    async def censor(self, message: str) -> str:
+    async def censor_message(self, message: str) -> str:
         """Used to censor a message.
         
         Parameters
@@ -292,7 +292,7 @@ class Security(CustomProfanity, URLExtract):
         :class:`str`
             The message that was censored
         """
-        return await super().censor(message)
+        return await self.wrap(self.censor, message)
     
     async def get_links(self, message: str) -> List[str]:
         """Extreact links from a certain message.
