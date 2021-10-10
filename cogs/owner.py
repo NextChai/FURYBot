@@ -7,12 +7,14 @@ import textwrap
 import subprocess
 import traceback
 import importlib
-
-from typing import List
+from typing import List, TYPE_CHECKING
 from contextlib import redirect_stdout
 
 import discord
 from discord.ext import commands
+
+if TYPE_CHECKING:
+    from cogs.utils.context import Context
 
 
 
@@ -24,7 +26,18 @@ class Owner(commands.Cog):
         self.bot = bot
         self._GIT_PULL_REGEX = re.compile(r'\s*(?P<filename>.+?)\s*\|\s*[0-9]+\s*[+-]+')
         
-    async def run_process(self, command):
+    async def run_process(self, command: str) -> List:
+        """Used to run a command via subprocess.
+        
+        Parameters
+        ----------
+        command: :class:`str`
+            The command to run.
+        
+        Returns
+        -------
+        List
+        """
         try:
             process = await asyncio.create_subprocess_shell(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             result = await process.communicate()
@@ -97,7 +110,7 @@ class Owner(commands.Cog):
         name='pull',
         description='Pull from the github to update the bot'
     )
-    async def git_pull(self, ctx) -> None:
+    async def git_pull(self, ctx: Context) -> None:
         async with ctx.typing():
             stdout, stderr = await self.run_process('git pull')
 
@@ -156,7 +169,7 @@ class Owner(commands.Cog):
         ]
     )
     @commands.is_owner()
-    async def debug(self, ctx, enable: str):
+    async def debug(self, ctx: Context, enable: str):
         converter = {
             'true': True,
             'false': False
@@ -177,7 +190,7 @@ class Owner(commands.Cog):
         ]
     )
     @commands.is_owner()
-    async def python(self, ctx, code: str):
+    async def python(self, ctx: Context, code: str):
         globalns = {
             'ctx': ctx,
             'guild': ctx.guild,
