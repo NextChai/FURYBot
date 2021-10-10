@@ -180,7 +180,7 @@ class CustomProfanity(ProfanityFilter):
             Raised if the word you are trying to add is already in the profanity wordset you're trying
             to add to.
         """
-        data = await self._split_filename_lines(filename)
+        data = await self._split_filename_lines(f'txt/{filename}.txt')
         if word in data:
             raise ProfanityFailure(f'word {word} is already in file {filename}')
         
