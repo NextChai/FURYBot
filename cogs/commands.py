@@ -3,12 +3,12 @@ from __future__ import annotations
 from math import ceil
 from typing import TYPE_CHECKING
 
-import discord
 from discord.ext import commands
+
+from cogs.utils.context import Context
 
 if TYPE_CHECKING:
     from bot import FuryBot
-    from cogs.utils.context import Context
     
 __all__ = (
     'Commands',

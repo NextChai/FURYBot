@@ -10,10 +10,10 @@ from cogs.utils import time
 from cogs.utils.enums import Reasons
 from cogs.utils.errors import ProfanityFailure
 from cogs.utils.checks import is_captain, is_mod, is_coach
+from cogs.utils.context import Context
 
 if TYPE_CHECKING:
     from bot import FuryBot
-    from cogs.utils.context import Context
     
 __all__ = (
     'Moderation',

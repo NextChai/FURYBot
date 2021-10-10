@@ -1,5 +1,4 @@
 import datetime
-import asyncio
 from dateutil.relativedelta import relativedelta
 
 __all__ = (
