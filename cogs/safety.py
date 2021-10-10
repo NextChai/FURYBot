@@ -111,7 +111,7 @@ class Safety(commands.Cog):
         if (await self.bot.contains_profanity(message.clean_content)):
             await message.delete()
             
-            censored = await self.bot.censor(message.clean_content)
+            censored = await self.bot.censor_message(message.clean_content)
             
             e = self.bot.Embed(
                 title='Oh no!',
@@ -246,7 +246,7 @@ class Safety(commands.Cog):
             if (await self.bot.contains_profanity(member.display_name)):
                 await self.bot.lockdown(member, reason=Reasons.displayname)
                 
-                censored = await self.bot.censor(member.display_name)
+                censored = await self.bot.censor_message(member.display_name)
                 e = self.bot.Embed(
                     title='Lockdown Incoming!',
                     description=f'Member {member.mention} has been locked down for {Reasons.type_to_string(Reasons.displayname)}'
@@ -261,7 +261,7 @@ class Safety(commands.Cog):
                     if (await self.bot.contains_profanity(activity.name)):
                         await self.bot.lockdown(member, reason=Reasons.activity)
                         
-                        censored = await self.bot.censor(activity.name)
+                        censored = await self.bot.censor_message(activity.name)
                         e = self.bot.Embed(
                             title='We got a live one!',
                             description=f'{member.mention} has been locked down for a bad status.'
