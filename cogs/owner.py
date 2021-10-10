@@ -10,13 +10,13 @@ import subprocess
 import traceback
 import importlib
 from contextlib import redirect_stdout
-from typing import TYPE_CHECKING, List
+from typing import List
 
 import discord
 from discord.ext import commands
 
-if TYPE_CHECKING:
-    from cogs.utils.context import Context
+from cogs.utils.context import Context
+
 
 __all__ = (
     'Owner',
