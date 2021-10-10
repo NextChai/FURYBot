@@ -4,6 +4,8 @@ import re
 
 from profanityfilter import ProfanityFilter
 
+from cogs.utils.errors import ProfanityFailure
+
 class PermeateProfanity:
     mapping: ClassVar[Dict[str, List[str]]] = {
         'a': ['@'],
@@ -65,7 +67,22 @@ class CustomProfanity(ProfanityFilter):
             '.'
         )
         
-
+    async def _split_filename_lines(self, filename: str) -> List[str]:
+        """Used to async-open a file, decode its content, and split it by a new line.
+        
+        Parameters
+        ----------
+        filename: :class:`str`
+            The filename to open and parse.
+        
+        Returns
+        -------
+        List[:class:`str`]
+        """
+        async with aiofile.async_open(filename, 'rb') as f:
+            data = (await f.read()).decode('utf-8').split('\n')
+            return [i for n, i in enumerate(data) if i not in data[:n]]
+        
     async def load_dirty_words(self) -> None:
         """Loads the dirty words from our custom wordset and adds it to the profanity filter.
         
@@ -73,11 +90,8 @@ class CustomProfanity(ProfanityFilter):
         -------
         None
         """
-        async with aiofile.async_open('txt/profanity.txt', 'rb') as f:
-            data = (await f.read()).decode('utf-8').split('\n')
-            
-        cleaned = [i for n, i in enumerate(data) if i not in data[:n]]  # Clean duplicates
-        swears = await PermeateProfanity(swears=cleaned)
+        data = await self._split_filename_lines('txt/profanity.txt')
+        swears = await PermeateProfanity(swears=data)
         
         self.append_words(swears)
             
@@ -88,12 +102,21 @@ class CustomProfanity(ProfanityFilter):
         -------
         None
         """
-        async with aiofile.async_open('txt/clean.txt', 'rb') as f:
-            data = (await f.read()).decode('utf-8').split('\n')
-            
+        data = await self._split_filename_lines('txt/clean.txt')
         self.clean_wordset = data
         
     async def reload_words(self, wrapper: Callable) -> None:
+        """Used to reload all clean and dirty words to the bot.
+        
+        Parameters
+        ----------
+        wrapper: Callable
+            A wrapper that uses `loop.run_in_executr` to make non-async code async.
+        
+        Returns
+        -------
+        None
+        """
         await wrapper(self.restore_words)
         await self.load_dirty_words()
         await self.load_clean_words()
@@ -136,6 +159,31 @@ class CustomProfanity(ProfanityFilter):
         return res
     
     async def add_word_to(self, filename: Literal['profanity', 'clean'], word: str, *, wrapper: Callable) -> None:
+        """Add a word to the black and whitelists of the profanity filter.
+        
+        Parameters
+        ----------
+        filename: Literal[:class:`str`]
+            The filename to add to. Can be either `profanity` or `clean`
+        word: :class:`str`
+            The word to add to the list
+        wrapper: Callable
+            An async wrapper we can use to make non-async code async.
+            
+        Returns
+        -------
+        None
+        
+        Raises
+        ------
+        :class:`ProfanityFailure`
+            Raised if the word you are trying to add is already in the profanity wordset you're trying
+            to add to.
+        """
+        data = await self._split_filename_lines(filename)
+        if word in data:
+            raise ProfanityFailure(f'word {word} is already in file {filename}')
+        
         async with aiofile.async_open(f'txt/{filename}.txt', 'a') as f:
             await f.write(f'\n{word}')
         
