@@ -1,10 +1,12 @@
-from typing import TYPE_CHECKING
+from __future__ import annotations
 
 import discord
 from discord.ext import commands, tasks
 
+
 import aiohttp
 import logging
+from typing import TYPE_CHECKING
 
 from cogs.utils.checks import should_ignore
 from cogs.utils import constants
