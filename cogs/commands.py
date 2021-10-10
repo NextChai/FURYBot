@@ -9,6 +9,11 @@ from discord.ext import commands
 if TYPE_CHECKING:
     from bot import FuryBot
     from cogs.utils.context import Context
+    
+__all__ = (
+    'Commands',
+)
+
 
 class Commands(commands.Cog):
     def __init__(self, bot):

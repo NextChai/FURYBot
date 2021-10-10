@@ -6,6 +6,11 @@ from profanityfilter import ProfanityFilter
 
 from cogs.utils.errors import ProfanityFailure
 
+__all__ = (
+    'PermeateProfanity',
+    'CustomProfanity'
+)
+
 class PermeateProfanity:
     mapping: ClassVar[Dict[str, List[str]]] = {
         'a': ['@'],

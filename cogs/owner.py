@@ -16,10 +16,10 @@ from discord.ext import commands
 if TYPE_CHECKING:
     from cogs.utils.context import Context
 
+__all__ = (
+    'Owner',
+)
 
-
-def setup(bot):
-    bot.add_cog(Owner(bot))
 
 class Owner(commands.Cog):
     def __init__(self, bot):
@@ -230,3 +230,6 @@ class Owner(commands.Cog):
                     await ctx.send(f'```py\n{value}\n```')
             else:
                 await ctx.send(f'```py\n{value}{ret}\n```')
+                
+def setup(bot):
+    bot.add_cog(Owner(bot))

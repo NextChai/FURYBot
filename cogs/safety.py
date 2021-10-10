@@ -13,6 +13,10 @@ from cogs.utils.enums import *
 if TYPE_CHECKING:
     from bot import FuryBot
     
+__all__ = (
+    'Safety',
+)
+    
 log = logging.getLogger(__name__)
 
 

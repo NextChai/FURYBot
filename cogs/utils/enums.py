@@ -1,6 +1,9 @@
 from __future__ import annotations
 from enum import Enum
 
+__all__ = (
+    'Reasons',
+)
 
 class Reasons(Enum):
     activity      = 1         # Member was locked out due to bad activity

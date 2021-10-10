@@ -14,6 +14,11 @@ from cogs.utils.checks import is_captain, is_mod, is_coach
 if TYPE_CHECKING:
     from bot import FuryBot
     from cogs.utils.context import Context
+    
+__all__ = (
+    'Moderation',
+)
+
 
 class Moderation(commands.Cog):
     def __init__(self, bot):
