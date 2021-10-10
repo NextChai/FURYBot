@@ -269,6 +269,8 @@ class Safety(commands.Cog):
                         e.add_field(name='Status', value=activity.name)
                         e.add_field(name='Censored', value=censored)
                         await self.bot.send_to_logging_channel(embed=e)
+        
+        log.info('Name Checker Finished.')
                 
                 
     @name_checker.before_loop
