@@ -165,7 +165,7 @@ class CustomProfanity(ProfanityFilter):
         res = input_text
         
         for word in bad_words:
-            regex_string = re.compile(r'{0}'.format(word))
+            regex_string = re.compile(r'{word}'.format(word))
             res = regex_string.sub('*' * len(word), res)
         
         return res
