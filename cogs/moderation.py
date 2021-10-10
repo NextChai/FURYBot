@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-import os
-import re
-import sys
-import importlib
 import dateparser
 from typing import TYPE_CHECKING, Optional
 
 import discord
 from discord.ext import commands
 
-from cogs.utils.enums import Reasons
-from cogs.utils.checks import is_captain, is_mod, is_coach
 from cogs.utils import time
+from cogs.utils.enums import Reasons
+from cogs.utils.errors import ProfanityFailure
+from cogs.utils.checks import is_captain, is_mod, is_coach
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -52,8 +49,11 @@ class Moderation(commands.Cog):
         ]
     )
     async def profanity_remove(self, ctx, word: str) -> None:
-        await self.bot.add_word_to('clean', word, wrapper=self.bot.wrap)
-        return await ctx.send(f'Removed "{word}" from the list of banned words', ephemeral=True)
+        try:
+            await self.bot.add_word_to('clean', word, wrapper=self.bot.wrap)
+            return await ctx.send(f'Removed "{word}" from the list of banned words', ephemeral=True)
+        except ProfanityFailure as exc:
+            return await ctx.send(str(exc).capitalize(), ephemeral=True)
     
     @profanity.slash(
         name='add',
@@ -67,8 +67,11 @@ class Moderation(commands.Cog):
         ]
     )
     async def wordset_add(self, ctx, word: str) -> None:
-        await self.bot.add_word_to('profanity', word, wrapper=self.bot.wrap)
-        return await ctx.send(f'Added {word} to the list of banned words', ephemeral=True)
+        try:
+            await self.bot.add_word_to('profanity', word, wrapper=self.bot.wrap)
+            return await ctx.send(f'Added {word} to the list of banned words', ephemeral=True)
+        except ProfanityFailure as exc:
+            return await ctx.send(str(exc).capitalize(), ephemeral=True)
     
     @profanity.slash(
         name='contains_profanity',
