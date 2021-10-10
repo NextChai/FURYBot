@@ -70,6 +70,8 @@ class Commands(commands.Cog):
         e.add_field(name='Message', value=message)
         await self.bot.send_to_logging_channel('<@!146348630926819328>', embed=e, view=ReportView(ctx.channel.id), ping_staff=False)
         
+        return await ctx.send("I've reported this issue, you should get a response back from Trevor F. soon, thank you!")
+        
         
 def setup(bot):
     bot.add_cog(Commands(bot))
