@@ -13,6 +13,7 @@ from cogs.utils.checks import is_captain, is_mod, is_coach
 
 if TYPE_CHECKING:
     from bot import FuryBot
+    from cogs.utils.context import Context
 
 class Moderation(commands.Cog):
     def __init__(self, bot):
@@ -48,7 +49,7 @@ class Moderation(commands.Cog):
             )
         ]
     )
-    async def profanity_remove(self, ctx, word: str) -> None:
+    async def profanity_remove(self, ctx: Context, word: str) -> None:
         try:
             await self.bot.add_word_to('clean', word, wrapper=self.bot.wrap)
             return await ctx.send(f'Removed "{word}" from the list of banned words', ephemeral=True)
@@ -66,7 +67,7 @@ class Moderation(commands.Cog):
             )
         ]
     )
-    async def wordset_add(self, ctx, word: str) -> None:
+    async def wordset_add(self, ctx: Context, word: str) -> None:
         try:
             await self.bot.add_word_to('profanity', word, wrapper=self.bot.wrap)
             return await ctx.send(f'Added {word} to the list of banned words', ephemeral=True)
@@ -84,7 +85,7 @@ class Moderation(commands.Cog):
             )
         ]
     )
-    async def wordset_contains_profanity(self, ctx, word: str) -> None:
+    async def wordset_contains_profanity(self, ctx: Context, word: str) -> None:
         check = await self.bot.contains_profanity(word)
         fmt = ' not' if check is False else ''
         return await ctx.send(f"Word {word} does{fmt} contain profanity.", ephemeral=True)
@@ -100,7 +101,7 @@ class Moderation(commands.Cog):
             )
         ]
     )
-    async def wordset_censor(self, ctx, sentence: str) -> None:
+    async def wordset_censor(self, ctx: Context, sentence: str) -> None:
         check = await self.bot.censor_message(sentence)
         return await ctx.send(check, ephemeral=True)
         
@@ -158,7 +159,7 @@ class Moderation(commands.Cog):
                 required=False)
         ]
     )
-    async def lockdown_member(self, ctx, member: discord.Member, reason_string: str, total_seconds: Optional[str] = None, human_time: Optional[str] = None):
+    async def lockdown_member(self, ctx: Context, member: discord.Member, reason_string: str, total_seconds: Optional[str] = None, human_time: Optional[str] = None):
         if total_seconds and human_time:
             return await ctx.send("You can not do both total_seconds and datetime, you need to pick one.")
         
@@ -213,7 +214,7 @@ class Moderation(commands.Cog):
             )
         ]
     )
-    async def freedom(self, ctx, member: discord.Member, reason: str):
+    async def freedom(self, ctx: Context, member: discord.Member, reason: str):
         success = await self.bot.freedom(member, reason=Reasons.from_string(reason))
         
         fmt = "able" if success is True else "unable"
@@ -236,7 +237,7 @@ class Moderation(commands.Cog):
     )
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
-    async def ban(self, ctx):
+    async def ban(self, ctx: Context):
         target = ctx.target
         if not isinstance(target, discord.Member):
             return await ctx.send("An internal error happened! Please try again later.", ephemeral=True)
@@ -250,7 +251,7 @@ class Moderation(commands.Cog):
     )
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def kick(self, ctx):
+    async def kick(self, ctx: Context):
         target = ctx.target
         if not isinstance(target, discord.Member):
             return await ctx.send("An internal error happened! Please try again later.", ephemeral=True)
