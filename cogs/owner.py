@@ -14,7 +14,6 @@ from contextlib import redirect_stdout
 import discord
 from discord.ext import commands
 
-from cogs.utils.checks import is_captain, is_mod, is_coach
 
 
 def setup(bot):
