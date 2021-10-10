@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import io
 import os
 import re
@@ -7,8 +9,8 @@ import textwrap
 import subprocess
 import traceback
 import importlib
-from typing import List, TYPE_CHECKING
 from contextlib import redirect_stdout
+from typing import TYPE_CHECKING, List
 
 import discord
 from discord.ext import commands
