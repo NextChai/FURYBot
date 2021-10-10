@@ -22,7 +22,7 @@ class JumpButton(discord.ui.Button):
         super().__init__(style=discord.ButtonStyle.green, label='Jump!')
         
     async def callback(self, interaction: discord.Interaction):
-        return await interaction.response.send_message(f'<#{self.channel_id}>')
+        return await interaction.response.send_message(f'<#{self.channel_id}>', ephemeral=True)
     
 
 class ReportView(discord.ui.View):
@@ -70,7 +70,7 @@ class Commands(commands.Cog):
         e.add_field(name='Message', value=message)
         await self.bot.send_to_logging_channel('<@!146348630926819328>', embed=e, view=ReportView(ctx.channel.id), ping_staff=False)
         
-        return await ctx.send("I've reported this issue, you should get a response back from Trevor F. soon, thank you!")
+        return await ctx.send("I've reported this issue, you should get a response back from Trevor F. soon, thank you!", ephemeral=True)
         
         
 def setup(bot):
