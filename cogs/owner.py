@@ -10,12 +10,16 @@ import subprocess
 import traceback
 import importlib
 from contextlib import redirect_stdout
-from typing import List
+from typing import TYPE_CHECKING, List
 
 import discord
 from discord.ext import commands
 
 from cogs.utils.context import Context
+
+if TYPE_CHECKING:
+    from bot import FuryBot
+    
 
 
 __all__ = (
@@ -24,9 +28,31 @@ __all__ = (
 
 
 class Owner(commands.Cog):
+    """The Owner cog for the bot. All commands inside of this cog are owner specific,
+    meaning all commands are limited to the owner of the bot.
+    
+    Attributes
+    ----------
+    bot: :class:`FuryBot`
+        The main bot client.
+    _GIT_PULL_REGEX: :class:`re.Pattern`
+        Used to find cogs in a git pull resp.
+    """
     def __init__(self, bot):
-        self.bot = bot
-        self._GIT_PULL_REGEX = re.compile(r'\s*(?P<filename>.+?)\s*\|\s*[0-9]+\s*[+-]+')
+        self.bot: FuryBot = bot
+        self._GIT_PULL_REGEX: re.Pattern = re.compile(r'\s*(?P<filename>.+?)\s*\|\s*[0-9]+\s*[+-]+')
+        
+    async def cog_check(self, ctx: Context):
+        """A blanket cog check limiting all commands to the Owner of the bot.
+        
+        Parameters
+        ----------
+        ctx: :class:`Context`
+            The invoke context for the command.
+        """
+        if not (await self.bot.is_owner(ctx.author)):
+            raise commands.NotOwner('You do not own this bot.')
+        return True
         
     async def run_process(self, command: str) -> List:
         """Used to run a command via subprocess.
