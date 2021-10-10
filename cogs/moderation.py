@@ -101,7 +101,7 @@ class Moderation(commands.Cog):
         ]
     )
     async def wordset_censor(self, ctx, sentence: str) -> None:
-        check = await self.bot.censor_message(sentence)
+        check = await self.bot.censor(sentence)
         return await ctx.send(check, ephemeral=True)
         
     @commands.group(

@@ -277,7 +277,7 @@ class Security(CustomProfanity, URLExtract):
         -------
         :class:`bool`
         """
-        return await self.wrap(self.has_bad_word, message)
+        return await super().has_bad_word(message)
     
     async def censor(self, message: str) -> str:
         """Used to censor a message.

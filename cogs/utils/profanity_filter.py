@@ -170,6 +170,9 @@ class CustomProfanity(ProfanityFilter):
         
         return res
     
+    async def has_bad_word(self, text: str) -> bool:
+        return (await self.censor(text)) != text
+    
     async def add_word_to(self, filename: Literal['profanity', 'clean'], word: str, *, wrapper: Callable) -> None:
         """Add a word to the black and whitelists of the profanity filter.
         
