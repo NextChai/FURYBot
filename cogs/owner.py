@@ -178,7 +178,7 @@ class Owner(commands.Cog):
         prompt_text = f'This will update the following modules, are you sure?\n{mods_text}'
         confirm = await ctx.get_confirmation(prompt_text)
         if not confirm:
-            return 
+            return await ctx.interaction.delete_original_message()
 
         statuses = []
         for is_submodule, module in modules:
