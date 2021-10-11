@@ -254,9 +254,11 @@ class DiscordBot(commands.Bot):
         lines = f'Ignoring exception in command {ctx.command}:\n{traceback_str}'
         print(lines)
         
+        formatted = lines.replace(traceback_str, f'```python\n{traceback_str}\n```')
+        await self.send_to_logging_channel(formatted)
+        
         if checks.should_ignore(ctx.author) and self.debug:
-            await self.send_to_logging_channel(f'```{traceback_str}```')
-            await ctx.send(f'```{traceback_str}```')
+            await ctx.send(formatted)
         else:
             e.description = f'I ran into an error when doing this command!\n\n**{str(error)}**'
             return await ctx.send(embed=e)
