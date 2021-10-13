@@ -41,6 +41,7 @@ from discord.ext import commands
 from urlextract import URLExtract
 
 from cogs.utils.enums import *
+from cogs.utils import copy_doc
 from cogs.utils import context, constants, checks
 from cogs.utils.profanity_filter import CustomProfanity
 
@@ -61,7 +62,14 @@ initial_extensions = (
     'cogs.owner'
 )
 
+@copy_doc(discord.Embed)
 def Embed(**kwargs) -> discord.Embed:
+    """A method used to have a consistent color across all bot Embeds.
+    
+    .. note::
+        
+        This is also so I can change the bots color easily when needed.
+    """
     kwargs['color'] = discord.Color.blue()
     return discord.Embed(**kwargs)
 
@@ -372,7 +380,7 @@ class Security(CustomProfanity, URLExtract):
             
         return links != []
     
-    async def is_valid_link(self, link: str, *, channel: Optional[discord.GuildChannel] = None) -> bool:
+    async def is_valid_link(self, link: str) -> bool:
         """Determine if a link is valid.
         
         .. note::
@@ -386,13 +394,9 @@ class Security(CustomProfanity, URLExtract):
         channel: Optional[:class:`discord.Guild.Channel`]
             Pass in a channel to determine if the link is in a valid gif channel.
         """
-        check = re.findall(r'gifyourgame.com|streamable.com|lowkey.gg', link)
+        check = await self.wrap(re.findall, r'gifyourgame|streamable|lowkey.gg', link)
         if not check:
             return False
-        
-        if channel is not None:
-            if channel not in constants.VALID_GIF_CHANNELS:
-                return False
         return True
     
     async def get_nsfw(self, url: str) -> Dict:
