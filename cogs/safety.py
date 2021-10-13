@@ -176,7 +176,7 @@ class Safety(commands.Cog):
             valid = True
             
             for link in links:
-                if not await self.bot.is_valid_link(link, channel=message.channel):
+                if not await self.bot.is_valid_link(link):
                     valid = False
                     await message.delete()
                     break
