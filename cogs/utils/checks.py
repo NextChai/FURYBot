@@ -27,6 +27,13 @@ from discord.ext import commands
 
 from cogs.utils.constants import CAPTAIN_ROLE, MOD_ROLE, BYPASS_FURY, COACH_ROLE
 
+__all__ = (
+    'is_captain',
+    'is_mod',
+    'is_coach',
+    'should_ignore',
+)
+
 def is_captain():
     async def predicate(ctx):
         roles = [r.id for r in ctx.author.roles]
