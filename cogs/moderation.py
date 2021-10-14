@@ -55,12 +55,14 @@ class Moderation(commands.Cog):
             commands.CommandOption(
                 name='member',
                 description='The member to give access to.',
-                type=commands.OptionType.user
+                type=commands.OptionType.user,
+                required=True
             ),
             commands.CommandOption(
                 name='channel',
                 description='The channel to give access to.',
-                type=commands.OptionType.channel
+                type=commands.OptionType.channel,
+                required=True
             ),
             commands.CommandOption(
                 name='permission',
@@ -68,7 +70,8 @@ class Moderation(commands.Cog):
                 choices=[
                     commands.CommandOptionChoice(name='Allow Access', value='allow'),
                     commands.CommandOptionChoice(name='Deny Access', value='deny')
-                ]
+                ],
+                required=True
             )
         ]
     )
