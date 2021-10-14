@@ -84,8 +84,9 @@ class Moderation(commands.Cog):
         else:
             kwargs['view_channel'] = True
         
+        formatted = 'given' if value is True else 'removed'
         await channel.set_permissions(member, reason=f'Invoked by {ctx.author}', **kwargs)
-        return await ctx.send(f'I have given {member.mention} to view the channel {channel.mention}')
+        return await ctx.send(f'I have {formatted} {member.mention} to view the channel {channel.mention}')
 
     @commands.group(name='profanity', description='Handle the profanity filter')
     @commands.check_any(is_captain(), is_coach(), is_mod())
