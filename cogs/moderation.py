@@ -47,6 +47,42 @@ __all__ = (
 class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot: FuryBot = bot
+        
+    @commands.slash(
+        name='sub',
+        description='Give a sub access to a channel.',
+        options=[
+            commands.CommandOption(
+                name='member',
+                description='The member to give access to.',
+                type=commands.OptionType.user
+            ),
+            commands.CommandOption(
+                name='channel',
+                description='The channel to give access to.',
+                type=commands.OptionType.channel
+            ),
+            commands.CommandOption(
+                name='permission',
+                description='Whether to deny or allow the permission',
+                choices=[
+                    commands.CommandOptionChoice('Allow Access', 'allow'),
+                    commands.CommandOptionChoice('Deny Access', 'deny')
+                ]
+            )
+        ]
+    )
+    @commands.check_any(is_captain(), is_coach(), is_mod())
+    async def sub(self, ctx, member: discord.Member, channel: discord.GuildChannel, permission: str) -> None:
+        value = True if permission == 'allow' else False
+        kwargs = {}
+        if not value:
+            kwargs['overwrite'] = None
+        else:
+            kwargs['view_channel'] = True
+        
+        await channel.set_permissions(member, reason=f'Invoked by {ctx.author}', **kwargs)
+        return await ctx.send(f'I have given {member.mention} to view the channel {channel.mention}')
 
     @commands.group(name='profanity', description='Handle the profanity filter')
     @commands.check_any(is_captain(), is_coach(), is_mod())
@@ -86,7 +122,7 @@ class Moderation(commands.Cog):
             return await ctx.send(str(exc).capitalize(), ephemeral=True)
     
     @profanity.slash(
-        name='add',
+        name='add' ,
         description='Make a word a profanity word.',
         options=[
             commands.CommandOption(
