@@ -66,8 +66,8 @@ class Moderation(commands.Cog):
                 name='permission',
                 description='Whether to deny or allow the permission',
                 choices=[
-                    commands.CommandOptionChoice('Allow Access', 'allow'),
-                    commands.CommandOptionChoice('Deny Access', 'deny')
+                    commands.CommandOptionChoice(name='Allow Access', value='allow'),
+                    commands.CommandOptionChoice(name='Deny Access', value='deny')
                 ]
             )
         ]
