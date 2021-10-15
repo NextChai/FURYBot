@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import dateparser
 from typing import TYPE_CHECKING, Optional
+import datetime
 
 import discord
 from discord.ext import commands
@@ -47,6 +48,84 @@ __all__ = (
 class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot: FuryBot = bot
+        
+    @commands.group(
+        name='team',
+        description='Edit, manage, and view teams.'
+    )
+    @commands.check_any(is_captain(), is_coach(), is_mod())
+    @commands.guild_only()
+    async def team(self) -> None:
+        return
+    
+    @team.slash(
+        name='create',
+        description='Create a team.',
+        options=[
+            commands.CommandOption(
+                name='name',
+                description='The team name.',
+                type=commands.OptionType.string,
+                required=True
+            ),
+            commands.CommandOption(
+                name='captain_role',
+                description='Mention the correct captain role to have access to the channel.',
+                type=commands.OptionType.role,
+                required=True
+            )
+        ] + [
+            commands.CommandOption(
+                name=f'mem{index}', 
+                description=f'Add a member.',
+                type=commands.OptionType.user,
+                required=False
+            ) for index in range(7)
+        ]
+    )
+    async def team_create(
+        self, 
+        ctx: Context, 
+        name: str, 
+        captain_role: discord.Role,
+        mem1: discord.Member, 
+        mem2: discord.Member,
+        mem3: discord.Member,
+        mem4: Optional[discord.Member],
+        mem5: Optional[discord.Member],
+        mem6: Optional[discord.Member],
+    ) -> None:
+        members = [m for m in ctx.args if isinstance(m, discord.Member)]
+        t_members = [m.mention for m in members]
+        
+        c_name = name.capitalize()
+        tc_name = name.lower().replace(' ', '-')
+        vc_name = f'{name.capitalize()} Voice'
+        
+        embed = self.bot.Embed(
+            title='Are you sure?',
+            description=f'You will be creating a team named: {name}'
+        )
+        embed.add_field(name='Guild Actions:', value=f'**New category named**: {c_name}\n**New text channel named**: {tc_name}\n**New voice channel named**: {vc_name}')
+        embed.add_field(name='Team Members', value=', '.join(t_members) if t_members else 'No members.')
+        
+        value = await ctx.get_confirmation(embed=embed)
+        if not value:
+            return
+        
+        overwrites = {m: discord.PermissionOverwrite(view_channel=True) for m in members}
+        overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(view_channel=False)
+        
+        category = await ctx.guild.create_category(c_name, overwrites=overwrites)
+        text = await category.create_text_channel(c_name)
+        voice = await category.create_voice_channel(vc_name)
+        
+        embed = self.bot.Embed(
+            title='Success!',
+            description=f'I have created a category named {category.mentio}, a text channel called {text.mention}, and a voice channel called {voice.mention}'
+        )
+        return await ctx.send(embed=embed)
+        
         
     @commands.slash(
         name='sub',
@@ -256,11 +335,22 @@ class Moderation(commands.Cog):
         else:
             self.bot.loop.create_task(self.bot.lockdown(member, reason=reason))
 
+        total_time = total_seconds
+        if human_time:
+            now = datetime.datetime.utcnow()
+            form = (now - date) if now > date else (date - now) # type: ignore
+            total_time = form.total_seconds()
+            
+        
         e = self.bot.Embed(
             title='Success',
             description=f'I have locked down {member.mention} for reason {reason}'
         )
         e.add_field(name='Note:', value='They have been given the Lockdown Role, and all their previous roles have been removed. You can do `/freedom` to unlock them.')
+        
+        if total_time is not None:
+            delta = datetime.timedelta(seconds=float(total_time))
+            e.description += f', for a total of **{total_time} seconds**.. or until **{time.human_time(delta)}**'
             
         return await ctx.send(embed=e)
     
