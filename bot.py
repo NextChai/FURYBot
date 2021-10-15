@@ -521,7 +521,7 @@ class Lockdown:
         
         e = Embed(
             title='Oh no!',
-            description=f'You have been given the {lr.mention} role in the FLVS Fury server!'
+            description=f'You have been given the **Lockdown** role in the FLVS Fury server!'
         )
         e.add_field(name='What does this mean?', value='You no longer have access to the server for now!')
         
