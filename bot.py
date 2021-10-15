@@ -279,7 +279,7 @@ class DiscordBot(commands.Bot):
         return await self.send_to_logging_channel(embed=e)
     
     async def on_member_freedom(self, member: discord.Member, reason: Reasons) -> None:
-        e = self.bot.Embed(
+        e = self.Embed(
             title='Member Freedom',
             description=f'Member {member.mention} has been freed for {Reasons.type_to_string(reason)}'
         )
@@ -618,8 +618,8 @@ class Lockdown:
             The reason for locking down the member.
         """
         now = datetime.datetime.utcnow()
-        total_seconds = (now - time).total_seconds()
-        print(total_seconds)
+        form = (now - time) if now > time else (time - now)
+        total_seconds = form.total_seconds()
         
         await self.lockdown_for(total_seconds, member=member, reason=reason)
 
