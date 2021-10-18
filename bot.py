@@ -104,7 +104,7 @@ class DiscordBot(commands.Bot):
         self.debug: bool = False
         
         # Spam Control for Messages
-        self.spam_control: commands.CooldownMapping = commands.CooldownMapping.from_cooldown(10, 12.0, commands.BucketType.user)
+        self.spam_control: commands.CooldownMapping = commands.CooldownMapping.from_cooldown(15, 12.0, commands.BucketType.user)
         self.spam_counter: Counter = Counter()
         
         for ext in initial_extensions:
@@ -762,7 +762,7 @@ class FuryBot(DiscordBot, SecurityMixin):
                 await self.mute_for(message.author, time=5*60)
                 del self._auto_spam_count[author_id]
                 
-                async for history in message.channel.history(limit=40):
+                async for history in message.channel.history(limit=100):
                     if history.author == message.author:
                         await history.delete()
                 
