@@ -115,7 +115,7 @@ class Moderation(commands.Cog):
         
         overwrites = {m: discord.PermissionOverwrite(view_channel=True) for m in members}
         overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(view_channel=False)
-        overwrites[captain_role] = discord.PermissionOverwrite(view_chanel=True)
+        overwrites[captain_role] = discord.PermissionOverwrite(view_channel=True)
         
         category = await ctx.guild.create_category(c_name, overwrites=overwrites)
         text = await category.create_text_channel(c_name)
