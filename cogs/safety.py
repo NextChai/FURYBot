@@ -141,7 +141,7 @@ class Safety(commands.Cog):
         if (await self.bot.contains_profanity(message.clean_content)):
             await message.delete()
             
-            await self.bot.lockdown_for(5*60, member=message.author, reason=Reasons.profanity)
+            self.bot.loop.create_task(self.bot.lockdown_for(5*60, member=message.author, reason=Reasons.profanity))
             censored = await self.bot.censor_message(message.clean_content)
             
             e = self.bot.Embed(
