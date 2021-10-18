@@ -113,7 +113,6 @@ class DiscordBot(commands.Bot):
                 log.info('Loaded ext: {0}'.format(ext))
             except Exception:
                 traceback.print_exc()
-                
 
     @property
     def activity_message(self) -> str:
@@ -785,8 +784,6 @@ class FuryBot(DiscordBot, SecurityMixin):
                 self.loop.create_task(self.mute_for(message.author, time=5*60))
                 del self.spam_counter[author_id]
                 
-                self.loop.create_task(self.cleanup_member(message))
-                
                 embed = Embed(
                     title='Member auto Muted',
                     description=f'{message.author.mention} was auto muted for message spamming.'
@@ -795,5 +792,6 @@ class FuryBot(DiscordBot, SecurityMixin):
                 embed.add_field(name='Message', value=message.clean_content)
                 embed.add_field(name='Mute time:', value='5 minutes.')
                 await self.send_to_logging_channel(embed=embed)
+                await self.cleanup_member(message)
         else:
             self.spam_counter.pop(author_id, None)
