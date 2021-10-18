@@ -764,6 +764,11 @@ class FuryBot(DiscordBot, SecurityMixin):
         self.dispatch('member_freedom', member, reason)
         return await super().freedom(member, reason=reason)
     
+    async def cleanup_member(self, message: discord.Message):
+        async for history in message.channel.history(limit=100):
+            if history.author == message.author:
+                await history.delete()
+    
     # We'll work in message based spam control here. 
     async def on_message(self, message: discord.Message) -> None:
         bucket = self.spam_control.get_bucket(message)
@@ -778,18 +783,15 @@ class FuryBot(DiscordBot, SecurityMixin):
                 self.loop.create_task(self.mute_for(message.author, time=5*60))
                 del self.spam_counter[author_id]
                 
-                async for history in message.channel.history(limit=100):
-                    if history.author == message.author:
-                        await history.delete()
+                self.loop.create_task(self.cleanup_member(message))
                 
                 embed = Embed(
                     title='Member auto Muted',
                     description=f'{message.author.mention} was auto muted for message spamming.'
                 )
-                embed.add_field(name='Channel', value=message.chanel.mention)
+                embed.add_field(name='Channel', value=message.channel.mention)
                 embed.add_field(name='Message', value=message.clean_content)
                 embed.add_field(name='Mute time:', value='5 minutes.')
                 await self.send_to_logging_channel(embed=embed)
-            return
         else:
             self.spam_counter.pop(author_id, None)
