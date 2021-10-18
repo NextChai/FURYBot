@@ -150,6 +150,7 @@ class Moderation(commands.Cog):
             else:
                 embed.add_field(name=member, value='Not Valid.')
         
+        return await ctx.send(embed=embed)
         
         
     @commands.slash(
