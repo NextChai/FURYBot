@@ -376,8 +376,7 @@ class Moderation(commands.Cog):
         e.add_field(name='Note:', value='They have been given the Lockdown Role, and all their previous roles have been removed. You can do `/freedom` to unlock them.')
         
         if total_time is not None:
-            delta = datetime.timedelta(seconds=float(total_time))
-            e.description += f', for a total of **{total_time} seconds**.. or until **{time.human_time(delta)}**'
+            e.description += f', for a total of **{total_time} seconds**..'
             
         return await ctx.send(embed=e)
     
