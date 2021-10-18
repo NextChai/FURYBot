@@ -446,10 +446,6 @@ class Lockdown:
     @staticmethod
     def get_lockdown_role(guild: discord.Guild):
         return guild.get_role(constants.LOCKDOWN_ROLE)
-    
-    @staticmethod
-    def get_muted_role(guild: discord.Guild):
-        return discord.utils.get(guild.roles, name='Muted')
 
     def get_lockdown_info(self, member: Union[discord.Member, discord.User]) -> Optional[Dict]:
         """A method used to get the lockdown info from a member.
@@ -546,7 +542,6 @@ class Lockdown:
         
         reasons = ', '.join([f'**{Reasons.type_to_string(reason)}**' for reason in current['reasons']])
         e.add_field(name='Why am I locked down?', value=f'Locked down for: {reasons}')
-        e.add_field(name='What to do now?', value='Fix what locked you out and your ')
         
         await self.send_to(member, embed=e)
         return True
@@ -594,7 +589,7 @@ class Lockdown:
         
         e = Embed(
             title='Oh yea!',
-            description=f'You have been unlocked from {member.guild.id}!'
+            description=f'You have been unlocked from {member.guild.name}!'
         )
         e.set_author(name=str(member), icon_url=member.display_avatar.url)
         e.set_footer(text=f'Member ID: {member.id}') 

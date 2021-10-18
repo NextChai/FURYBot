@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING
 
 from cogs.utils.checks import should_ignore
 from cogs.utils import constants
-from cogs.utils.enums import *
+from cogs.utils.enums import Reasons
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -141,6 +141,7 @@ class Safety(commands.Cog):
         if (await self.bot.contains_profanity(message.clean_content)):
             await message.delete()
             
+            await self.bot.lockdown_for(5*60, member=message.author, reason=Reasons.profanity)
             censored = await self.bot.censor_message(message.clean_content)
             
             e = self.bot.Embed(
@@ -156,8 +157,6 @@ class Safety(commands.Cog):
             e.description = f'{message.author.mention} has said a word that contains profanity in {message.channel.mention}.'
             e.add_field(name='Action Taken', value='I have locked them out of the server for 5 minutes.')
             await self.bot.send_to_logging_channel(embed=e)
-            
-            await self.bot.lockdown_for(5*60, member=message.author, reason=Reasons.profanity)
         
     @commands.Cog.listener('on_message')
     async def link_checker(self, message: discord.Message) -> None:
