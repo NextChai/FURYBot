@@ -138,7 +138,7 @@ class Moderation(commands.Cog):
             ) for index in range(3)
         ]
     )
-    async def is_valid(self, ctx):
+    async def is_valid(self, ctx, mem1, mem2, mem3):
         embed = discord.Embed(
             title='Team Check',
         )
