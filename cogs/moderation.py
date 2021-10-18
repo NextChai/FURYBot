@@ -354,6 +354,9 @@ class Moderation(commands.Cog):
                 title='Please Confirm',
                 description=f'Do you want to lockdown {member.mention} until {time.human_time(date)}?'
             )
+            e.set_author(name=str(member), icon_url=member.display_avatar.url)
+            e.set_footer(text=f'Member ID: {member.id}') 
+        
             confirmation = await ctx.get_confirmation(embed=e)
             if not confirmation:
                 return

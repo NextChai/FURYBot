@@ -286,6 +286,9 @@ class DiscordBot(commands.Bot):
             title='Member Lockdown',
             description=f'Member {member.mention} has been locked down for {Reasons.type_to_string(reason)}.'
         )
+        e.set_author(name=str(member), icon_url=member.display_avatar.url)
+        e.set_footer(text=f'Member ID: {member.id}') 
+        
         return await self.send_to_logging_channel(embed=e)
     
     async def on_member_freedom(self, member: discord.Member, reason: Reasons) -> None:
@@ -293,6 +296,9 @@ class DiscordBot(commands.Bot):
             title='Member Freedom',
             description=f'Member {member.mention} has been freed for {Reasons.type_to_string(reason)}'
         )
+        e.set_author(name=str(member), icon_url=member.display_avatar.url)
+        e.set_footer(text=f'Member ID: {member.id}') 
+        
         return await self.send_to_logging_channel(embed=e)
 
 
@@ -538,6 +544,9 @@ class Lockdown:
             title='Oh no!',
             description=f'You have been given the **Lockdown** role in the FLVS Fury server!'
         )
+        e.set_author(name=str(member), icon_url=member.display_avatar.url)
+        e.set_footer(text=f'Member ID: {member.id}') 
+        
         e.add_field(name='What does this mean?', value='You no longer have access to the server for now!')
         
         reasons = ', '.join([f'**{Reasons.type_to_string(reason)}**' for reason in current['reasons']])
@@ -592,6 +601,9 @@ class Lockdown:
             title='Oh yea!',
             description=f'You have been unlocked from {member.guild.id}!'
         )
+        e.set_author(name=str(member), icon_url=member.display_avatar.url)
+        e.set_footer(text=f'Member ID: {member.id}') 
+        
         await self.send_to(member, embed=e)
         return True
         
@@ -658,6 +670,8 @@ class Lockdown:
                 title='Oh no!',
                 description='You have been muted in FLVS Fury!'
             )
+            embed.set_author(name=str(member), icon_url=member.display_avatar.url) # type: ignore
+            embed.set_footer(text=f'Member ID: {member.id}') # type: ignore
         
         await self.send_to(member, embed=embed)
         
@@ -681,6 +695,9 @@ class Lockdown:
             title='Oh no!',
             description=f'You have been muted in FLVS Fury for {time} seconds!'
         )
+        embed.set_author(name=str(member), icon_url=member.display_avatar.url)
+        embed.set_footer(text=f'Member ID: {member.id}')
+        
         await self.mute(member, embed=embed)
         await asyncio.sleep(time)
         await member.edit(roles=[original_roles])
@@ -747,7 +764,6 @@ class FuryBot(DiscordBot, SecurityMixin):
         self.dispatch('member_freedom', member, reason)
         return await super().freedom(member, reason=reason)
     
-    
     # We'll work in message based spam control here. 
     async def on_message(self, message: discord.Message) -> None:
         bucket = self.spam_control.get_bucket(message)
@@ -759,7 +775,7 @@ class FuryBot(DiscordBot, SecurityMixin):
             self.spam_counter[author_id] += 1
             
             if self.spam_counter[author_id] >= 5:
-                await self.mute_for(message.author, time=5*60)
+                self.loop.create_task(self.mute_for(message.author, time=5*60))
                 del self._auto_spam_count[author_id]
                 
                 async for history in message.channel.history(limit=100):
