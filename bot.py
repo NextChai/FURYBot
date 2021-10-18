@@ -448,7 +448,7 @@ class Lockdown:
     
     @staticmethod
     def get_muted_role(guild: discord.Guild):
-        return guild.get_role(constants.MUTED_ROLE)
+        return discord.utils.get(guild.roles, name='Muted')
 
     def get_lockdown_info(self, member: Union[discord.Member, discord.User]) -> Optional[Dict]:
         """A method used to get the lockdown info from a member.
@@ -761,6 +761,15 @@ class FuryBot(DiscordBot, SecurityMixin):
             if self.spam_counter[author_id] >= 5:
                 await self.mute_for(message.author, time=5*60)
                 del self._auto_spam_count[author_id]
+                
+                embed = Embed(
+                    title='Member auto Muted',
+                    description=f'{message.author.mention} was auto muted for message spamming.'
+                )
+                embed.add_field(name='Channel', value=message.chanel.mention)
+                embed.add_field(name='Message', value=message.clean_content)
+                embed.add_field(name='Mute time:', value='5 minutes.')
+                await self.send_to_logging_channel(embed=embed)
             return
         else:
             self.spam_counter.pop(author_id, None)
