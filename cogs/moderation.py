@@ -80,7 +80,7 @@ class Moderation(commands.Cog):
                 description=f'Add a member.',
                 type=commands.OptionType.user,
                 required=False
-            ) for index in range(7)
+            ) for index in range(6)
         ]
     )
     async def team_create(
