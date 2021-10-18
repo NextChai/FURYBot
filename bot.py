@@ -103,10 +103,6 @@ class DiscordBot(commands.Bot):
         self.activity_type = discord.ActivityType.watching
         self.debug: bool = False
         
-        # Spam Control for Messages
-        self.spam_control: commands.CooldownMapping = commands.CooldownMapping.from_cooldown(10, 10, commands.BucketType.user)
-        self.spam_counter: Counter = Counter()
-        
         for ext in initial_extensions:
             try:
                 self.load_extension(ext)
@@ -649,68 +645,7 @@ class Lockdown:
         
         await self.lockdown_for(total_seconds, member=member, reason=reason)
         
-    async def mute(self, member: discord.Member, *, embed: Optional[discord.Embed] = None) -> None:
-        """Give a member the muted role.
         
-        Paramters
-        ---------
-        member: :class:`discord.Member`
-            The member to mute
-        
-        Returns
-        -------
-        None
-        """
-        role = self.get_muted_role(member.guild)
-        await member.edit(roles=[role])
-        
-        if not embed:
-            embed = Embed(
-                title='Oh no!',
-                description='You have been muted in FLVS Fury!'
-            )
-            embed.set_author(name=str(member), icon_url=member.display_avatar.url) # type: ignore
-            embed.set_footer(text=f'Member ID: {member.id}') # type: ignore
-        
-        await self.send_to(member, embed=embed)
-        
-    async def mute_for(self, member: discord.Member, time: Union[int, float]) -> None:
-        """Mute a member for a given amount of seconds.
-        
-        Parameters
-        ----------
-        member: :class:`discord.Member`
-            The member to mute
-        time: Union[:class:`int`, :class:`float`]
-            The total time, in seconds, to mute the member.
-        
-        Returns
-        -------
-        None
-        """
-        original_roles = member.roles.copy()
-        
-        embed = Embed(
-            title='Oh no!',
-            description=f'You have been muted in FLVS Fury for {time} seconds!'
-        )
-        embed.set_author(name=str(member), icon_url=member.display_avatar.url)
-        embed.set_footer(text=f'Member ID: {member.id}')
-        
-        await self.mute(member, embed=embed)
-        await asyncio.sleep(time)
-        await member.edit(roles=original_roles)
-        
-        embed = Embed(
-            title='Oh yea!',
-            description='You have been unmuted in the FLVS Fury Discord Server!'
-        )
-        embed.set_author(name=str(member), icon_url=member.display_avatar.url)
-        embed.set_footer(text=f'Member ID: {member.id}')
-        await self.send_to(member, embed=embed)
-        
-        
-
 class SecurityMixin(Security, Lockdown):
     """A mixin that implements the attrs and methods of both the 
     Lockdown and Secury classes into one.
@@ -764,34 +699,3 @@ class FuryBot(DiscordBot, SecurityMixin):
     async def freedom(self, member: discord.Member, *, reason: Reasons) -> bool:
         self.dispatch('member_freedom', member, reason)
         return await super().freedom(member, reason=reason)
-    
-    async def cleanup_member(self, message: discord.Message):
-        async for history in message.channel.history(limit=100):
-            if history.author == message.author:
-                await history.delete()
-    
-    # We'll work in message based spam control here. 
-    async def on_message(self, message: discord.Message) -> None:
-        bucket = self.spam_control.get_bucket(message)
-        current = message.created_at.timestamp()
-        retry_after = bucket.update_rate_limit(current)
-        author_id = message.author.id
-        
-        if retry_after and not checks.should_ignore(message.author):
-            self.spam_counter[author_id] += 1
-            
-            if self.spam_counter[author_id] >= 5:
-                self.loop.create_task(self.mute_for(message.author, time=5*60))
-                del self.spam_counter[author_id]
-                
-                embed = Embed(
-                    title='Member auto Muted',
-                    description=f'{message.author.mention} was auto muted for message spamming.'
-                )
-                embed.add_field(name='Channel', value=message.channel.mention)
-                embed.add_field(name='Message', value=message.clean_content)
-                embed.add_field(name='Mute time:', value='5 minutes.')
-                await self.send_to_logging_channel(embed=embed)
-                await self.cleanup_member(message)
-        else:
-            self.spam_counter.pop(author_id, None)
