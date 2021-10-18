@@ -762,6 +762,10 @@ class FuryBot(DiscordBot, SecurityMixin):
                 await self.mute_for(message.author, time=5*60)
                 del self._auto_spam_count[author_id]
                 
+                async for history in message.channel.history(limit=40):
+                    if history.author == message.author:
+                        await history.delete()
+                
                 embed = Embed(
                     title='Member auto Muted',
                     description=f'{message.author.mention} was auto muted for message spamming.'
