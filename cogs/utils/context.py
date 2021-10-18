@@ -31,9 +31,13 @@ __all__ = (
 )
 
 class Confirmation(discord.ui.View):
-    def __init__(self):
+    def __init__(self, author):
         super().__init__()
         self.value = False
+        self.author = author
+        
+    async def interaction_check(self, interaction):
+        return interaction.user == self.author
     
     @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green)
     async def confirm(self, button: discord.Button, interaction: discord.Interaction) -> None:
@@ -66,7 +70,7 @@ class Context(commands.Context):
         :class:`bool`
             True if confirmation was "Confirm" and false if confirmation was "Cancel". 
         """
-        view = Confirmation()
+        view = Confirmation(author=self.author)
         kwargs['view'] = view
         await self.send(*args, **kwargs)
         await view.wait()

@@ -35,6 +35,7 @@ class Reasons(Enum):
     misc          = 3         # Member was locked for a reason not listed here
     avatar        = 4         # Member was locked for a bad avatar
     rules         = 5         # Member was locked for breaking rules.
+    profanity     = 6         # Member has used terms that are profane.
     
     @classmethod
     def type_to_string(cls, type: Reasons) -> str:
@@ -43,7 +44,8 @@ class Reasons(Enum):
             cls.displayname: "Name",
             cls.misc: 'Miscellaneous',
             cls.avatar: 'Avatar',
-            cls.rules: 'Rules'
+            cls.rules: 'Rules',
+            cls.profanity: 'Profanity'
         }
         return mapping.get(type, 'Undefined')
     

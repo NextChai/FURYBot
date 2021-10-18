@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 
 from __future__ import annotations
+from os import stat
 
 import re
 import sys
@@ -30,6 +31,7 @@ import logging
 import traceback
 import functools
 import datetime
+from collections import Counter
 from typing import Callable, List, Dict, Any, Optional, Union
 
 import asyncio
@@ -78,6 +80,9 @@ class DiscordBot(commands.Bot):
     
     Will contain all discord.py related activities and methods.
     
+    Fury bot will also have a complete spam detector. This will check for both
+    infractions within a certain time frame and a user spamming messages.
+    
     Attributes
     ----------
     activity_message: :class:`str`
@@ -93,17 +98,22 @@ class DiscordBot(commands.Bot):
             guild_ids=[757664675864248360]
         )
         
+        self.Embed: discord.Embed = Embed
+        self.activity_message = 'Over the server.'
+        self.activity_type = discord.ActivityType.watching
+        self.debug: bool = False
+        
+        # Spam Control for Messages
+        self.spam_control: commands.CooldownMapping = commands.CooldownMapping.from_cooldown(10, 12.0, commands.BucketType.user)
+        self.spam_counter: Counter = Counter()
+        
         for ext in initial_extensions:
             try:
                 self.load_extension(ext)
                 log.info('Loaded ext: {0}'.format(ext))
             except Exception:
                 traceback.print_exc()
-        
-        self.Embed: discord.Embed = Embed
-        self.activity_message = 'Over the server.'
-        self.activity_type = discord.ActivityType.watching
-        self.debug: bool = False
+                
 
     @property
     def activity_message(self) -> str:
@@ -435,6 +445,10 @@ class Lockdown:
     @staticmethod
     def get_lockdown_role(guild: discord.Guild):
         return guild.get_role(constants.LOCKDOWN_ROLE)
+    
+    @staticmethod
+    def get_muted_role(guild: discord.Guild):
+        return guild.get_role(constants.MUTED_ROLE)
 
     def get_lockdown_info(self, member: Union[discord.Member, discord.User]) -> Optional[Dict]:
         """A method used to get the lockdown info from a member.
@@ -517,6 +531,7 @@ class Lockdown:
         current['reasons'] = [reason]
         
         lr = self.get_lockdown_role(member.guild)
+
         await member.edit(roles=[lr], reason='Member is getting locked down.')
         
         e = Embed(
@@ -622,6 +637,61 @@ class Lockdown:
         total_seconds = form.total_seconds()
         
         await self.lockdown_for(total_seconds, member=member, reason=reason)
+        
+    async def mute(self, member: discord.Member, *, embed: Optional[discord.Embed] = None) -> None:
+        """Give a member the muted role.
+        
+        Paramters
+        ---------
+        member: :class:`discord.Member`
+            The member to mute
+        
+        Returns
+        -------
+        None
+        """
+        role = self.get_muted_role(member.guild)
+        await member.edit(roles=[role])
+        
+        if not embed:
+            embed = Embed(
+                title='Oh no!',
+                description='You have been muted in FLVS Fury!'
+            )
+        
+        await self.send_to(member, embed=embed)
+        
+    async def mute_for(self, member: discord.Member, time: Union[int, float]) -> None:
+        """Mute a member for a given amount of seconds.
+        
+        Parameters
+        ----------
+        member: :class:`discord.Member`
+            The member to mute
+        time: Union[:class:`int`, :class:`float`]
+            The total time, in seconds, to mute the member.
+        
+        Returns
+        -------
+        None
+        """
+        original_roles = member.roles.copy()
+        
+        embed = Embed(
+            title='Oh no!',
+            description=f'You have been muted in FLVS Fury for {time} seconds!'
+        )
+        await self.mute(member, embed=embed)
+        await asyncio.sleep(time)
+        await member.edit(roles=[original_roles])
+        
+        embed = Embed(
+            title='Oh yea!',
+            description='You have been unmuted in the FLVS Fury Discord Server!'
+        )
+        await self.send_to(member, embed=embed)
+        
+        
 
 class SecurityMixin(Security, Lockdown):
     """A mixin that implements the attrs and methods of both the 
@@ -676,3 +746,21 @@ class FuryBot(DiscordBot, SecurityMixin):
     async def freedom(self, member: discord.Member, *, reason: Reasons) -> bool:
         self.dispatch('member_freedom', member, reason)
         return await super().freedom(member, reason=reason)
+    
+    
+    # We'll work in message based spam control here. 
+    async def on_message(self, message: discord.Message) -> None:
+        bucket = self.spam_control.get_bucket(message)
+        current = message.created_at.timestamp()
+        retry_after = bucket.update_rate_limit(current)
+        author_id = message.author.id
+        
+        if retry_after and not checks.should_ignore(message.author):
+            self.spam_counter[author_id] += 1
+            
+            if self.spam_counter[author_id] >= 5:
+                await self.mute_for(message.author, time=5*60)
+                del self._auto_spam_count[author_id]
+            return
+        else:
+            self.spam_counter.pop(author_id, None)
