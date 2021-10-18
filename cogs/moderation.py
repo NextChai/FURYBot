@@ -134,7 +134,7 @@ class Moderation(commands.Cog):
                 name=f'mem{index}', 
                 description=f'Add a member.',
                 type=commands.OptionType.user,
-                required=False
+                required=True
             ) for index in range(3)
         ]
     )
