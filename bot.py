@@ -700,12 +700,14 @@ class Lockdown:
         
         await self.mute(member, embed=embed)
         await asyncio.sleep(time)
-        await member.edit(roles=[original_roles])
+        await member.edit(roles=original_roles)
         
         embed = Embed(
             title='Oh yea!',
             description='You have been unmuted in the FLVS Fury Discord Server!'
         )
+        embed.set_author(name=str(member), icon_url=member.display_avatar.url)
+        embed.set_footer(text=f'Member ID: {member.id}')
         await self.send_to(member, embed=embed)
         
         
