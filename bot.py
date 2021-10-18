@@ -776,7 +776,7 @@ class FuryBot(DiscordBot, SecurityMixin):
             
             if self.spam_counter[author_id] >= 5:
                 self.loop.create_task(self.mute_for(message.author, time=5*60))
-                del self._auto_spam_count[author_id]
+                del self.spam_counter[author_id]
                 
                 async for history in message.channel.history(limit=100):
                     if history.author == message.author:
