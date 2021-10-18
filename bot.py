@@ -104,7 +104,7 @@ class DiscordBot(commands.Bot):
         self.debug: bool = False
         
         # Spam Control for Messages
-        self.spam_control: commands.CooldownMapping = commands.CooldownMapping.from_cooldown(15, 12.0, commands.BucketType.user)
+        self.spam_control: commands.CooldownMapping = commands.CooldownMapping.from_cooldown(10, 12.0, commands.BucketType.user)
         self.spam_counter: Counter = Counter()
         
         for ext in initial_extensions:
