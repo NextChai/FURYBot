@@ -86,8 +86,8 @@ class Safety(commands.Cog):
         if before.clean_content == after.clean_content:
             return
         
-        await self.profanity_checker(after)
-        await self.link_checker(after)
+        self.bot.loop.create_task(self.profanity_checker(after))
+        self.bot.loop.create_task(self.link_checker(after))
         
     @commands.Cog.listener('on_message')
     async def nsfw_image_checker(self, message: discord.Message) -> None:
@@ -119,7 +119,7 @@ class Safety(commands.Cog):
                 await self.bot.send_to(message.author, embed=e)
                 
                 e.title = 'Profane Image detected!'
-                e.description = f'{message.author.mention} has uploaded an image that is profane.'
+                e.description = f'{message.author.mention} has uploaded an image that is profane in {message.channel.mention}.'
                 await self.bot.send_to_logging_channel(embed=e)
                     
     @commands.Cog.listener('on_message')
@@ -152,7 +152,7 @@ class Safety(commands.Cog):
             await self.bot.send_to(message.author, embed=e)
             
             e.title = 'Profanity Found'
-            e.description = f'{message.author.mention} has said a word that contains profanity.'
+            e.description = f'{message.author.mention} has said a word that contains profanity in {message.channel.mention}.'
             await self.bot.send_to_logging_channel(embed=e)
         
     @commands.Cog.listener('on_message')
