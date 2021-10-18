@@ -125,6 +125,31 @@ class Moderation(commands.Cog):
             description=f'I have created a category named {category.mentio}, a text channel called {text.mention}, and a voice channel called {voice.mention}'
         )
         return await ctx.send(embed=embed)
+    
+    @team.slash(
+        name='is_valid',
+        description='See if a Fortnite team is valid.',
+        options=[
+            commands.CommandOption(
+                name=f'mem{index}', 
+                description=f'Add a member.',
+                type=commands.OptionType.user,
+                required=False
+            ) for index in range(3)
+        ]
+    )
+    async def is_valid(self, ctx):
+        embed = discord.Embed(
+            title='Team Check',
+        )
+        members = [m for m in ctx.args if isinstance(m, discord.Member)]
+        for member in members:
+            roles = [role.name for role in member.roles]
+            if 'PC' in roles:
+                embed.add_field(name=member, value='Valid.')
+            else:
+                embed.add_field(name=member, value='Not Valid.')
+        
         
         
     @commands.slash(
