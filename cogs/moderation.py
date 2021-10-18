@@ -146,9 +146,9 @@ class Moderation(commands.Cog):
         for member in members:
             roles = [role.name for role in member.roles]
             if 'PC' in roles:
-                embed.add_field(name=member, value='Valid.')
+                embed.add_field(name=member.nick or str(member), value='Valid.')
             else:
-                embed.add_field(name=member, value='Not Valid.')
+                embed.add_field(name=member.nick or str(member), value='Not Valid.')
         
         return await ctx.send(embed=embed)
         
