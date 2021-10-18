@@ -76,10 +76,10 @@ class Moderation(commands.Cog):
             )
         ] + [
             commands.CommandOption(
-                name=f'mem{index}', 
+                name=f'mem{index+1}', 
                 description=f'Add a member.',
                 type=commands.OptionType.user,
-                required=False
+                required=True if index+1 <= 3 else False
             ) for index in range(6)
         ]
     )
@@ -115,6 +115,7 @@ class Moderation(commands.Cog):
         
         overwrites = {m: discord.PermissionOverwrite(view_channel=True) for m in members}
         overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(view_channel=False)
+        overwrites[captain_role] = discord.PermissionOverwrite(view_chanel=True)
         
         category = await ctx.guild.create_category(c_name, overwrites=overwrites)
         text = await category.create_text_channel(c_name)
@@ -122,7 +123,7 @@ class Moderation(commands.Cog):
         
         embed = self.bot.Embed(
             title='Success!',
-            description=f'I have created a category named {category.mentio}, a text channel called {text.mention}, and a voice channel called {voice.mention}'
+            description=f'I have created a category named {category.mention}, a text channel called {text.mention}, and a voice channel called {voice.mention}'
         )
         return await ctx.send(embed=embed)
     
