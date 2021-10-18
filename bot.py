@@ -260,18 +260,17 @@ class DiscordBot(commands.Bot):
         if isinstance(error, commands.MissingPermissions):
             e.description = 'You do not have the permissions to do this command!'
             return await ctx.send(embed=e)
-        
-        exc = getattr(error, 'original', error)
-        traceback_str = ''.join(traceback.format_exception(exc.__class__, exc, exc.__traceback__)) # type: ignore
-        
-        lines = f'Ignoring exception in command {ctx.command}:\n{traceback_str}'
-        print(lines)
-        
-        formatted = lines.replace(traceback_str, f'```python\n{traceback_str}\n```')
-        await self.send_to_logging_channel(formatted)
-        
+
         if checks.should_ignore(ctx.author) and self.debug:
+            exc = getattr(error, 'original', error)
+            traceback_str = ''.join(traceback.format_exception(exc.__class__, exc, exc.__traceback__)) # type: ignore
+            
+            lines = f'Ignoring exception in command {ctx.command}:\n{traceback_str}'
+            print(lines)
+            
+            formatted = lines.replace(traceback_str, f'```python\n{traceback_str}\n```')
             await ctx.send(formatted)
+            await self.send_to_logging_channel(formatted)
         else:
             e.description = f'I ran into an error when doing this command!\n\n**{str(error)}**'
             return await ctx.send(embed=e)
