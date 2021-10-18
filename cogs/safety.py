@@ -156,7 +156,7 @@ class Safety(commands.Cog):
             e.title = 'Profanity Found'
             e.description = f'{message.author.mention} has said a word that contains profanity in {message.channel.mention}.'
             e.add_field(name='Action Taken', value='I have locked them out of the server for 5 minutes.')
-            await self.bot.send_to_logging_channel(embed=e)
+            await self.bot.send_to_logging_channel(embed=e, ping_staff=False)
         
     @commands.Cog.listener('on_message')
     async def link_checker(self, message: discord.Message) -> None:
