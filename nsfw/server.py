@@ -24,7 +24,8 @@ DEALINGS IN THE SOFTWARE.
 
 import os
 import random
-from typing import Literal, Union, Dict, Any
+from typing import Union, Dict, Any
+from typing_extensions import Literal
 
 import uvicorn
 import aiohttp
