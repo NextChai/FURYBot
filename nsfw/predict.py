@@ -68,7 +68,6 @@ def load_images(image_paths, image_size, verbose=True):
         except Exception as ex:
             print("Image Load Failure: ", img_path, ex)
 
-    return np.array([loaded_images]), loaded_image_paths
     return np.asarray(loaded_images), loaded_image_paths
 
 
