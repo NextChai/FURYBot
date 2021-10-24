@@ -68,6 +68,7 @@ def load_images(image_paths, image_size, verbose=True):
         except Exception as ex:
             print("Image Load Failure: ", img_path, ex)
 
+    return loaded_images
     return np.asarray(loaded_images), loaded_image_paths
 
 
@@ -77,7 +78,7 @@ def load_model(model_path: str):
 
 def classify(model, input_paths, image_dim=IMAGE_DIM):
     """Classify given a model, input paths (could be single string), and image dimensionality...."""
-    images, image_paths = load_images(input_paths, (image_dim, image_dim))
+    images = load_images(input_paths, (image_dim, image_dim))
     probs = classify_nd(model, images)
     return dict(zip(['data'], probs))
 
