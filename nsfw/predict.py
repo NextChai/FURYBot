@@ -68,6 +68,8 @@ def load_images(image_paths, image_size, verbose=True):
         except Exception as ex:
             print("Image Load Failure: ", img_path, ex)
 
+    for index, entry in enumerate(loaded_images):
+        loaded_images[index] = np.array([x for x in entry])
     return np.asarray(loaded_images)
 
 
