@@ -38,7 +38,7 @@ app = fastapi.FastAPI()
 session = aiohttp.ClientSession()
 
 MAX_IMAGE_SIZE = 25 * 1000000 # 25 mb
-model = predict.load_model('nsfw_model.h5')
+model = predict.load_model('./nsfw_model.h5')
 
 async def download_image(url: str) -> Union[str, Literal[False]]:
     filename = f'{random.randint(6969, 6999)}.jpg'
