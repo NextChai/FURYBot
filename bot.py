@@ -23,7 +23,6 @@ DEALINGS IN THE SOFTWARE.
 """
 
 from __future__ import annotations
-from os import stat
 
 import re
 import sys
@@ -31,7 +30,6 @@ import logging
 import traceback
 import functools
 import datetime
-from collections import Counter
 from typing import Callable, List, Dict, Any, Optional, Union
 
 import asyncio

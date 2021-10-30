@@ -68,6 +68,18 @@ class Safety(commands.Cog):
         self.name_checker.start()
         self.load_profanity.start()
         
+    @commands.Cog.listener('on_message')
+    async def message_content_check(self, message: discord.Message):
+        """Used to determine if a message's content legnth is too high.
+        
+        Anything 1000 or over will automatically be deleted."""
+        if should_ignore(message.author):
+            return
+        if len(message.clean_content) >= 1000:
+            await message.delete()
+            
+        
+        
     @commands.Cog.listener('on_message_edit')
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
         """Used to check if a member edited a message that now contains links / profanity.

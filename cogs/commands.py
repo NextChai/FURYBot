@@ -108,7 +108,7 @@ class Commands(commands.Cog):
     """
     def __init__(self, bot):
         self.bot: FuryBot = bot
-        
+
     @commands.slash(
         name='ping',
         description='Ping the bot to ensure it is online.',

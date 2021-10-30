@@ -34,7 +34,7 @@ import subprocess
 import traceback
 import importlib
 from contextlib import redirect_stdout
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Literal
 
 import discord
 from discord.ext import commands
@@ -236,13 +236,10 @@ class Owner(commands.Cog):
     
     @commands.slash(
         name='python',
-        description='Run code.',
-        options=[
-            commands.CommandOption('code', 'The code to evaluate', required=True)
-        ]
+        description='Run code.'
     )
     @commands.is_owner()
-    async def python(self, ctx: Context, code: str):
+    async def python(self, ctx: Context, code: commands.Option[str, Literal['The code to evaluate']]):
         globalns = {
             'ctx': ctx,
             'guild': ctx.guild,

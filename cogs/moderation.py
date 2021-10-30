@@ -25,7 +25,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import dateparser
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Literal
 import datetime
 
 import discord
@@ -215,16 +215,9 @@ class Moderation(commands.Cog):
     
     @profanity.slash(
         name='remove',
-        description='Make a word bad word a good word',
-        options=[
-            commands.CommandOption(
-                name='word',
-                description='The word to remove.',
-                required=True
-            )
-        ]
+        description='Make a word bad word a good word'
     )
-    async def profanity_remove(self, ctx: Context, word: str) -> None:
+    async def profanity_remove(self, ctx: Context, word: commands.Option[str, Literal['The word to remove.']]) -> None:
         try:
             await self.bot.add_word_to('clean', word, wrapper=self.bot.wrap)
             return await ctx.send(f'Removed "{word}" from the list of banned words', ephemeral=True)
@@ -233,16 +226,9 @@ class Moderation(commands.Cog):
     
     @profanity.slash(
         name='add' ,
-        description='Make a word a profanity word.',
-        options=[
-            commands.CommandOption(
-                name='word',
-                description='The word to add.',
-                required=True
-            )
-        ]
+        description='Make a word a profanity word.'
     )
-    async def wordset_add(self, ctx: Context, word: str) -> None:
+    async def wordset_add(self, ctx: Context, word: commands.Option[str, Literal['The word to add.']]) -> None:
         try:
             await self.bot.add_word_to('profanity', word, wrapper=self.bot.wrap)
             return await ctx.send(f'Added {word} to the list of banned words', ephemeral=True)
@@ -251,32 +237,26 @@ class Moderation(commands.Cog):
     
     @profanity.slash(
         name='contains_profanity',
-        description='Determine if a word contains profanity.',
-        options=[
-            commands.CommandOption(
-                name='word',
-                description='The word to check.',
-                required=True
-            )
-        ]
+        description='Determine if a word contains profanity.'
     )
-    async def wordset_contains_profanity(self, ctx: Context, word: str) -> None:
+    async def wordset_contains_profanity(
+        self, 
+        ctx: Context, 
+        word: commands.Option[str, Literal['The word to check.']]
+    ) -> None:
         check = await self.bot.contains_profanity(word)
         fmt = ' not' if check is False else ''
         return await ctx.send(f"Word {word} does{fmt} contain profanity.", ephemeral=True)
     
     @profanity.slash(
         name='censor',
-        description='Censor a sentence.',
-        options=[
-            commands.CommandOption(
-                name='sentence',
-                description='The sentence to censor.',
-                required=True
-            )
-        ]
+        description='Censor a sentence.'
     )
-    async def wordset_censor(self, ctx: Context, sentence: str) -> None:
+    async def wordset_censor(
+        self, 
+        ctx: Context, 
+        sentence: commands.Option[str, Literal['The sentence to censor.']]
+    ) -> None:
         check = await self.bot.censor_message(sentence)
         return await ctx.send(check, ephemeral=True)
         
@@ -334,7 +314,14 @@ class Moderation(commands.Cog):
                 required=False)
         ]
     )
-    async def lockdown_member(self, ctx: Context, member: discord.Member, reason_string: str, total_seconds: Optional[str] = None, human_time: Optional[str] = None):
+    async def lockdown_member(
+        self, 
+        ctx: Context, 
+        member: discord.Member, 
+        reason_string: str, 
+        total_seconds: Optional[Literal['60', '3600', '86400', '172800', '604800']] = None, 
+        human_time: Optional[str] = None
+    ) -> None:
         if total_seconds and human_time:
             return await ctx.send("You can not do both total_seconds and datetime, you need to pick one.")
         
@@ -417,35 +404,6 @@ class Moderation(commands.Cog):
             e.add_field(name='Remaining Lockdown Reasons:', value=formatted)
         
         return await ctx.send(embed=e, ephemeral=True)
-    
-    @commands.slash(
-        name='ban',
-        description='Ban a member',
-        type=commands.InteractionType.user,
-    )
-    @commands.guild_only()
-    @commands.has_permissions(ban_members=True)
-    async def ban(self, ctx: Context):
-        target = ctx.target
-        if not isinstance(target, discord.Member):
-            return await ctx.send("An internal error happened! Please try again later.", ephemeral=True)
-        
-        await target.ban(reason=f'Requested by {ctx.author} via application command.')
-        
-    @commands.slash(
-        name='kick',
-        description='Kick a member',
-        type=commands.InteractionType.user
-    )
-    @commands.guild_only()
-    @commands.has_permissions(kick_members=True)
-    async def kick(self, ctx: Context):
-        target = ctx.target
-        if not isinstance(target, discord.Member):
-            return await ctx.send("An internal error happened! Please try again later.", ephemeral=True)
-        
-        await target.kick(reason=f'Requested by {ctx.author} via application command.')
-        
         
 def setup(bot):
     bot.add_cog(Moderation(bot))
