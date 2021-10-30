@@ -173,4 +173,4 @@ class Commands(commands.Cog):
         
         
 def setup(bot):
-    bot.add_cog(Commands(bot))
+    return bot.add_cog(Commands(bot))

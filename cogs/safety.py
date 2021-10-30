@@ -332,4 +332,4 @@ class Safety(commands.Cog):
         log.info("Finished loading profanity wordset.")
         
 def setup(bot):
-    bot.add_cog(Safety(bot))
+    return bot.add_cog(Safety(bot))

@@ -281,4 +281,4 @@ class Owner(commands.Cog):
                 await ctx.send(f'```py\n{value}{ret}\n```')
                 
 def setup(bot):
-    bot.add_cog(Owner(bot))
+    return bot.add_cog(Owner(bot))
