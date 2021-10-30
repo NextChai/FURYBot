@@ -146,7 +146,7 @@ class Commands(commands.Cog):
         name='report',
         description='Report a bug!',
         options=[
-            commands.CommandOption(
+            commands.Option(
                 name='message',
                 description='The message to report',
                 required=True

@@ -62,20 +62,20 @@ class Moderation(commands.Cog):
         name='create',
         description='Create a team.',
         options=[
-            commands.CommandOption(
+            commands.Option(
                 name='name',
                 description='The team name.',
                 type=commands.OptionType.string,
                 required=True
             ),
-            commands.CommandOption(
+            commands.Option(
                 name='captain_role',
                 description='Mention the correct captain role to have access to the channel.',
                 type=commands.OptionType.role,
                 required=True
             )
         ] + [
-            commands.CommandOption(
+            commands.Option(
                 name=f'mem{index+1}', 
                 description=f'Add a member.',
                 type=commands.OptionType.user,
@@ -131,7 +131,7 @@ class Moderation(commands.Cog):
         name='is_valid',
         description='See if a Fortnite team is valid.',
         options=[
-            commands.CommandOption(
+            commands.Option(
                 name=f'mem{index}', 
                 description=f'Add a member.',
                 type=commands.OptionType.user,
@@ -158,24 +158,24 @@ class Moderation(commands.Cog):
         name='sub',
         description='Give a sub access to a channel.',
         options=[
-            commands.CommandOption(
+            commands.Option(
                 name='member',
                 description='The member to give access to.',
                 type=commands.OptionType.user,
                 required=True
             ),
-            commands.CommandOption(
+            commands.Option(
                 name='channel',
                 description='The channel to give access to.',
                 type=commands.OptionType.channel,
                 required=True
             ),
-            commands.CommandOption(
+            commands.Option(
                 name='permission',
                 description='Whether to deny or allow the permission',
                 choices=[
-                    commands.CommandOptionChoice(name='Allow Access', value='allow'),
-                    commands.CommandOptionChoice(name='Deny Access', value='deny')
+                    commands.OptionChoice(name='Allow Access', value='allow'),
+                    commands.OptionChoice(name='Deny Access', value='deny')
                 ],
                 required=True
             )
@@ -281,33 +281,33 @@ class Moderation(commands.Cog):
         name='member',
         description='Lock down a member for a specific reason.',
         options=[
-            commands.CommandOption(
+            commands.Option(
                 name='member',
                 description='The member to lock down.',
                 type=commands.OptionType.user,
                 required=True
             ),
-            commands.CommandOption(
+            commands.Option(
                 name='reason',
                 description='The reason for locking down the member.',
                 type=commands.OptionType.string,
-                choices=[commands.CommandOptionChoice(name=Reasons.type_to_string(value), value=name) for name, value in Reasons.__members__.items()],
+                choices=[commands.OptionChoice(name=Reasons.type_to_string(value), value=name) for name, value in Reasons.__members__.items()],
                 required=True
             ),
-            commands.CommandOption(
+            commands.Option(
                 name='time',
                 description='How long you want them locked.',
                 type=commands.OptionType.string,
                 required=False,
                 choices=[
-                    commands.CommandOptionChoice(name='1m', value='60'),
-                    commands.CommandOptionChoice(name='1h', value='3600'),
-                    commands.CommandOptionChoice(name='1d', value='86400'),
-                    commands.CommandOptionChoice(name='2d', value='172800'),
-                    commands.CommandOptionChoice(name='7d', value='604800'),
+                    commands.OptionChoice(name='1m', value='60'),
+                    commands.OptionChoice(name='1h', value='3600'),
+                    commands.OptionChoice(name='1d', value='86400'),
+                    commands.OptionChoice(name='2d', value='172800'),
+                    commands.OptionChoice(name='7d', value='604800'),
                 ]
             ),
-            commands.CommandOption(
+            commands.Option(
                 name='datetime', 
                 description='A specific date you want to unlock them.',
                 type=commands.OptionType.string,
@@ -374,17 +374,17 @@ class Moderation(commands.Cog):
         name='freedom',
         description='Remove a lockdown from a member.',
         options=[
-            commands.CommandOption(
+            commands.Option(
                 name='member',
                 description='The member to free',
                 type=commands.OptionType.user,
                 required=True
             ),
-            commands.CommandOption(
+            commands.Option(
                 name='reason',
                 description='The reason for freeing the member.',
                 type=commands.OptionType.string,
-                choices=[commands.CommandOptionChoice(name=Reasons.type_to_string(value), value=name) for name, value in Reasons.__members__.items()],
+                choices=[commands.OptionChoice(name=Reasons.type_to_string(value), value=name) for name, value in Reasons.__members__.items()],
                 required=True
             )
         ]

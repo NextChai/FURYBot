@@ -209,13 +209,13 @@ class Owner(commands.Cog):
         name='debug',
         description='Toggle the debug feature of the bot.',
         options=[
-            commands.CommandOption(
+            commands.Option(
                 'enabled',
                 'To enable or disable debug',
                 type=commands.OptionType.string,
                 choices=[
-                    commands.CommandOptionChoice(name='Enabled', value='true'),
-                    commands.CommandOptionChoice(name='Disabled', value='false')
+                    commands.OptionChoice(name='Enabled', value='true'),
+                    commands.OptionChoice(name='Disabled', value='false')
                 ]
             )
         ]
