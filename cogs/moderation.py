@@ -406,4 +406,4 @@ class Moderation(commands.Cog):
         return await ctx.send(embed=e, ephemeral=True)
         
 def setup(bot):
-    bot.add_cog(Moderation(bot))
+    return bot.add_cog(Moderation(bot))
