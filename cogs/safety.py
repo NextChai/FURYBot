@@ -69,16 +69,35 @@ class Safety(commands.Cog):
         self.load_profanity.start()
         
     @commands.Cog.listener('on_message')
+    async def file_checker(self, message: discord.Message):
+        """Used to check for message attachments. Any message that has them is deleted without correct perms."""
+        if should_ignore(message.author):
+            return
+        
+        if message.attachments:
+            await message.delete()
+            
+            embed = self.bot.Embed(
+                title='Message attachments found',
+                description='Please do not post files!'
+            )
+            return await message.channel.send(embed=embed)
+        
+    @commands.Cog.listener('on_message')
     async def message_content_check(self, message: discord.Message):
         """Used to determine if a message's content legnth is too high.
         
-        Anything 1000 or over will automatically be deleted."""
+        Anything 700 or over will automatically be deleted."""
         if should_ignore(message.author):
             return
-        if len(message.clean_content) >= 1000:
+        if len(message.clean_content) >= 700:
             await message.delete()
-            
         
+            embed = self.bot.Embed(
+                title='Message content legnth',
+                description='Please do not post messages that long!'
+            )
+            return await message.channel.send(embed=embed)
         
     @commands.Cog.listener('on_message_edit')
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:

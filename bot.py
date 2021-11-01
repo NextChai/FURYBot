@@ -73,6 +73,7 @@ def Embed(**kwargs) -> discord.Embed:
     kwargs['color'] = discord.Color.blue()
     return discord.Embed(**kwargs)
 
+
 class DiscordBot(commands.Bot):
     """The base container for FURY Bot.
     
