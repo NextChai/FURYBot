@@ -75,13 +75,18 @@ class Safety(commands.Cog):
             return
         
         if message.attachments:
+            files = [att.to_file() for att in message.attachments]
+            
             await message.delete()
             
             embed = self.bot.Embed(
                 title='Message attachments found',
                 description='Please do not post files!'
             )
-            return await message.channel.send(embed=embed)
+            await message.channel.send(embed=embed)
+            
+            embed.description = f'{message.author.mention} has posted an attachment in {message.channel.mention}\n\nI have attached the files for you to view.'
+            await self.bot.send_to_logging_channel(embed=embed, files=files)
         
     @commands.Cog.listener('on_message')
     async def message_content_check(self, message: discord.Message):
@@ -120,9 +125,11 @@ class Safety(commands.Cog):
         self.bot.loop.create_task(self.profanity_checker(after))
         self.bot.loop.create_task(self.link_checker(after))
         
-    @commands.Cog.listener('on_message')
+    #@commands.Cog.listener('on_message')
     async def nsfw_image_checker(self, message: discord.Message) -> None:
         """Used to determine if an image a user uploaded is nsfw.
+        
+        .. NOTE:: NOT IN USE RIGHT NOW!
         
         Parameters
         ----------
