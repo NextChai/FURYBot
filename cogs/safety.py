@@ -75,9 +75,8 @@ class Safety(commands.Cog):
             return
         
         if message.attachments:
-            files = [await att.to_file() for att in message.attachments]
-            
             await message.delete()
+            files = [await att.to_file(cache=True) for att in message.attachments]
             
             embed = self.bot.Embed(
                 title='Message attachments found',
@@ -86,6 +85,11 @@ class Safety(commands.Cog):
             await message.channel.send(embed=embed)
             
             embed.description = f'{message.author.mention} has posted an attachment in {message.channel.mention}\n\nI have attached the files for you to view.'
+            if len(files) == 1:
+                file = files[0]
+                embed.set_image(url=f'attachment://{file.filename}')
+                return await self.bot.send_to_logging_channel(embed=embed, file=file)
+                
             await self.bot.send_to_logging_channel(embed=embed, files=files)
         
     @commands.Cog.listener('on_message')
