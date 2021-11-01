@@ -76,7 +76,7 @@ class Safety(commands.Cog):
         
         if message.attachments:
             await message.delete()
-            files = [await att.to_file(cache=True) for att in message.attachments]
+            files = [await att.to_file(use_cached=True) for att in message.attachments]
             
             embed = self.bot.Embed(
                 title='Message attachments found',
