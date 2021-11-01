@@ -75,7 +75,7 @@ class Safety(commands.Cog):
             return
         
         if message.attachments:
-            files = [att.to_file() for att in message.attachments]
+            files = [await att.to_file() for att in message.attachments]
             
             await message.delete()
             
