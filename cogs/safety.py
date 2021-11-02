@@ -103,10 +103,10 @@ class Safety(commands.Cog):
             await message.delete()
         
             embed = self.bot.Embed(
-                title='Message content legnth',
+                title='Oh no!',
                 description='Please do not post messages that long!'
             )
-            return await message.channel.send(embed=embed)
+            return await message.channel.send(embed=embed, content=message.author.mention)
         
     @commands.Cog.listener('on_message_edit')
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
