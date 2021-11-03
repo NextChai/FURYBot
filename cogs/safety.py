@@ -74,14 +74,30 @@ class Safety(commands.Cog):
         if should_ignore(message.author):
             return
         
-        if await self.bot.wrap(re.findall, r'@here|@everyone', message.content):
+        mentions = await self.bot.wrap(re.findall, r'@here|@everyone', message.content)
+        if mentions:
             await message.delete()
+            
+            mentions_formatted = ', '.join([discord.utils.escape_markdown(f'**{entry}**') for entry in mentions]) # type: ignore
             
             embed = self.bot.Embed(
                 title='Oh no!',
-                description=f'Please do not try to mention **\@here** or **\@everyone**, {message.author.mention}'
+                description=f'Please do not try to mention {mentions_formatted}, {message.author.mention}' # type: ignore
             )
-            await message.channel.send(embed=embed, content=message.author.mention, allowed_mentions=None)
+            embed.add_field(name='Actions taken', value='You have been automatically locked out of the server for 5 minutes.')
+            await self.bot.send_to(message.author, embed=embed, content=message.author.mention, allowed_mentions=None)
+            
+            embed = self.bot.Embed(
+                title='Member Lockdown',
+                description=f'Member {message.author.mention} has been locked down automatically for trying to mention {mentions_formatted}'
+            )
+            embed.add_field(name='Actions taken', value='They have been automatically locked out of the server for 5 minutes.')
+            await self.bot.send_to_logging_channel(embed=embed)
+            
+            self.bot.loop.create_task(self.bot.lockdown_for(5*60, member=message.author, reason=Reasons.rules))
+            
+            
+            
         
     @commands.Cog.listener('on_message')
     async def file_checker(self, message: discord.Message):
