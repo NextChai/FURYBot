@@ -91,6 +91,7 @@ class Safety(commands.Cog):
                 title='Member Lockdown',
                 description=f'Member {message.author.mention} has been locked down automatically for trying to mention {mentions_formatted}'
             )
+            embed.add_field(name='Message Content', value=message.content)
             embed.add_field(name='Actions taken', value='They have been automatically locked out of the server for 5 minutes.')
             await self.bot.send_to_logging_channel(embed=embed, ping_staff=False)
             
