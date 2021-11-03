@@ -27,7 +27,7 @@ from __future__ import annotations
 import discord
 from discord.ext import commands, tasks
 
-
+import re
 import aiohttp
 import logging
 from typing import TYPE_CHECKING
@@ -67,6 +67,22 @@ class Safety(commands.Cog):
         
         self.name_checker.start()
         self.load_profanity.start()
+        
+    @commands.Cog.listener('on_message')
+    async def mention_checker(self, message: discord.Message) -> None:
+        """"Used to check if a user is trying to mention @here or @everyone"""
+        if should_ignore(message.author):
+            return
+        
+        
+        if await self.bot.wrap(re.findall, r'@here|@everyone', message.clean_content):
+            await message.delete()
+            
+            embed = self.bot.Embed(
+                title='Oh no!',
+                description=f'Please do not try to mention **@here** or **@everyone**, {message.author.mention}'
+            )
+            await message.channel.send(embed=embed, content=message.author.mention, allowed_mentions=None)
         
     @commands.Cog.listener('on_message')
     async def file_checker(self, message: discord.Message):
