@@ -78,7 +78,7 @@ class Safety(commands.Cog):
         if mentions:
             await message.delete()
             
-            mentions_formatted = ', '.join([discord.utils.escape_markdown(f'**{entry}**') for entry in mentions]) # type: ignore
+            mentions_formatted = ', '.join([discord.utils.escape_markdown(entry) for entry in mentions]) # type: ignore
             
             embed = self.bot.Embed(
                 title='Oh no!',
@@ -92,7 +92,7 @@ class Safety(commands.Cog):
                 description=f'Member {message.author.mention} has been locked down automatically for trying to mention {mentions_formatted}'
             )
             embed.add_field(name='Actions taken', value='They have been automatically locked out of the server for 5 minutes.')
-            await self.bot.send_to_logging_channel(embed=embed)
+            await self.bot.send_to_logging_channel(embed=embed, ping_staff=False)
             
             self.bot.loop.create_task(self.bot.lockdown_for(5*60, member=message.author, reason=Reasons.rules))
             
