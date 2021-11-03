@@ -79,7 +79,7 @@ class Safety(commands.Cog):
             
             embed = self.bot.Embed(
                 title='Oh no!',
-                description=f'Please do not try to mention **@here** or **@everyone**, {message.author.mention}'
+                description=f'Please do not try to mention **\@here** or **\@everyone**, {message.author.mention}'
             )
             await message.channel.send(embed=embed, content=message.author.mention, allowed_mentions=None)
         
