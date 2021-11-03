@@ -74,7 +74,7 @@ class Safety(commands.Cog):
         if should_ignore(message.author):
             return
         
-        
+        print((await self.bot.wrap(re.findall, r'@here|@everyone', message.clean_content)))
         if await self.bot.wrap(re.findall, r'@here|@everyone', message.clean_content):
             await message.delete()
             
