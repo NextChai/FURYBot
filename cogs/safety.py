@@ -97,9 +97,6 @@ class Safety(commands.Cog):
             
             self.bot.loop.create_task(self.bot.lockdown_for(5*60, member=message.author, reason=Reasons.rules))
             
-            
-            
-        
     @commands.Cog.listener('on_message')
     async def file_checker(self, message: discord.Message):
         """Used to check for message attachments. Any message that has them is deleted without correct perms."""

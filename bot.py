@@ -439,7 +439,7 @@ class Lockdown:
         The locked out members and their corresponding data.
     """
     def __init__(self):
-        self.locked_out: Dict[int, Dict[str, List[Any]]] = {}
+        self.locked_out: Dict[int, Dict[str, Any]] = {}
     
     @staticmethod
     def get_lockdown_role(guild: discord.Guild):
@@ -524,6 +524,14 @@ class Lockdown:
         current = self.locked_out[member.id]
         current['roles'] = [role.id for role in member.roles]
         current['reasons'] = [reason]
+        current['channels'] = []  # channels that overwrites need to be removed / added
+        
+        for channel in member.guild.channels: # Remove any special team creation
+            overwrites = channel.overwrites
+            if overwrites.get(member):
+                overwrites.update(view_channel=False)
+                await channel.edit(overwrites=overwrites)
+                current['channels'].append(channel)
         
         lr = self.get_lockdown_role(member.guild)
 
@@ -535,7 +543,6 @@ class Lockdown:
         )
         e.set_author(name=str(member), icon_url=member.display_avatar.url)
         e.set_footer(text=f'Member ID: {member.id}') 
-        
         e.add_field(name='What does this mean?', value='You no longer have access to the server for now!')
         
         reasons = ', '.join([f'**{Reasons.type_to_string(reason)}**' for reason in current['reasons']])
@@ -568,6 +575,13 @@ class Lockdown:
         current = self.locked_out.get(member.id)
         if current is None:
             return False 
+        
+        channels = current['channels']
+        for channel in member.guild.channels:
+            if channel in channels:
+                overwrites = channel.overwrites
+                overwrites[member].update(view_channel=True)
+                await channel.edit(overwrites=overwrites)
         
         self.locked_out.pop(member.id)
         
