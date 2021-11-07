@@ -182,7 +182,7 @@ class Moderation(commands.Cog):
         ]
     )
     @commands.check_any(is_captain(), is_coach(), is_mod())
-    async def sub(self, ctx, member: discord.Member, channel: discord.GuildChannel, permission: str) -> None:
+    async def sub(self, ctx, member: discord.Member, channel: discord.TextChannel, permission: str) -> None:
         value = True if permission == 'allow' else False
         kwargs = {}
         if not value:
