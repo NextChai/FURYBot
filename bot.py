@@ -529,7 +529,7 @@ class Lockdown:
         for channel in member.guild.channels: # Remove any special team creation
             overwrites = channel.overwrites
             if overwrites.get(member):
-                overwrites.update(view_channel=False)
+                overwrites[member].update(view_channel=False)
                 await channel.edit(overwrites=overwrites)
                 current['channels'].append(channel)
         
