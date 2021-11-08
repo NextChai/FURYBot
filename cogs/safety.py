@@ -98,7 +98,7 @@ class Safety(commands.Cog):
             
             print(decoded)
             
-            message.contnet = decoded
+            message.content = decoded
             self.bot.loop.create_task(self.profanity_checker, message)
             
     @commands.Cog.listener('on_message')
