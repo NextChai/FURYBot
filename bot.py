@@ -535,7 +535,12 @@ class Lockdown:
         
         lr = self.get_lockdown_role(member.guild)
 
-        await member.edit(roles=[lr], reason='Member is getting locked down.')
+        try:
+            await member.edit(roles=[lr], reason='Member is getting locked down.')
+        except discord.Forbidden:
+            # We cant do this to this person, re-wind that we did
+            del self.locked_out[member.id]
+            return False
         
         e = Embed(
             title='Oh no!',
