@@ -55,6 +55,12 @@ class Safety(commands.Cog):
         - A message has profanity
         - A member has a bad display name
         - A member has updated their display name to an inappropriate one.
+        - A binary message has profanity
+        - A message has tried to mention @here or @everyone
+        - A message has been uploaded with images or files
+        - A message's content legnth is too long.
+        - A profanity check on messages that have been edited
+        - A member's status is profane.
         
     Attributes
     ----------
