@@ -87,6 +87,7 @@ class Safety(commands.Cog):
                 lambda msg: ''.join([m for m in msg if m.isdigit()]),
                 message.content
             )
+            
             # Instead of checking for profanity here and handling it,
             # let's pass this onto profanity_checker for checking.
             try:
