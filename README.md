@@ -4,13 +4,18 @@ The Discord Bot for the FLVS Fury School Discord. The FURY bot allows works to l
 Unfortunately, I am including the list of profanity based words in the repo. This is strictly for educational purposes, and is not something that should be used to be abused.
 
 # Features
-Auto moderation of members who:
+Bot will detect and auto mod any message or member if:
 
-- Have a bad status,
-- Have a bad Discord name,
-- Have a NSFW pfp,
-- Post non-authorized links,
-- Use swears or any non PG-related terms
+- A message has links
+- A message has profanity
+- A member has a bad display name
+- A member has updated their display name to an inappropriate one.
+- A binary message has profanity
+- A message has tried to mention @here or @everyone
+- A message has been uploaded with images or files
+- A message's content legnth is too long.
+- A profanity check on messages that have been edited
+- A member's status is profane.
 
 
 # Credit
