@@ -68,6 +68,31 @@ class Safety(commands.Cog):
         self.name_checker.start()
         self.load_profanity.start()
         
+    async def decode_binary_string(self, string: str) -> str:
+        string = string.replace(' ', '')
+        return ''.join(chr(int(string[i*8:i*8+8],2)) for i in range(len(string)//8))
+        
+    @commands.Cog.listener('on_message')
+    async def binary_check(self, message: discord.Message) -> None:
+        """Used to Check for binary messages, decode them, and check for profanity."""
+        if should_ignore(message.author):
+            return
+        
+        binary_regex = r'(?P<number>1|0){1,}(?P<space>\s)?'
+        contains_binary = await self.bot.wrap(re.findall, binary_regex, message.content)
+        if contains_binary:
+            # NOTE: I am wrapping this because it could be time consuming and I dont want it to break the bot.
+            all_binary = await self.bot.wrap( 
+                lambda msg: ''.join([m for m in msg if m.isdigit()]),
+                message.content
+            )
+            
+            # Instead of checking for profanity here and handling it,
+            # let's pass this onto profanity_checker for checking.
+            decoded = await self.decode_binary_string(all_binary)
+            message.contnet = decoded
+            self.bot.loop.create_task(self.profanity_checker, message)
+            
     @commands.Cog.listener('on_message')
     async def mention_checker(self, message: discord.Message) -> None:
         """"Used to check if a user is trying to mention @here or @everyone"""
@@ -209,18 +234,18 @@ class Safety(commands.Cog):
         if not message.guild or should_ignore(message.author):
             return
         
-        if (await self.bot.contains_profanity(message.clean_content)):
+        if (await self.bot.contains_profanity(message.content)):
             await message.delete()
             
             self.bot.loop.create_task(self.bot.lockdown_for(5*60, member=message.author, reason=Reasons.profanity))
-            censored = await self.bot.censor_message(message.clean_content)
+            censored = await self.bot.censor_message(message.content)
             
             e = self.bot.Embed(
                 title='Oh no!',
                 description='You can not use a message that contains profanity!\n\nI have locked you out of the server for 5 minutes. ' \
                     'You will automatically be unlocked once that time is up.'
             )
-            e.add_field(name='Message:', value=message.clean_content)
+            e.add_field(name='Message:', value=message.content)
             e.add_field(name='Censored:', value=censored)
             await self.bot.send_to(message.author, embed=e)
             
