@@ -80,7 +80,6 @@ class Safety(commands.Cog):
         
         binary_regex = r'(?P<number>1|0){1,}(?P<space>\s)?'
         contains_binary = await self.bot.wrap(re.findall, binary_regex, message.content)
-        print(contains_binary)
         
         if contains_binary:
             # NOTE: I am wrapping this because it could be time consuming and I dont want it to break the bot.
@@ -92,7 +91,11 @@ class Safety(commands.Cog):
             
             # Instead of checking for profanity here and handling it,
             # let's pass this onto profanity_checker for checking.
-            decoded = await self.decode_binary_string(all_binary)
+            try:
+                decoded = await self.decode_binary_string(all_binary)
+            except ValueError:
+                return
+            
             print(decoded)
             
             message.contnet = decoded
