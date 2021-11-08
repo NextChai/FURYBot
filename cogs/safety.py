@@ -99,7 +99,7 @@ class Safety(commands.Cog):
             print(decoded)
             
             message.content = decoded
-            self.bot.loop.create_task(self.profanity_checker, message)
+            self.bot.loop.create_task(self.profanity_checker(message))
             
     @commands.Cog.listener('on_message')
     async def mention_checker(self, message: discord.Message) -> None:
