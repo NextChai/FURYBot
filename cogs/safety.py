@@ -87,16 +87,12 @@ class Safety(commands.Cog):
                 lambda msg: ''.join([m for m in msg if m.isdigit()]),
                 message.content
             )
-            print(len(all_binary))
-            
             # Instead of checking for profanity here and handling it,
             # let's pass this onto profanity_checker for checking.
             try:
                 decoded = await self.decode_binary_string(all_binary)
             except ValueError:
                 return
-            
-            print(decoded)
             
             message.content = decoded
             self.bot.loop.create_task(self.profanity_checker(message))
