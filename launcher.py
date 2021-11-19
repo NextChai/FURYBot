@@ -34,40 +34,7 @@ from logging.handlers import RotatingFileHandler
 from bot import FuryBot
 from config import TOKEN, postgresql as uri
 
-
-class RemoveNoise(logging.Filter):
-    def __init__(self):
-        super().__init__(name='discord.state')
-
-    def filter(self, record):
-        if record.levelname == 'WARNING' and 'referencing an unknown' in record.msg:
-            return False
-        return True
-    
-
-@contextlib.contextmanager
-def setup_logging():
-    try:
-        # __enter__
-        max_bytes = 32 * 1024 * 1024 # 32 MiB
-        logging.getLogger('discord').setLevel(logging.INFO)
-        logging.getLogger('discord.http').setLevel(logging.WARNING)
-        logging.getLogger('discord.state').addFilter(RemoveNoise())
-
-        log = logging.getLogger()
-        log.setLevel(logging.INFO)
-        handler = RotatingFileHandler(filename='scott.log', encoding='utf-8', mode='w', maxBytes=max_bytes, backupCount=5)
-        dt_fmt = '%Y-%m-%d %H:%M:%S'
-        fmt = logging.Formatter('[{asctime}] [{levelname:<7}] {name}: {message}', dt_fmt, style='{')
-        handler.setFormatter(fmt)
-        log.addHandler(handler)
-        yield
-    finally:
-        # __exit__
-        handlers = log.handlers[:] # type: ignore
-        for hdlr in handlers:
-            hdlr.close()
-            log.removeHandler(hdlr) # type: ignore
+logging.basicConfig(level=logging.INFO)
 
 async def setup_pool() -> asyncpg.Pool:
     def _encode_jsonb(value):
@@ -99,5 +66,4 @@ def run_bot():
     fury.run(TOKEN)
     
 if __name__ == '__main__':
-    with setup_logging():
-        run_bot()
+    run_bot()
