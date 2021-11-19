@@ -46,7 +46,7 @@ from cogs.utils import copy_doc
 from cogs.utils import context, constants, checks
 from cogs.utils.profanity_filter import CustomProfanity
 from cogs.utils.db import Table, Row
-from cogs.utils.timer import Timer, TimerRow
+from cogs.utils.timer import Timer
 
 if TYPE_CHECKING:
     import asyncpg
@@ -135,7 +135,7 @@ class DiscordBot(commands.Bot):
         )
         
         self.Embed: discord.Embed = Embed
-        self.debug: bool = False
+        self.debug: bool = True
         
         self.lockdown_timer: Timer = Timer(LockdownTable(), self) # type: ignore
         # self.mute_timer: Timer = Timer(MuteTable(), self) 

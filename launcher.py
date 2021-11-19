@@ -41,7 +41,6 @@ async def setup_pool() -> asyncpg.Pool:
     def _decode_jsonb(value):
         return json.loads(value)
     
-    
     async def init(con):
         await con.set_type_codec('jsonb', schema='pg_catalog', encoder=_encode_jsonb, decoder=_decode_jsonb, format='text')
             

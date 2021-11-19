@@ -66,7 +66,7 @@ class TimerRow:
         self.channel_id: int = kwargs.pop('channel')
         self.guild_id: int = kwargs.pop('guild')
         self.moderator_id: int = kwargs.pop('moderator')
-        self.id: int = kwargs.pop('id')
+        self.id: Optional[int] = kwargs.get('id')
     
     @property
     def channel(self) -> Optional[discord.abc.GuildChannel]:
