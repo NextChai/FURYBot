@@ -24,12 +24,35 @@ DEALINGS IN THE SOFTWARE.
 
 import datetime
 from dateutil.relativedelta import relativedelta
+import parsedatetime as pdt
+from discord.ext import commands
 
 __all__ = (
     'plural',
     'human_join',
     'human_time',
+    'HumanTime'
 )
+
+class HumanTime:
+    calendar = pdt.Calendar(version=pdt.VERSION_CONTEXT_STYLE)
+
+    def __init__(self, argument, *, now=None):
+        now = now or datetime.datetime.utcnow()
+        dt, status = self.calendar.parseDT(argument, sourceTime=now)
+        if not status.hasDateOrTime:
+            raise commands.BadArgument('invalid time provided, try e.g. "tomorrow" or "3 days"')
+
+        if not status.hasTime:
+            # replace it with the current time
+            dt = dt.replace(hour=now.hour, minute=now.minute, second=now.second, microsecond=now.microsecond)
+
+        self.dt = dt
+        self._past = dt < now
+
+    @classmethod
+    async def convert(cls, ctx, argument):
+        return cls(argument, now=ctx.message.created_at)
 
 class plural:
     def __init__(self, value):

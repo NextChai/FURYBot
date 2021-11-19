@@ -334,7 +334,7 @@ class Safety(commands.Cog):
             member = guild.get_member(after.id) or (await guild.fetch_member(after.id))
             await self.bot.lockdown(member, reason=Reasons.displayname)
         else:
-            if self.bot.is_locked(after):
+            if await self.bot.is_locked(after):
                 guild = self.bot.get_guild(constants.FURY_GUILD)
                 member = guild.get_member(after.id) or (await guild.fetch_member(after.id))
                 await self.bot.freedom(member, reason=Reasons.displayname)
@@ -362,7 +362,7 @@ class Safety(commands.Cog):
             member = guild.get_member(after.id) or (await guild.fetch_member(after.id))
             await self.bot.lockdown(member, reason=Reasons.avatar)
         else:
-            if self.bot.is_locked(after):
+            if await self.bot.is_locked(after):
                 guild = self.bot.get_guild(constants.FURY_GUILD)
                 member = guild.get_member(after.id) or (await guild.fetch_member(after.id))
                 await self.bot.freedom(member, reason=Reasons.avatar)

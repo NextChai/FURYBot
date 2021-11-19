@@ -40,6 +40,7 @@ __all__ = (
     'Commands',
 )
 
+
 class JumpButton(discord.ui.Button):
     """Used to handle the interaciton given when the "Jump!" button is pressed
     in the ReportView.
