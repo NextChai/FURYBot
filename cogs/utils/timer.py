@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import logging
 import asyncio
 import async_timeout
 import datetime
@@ -34,6 +35,8 @@ from .db import Table, Row
 
 if TYPE_CHECKING:
     from bot import FuryBot
+    
+log = logging.getLogger(__name__)
     
 
 class TimerTable(Table, name='timers'):
@@ -117,12 +120,14 @@ class Timer:
         """
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(query, member.id)
+            log.info(f'{self.table.qualified_name} - {data}')
         
         return TimerRow(self.bot, **data) if data else None
     
     async def create_table(self) -> None:
         async with self.bot.safe_connection() as connection:
-            await self.table.create(connection)
+            query = self.table.create_string
+            exc = await connection.execute(query)
             
     async def insert_row(self, **kwargs) -> None:
         query = f"""
