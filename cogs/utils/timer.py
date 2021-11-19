@@ -59,8 +59,8 @@ class TimerRow:
     def __init__(self, bot: FuryBot, **kwargs: Any) -> None:
         self.bot: FuryBot = bot
         
-        self.created_at: datetime.datetime = kwargs.pop('created')
-        self.expires_at: datetime.datetime = kwargs.pop('expires')
+        self.created_at: datetime.datetime = kwargs.pop('created_at')
+        self.expires_at: datetime.datetime = kwargs.pop('expires_at')
         self.extra: dict = kwargs.pop('extra')
         self.member_id: int = kwargs.pop('member')
         self.channel_id: int = kwargs.pop('channel')
