@@ -31,9 +31,8 @@ import traceback
 import functools
 import datetime
 import contextlib
-from typing import TYPE_CHECKING, Callable, List, Dict, Any, Optional, Union
+from typing import TYPE_CHECKING, Callable, List, Dict, Optional, Union, Any
 
-import asyncio
 import aiohttp
 
 import discord
@@ -46,7 +45,7 @@ from cogs.utils import copy_doc
 from cogs.utils import context, constants, checks
 from cogs.utils.profanity_filter import CustomProfanity
 from cogs.utils.db import Table, Row
-from cogs.utils.timer import Timer
+from cogs.utils.timer import Timer, TimerRow
 
 if TYPE_CHECKING:
     import asyncpg
@@ -56,7 +55,8 @@ __all__ = (
     'Security',
     'Lockdown',
     'SecurityMixin',
-    'FuryBot'
+    'FuryBot',
+    'LockdownTimer'
 )
 
 log = logging.getLogger(__name__)
@@ -106,6 +106,16 @@ class MuteTable(Table, name='mutes'):
             Row('moderator', 'BIGINT'),
             Row('id', 'BIGSERIAL'),
         ])
+        
+
+class LockdownTimer(Timer):
+    def __init__(self, bot: FuryBot) -> None:
+        super().__init__(LockdownTable(), bot)
+    
+    async def dispatch(self, member: discord.Member, row: TimerRow) -> Any:
+        return await self.bot.freedom(member, row=row)
+    
+    
 
 
 class DiscordBot(commands.Bot):
@@ -137,7 +147,7 @@ class DiscordBot(commands.Bot):
         self.Embed: discord.Embed = Embed
         self.debug: bool = True
         
-        self.lockdown_timer: Timer = Timer(LockdownTable(), self) # type: ignore
+        self.lockdown_timer: Timer = LockdownTimer(self) # type: ignore
         # self.mute_timer: Timer = Timer(MuteTable(), self) 
         
         for ext in initial_extensions:
@@ -564,7 +574,7 @@ class Lockdown:
         await self.send_to(member, embed=e)
         return True
         
-    async def freedom(self, member: discord.Member) -> bool:
+    async def freedom(self, member: discord.Member, *, row: Optional[TimerRow] = None) -> bool:
         """Removes a users lockdown state and restores their original roles.
         
         .. note::   
@@ -585,10 +595,11 @@ class Lockdown:
         """
         log.info(f'Coro freedom called on {member}')
         
-        # Get the current row and dispatch it within discord
-        row = await self.lockdown_timer.get_row(member)
-        if not row:
-            return False
+        if row is None:
+            # Get the current row and dispatch it within discord
+            row = await self.lockdown_timer.get_row(member)
+            if not row:
+                return False
         
         async with self.safe_connection() as connection:
             await connection.execute('DELETE FROM lockdowns WHERE member = $1', member.id)
@@ -670,6 +681,6 @@ class FuryBot(DiscordBot, SecurityMixin):
         self.dispatch('member_lockdown', member, reason)
         return await super().lockdown(member, reason=reason, time=time)
     
-    async def freedom(self, member: discord.Member) -> bool:
+    async def freedom(self, member: discord.Member, *, row: Optional[TimerRow] = None) -> bool:
         self.dispatch('member_freedom', member)
         return await super().freedom(member)

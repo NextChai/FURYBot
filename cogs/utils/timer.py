@@ -206,6 +206,8 @@ class Timer:
                 
                 if row.expires_at > now:
                     sleeptime = (row.expires_at - now).total_seconds()
+                    log.info(f'Waiting on next event - {sleeptime}')
+                    
                     await asyncio.sleep(sleeptime)
                 
                 await self.distrubute_event(row)
