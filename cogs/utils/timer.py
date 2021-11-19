@@ -27,7 +27,7 @@ import logging
 import asyncio
 import async_timeout
 import datetime
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Type
 
 import discord
 
@@ -130,13 +130,20 @@ class Timer:
             exc = await connection.execute(query)
             log.info(f'{self.table.qualified_name} - {exc}')
             
-    async def insert_row(self, **kwargs) -> None:
+    async def insert_row(self, **kwargs) -> Type[TimerRow]:
         query = f"""
             INSERT INTO {self.table.qualified_name} (created_at, expires_at, extra, member, channel, guild, moderator) 
             VALUES ($1, $2, $3, $4, $5, $6, $7);
         """
         
         timer = TimerRow(self.bot, **kwargs)
+        log.info(f'Row getting inserted for {timer.member_id}')
+        
+        # Remove timezone information since the database does not deal with it
+        timer.created_at = timer.created_at.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        timer.expires_at = timer.expires_at.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        delta = (timer.created_at - timer.expires_at).total_seconds()
+        
         async with self.bot.safe_connection() as connection:
             await connection.fetchrow(
                 query,
@@ -154,13 +161,23 @@ class Timer:
         # 1. The first packet in the queue
         # 2. The closest packet in the queue
         
-        self._task.cancel()
-        self._task = self.bot.loop.create_task(self.send_events())
+        # only set the data check if it can be waited on
+        if delta <= (86400 * 40): # 40 days
+            self._event.set()
+            
+        # check if this timer is earlier than our currently run timer
+        if self._current and timer.expires_at < self._current.expires_at:
+            # cancel the task and re-run it
+            self._task.cancel()
+            self._task = self.bot.loop.create_task(self.send_events())
+        
+        return TimerRow
     
     async def get_expired_row(self) -> Optional[TimerRow]:
         async with self.bot.safe_connection() as connection:
             query = f'SELECT * FROM {self.table.qualified_name} WHERE expires < (CURRENT_DATE + $1::interval) ORDER BY expires LIMIT 1;'
             data = await connection.fetchrow(query, datetime.timedelta(days=40))
+            log.info(f'Found data from get_expired_row - {data}')
         
         return TimerRow(self.bot, **data) if data else None
     
