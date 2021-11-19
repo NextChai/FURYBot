@@ -182,7 +182,7 @@ class Timer:
         
         return TimerRow(self.bot, **data) if data else None
     
-    async def get_closest_row(self) -> TimerRow:
+    async def get_closest_row(self):
         row = await self.get_expired_row()
         
         if row is not None:
@@ -192,7 +192,7 @@ class Timer:
         self._event.clear()
         self._current = None
         await self._event.wait()
-        return await self.get_closest_row()
+        return await self.get_expired_row()
     
     async def distrubute_event(self, row: TimerRow) -> None:
         async with self.bot.safe_connection() as connection:
@@ -210,13 +210,13 @@ class Timer:
                 row = self._current = await self.get_closest_row()
                 now = datetime.datetime.utcnow()
                 
-                if row.expires_at > now:
-                    sleeptime = (row.expires_at - now).total_seconds()
+                if row.expires_at > now: # type: ignore
+                    sleeptime = (row.expires_at - now).total_seconds() # type: ignore
                     log.info(f'Waiting on next event - {sleeptime}')
                     
                     await asyncio.sleep(sleeptime)
                 
-                await self.distrubute_event(row)
+                await self.distrubute_event(row) # type: ignore
         except discord.ConnectionClosed:
             self._task.cancel()
             self._task = self.bot.loop.create_task(self.send_events())   
