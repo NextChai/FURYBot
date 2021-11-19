@@ -137,8 +137,8 @@ class DiscordBot(commands.Bot):
         self.Embed: discord.Embed = Embed
         self.debug: bool = False
         
-        self.lockdown_timer: Timer = Timer(LockdownTable, self) # type: ignore
-        # self.mute_timer: Timer = Timer(MuteTable, self) 
+        self.lockdown_timer: Timer = Timer(LockdownTable(), self) # type: ignore
+        # self.mute_timer: Timer = Timer(MuteTable(), self) 
         
         for ext in initial_extensions:
             try:
