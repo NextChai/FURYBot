@@ -332,7 +332,7 @@ class Moderation(commands.Cog):
             if not confirmation:
                 return
             
-            await self.bot.lockdown(member, reason=reason, time=date) # type: ignore
+            await self.bot.lockdown(member, reason=reason, time=date)
 
         e = self.bot.Embed(
             title='Success',

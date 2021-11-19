@@ -291,10 +291,10 @@ class DiscordBot(commands.Bot):
         
         return await self.send_to_logging_channel(embed=e)
     
-    async def on_member_freedom(self, member: discord.Member, reason: Reasons) -> None:
+    async def on_member_freedom(self, member: discord.Member) -> None:
         e = self.Embed(
             title='Member Freedom',
-            description=f'Member {member.mention} has been freed for {Reasons.type_to_string(reason)}'
+            description=f'Member {member.mention} has been freed from lockdown!'
         )
         e.set_author(name=str(member), icon_url=member.display_avatar.url)
         e.set_footer(text=f'Member ID: {member.id}') 
@@ -666,10 +666,10 @@ class FuryBot(DiscordBot, SecurityMixin):
         SecurityMixin.__init__(self)
         super().__init__()
 
-    async def lockdown(self, member: discord.Member, *, reason: Reasons) -> bool:
+    async def lockdown(self, member: discord.Member, *, reason: Reasons, time: Optional[datetime.datetime] = None) -> bool:
         self.dispatch('member_lockdown', member, reason)
-        return await super().lockdown(member, reason=reason)
+        return await super().lockdown(member, reason=reason, time=time)
     
-    async def freedom(self, member: discord.Member, *, reason: Reasons) -> bool:
-        self.dispatch('member_freedom', member, reason)
-        return await super().freedom(member, reason=reason)
+    async def freedom(self, member: discord.Member) -> bool:
+        self.dispatch('member_freedom', member)
+        return await super().freedom(member)
