@@ -76,7 +76,6 @@ class Table(metaclass=TableMeta):
     def qualified_name(self) -> str:
         return self.__table_name__
         
-    @cached_property
     def create_string(self) -> str:
         """:class:`str`: Returns a string that can be used to create the table."""
         return 'CREATE TABLE IF NOT EXISTS {0} ({1});'.format(
@@ -86,5 +85,5 @@ class Table(metaclass=TableMeta):
         
     async def create(self, connection) -> None:
         """Creates the table."""
-        await connection.execute(self.create_string)
+        await connection.execute(self.create_string())
 

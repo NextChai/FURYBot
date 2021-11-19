@@ -126,8 +126,9 @@ class Timer:
     
     async def create_table(self) -> None:
         async with self.bot.safe_connection() as connection:
-            query = self.table.create_string
+            query = self.table.create_string()
             exc = await connection.execute(query)
+            log.info(f'{self.table.qualified_name} - {exc}')
             
     async def insert_row(self, **kwargs) -> None:
         query = f"""
