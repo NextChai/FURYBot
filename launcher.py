@@ -26,10 +26,8 @@ from __future__ import annotations
 import json
 import asyncpg
 import asyncio
-import contextlib
 
 import logging
-from logging.handlers import RotatingFileHandler
 
 from bot import FuryBot
 from config import TOKEN, postgresql as uri
