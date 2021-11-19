@@ -163,11 +163,12 @@ class Timer:
         
         # only set the data check if it can be waited on
         if delta <= (86400 * 40): # 40 days
+            log.info(f'Setting event because we can wait for it - {delta}')
             self._event.set()
             
         # check if this timer is earlier than our currently run timer
         if self._current and timer.expires_at < self._current.expires_at:
-            # cancel the task and re-run it
+            log.info(f'Setting event because we are earlier than the current timer')
             self._task.cancel()
             self._task = self.bot.loop.create_task(self.send_events())
         
@@ -184,25 +185,13 @@ class Timer:
     async def get_closest_row(self) -> TimerRow:
         row = await self.get_expired_row()
         
-        if row:
+        if row is not None:
             self._event.set()
-            self._current = row
             return row
             
         self._event.clear()
         self._current = None
-        
-        try:
-            # I'm adding the async timeout for a very specific reason.
-            # If a user adds a packet more than 40 days out, and the bot's uptime is more than 40 days,
-            # and no other user uses the command, the event wont get distrubuted. This fixes that.
-            async with async_timeout(3600, loop=self.bot.loop):
-                await self._event.wait()
-        except asyncio.TimeoutError: 
-            pass
-        
-        # If we get here we couldn't get a packet.
-        # Due to this, let's re-call get_closest_row and try again.
+        await self._event.wait()
         return await self.get_closest_row()
     
     async def distrubute_event(self, row: TimerRow) -> None:
@@ -218,7 +207,7 @@ class Timer:
         
         try:
             while not self.bot.is_closed():
-                row = await self.get_closest_row()
+                row = self._current = await self.get_closest_row()
                 now = datetime.datetime.utcnow()
                 
                 if row.expires_at > now:
