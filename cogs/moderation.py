@@ -110,12 +110,15 @@ class Timer:
 class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot: FuryBot = bot
-    
+        
+    async def cog_check(self, ctx) -> bool:
+        checker = commands.check_any(is_captain(), is_coach(), is_mod())
+        return await checker(ctx)
+        
     @commands.group(
         name='lockdown',
         description='Lock down commands.'
     )
-    @commands.check_any(is_captain(), is_coach(), is_mod())
     async def lockdown(self) -> None:
         """A command group to interact with locking down members.
         
@@ -196,7 +199,6 @@ class Moderation(commands.Cog):
         name='team',
         description='Edit, manage, and view teams.'
     )
-    @commands.check_any(is_captain(), is_coach(), is_mod())
     @commands.guild_only()
     async def team(self) -> None:
         return
@@ -316,7 +318,6 @@ class Moderation(commands.Cog):
             )
         ]
     )
-    @commands.check_any(is_captain(), is_coach(), is_mod())
     async def sub(
         self, 
         ctx, 
@@ -335,7 +336,6 @@ class Moderation(commands.Cog):
         return await ctx.send(f'I have {formatted} {member.mention} the permission to view the channel {channel.mention}')
 
     @commands.group(name='profanity', description='Handle the profanity filter')
-    @commands.check_any(is_captain(), is_coach(), is_mod())
     async def profanity(self) -> None:
         """A command group to handle and interact with the profanity filter.
         
