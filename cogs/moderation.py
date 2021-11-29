@@ -603,6 +603,7 @@ class Moderation(commands.Cog):
         
         embed = self.bot.Embed(title='Mute History', description=f'{member.mention} has a mute history.')
         for index, entry in enumerate(data):
+            print(entry)
             new = timer.Timer(record=entry)
             
             fmt = f"**Reason**: {new.kwargs['reason']}\n" \
