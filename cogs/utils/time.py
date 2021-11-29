@@ -136,8 +136,8 @@ class UserFriendlyTime(commands.Converter):
         else:
             self.arg = remaining
         
-        if self.dt.tzinfo is None:
-            self.dt.replace(tzinfo=datetime.timezone.utc)
+        if self.dt.tzinfo is not None:
+            self.dt.replace(tzinfo=None)
         
         return self
 
