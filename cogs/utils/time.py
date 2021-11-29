@@ -58,7 +58,7 @@ class ShortTime:
 
     @classmethod
     async def convert(cls, ctx, argument):
-        return cls(argument, now=ctx.message.created_at)
+        return cls(argument, now=ctx.created_at)
 
 
 class HumanTime:
@@ -79,7 +79,7 @@ class HumanTime:
 
     @classmethod
     async def convert(cls, ctx, argument):
-        return cls(argument, now=ctx.message.created_at)
+        return cls(argument, now=ctx.created_at)
 
 class Time(HumanTime):
     def __init__(self, argument, *, now=None):
@@ -141,7 +141,7 @@ class UserFriendlyTime(commands.Converter):
         try:
             calendar = HumanTime.calendar
             regex = ShortTime.compiled
-            now = ctx.message.created_at
+            now = ctx.created_at
 
             match = regex.match(argument)
             if match is not None and match.group(0):
