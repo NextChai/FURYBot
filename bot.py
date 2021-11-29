@@ -184,7 +184,7 @@ class DiscordBot(commands.Bot):
     
     async def get_logging_webhook(self) -> discord.Webhook:
         if not hasattr(self, 'logging_webhook'):
-            partial = discord.Webhook.from_url(self.logging_webhook_url)
+            partial = discord.Webhook.from_url(self.logging_webhook_url, session=self.session, bot_token=self.http.token)
             self.logging_webhook = await partial.fetch()
         
         return self.logging_webhook
@@ -301,7 +301,7 @@ class DiscordBot(commands.Bot):
             return 
         
         if not hasattr(self, 'message_webhook'):
-            partial = discord.Webhook.from_url(self.message_webhook_url)
+            partial = discord.Webhook.from_url(self.message_webhook_url, session=self.session, bot_token=self.http.token)
             self.message_webhook = await partial.fetch()
         
         kwargs = {}

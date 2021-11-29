@@ -391,11 +391,7 @@ class Moderation(commands.Cog):
         description='Make a word bad word a good word'
     )
     @commands.describe('word', description='The word to remove from the profanity filter')
-    async def profanity_remove(
-        self, 
-        ctx: Context, 
-        word: str
-    ) -> None:
+    async def profanity_remove(self, ctx: Context, word: str) -> None:
         try:
             await self.bot.add_word_to('clean', word, wrapper=self.bot.wrap)
             return await ctx.send(f'Removed "{word}" from the list of banned words', ephemeral=True)
@@ -407,11 +403,7 @@ class Moderation(commands.Cog):
         description='Make a word a profanity word.'
     )
     @commands.describe('word', description='The word to add.')
-    async def wordset_add(
-        self, 
-        ctx: Context, 
-        word: str
-    ) -> None:
+    async def wordset_add(self, ctx: Context, word: str) -> None:
         try:
             await self.bot.add_word_to('profanity', word, wrapper=self.bot.wrap)
             return await ctx.send(f'Added {word} to the list of banned words', ephemeral=True)
@@ -423,11 +415,7 @@ class Moderation(commands.Cog):
         description='Determine if a word contains profanity.'
     )
     @commands.describe('word', description='The word to check for profanity.')
-    async def wordset_contains_profanity(
-        self, 
-        ctx: Context, 
-        word: str
-    ) -> None:
+    async def wordset_contains_profanity(self, ctx: Context,  word: str) -> None:
         check = await self.bot.contains_profanity(word)
         fmt = ' not' if check is False else ''
         return await ctx.send(f"Word {word} does{fmt} contain profanity.", ephemeral=True)
@@ -437,17 +425,29 @@ class Moderation(commands.Cog):
         description='Censor a sentence.'
     )
     @commands.describe('sentence', description='The sentence to censor.')
-    async def wordset_censor(
-        self, 
-        ctx: Context, 
-        sentence: str
-    ) -> None:
+    async def wordset_censor(self, ctx: Context, sentence: str) -> None:
         check = await self.bot.censor_message(sentence)
         return await ctx.send(check, ephemeral=True)
     
     # Muting members
-    @commands.slash()
-    async def mute(self, ctx, member: discord.Member, reason: str, until: Optional[time.UserFriendlyTime]) -> None:
+    @commands.group(name='mute', description='Mute members.')
+    async def mute(self, ctx) -> None:
+        return
+    
+    @mute.slash(name='member', description='Mute a member.')
+    @commands.describe('member', description='The member to mute.')
+    @commands.describe('reason', description='The reason for muting the member.')
+    @commands.describe('until', description='How long to mute the member for.')
+    async def mute_member(self, ctx, member: discord.Member, reason: Optional[str], until: Optional[time.UserFriendlyTime]) -> None:
+        async with self.bot.safe_connection() as conn:
+            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 WHERE dispatched = $2', member.id, False)
+        
+        if data:
+            return await ctx.send(embed=self.bot.Embed(
+                title='Oh no!',
+                description=f'{member.mention} is already muted.',
+            ))
+        
         original_roles = [r.id for r in member.roles]
         
         channels = []
@@ -478,7 +478,8 @@ class Moderation(commands.Cog):
                     connection=conn,
                     created=ctx.created_at,
                     roles=original_roles,
-                    channels=channels
+                    channels=channels,
+                    reason=reason
                 )
             else:
                 await conn.execute(
@@ -487,6 +488,74 @@ class Moderation(commands.Cog):
                     None, member.id, ctx.created_at, ctx.author.id
                 )
                 
+    @mute.slash(name='remove', description='Remove a mute on a member.')
+    @commands.describe('member', description='The member to remove the mute for.')
+    async def mute_remove(self, ctx, member: discord.Member) -> None:
+        async with self.bot.safe_connection() as conn:
+            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 WERE dispatched = $2', member.id, False)
+        
+        if not data:
+            return await ctx.send(embed=self.bot.Embed(
+                title='Oh no!',
+                description=f'{member.mention} is not muted.'
+            ))
+
+        temp = timer.Timer(record=data)
+        for channel_id in temp.kwargs['channels']:
+            channel = self.bot.get_channel(channel_id)
+            if channel is not None:
+                overwrites = channel.overwrites
+                overwrites[member].update(send_messages=True)
+                await channel.edit(overwrites=overwrites)
+        
+        roles = []
+        for role_id in temp.kwargs['roles']:
+            role = ctx.guild.get_role(role_id)
+            if role:
+                roles.append(role)
+        
+        await member.edit(roles=roles)
+        
+        async with self.bot.safe_connection() as conn:
+            await conn.execute('DELETE FROM mutes WHERE id = $1', temp.id)
+        
+        return await ctx.send(embed=self.bot.Embed(
+            title='Mute removed',
+            description=f'{member.mention} has been unmuted.'
+        ))
+    
+    @mute.slash(name='current', description='Get info on a current mute.')
+    @commands.describe('member', description='The member to get info on.')
+    async def mute_current(self, ctx, member: discord.Member) -> None:
+        async with self.bot.safe_connection() as conn:
+            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 WERE dispatched = $2', member.id, False)
+            
+        if not data:
+            return await ctx.send(embed=self.bot.Embed(
+                title='Oh no!',
+                description=f'{member.mention} is not muted.'
+            ))
+            
+        temp = timer.Timer(record=data)
+        embed = self.bot.Embed(
+            title='Oh no!',
+            description=f'{member.mention} is already muted.'
+        )
+        embed.add_field(name='Created At', value=time.human_time(temp.created_at), inline=False)
+        embed.add_field(name='Expires', value=time.human_time(expires) if (expires := temp.expires) else 'Never', inline=False)
+        embed.add_field(name='Mute Reason', value=temp.kwargs['reason'], inline=False)
+        embed.add_field(
+            name='Channel(s) Affected', 
+            value=', '.join([f'<#{id}>' for id in temp.kwargs['channels']] or ['No channels affected.']), 
+            inline=False
+        )
+        embed.add_field(
+            name='Role(s) Affected', 
+            value=', '.join([f'<@&{id}>' for id in temp.kwargs['roles']] or ['No roles removed.']), 
+            inline=False
+        )
+        return await ctx.send(embed=embed)
+        
     @commands.Cog.listener()
     async def on_lockdowns_timer_complete(self, timer: timer.Timer) -> None:
         await self.bot.wait_until_ready()
