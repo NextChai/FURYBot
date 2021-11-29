@@ -415,5 +415,3 @@ class Moderation(commands.Cog):
         
 def setup(bot):
     return bot.add_cog(Moderation(bot))
-
-print(Moderation.sub.to_dict())
