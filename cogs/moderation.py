@@ -508,8 +508,8 @@ class Moderation(commands.Cog):
         embed.add_field(name='Reason', value=reason)
         embed.add_field(name='Expires', value=time.human_time(new.expires) if new.expires else "Does not expire.")
         embed.add_field(name='Moderator', value=ctx.author.mention)
-        embed.add_field(name='Role(s) Affected', value=', '.join([f'<@&{r}>' for r in original_roles]))
-        embed.add_field(name='Channel(s) Affected', value=', '.join([f'<#{c}>' for c in channels]))
+        embed.add_field(name='Role(s) Affected', value=', '.join([f'<@&{r}>' for r in original_roles] or ['No roles.']))
+        embed.add_field(name='Channel(s) Affected', value=', '.join([f'<#{c}>' for c in channels] or ['No channels.']))
         return await ctx.send(embed=embed)
         
                 
