@@ -607,6 +607,11 @@ class Moderation(commands.Cog):
             if overwrites.get(member):
                 overwrites[member].update(send_messages=True)
                 await channel.edit(overwrites=overwrites)
+                
+        roles = timer.kwargs['roles']
+        objs = [discord.Object(id=r) for r in roles]
+        await member.edit(roles=objs)
+        
         
         
 def setup(bot):
