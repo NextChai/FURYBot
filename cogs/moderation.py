@@ -446,6 +446,8 @@ class Moderation(commands.Cog):
     @commands.describe('reason', description='The reason for muting the member.')
     @commands.describe('until', description='How long to mute the member for.')
     async def mute_member(self, ctx, member: discord.Member, reason: Optional[str], until: Optional[time.UserFriendlyTime]) -> None:
+        await ctx.defer(ephemeral=True)
+        
         async with self.bot.safe_connection() as conn:
             data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 AND dispatched = $2', member.id, False)
         
@@ -515,6 +517,8 @@ class Moderation(commands.Cog):
     @mute.slash(name='remove', description='Remove a mute on a member.')
     @commands.describe('member', description='The member to remove the mute for.')
     async def mute_remove(self, ctx, member: discord.Member) -> None:
+        await ctx.defer(ephemeral=True)
+        
         async with self.bot.safe_connection() as conn:
             data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 AND dispatched = $2', member.id, False)
         
@@ -551,6 +555,8 @@ class Moderation(commands.Cog):
     @mute.slash(name='current', description='Get info on a current mute.')
     @commands.describe('member', description='The member to get info on.')
     async def mute_current(self, ctx, member: discord.Member) -> None:
+        await ctx.defer(ephemeral=True)
+        
         async with self.bot.safe_connection() as conn:
             data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 AND dispatched = $2', member.id, False)
             
