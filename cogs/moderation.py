@@ -611,6 +611,8 @@ class Moderation(commands.Cog):
                 "**Moderator**: {0}".format(f'<@{new.kwargs["moderator"]}>')
             embed.add_field(name=f'Mute {index+1}', value=fmt, inline=False)
         
+        return await ctx.send(embed=embed)
+        
     @commands.Cog.listener()
     async def on_lockdowns_timer_complete(self, timer: timer.Timer) -> None:
         await self.bot.wait_until_ready()
