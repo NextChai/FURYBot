@@ -23,19 +23,14 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import asyncpg
-import datetime
-import asyncio
-import dateparser
 from typing import TYPE_CHECKING, Optional
 
 import discord
 from discord.ext import commands
 
-from cogs.utils import time
+from cogs.utils import time, constants
 from cogs.utils.enums import Reasons
 from cogs.utils.errors import ProfanityFailure
-from cogs.utils.checks import is_captain, is_mod, is_coach
 from cogs.utils.context import Context
 from cogs.utils.db import Row, Table
 
@@ -112,8 +107,13 @@ class Moderation(commands.Cog):
         self.bot: FuryBot = bot
         
     async def cog_check(self, ctx) -> bool:
-        checker = commands.check_any(is_captain(), is_coach(), is_mod())
-        return await checker(ctx)
+        roles = [r.id for r in ctx.author.roles]
+        return any((
+            constants.CAPTAIN_ROLE in roles,
+            constants.MOD_ROLE in roles,
+            constants.COACH_ROLE in roles,
+            constants.BYPASS_FURY in roles
+        ))
         
     @commands.group(
         name='lockdown',
