@@ -130,6 +130,12 @@ class Moderation(commands.Cog):
             confirmation = await ctx.get_confirmation(embed=e)
             if not confirmation:
                 return
+            
+            await ctx.send(embed=self.bot.Embed(
+                title='Working..',
+                description=f'Locking down {member.mention}.'
+            ), ephemeral=True, view=None)
+            
             await self.bot.lockdown(member, reason=reason, time=total_time.dt) # type: ignore
         
         e = self.bot.Embed(
@@ -137,7 +143,7 @@ class Moderation(commands.Cog):
             description=f'I have locked down {member.mention} for reason {reason}'
         )
         e.add_field(name='Note:', value='They have been given the Lockdown Role, and all their previous roles have been removed. You can do `/freedom` to unlock them.')
-        return await ctx.send(embed=e, view=None)
+        return await ctx.send(embed=e, ephemeral=True)
     
     @lockdown.slash(
         name='freedom',
