@@ -511,7 +511,6 @@ class Moderation(commands.Cog):
         embed.add_field(name='Role(s) Affected', value=', '.join([f'<@&{r}>' for r in original_roles] or ['No roles.']))
         embed.add_field(name='Channel(s) Affected', value=', '.join([f'<#{c}>' for c in channels] or ['No channels.']))
         return await ctx.send(embed=embed)
-        
                 
     @mute.slash(name='remove', description='Remove a mute on a member.')
     @commands.describe('member', description='The member to remove the mute for.')
