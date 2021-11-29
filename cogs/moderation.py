@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Optional
 
 import discord
@@ -37,6 +38,8 @@ from cogs.utils.db import Row, Table
 
 if TYPE_CHECKING:
     from bot import FuryBot
+    
+log = logging.getLogger(__name__)
     
 __all__ = (
     'LockdownTable',
@@ -475,7 +478,7 @@ class Moderation(commands.Cog):
     
         async with self.bot.safe_connection() as conn:
             if until:
-                await self.bot.mute_timer.create_timer(
+                rec = await self.bot.mute_timer.create_timer(
                     until.dt,
                     member.id,
                     ctx.author.id,
@@ -486,11 +489,21 @@ class Moderation(commands.Cog):
                     reason=reason
                 )
             else:
-                await conn.execute(
+                rec = await conn.execute(
                     'INSERT INTO mutes (event, extra, expires, member, created, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)', 
                     'mutes', {'args': [], 'kwargs': {'roles': original_roles, 'channels': channels}}, 
                     None, member.id, ctx.created_at, ctx.author.id
                 )
+        
+        new = timer.Timer(record=rec)
+        embed = self.bot.Embed(title='Muted', description=f'{member.mention} has been muted.')
+        embed.add_field(name='Reason', value=reason)
+        embed.add_field(name='Expires', value=time.human_time(new.expires) if new.expires else "Does not expire.")
+        embed.add_field(name='Moderator', value=ctx.author.mention)
+        embed.add_field(name='Role(s) Affected', value=', '.join([f'<@&{r}>' for r in original_roles]))
+        embed.add_field(name='Channel(s) Affected', value=', '.join([f'<#{c}>' for c in channels]))
+        return await ctx.send(embed=embed)
+        
                 
     @mute.slash(name='remove', description='Remove a mute on a member.')
     @commands.describe('member', description='The member to remove the mute for.')
@@ -568,6 +581,8 @@ class Moderation(commands.Cog):
         
         guild = self.bot.get_guild(constants.FURY_GUILD)
         member = guild.get_member(timer.member) or await guild.fetch_member(timer.member)
+        log.info(f'On lockdowns timer complete for member {member}')
+        
         await self.bot.freedom(member, reason=reason)
         
     @commands.Cog.listener()
@@ -576,6 +591,8 @@ class Moderation(commands.Cog):
         
         guild = self.bot.get_guild(constants.FURY_GUILD)
         member = guild.get_member(timer.member) or await guild.fetch_member(timer.member)
+        log.info(f'On mutes timer complete for member {member}')
+        
         for channel_id in timer.kwargs['channels']:
             channel = guild.get_channel(channel_id)
             overwrites = channel.overwrites

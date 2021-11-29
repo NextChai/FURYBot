@@ -570,8 +570,8 @@ class Lockdown:
                     )
                     return True
                 else:
-                    await connection.execute(
-                        'INSERT INTO lockdowns (event, extra, expires, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)',
+                    await connection.fetchrow(
+                        'INSERT INTO lockdowns (event, extra, expires, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5) RETURNING *',
                         'lockdowns', {'kwargs': new_kwargs, 'args': []}, None, member.id, kwargs.get('moderator', member.id)
                     )
         
