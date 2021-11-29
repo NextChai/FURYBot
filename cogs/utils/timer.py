@@ -181,12 +181,12 @@ class TimerHandler:
             self.bot.loop.create_task(self.short_timer_optimisation(delta, timer))
             return timer
 
-        query = """INSERT INTO reminders (event, extra, expires, created,)
+        query = """INSERT INTO lockdowns (event, extra, expires, created, member)
                    VALUES ($1, $2::jsonb, $3, $4)
                    RETURNING id;
                 """
 
-        row = await connection.fetchrow(query, event, { 'args': args, 'kwargs': kwargs }, when, now)
+        row = await connection.fetchrow(query, event, { 'args': args, 'kwargs': kwargs }, when, now, member)
         timer.id = row[0]
 
         # only set the data check if it can be waited on
