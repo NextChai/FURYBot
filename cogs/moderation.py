@@ -304,8 +304,8 @@ class Moderation(commands.Cog):
                 description='The type of channel',
                 type=commands.OptionType.channel,
                 channels=[
-                    commands.ChannelType.text_channel, 
-                    commands.ChannelType.voice_channel,
+                    commands.ChannelType.text, 
+                    commands.ChannelType.voice,
                     commands.ChannelType.category
                 ]
             ),
