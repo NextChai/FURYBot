@@ -197,7 +197,6 @@ class Moderation(commands.Cog):
         embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.', inline=False)
         
         active_lockdowns = [(e, e['expires']) for e in data if not e['dispatched']]
-        embed.add_field(name='Active Lockdowns', value=f'{len(active_lockdowns)} active lockdowns total.', inline=False)
         
         if active_lockdowns:
             embed.add_field(name='Active Lockdowns', value=f'{len(active_lockdowns)} active lockdowns total.', inline=False)
