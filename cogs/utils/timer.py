@@ -9,7 +9,7 @@ from discord.ext import commands
 from . import time
     
 class Timer:
-    __slots__ = ('args', 'kwargs', 'event', 'id', 'created_at', 'expires',  'member')
+    __slots__ = ('args', 'kwargs', 'event', 'id', 'created_at', 'expires',  'member', 'dispatched')
 
     def __init__(self, *, record):
         self.id = record['id']
@@ -21,6 +21,7 @@ class Timer:
         self.created_at = record['created']
         self.expires = record['expires']
         self.member: int = record['member']
+        self.dispatched: bool = record['dispatched']
 
     @classmethod
     def temporary(cls, *, member, expires, created, event, args, kwargs):
@@ -30,7 +31,8 @@ class Timer:
             'event': event,
             'created': created,
             'expires': expires,
-            'member': member
+            'member': member,
+            'dispatched': None
         }
         return cls(record=pseudo)
 
@@ -80,10 +82,10 @@ class TimerHandler:
             await ctx.send(f'You called the {ctx.command.name} command with too many arguments.')
             
     async def get_active_timer(self, *, connection=None, days=7):
-        query = f"SELECT * FROM {self.name} WHERE (expires IS NOT NULL AND expires < (CURRENT_DATE + $1::interval)) ORDER BY expires LIMIT 1;"
+        query = f"SELECT * FROM {self.name} WHERE (expires IS NOT NULL AND expires < (CURRENT_DATE + $1::interval)) AND dispatched IS $2 ORDER BY expires LIMIT 1;"
         con = connection or self.bot.pool
 
-        record = await con.fetchrow(query, datetime.timedelta(days=days))
+        record = await con.fetchrow(query, datetime.timedelta(days=days), False)
         return Timer(record=record) if record else None
     
     async def wait_for_active_timers(self, *, connection=None, days=7):
@@ -99,6 +101,9 @@ class TimerHandler:
             return await self.get_active_timer(connection=con, days=days)
         
     async def call_timer(self, timer):
+        async with self.bot.safe_connection() as con:
+            await con.execute(f"UPDATE {self.name} SET dispatched = $1 WHERE id = $2;", True, timer.id)
+        
         event_name = f'{timer.event}_timer_complete'
         self.bot.dispatch(event_name, timer)
     
