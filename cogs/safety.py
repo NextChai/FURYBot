@@ -339,7 +339,7 @@ class Safety(commands.Cog):
                 member = guild.get_member(after.id) or (await guild.fetch_member(after.id))
                 await self.bot.freedom(member, reason=Reasons.displayname)
                 
-    @commands.Cog.listener('on_user_update')
+    #@commands.Cog.listener('on_user_update')
     async def user_avatar_update(self, before: discord.User, after: discord.User) -> None:
         """Checks when users update their avatar.
         
