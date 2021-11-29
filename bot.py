@@ -247,16 +247,12 @@ class DiscordBot(commands.Bot):
         
     async def on_ready(self):
         print(f"{self.user.name} has come online.")
+            
+    def _yield_chunks(self, value: str):
+        const = 10
         
-    async def on_guild_join(self, guild: discord.Guild) -> None:
-        """This ensures that Fury bot can't be invited to other discord servers and stay in them.
-        
-        Returns
-        -------
-        None
-        """
-        if guild.id != 757664675864248360:
-            await guild.leave()
+        for i in range(0, len(value), 2000):
+            yield f'```py\n{value[i:i + (2000 - const)]}\n```'
             
     async def on_error(self, event, *args, **kwargs) -> None:
         """Called when the Bot runs into an error that is not handled by `on_command_error`.
@@ -268,7 +264,8 @@ class DiscordBot(commands.Bot):
 
         trace_str = ''.join(traceback.format_exception(type, value, traceback_str))
         print(trace_str)
-        await self.send_to_logging_channel(f'```python\n{trace_str}\n```')
+        for e in self._yield_chunks(trace_str):
+            await self.send_to_logging_channel(e)
         
     async def on_command_error(self, ctx, error) -> None:
         if hasattr(ctx.command, 'on_error'):
@@ -294,7 +291,9 @@ class DiscordBot(commands.Bot):
             
             formatted = lines.replace(traceback_str, f'```python\n{traceback_str}\n```')
             await ctx.send(formatted)
-            await self.send_to_logging_channel(formatted)
+            
+            for e in self._yield_chunks(traceback_str):
+                await self.send_to_logging_channel(e)
         else:
             e.description = f'I ran into an error when doing this command!\n\n**{str(error)}**'
             return await ctx.send(embed=e)
