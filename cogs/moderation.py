@@ -574,6 +574,7 @@ class Moderation(commands.Cog):
         embed.add_field(name='Created At', value=time.human_time(temp.created_at), inline=False)
         embed.add_field(name='Expires', value=time.human_time(expires) if (expires := temp.expires) else 'Never', inline=False)
         embed.add_field(name='Mute Reason', value=temp.kwargs['reason'], inline=False)
+        embed.add_field(name='Moderator', value=f'<@{temp.kwargs["moderator"]}>')
         embed.add_field(
             name='Channel(s) Affected', 
             value=', '.join([f'<#{id}>' for id in temp.kwargs['channels']] or ['No channels affected.']), 
@@ -585,6 +586,30 @@ class Moderation(commands.Cog):
             inline=False
         )
         return await ctx.send(embed=embed)
+    
+    @mute.slash(name='history', description='List the mute history of a member.')
+    @commands.describe('member', description='The member to get info on.')
+    async def mute_history(self, ctx, member: discord.Member) -> None:
+        await ctx.defer(ephemeral=True)
+        
+        async with self.bot.safe_connection() as conn:
+            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 ORDER BY created', member.id)
+        
+        if not data:
+            return await ctx.send(embed=self.bot.Embed(
+                title='No mute history!',
+                description=f'{member.mention} has no mute history.'
+            ))
+        
+        embed = self.bot.Embed(title='Mute History', description=f'{member.mention} has a mute history.')
+        for index, entry in enumerate(data):
+            new = timer.Timer(record=entry)
+            
+            fmt = f"**Reason**: {new.kwargs['reason']}\n" \
+                f"**Created**: {time.human_time(new.created_at)}\n" \
+                f"**Expires**: {time.human_time(new.expires) if new.expires else 'Never'}" \
+                "**Moderator**: {0}".format(f'<@{new.kwargs["moderator"]}>')
+            embed.add_field(name=f'Mute {index+1}', value=fmt, inline=False)
         
     @commands.Cog.listener()
     async def on_lockdowns_timer_complete(self, timer: timer.Timer) -> None:
