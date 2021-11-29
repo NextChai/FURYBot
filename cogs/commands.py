@@ -127,7 +127,6 @@ class Commands(commands.Cog):
     
     @commands.message(
         name='wave',
-        description='Wave to a message',
     )
     async def wave(self, ctx: Context):
         """A simple command that allows users to wave to a user via a User based Application Command.
