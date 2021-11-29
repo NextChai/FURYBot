@@ -8,12 +8,11 @@ from discord.ext import commands
 
 from . import time
 
-
 if TYPE_CHECKING:
     from bot import FuryBot
     
 class Timer:
-    __slots__ = ('args', 'kwargs', 'event', 'id', 'created_at', 'expires', 'member')
+    __slots__ = ('args', 'kwargs', 'event', 'id', 'created_at', 'expires',  'member')
 
     def __init__(self, *, record):
         self.id = record['id']
