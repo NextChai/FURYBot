@@ -191,7 +191,7 @@ class Moderation(commands.Cog):
         )
         
         async with self.bot.safe_connection() as conn:
-            data = await conn.fetch('SELECT * FROM lockdowns WHERE member = $1 AND expires > CURRENT_TIME AND expires ORDER BY expires', member.id)
+            data = await conn.fetch('SELECT * FROM lockdowns WHERE member = $1 AND expires > CURRENT_TIMESTAMP AND expires ORDER BY expires', member.id)
             
         embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.')
         

@@ -80,7 +80,7 @@ class TimerHandler:
             await ctx.send(f'You called the {ctx.command.name} command with too many arguments.')
             
     async def get_active_timer(self, *, connection=None, days=7):
-        query = f"SELECT * FROM {self.name} WHERE expires < (CURRENT_DATE + $1::interval) AND expires IS NOT NULL ORDER BY expires LIMIT 1;"
+        query = f"SELECT * FROM {self.name} WHERE (expires IS NOT NULL AND expires < (CURRENT_DATE + $1::interval)) ORDER BY expires LIMIT 1;"
         con = connection or self.bot.pool
 
         record = await con.fetchrow(query, datetime.timedelta(days=days))

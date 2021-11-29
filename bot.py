@@ -643,6 +643,8 @@ class Lockdown:
         return True
     
     async def on_lockdowns_timer_complete(self, timer: Timer) -> None:
+        await self.wait_until_ready() # type: ignore
+        
         reason = Reasons.from_string(timer.kwargs['reason'])
         member_id = timer.kwargs['member']
         
