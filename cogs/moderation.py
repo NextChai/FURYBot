@@ -496,7 +496,7 @@ class Moderation(commands.Cog):
     @commands.describe('member', description='The member to remove the mute for.')
     async def mute_remove(self, ctx, member: discord.Member) -> None:
         async with self.bot.safe_connection() as conn:
-            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 WERE dispatched = $2', member.id, False)
+            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 WHERE dispatched = $2', member.id, False)
         
         if not data:
             return await ctx.send(embed=self.bot.Embed(
