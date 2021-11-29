@@ -209,7 +209,7 @@ class Safety(commands.Cog):
         -------
         None
         """
-        if not message.attachments or should_ignore(message.author):
+        if not message.attachments or should_ignore(message.author) or message.webhook_id:
             return
         
         for attachment in message.attachments:
@@ -242,7 +242,7 @@ class Safety(commands.Cog):
         -------
         None
         """
-        if not message.guild or should_ignore(message.author):
+        if not message.guild or should_ignore(message.author) or message.webhook_id:
             return
         
         if (await self.bot.contains_profanity(message.content)):
@@ -278,7 +278,7 @@ class Safety(commands.Cog):
         -------
         None
         """
-        if not message.guild or should_ignore(message.author):
+        if not message.guild or should_ignore(message.author) or message.webhook_id:
             return
         
         if (await self.bot.contains_links(message.clean_content)):
