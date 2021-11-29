@@ -280,10 +280,16 @@ class DiscordBot(commands.Bot):
         
         didnt_have_parent = []
         for entry in data:
+            if not (expires := entry['expires']):
+                continue
+            if expires < discord.utils.utcnow():
+                continue
+            
             kwargs = entry['extra']['kwargs']
             if not (channels := kwargs.get('channels')):
                 didnt_have_parent.append(entry)
                 continue
+                
                 
             self.lockdowns[int(kwargs['member'])] = {
                 'channels': channels,

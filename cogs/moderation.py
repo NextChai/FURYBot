@@ -116,6 +116,8 @@ class Moderation(commands.Cog):
         reason: string_to_reason, 
         total_time: Optional[time.UserFriendlyTime] = None
     ) -> None:
+        await ctx.defer(ephemeral=True)
+        
         if total_time is None:
             await self.bot.lockdown(member, reason=reason) # type: ignore
         else:
@@ -133,7 +135,7 @@ class Moderation(commands.Cog):
             await ctx.send(embed=self.bot.Embed(
                 title='Working..',
                 description=f'Locking down {member.mention}.'
-            ), ephemeral=True, view=None)
+            ), view=None)
             
             await self.bot.lockdown(member, reason=reason, time=total_time.dt) # type: ignore
         
@@ -142,7 +144,7 @@ class Moderation(commands.Cog):
             description=f'I have locked down {member.mention} for reason {reason}'
         )
         e.add_field(name='Note:', value='They have been given the Lockdown Role, and all their previous roles have been removed. You can do `/freedom` to unlock them.')
-        return await ctx.send(embed=e, ephemeral=True)
+        return await ctx.send(embed=e)
     
     @lockdown.slash(
         name='freedom',
