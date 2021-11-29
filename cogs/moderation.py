@@ -179,12 +179,6 @@ class Moderation(commands.Cog):
         description='Get information on user lockdowns.'
     )
     async def lockdown_info(self, ctx: Context, member: discord.Member) -> None:
-        if member.id not in self.bot.lockdowns:
-            return await ctx.send(embed=self.bot.Embed(
-                title='Oh no!',
-                description=f'{member.mention} is not locked down.'
-            ))
-            
         embed = self.bot.Embed(
             title=f'Lockdown information on {member}',
             description=f"Here's all the lockdown info I could find on {member.mention}.\n\n"
@@ -193,18 +187,26 @@ class Moderation(commands.Cog):
         async with self.bot.safe_connection() as conn:
             data = await conn.fetch('SELECT * FROM lockdowns WHERE member = $1 AND expires > CURRENT_TIMESTAMP AND expires IS NOT NULL ORDER BY expires', member.id)
             
+        if not data:
+            return await ctx.send(embed=self.bot.Embed(
+                title='Oh no!',
+                description=f'{member.mention} has no lockdown history!'
+            ))
+            
         embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.')
         
         most_recent = data[0]
+        kwargs = most_recent['extra']['kwargs']
         embed.add_field(name='Most Recent Lockdown', value=f'{0} - Created {1} - Ends {2}'.format(
-            most_recent['kwargs']['reason'], 
+            kwargs['reason'], 
             time.human_time(most_recent['created']), 
             time.human_time(expires) if (expires := most_recent['expires']) is not None else 'never'
         ))
         
         first_lockdown = data[-1]
+        kwargs = first_lockdown['extra']['kwargs']
         embed.add_field(name='First Lockdown', value=f'{0} - Created {1} - Ends {2}'.format(
-            most_recent['kwargs']['reason'], 
+            kwargs['reason'], 
             time.human_time(first_lockdown['created']), 
             time.human_time(expires) if (expires := first_lockdown['expires']) is not None else 'never'
         ))
