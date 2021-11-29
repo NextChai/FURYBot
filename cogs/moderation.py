@@ -444,7 +444,7 @@ class Moderation(commands.Cog):
     @commands.describe('until', description='How long to mute the member for.')
     async def mute_member(self, ctx, member: discord.Member, reason: Optional[str], until: Optional[time.UserFriendlyTime]) -> None:
         async with self.bot.safe_connection() as conn:
-            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 WHERE dispatched = $2', member.id, False)
+            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 AND dispatched = $2', member.id, False)
         
         if data:
             return await ctx.send(embed=self.bot.Embed(
@@ -565,10 +565,9 @@ class Moderation(commands.Cog):
         await self.bot.wait_until_ready()
         
         reason = Reasons.from_string(timer.kwargs['reason'])
-        member_id = timer.kwargs['member']
         
         guild = self.bot.get_guild(constants.FURY_GUILD)
-        member = guild.get_member(member_id) or await guild.fetch_member(member_id)
+        member = guild.get_member(timer.member) or await guild.fetch_member(timer.member)
         await self.bot.freedom(member, reason=reason)
         
     @commands.Cog.listener()
