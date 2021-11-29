@@ -134,7 +134,7 @@ class DiscordBot(commands.Bot):
             lockdowns = self.lockdowns
             try:
                 current = lockdowns[member]
-                current['reason'].append(kwargs['reason'])
+                current['reason'].append(Reasons.from_string(kwargs['reason']))
                 if not current['channels']:
                     current['channels'] = channels
                     current['roles'] = roles
@@ -142,7 +142,7 @@ class DiscordBot(commands.Bot):
                 lockdowns[member] = {
                     'channels': channels,
                     'roles': roles,
-                    'reason': [reason]
+                    'reason': [Reasons.from_string(reason)]
                 }
             
                 
