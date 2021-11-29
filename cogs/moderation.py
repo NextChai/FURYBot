@@ -123,7 +123,7 @@ class Moderation(commands.Cog):
         else:
             e = self.bot.Embed(
                 title='Please Confirm',
-                description=f'Do you want to lockdown {member.mention} until {time.human_time(total_time.dt, accuracy=5)}?'
+                description=f'Do you want to lockdown {member.mention} until {time.human_time(total_time.dt)}?'
             )
             e.set_author(name=str(member), icon_url=member.display_avatar.url)
             e.set_footer(text=f'Member ID: {member.id}') 
@@ -205,15 +205,15 @@ class Moderation(commands.Cog):
             
             active_lockdown = max(active_lockdowns)
             kwargs = active_lockdown['extra']['kwargs']
-            embed.add_field(name='Closest Active Lockdown', value=f'{0} - Created {1} - Ends {2}'.format(
+            embed.add_field(name='Closest Active Lockdown', value='{0} - Created {1} - Ends {2}'.format(
                 kwargs['reason'], 
-                time.human_time(active_lockdown['created'], accuracy=5), 
-                time.human_time(expires, accuracy=5) if (expires := active_lockdown['expires']) is not None else 'never'
+                time.human_time(active_lockdown['created']), 
+                time.human_time(expires) if (expires := active_lockdown['expires']) is not None else 'never'
             ), inline=False)
         
         most_recent = data[0]
         kwargs = most_recent['extra']['kwargs']
-        embed.add_field(name='Most Recent Lockdown', value=f'{0} - Created {1} - Ends {2}'.format(
+        embed.add_field(name='Most Recent Lockdown', value='{0} - Created {1} - Ends {2}'.format(
             kwargs['reason'], 
             time.human_time(most_recent['created']), 
             time.human_time(expires) if (expires := most_recent['expires']) is not None else 'never'
@@ -221,7 +221,7 @@ class Moderation(commands.Cog):
         
         first_lockdown = data[-1]
         kwargs = first_lockdown['extra']['kwargs']
-        embed.add_field(name='First Lockdown', value=f'{0} - Created {1} - Ends {2}'.format(
+        embed.add_field(name='First Lockdown', value='{0} - Created {1} - Ends {2}'.format(
             kwargs['reason'], 
             time.human_time(first_lockdown['created']), 
             time.human_time(expires) if (expires := first_lockdown['expires']) is not None else 'never'
