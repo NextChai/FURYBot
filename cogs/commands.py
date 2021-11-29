@@ -125,9 +125,7 @@ class Commands(commands.Cog):
         """
         return await ctx.send(f"Pong! {ceil(round(self.bot.latency * 1000))} ms.")
     
-    @commands.message(
-        name='wave',
-    )
+    @commands.message()
     async def wave(self, ctx: Context):
         """A simple command that allows users to wave to a user via a User based Application Command.
         
