@@ -9,7 +9,7 @@ from discord.ext import commands
 from . import time
     
 class Timer:
-    __slots__ = ('args', 'kwargs', 'event', 'id', 'created_at', 'expires',  'member', 'dispatched')
+    __slots__ = ('args', 'kwargs', 'event', 'id', 'created_at', 'expires',  'member', 'dispatched', 'moderator')
 
     def __init__(self, *, record):
         self.id = record['id']
@@ -22,6 +22,7 @@ class Timer:
         self.expires = record['expires']
         self.member: int = record['member']
         self.dispatched: bool = record['dispatched']
+        self.moderator: int = record['moderator']
 
     @classmethod
     def temporary(cls, *, member, expires, created, event, args, kwargs):
@@ -155,7 +156,7 @@ class TimerHandler:
         --------
         :class:`Timer`
         """
-        when, member, *args = args
+        when, member, moderator, *args = args
 
         try:
             connection = kwargs.pop('connection')
@@ -174,12 +175,12 @@ class TimerHandler:
         timer = Timer.temporary(member=member, event=self.name, args=args, kwargs=kwargs, expires=when, created=now)
         delta = (when - now).total_seconds()
 
-        query = f"""INSERT INTO {self.name} (event, extra, expires, created, member)
-                   VALUES ($1, $2::jsonb, $3, $4, $5)
+        query = f"""INSERT INTO {self.name} (event, extra, expires, created, member, dispatched, moderator)
+                   VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7)
                    RETURNING id;
                 """
 
-        row = await connection.fetchrow(query, self.name, { 'args': args, 'kwargs': kwargs }, when, now, member)
+        row = await connection.fetchrow(query, self.name, { 'args': args, 'kwargs': kwargs }, when, now, member, False, moderator)
         timer.id = row[0]
 
         # only set the data check if it can be waited on

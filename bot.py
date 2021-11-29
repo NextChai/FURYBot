@@ -517,7 +517,14 @@ class Lockdown:
         except (discord.HTTPException, discord.Forbidden):
             return None
         
-    async def lockdown(self, member: discord.Member, *, reason: Reasons, time: Optional[datetime.datetime] = None) -> bool:
+    async def lockdown(
+        self, 
+        member: discord.Member, 
+        *, 
+        reason: Reasons, 
+        time: Optional[datetime.datetime] = None,
+        **kwargs
+    ) -> bool:
         """Adds a user to Lockdown.
         
         Parameters
@@ -551,13 +558,14 @@ class Lockdown:
                         time,
                         'lockdown',
                         member.id,
+                        kwargs.get('moderator', member.id),
                         connection=connection,
                         **kwargs
                     )
                 else:
                     await connection.execute(
-                        'INSERT INTO lockdowns (event, extra, expires, member) VALUES ($1, $2::jsonb, $3, $4, $5)',
-                        'lockdowns', {'kwargs': kwargs, 'args': []}, None, member.id
+                        'INSERT INTO lockdowns (event, extra, expires, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)',
+                        'lockdowns', {'kwargs': kwargs, 'args': []}, None, member.id, kwargs.get('moderator', member.id)
                     )
         
         channels = []
@@ -584,13 +592,14 @@ class Lockdown:
                 await self.lockdown_timer.create_timer(
                     time,
                     member.id,
+                    kwargs.get('moderator', None),
                     connection=connection,
                     **kwargs
                 )
             else:
                 await connection.execute(
-                    'INSERT INTO lockdowns (event, extra, created, member) VALUES ($1, $2::jsonb, $3, $4, $5)',
-                    'lockdowns', {'kwargs': kwargs, 'args': []}, discord.utils.utcnow(), member.id
+                    'INSERT INTO lockdowns (event, extra, created, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)',
+                    'lockdowns', {'kwargs': kwargs, 'args': []}, discord.utils.utcnow(), member.id, kwargs.get('moderator', member.id)
                 )
 
         lr = self.get_lockdown_role(member.guild)

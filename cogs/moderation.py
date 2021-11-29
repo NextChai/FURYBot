@@ -119,7 +119,7 @@ class Moderation(commands.Cog):
         await ctx.defer(ephemeral=True)
         
         if total_time is None:
-            await self.bot.lockdown(member, reason=reason) # type: ignore
+            await self.bot.lockdown(member, reason=reason, moderator=ctx.author.id) # type: ignore
         else:
             e = self.bot.Embed(
                 title='Please Confirm',
@@ -137,7 +137,7 @@ class Moderation(commands.Cog):
                 description=f'Locking down {member.mention}.'
             ), view=None)
             
-            await self.bot.lockdown(member, reason=reason, time=total_time.dt) # type: ignore
+            await self.bot.lockdown(member, reason=reason, time=total_time.dt, moderator=ctx.author.id) # type: ignore
         
         e = self.bot.Embed(
             title='Success',
@@ -196,6 +196,18 @@ class Moderation(commands.Cog):
             ))
             
         embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.')
+        
+        active_lockdowns = [e for e in data if not e['dispatched']]
+        embed.add_field(name='Active Lockdowns', value=f'{len(active_lockdowns)} active lockdowns total.')
+        
+        if active_lockdowns:
+            active_lockdown = max(active_lockdowns)
+            kwargs = active_lockdown['extra']['kwargs']
+            embed.add_field(name='Active Lockdown', value=f'{0} - Created {1} - Ends {2}'.format(
+            kwargs['reason'], 
+            time.human_time(active_lockdown['created']), 
+            time.human_time(expires) if (expires := active_lockdown['expires']) is not None else 'never'
+        ))
         
         most_recent = data[0]
         kwargs = most_recent['extra']['kwargs']
