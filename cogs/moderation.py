@@ -295,21 +295,14 @@ class Moderation(commands.Cog):
         description='Give a sub access to a channel.'
     )
     @commands.describe('member', description='The member to give access to.')
-    @commands.describe(
-        'channel', 
-        type=commands.OptionType.channel,
-        channels=[
-            commands.ChannelType.text, 
-            commands.ChannelType.voice
-        ]
-    )
+    @commands.describe('channel', description='The channel to give access to.')
     @commands.describe('permission', description='Whether to allow or deny access.')
     @commands.check_any(is_captain(), is_coach(), is_mod())
     async def sub(
         self, 
         ctx, 
         member: discord.Member, 
-        channel: str, 
+        channel: discord.TextChannel, 
         permission: bool
     ) -> None:
         value = True if permission == 'allow' else False
