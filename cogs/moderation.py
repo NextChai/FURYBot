@@ -125,7 +125,7 @@ class Moderation(commands.Cog):
         else:
             e = self.bot.Embed(
                 title='Please Confirm',
-                description=f'Do you want to lockdown {member.mention} until {time.human_time(total_time.dt)}?'
+                description=f'Do you want to lockdown {member.mention} until {discord.utils.format_dt(total_time.dt, stlye="F")}?'
             )
             e.set_author(name=str(member), icon_url=member.display_avatar.url)
             e.set_footer(text=f'Member ID: {member.id}') 
@@ -213,24 +213,24 @@ class Moderation(commands.Cog):
             kwargs = active_lockdown['extra']['kwargs']
             embed.add_field(name='Closest Active Lockdown', value='{0} - Created {1} - Ends {2}'.format(
                 kwargs['reason'], 
-                time.human_time(active_lockdown['created']), 
-                time.human_time(expires)
+                discord.utils.format_dt(active_lockdown['created'], style='F'),
+                discord.utils.format_dt(expires, style='F'),
             ), inline=False)
         
         most_recent = data[0]
         kwargs = most_recent['extra']['kwargs']
         embed.add_field(name='Most Recent Lockdown', value='{0} - Created {1} - Ends {2}'.format(
             kwargs['reason'], 
-            time.human_time(most_recent['created']), 
-            time.human_time(expires) if (expires := most_recent['expires']) is not None else 'never'
+            discord.utils.format_dt(most_recent['created'], style='F'),
+            discord.utils.format_dt(expires, style='F') if (expires := most_recent['expires']) is not None else 'never'
         ), inline=False)
         
         first_lockdown = data[-1]
         kwargs = first_lockdown['extra']['kwargs']
         embed.add_field(name='First Lockdown', value='{0} - Created {1} - Ends {2}'.format(
             kwargs['reason'], 
-            time.human_time(first_lockdown['created']), 
-            time.human_time(expires) if (expires := first_lockdown['expires']) is not None else 'never'
+            discord.utils.format_dt(first_lockdown['created'], style='F'),
+            discord.utils.format_dt(expires, style='F') if (expires := first_lockdown['expires']) is not None else 'never'
         ), inline=False)
             
         return await ctx.send(embed=embed)
@@ -508,7 +508,7 @@ class Moderation(commands.Cog):
         
         embed = self.bot.Embed(title='Muted', description=f'{member.mention} has been muted.')
         embed.add_field(name='Reason', value=reason)
-        embed.add_field(name='Expires', value=time.human_time(new.expires) if new.expires else "Does not expire.")
+        embed.add_field(name='Expires', value=discord.utils.format_dt(new.expires, style='F') if new.expires else "Does not expire.")
         embed.add_field(name='Moderator', value=ctx.author.mention)
         embed.add_field(name='Role(s) Affected', value=', '.join([f'<@&{r}>' for r in original_roles] or ['No roles.']))
         embed.add_field(name='Channel(s) Affected', value=', '.join([f'<#{c}>' for c in channels] or ['No channels.']))
@@ -571,8 +571,8 @@ class Moderation(commands.Cog):
             title='Oh no!',
             description=f'{member.mention} is already muted.'
         )
-        embed.add_field(name='Created At', value=time.human_time(temp.created_at), inline=False)
-        embed.add_field(name='Expires', value=time.human_time(expires) if (expires := temp.expires) else 'Never', inline=False)
+        embed.add_field(name='Created At', value=discord.utils.format_dt(temp.created_at, style='F'), inline=False)
+        embed.add_field(name='Expires', value=discord.utils.format_dt(expires, style='F') if (expires := temp.expires) else 'Never', inline=False)
         embed.add_field(name='Mute Reason', value=temp.kwargs['reason'], inline=False)
         embed.add_field(name='Moderator', value=f'<@{temp.kwargs["moderator"]}>')
         embed.add_field(
@@ -606,8 +606,8 @@ class Moderation(commands.Cog):
             new = timer.Timer(record=entry)
             
             fmt = f"**Reason**: {new.kwargs['reason']}\n" \
-                f"**Created**: {time.human_time(new.created_at)}\n" \
-                f"**Expires**: {time.human_time(new.expires) if new.expires else 'Never'}\n" \
+                f"**Created**: {discord.utils.format_dt(new.created_at, style='F')}\n" \
+                f"**Expires**: {discord.utils.format_dt(new.expires, style='F') if new.expires else 'Never'}\n" \
                 "**Moderator**: {0}".format(f'<@{new.moderator}>')
             embed.add_field(name=f'Mute {index+1}', value=fmt, inline=False)
         
