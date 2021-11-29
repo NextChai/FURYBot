@@ -323,7 +323,7 @@ class DiscordBot(commands.Bot):
             username=message.author.display_name,
             avatar_url=message.author.display_avatar.url,
             embeds=message.embeds,
-            contnet=message.content,
+            content=message.content,
             **kwargs
         )
             
