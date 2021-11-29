@@ -238,8 +238,9 @@ class Owner(commands.Cog):
         name='python',
         description='Run code.'
     )
+    @commands.describe('code', description='The code to run.')
     @commands.is_owner()
-    async def python(self, ctx: Context, code: commands.Option[str, Literal['The code to evaluate']]):
+    async def python(self, ctx: Context, code: str):
         globalns = {
             'ctx': ctx,
             'guild': ctx.guild,
