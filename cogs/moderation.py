@@ -355,7 +355,7 @@ class Moderation(commands.Cog):
         name='add' ,
         description='Make a word a profanity word.'
     )
-    @commands.describe('word', 'The word to add.')
+    @commands.describe('word', description='The word to add.')
     async def wordset_add(
         self, 
         ctx: Context, 
