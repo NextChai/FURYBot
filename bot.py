@@ -31,10 +31,9 @@ import traceback
 import functools
 import datetime
 import contextlib
-from typing import TYPE_CHECKING, Callable, List, Dict, Optional, Set, Union, Any
+from typing import TYPE_CHECKING, Callable, List, Dict, Optional, Union
 
 import aiohttp
-from asyncio.subprocess import PIPE
 
 import discord
 from discord.ext import commands
