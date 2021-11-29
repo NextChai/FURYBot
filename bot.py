@@ -228,6 +228,9 @@ class DiscordBot(commands.Bot):
                 content = f'<@&867901004728762399>\n{content}'
             else:
                 kwargs['content'] ='<@&867901004728762399>'
+            kwargs['allowed_mentions'] = discord.AllowedMentions(roles=[discord.Object(id=867901004728762399)])
+        else:
+            kwargs['allowed_mentions'] = discord.AllowedMentions.none()
 
         return await webhook.send(
             username=self.user.display_name, 
