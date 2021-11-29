@@ -155,7 +155,7 @@ class Moderation(commands.Cog):
         else:
             e = self.bot.Embed(
                 title='Please Confirm',
-                description=f'Do you want to lockdown {member.mention} until {time.human_time(total_time)}?'
+                description=f'Do you want to lockdown {member.mention} until {time.human_time(total_time.dt)}?'
             )
             e.set_author(name=str(member), icon_url=member.display_avatar.url)
             e.set_footer(text=f'Member ID: {member.id}') 
