@@ -276,7 +276,7 @@ class DiscordBot(commands.Bot):
     
     async def propagate_lockdowns(self) -> None:
         async with self.safe_connection() as conn:
-            data = await conn.fetch('SELECT * FROM lockdowns WHERE expires IS NOT NULL AND expires > CURRENT_TIME')
+            data = await conn.fetch('SELECT * FROM lockdowns WHERE expires IS NOT NULL AND expires > $1', discord.utils.utcnow())
         
         didnt_have_parent = []
         for entry in data:
