@@ -183,6 +183,8 @@ class Moderation(commands.Cog):
             title=f'Lockdown information on {member}',
             description=f"Here's all the lockdown info I could find on {member.mention}.\n\n"
         )
+        embed.set_author(name=str(member), icon_url=member.display_avatar.url)
+        embed.set_thumbnail(url=member.display_avatar.url)
         
         async with self.bot.safe_connection() as conn:
             data = await conn.fetch('SELECT * FROM lockdowns WHERE member = $1 AND expires > CURRENT_TIMESTAMP AND expires IS NOT NULL ORDER BY expires', member.id)
