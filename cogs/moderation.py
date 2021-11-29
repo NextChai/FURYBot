@@ -601,13 +601,13 @@ class Moderation(commands.Cog):
                 description=f'{member.mention} has no mute history.'
             ))
         
-        embed = self.bot.Embed(title='Mute History', description=f'{member.mention} has a mute history.')
+        embed = self.bot.Embed(title='Mute History', description=f'{member.mention} has a mute history {len(data)} entries long.')
         for index, entry in enumerate(data):
             new = timer.Timer(record=entry)
             
             fmt = f"**Reason**: {new.kwargs['reason']}\n" \
                 f"**Created**: {time.human_time(new.created_at)}\n" \
-                f"**Expires**: {time.human_time(new.expires) if new.expires else 'Never'}" \
+                f"**Expires**: {time.human_time(new.expires) if new.expires else 'Never'}\n" \
                 "**Moderator**: {0}".format(f'<@{new.moderator}>')
             embed.add_field(name=f'Mute {index+1}', value=fmt, inline=False)
         
