@@ -75,12 +75,13 @@ class Moderation(commands.Cog):
         
     async def cog_check(self, ctx) -> bool:
         roles = [r.id for r in ctx.author.roles]
-        return any((
-            constants.CAPTAIN_ROLE in roles,
-            constants.MOD_ROLE in roles,
-            constants.COACH_ROLE in roles,
-            constants.BYPASS_FURY in roles
-        ))
+        
+        return (constants.CAPTAIN_ROLE in roles
+            or constants.MOD_ROLE in roles
+            or constants.COACH_ROLE in roles
+            or constants.BYPASS_FURY in roles
+        )
+    
         
     @commands.group(
         name='lockdown',
