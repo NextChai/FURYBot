@@ -197,18 +197,18 @@ class Moderation(commands.Cog):
             
         embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.', inline=False)
         
-        active_lockdowns = [e for e in data if not e['dispatched']]
+        active_lockdowns = [(e, e['expires']) for e in data if not e['dispatched']]
         embed.add_field(name='Active Lockdowns', value=f'{len(active_lockdowns)} active lockdowns total.', inline=False)
         
         if active_lockdowns:
             embed.add_field(name='Active Lockdowns', value=f'{len(active_lockdowns)} active lockdowns total.', inline=False)
             
-            active_lockdown = max(active_lockdowns)
+            active_lockdown, expires = max(active_lockdowns, key=lambda e: e[1])
             kwargs = active_lockdown['extra']['kwargs']
             embed.add_field(name='Closest Active Lockdown', value='{0} - Created {1} - Ends {2}'.format(
                 kwargs['reason'], 
                 time.human_time(active_lockdown['created']), 
-                time.human_time(expires) if (expires := active_lockdown['expires']) is not None else 'never'
+                time.human_time(expires)
             ), inline=False)
         
         most_recent = data[0]
