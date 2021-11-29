@@ -553,7 +553,7 @@ class Lockdown:
             self.lockdowns[member.id]['reason'].append(reason)
             async with self.safe_connection() as connection:
                 if time is not None:
-                    return await self.lockdown_timer.create_timer(
+                    await self.lockdown_timer.create_timer(
                         time,
                         'lockdown',
                         member.id,
@@ -561,6 +561,7 @@ class Lockdown:
                         connection=connection,
                         **new_kwargs
                     )
+                    return True
                 else:
                     await connection.execute(
                         'INSERT INTO lockdowns (event, extra, expires, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)',
@@ -571,9 +572,11 @@ class Lockdown:
         for channel in member.guild.channels: # Remove any special team creation. EX: rocket-league-1
             overwrites = channel.overwrites
             if overwrites.get(member):
-                overwrites[member].update(view_channel=False)
-                await channel.edit(overwrites=overwrites)
-                channels.append(channel.id)
+                specific = discord.utils.find(lambda e: e[0] == 'view_channel' and e[1] == True, overwrites)
+                if specific:
+                    overwrites.update(view_channel=False)
+                    await channel.edit(overwrites=overwrites)
+                    channels.append(channel.id)
         
         roles = [r.id for r in member.roles]
         

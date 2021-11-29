@@ -22,7 +22,6 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
-from logging import info
 
 from typing import TYPE_CHECKING, Optional
 
@@ -445,6 +444,48 @@ class Moderation(commands.Cog):
     ) -> None:
         check = await self.bot.censor_message(sentence)
         return await ctx.send(check, ephemeral=True)
+    
+    # Muting members
+    @commands.slash()
+    async def mute(self, ctx, member: discord.Member, reason: str, until: Optional[time.UserFriendlyTime]) -> None:
+        original_roles = [r.id for r in member.roles]
+        
+        channels = []
+        for channel in ctx.guild.text_channels:
+            overwrites = channel.overwrites
+            if overwrites.get(member):
+                specific = discord.utils.find(lambda e: e[0] == 'send_messages' and e[1] == True, overwrites)
+                if specific:
+                    overwrites[member].update(send_messages=False)
+                    await channel.edit(overwrites=overwrites)
+                    channels.append(channel.id)
+        
+        muted_role = ctx.guild.get_role(constants.MUTED_ROLE)
+        try:
+            await member.edit(roles=[muted_role])
+        except:
+            return await ctx.send(embed=self.bot.Embed(
+                title='Oh no!',
+                description=f'I can not edit the roles on {member.mention}.'
+            ))
+    
+        async with self.bot.safe_connection() as conn:
+            if until:
+                await self.bot.mute_timer.create_timer(
+                    until.dt,
+                    member.id,
+                    ctx.author.id,
+                    connection=conn,
+                    created=ctx.created_at,
+                    roles=original_roles,
+                    channels=channels
+                )
+            else:
+                await conn.execute(
+                    'INSERT INTO mutes (event, extra, expires, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)', 
+                    'mutes', {'args': [], 'kwargs': {'roles': original_roles, 'channels': channels}}, 
+                    None, member.id, ctx.created_at, ctx.author.id
+                )
         
         
 def setup(bot):

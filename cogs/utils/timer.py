@@ -131,7 +131,7 @@ class TimerHandler:
             self._task.cancel()
             self._task = self.bot.loop.create_task(self.dispatch_timers())
         
-    async def create_timer(self, *args, **kwargs):
+    async def create_timer(self, when, member, moderator, *args, **kwargs):
         r"""Creates a timer.
         
         Parameters
@@ -159,8 +159,6 @@ class TimerHandler:
         --------
         None
         """
-        when, member, moderator, *args = args
-
         try:
             connection = kwargs.pop('connection')
         except KeyError:
