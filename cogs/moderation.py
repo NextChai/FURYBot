@@ -201,6 +201,8 @@ class Moderation(commands.Cog):
         infinite_reasons = [reason for reason in lockdown['reason'] if Reasons.type_to_string(reason) not in database_reasons]
         for entry in infinite_reasons:
             embed.add_field(name='Reason', value=Reasons.type_to_string(entry))
+            
+        return await ctx.send(embed=embed)
         
     @commands.group(
         name='team',
