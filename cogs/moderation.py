@@ -173,6 +173,11 @@ class Moderation(commands.Cog):
 
         await self.bot.freedom(member, reason=reason) # type: ignore
         
+        return await ctx.send(embed=self.bot.Embed(
+            title='Success!',
+            description=f'I have freed {member.mention} from lockdown.'
+        ))
+        
     @lockdown.slash(
         name='info',
         description='Get information on user lockdowns.'
