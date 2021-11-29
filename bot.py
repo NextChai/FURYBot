@@ -279,26 +279,6 @@ class DiscordBot(commands.Bot):
         else:
             e.description = f'I ran into an error when doing this command!\n\n**{str(error)}**'
             return await ctx.send(embed=e)
-        
-    async def on_member_lockdown(self, member: discord.Member, reason: Reasons) -> None:
-        e = self.Embed(
-            title='Member Lockdown',
-            description=f'Member {member.mention} has been locked down for {Reasons.type_to_string(reason)}.'
-        )
-        e.set_author(name=str(member), icon_url=member.display_avatar.url)
-        e.set_footer(text=f'Member ID: {member.id}') 
-        
-        return await self.send_to_logging_channel(embed=e)
-    
-    async def on_member_freedom(self, member: discord.Member) -> None:
-        e = self.Embed(
-            title='Member Freedom',
-            description=f'Member {member.mention} has been freed from lockdown!'
-        )
-        e.set_author(name=str(member), icon_url=member.display_avatar.url)
-        e.set_footer(text=f'Member ID: {member.id}') 
-        
-        return await self.send_to_logging_channel(embed=e)
     
     async def propagate_lockdowns(self) -> None:
         async with self.safe_connection() as conn:
@@ -733,11 +713,3 @@ class FuryBot(DiscordBot, SecurityMixin):
     def __init__(self):
         SecurityMixin.__init__(self)
         super().__init__()
-
-    async def lockdown(self, member: discord.Member, *, reason: Reasons, time: Optional[datetime.datetime] = None) -> bool:
-        self.dispatch('member_lockdown', member, reason)
-        return await super().lockdown(member, reason=reason, time=time)
-    
-    async def freedom(self, member: discord.Member, *, reason: Reasons) -> bool:
-        self.dispatch('member_freedom', member)
-        return await super().freedom(member, reason=reason)
