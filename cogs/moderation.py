@@ -608,7 +608,7 @@ class Moderation(commands.Cog):
             fmt = f"**Reason**: {new.kwargs['reason']}\n" \
                 f"**Created**: {time.human_time(new.created_at)}\n" \
                 f"**Expires**: {time.human_time(new.expires) if new.expires else 'Never'}" \
-                "**Moderator**: {0}".format(f'<@{new.kwargs["moderator"]}>')
+                "**Moderator**: {0}".format(f'<@{new.moderator}>')
             embed.add_field(name=f'Mute {index+1}', value=fmt, inline=False)
         
         return await ctx.send(embed=embed)
