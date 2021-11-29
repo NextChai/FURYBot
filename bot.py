@@ -523,7 +523,7 @@ class Lockdown:
         """
         log.info(f'Coro lockdown was called on {member} for reason {Reasons.type_to_string(reason)}')
         
-        kwargs = {
+        new_kwargs = {
             'reason': Reasons.type_to_string(reason),
             'channels': None,
             'roles': None,
@@ -540,12 +540,12 @@ class Lockdown:
                         member.id,
                         kwargs.get('moderator', member.id),
                         connection=connection,
-                        **kwargs
+                        **new_kwargs
                     )
                 else:
                     await connection.execute(
                         'INSERT INTO lockdowns (event, extra, expires, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)',
-                        'lockdowns', {'kwargs': kwargs, 'args': []}, None, member.id, kwargs.get('moderator', member.id)
+                        'lockdowns', {'kwargs': new_kwargs, 'args': []}, None, member.id, kwargs.get('moderator', member.id)
                     )
         
         channels = []
@@ -558,11 +558,11 @@ class Lockdown:
         
         roles = [r.id for r in member.roles]
         
-        kwargs['channels'] = channels
-        kwargs['roles'] = roles
+        new_kwargs['channels'] = channels
+        new_kwargs['roles'] = roles
         
         self.lockdowns[member.id] = {
-            'reason': reason,
+            'reason': [reason],
             'channels': channels,
             'roles': roles
         }
@@ -574,12 +574,12 @@ class Lockdown:
                     member.id,
                     kwargs.get('moderator', None),
                     connection=connection,
-                    **kwargs
+                    **new_kwargs
                 )
             else:
                 await connection.execute(
                     'INSERT INTO lockdowns (event, extra, created, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)',
-                    'lockdowns', {'kwargs': kwargs, 'args': []}, discord.utils.utcnow(), member.id, kwargs.get('moderator', member.id)
+                    'lockdowns', {'kwargs': new_kwargs, 'args': []}, discord.utils.utcnow(), member.id, kwargs.get('moderator', member.id)
                 )
 
         lr = self.get_lockdown_role(member.guild)

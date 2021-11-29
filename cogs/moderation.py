@@ -114,7 +114,7 @@ class Moderation(commands.Cog):
         ctx: Context, 
         member: discord.Member, 
         reason: string_to_reason, 
-        total_time: Optional[time.UserFriendlyTime] = None
+        total_time: Optional[time.UserFriendlyTime] = None 
     ) -> None:
         await ctx.defer(ephemeral=True)
         
