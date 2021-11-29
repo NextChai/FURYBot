@@ -135,6 +135,10 @@ class UserFriendlyTime(commands.Converter):
             self.arg = await self.converter.convert(ctx, remaining) # type: ignore
         else:
             self.arg = remaining
+        
+        if self.dt.tzinfo is None:
+            self.dt.replace(tzinfo=datetime.timezone.utc)
+        
         return self
 
     def copy(self):
