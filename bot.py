@@ -95,6 +95,8 @@ class DiscordBot(commands.Bot):
     """
     if TYPE_CHECKING:
         pool: asyncpg.Pool
+        logging_webhook_url: str
+        message_webhook_url: str
         
     def __init__(self):
         super().__init__(
@@ -146,7 +148,6 @@ class DiscordBot(commands.Bot):
                     'roles': roles,
                     'reason': [Reasons.from_string(reason)]
                 }
-            
                 
     @contextlib.asynccontextmanager
     async def safe_connection(self, timeout: Optional[float] = 10):
@@ -181,7 +182,14 @@ class DiscordBot(commands.Bot):
         """
         return await super().get_context(interaction, cls=cls)
     
-    async def send_to_logging_channel(self, *args, **kwargs) -> discord.Mesasage:
+    async def get_logging_webhook(self) -> discord.Webhook:
+        if not hasattr(self, 'logging_webhook'):
+            partial = discord.Webhook.from_url(self.logging_webhook_url)
+            self.logging_webhook = await partial.fetch()
+        
+        return self.logging_webhook
+    
+    async def send_to_logging_channel(self, *args, **kwargs) -> None:
         """Send a message to the logging channel.
         
         This is the only non-native dpy related coro. This is so the on_error can get placed here and not
@@ -205,18 +213,24 @@ class DiscordBot(commands.Bot):
         
         Returns
         -------
-        :class:`discord.Message`"""
-        channel = self.get_channel(constants.LOGGING_CHANNEL) or (await self.fetch_channel(constants.LOGGING_CHANNEL))
+        None
+        """
+        await self.wait_until_ready()
         
+        webhook = await self.get_logging_webhook()
+
         ping_staff = kwargs.pop('ping_staff', True)
         if ping_staff:
-            if args:
-                content = args[0]
-                content = '<@&867901004728762399>\n' + content
+            if content := kwargs.get('content'):
+                content = f'<@&867901004728762399>\n{content}'
             else:
-                args = ['<@&867901004728762399>']
-                
-        return await channel.send(*args, **kwargs)
+                kwargs['content'] ='<@&867901004728762399>'
+
+        return await webhook.send(
+            username=self.user.display_name, 
+            avatar_url=self.user.display_avatar.url,
+            **kwargs
+        )
     
     async def update_activity(self) -> None:
         """Updates the bot's activity to the current set name and type.
@@ -282,27 +296,30 @@ class DiscordBot(commands.Bot):
             e.description = f'I ran into an error when doing this command!\n\n**{str(error)}**'
             return await ctx.send(embed=e)
     
-    async def propagate_lockdowns(self) -> None:
-        async with self.safe_connection() as conn:
-            data = await conn.fetch('SELECT * FROM lockdowns WHERE expires IS NOT NULL AND expires > CURRENT_TIMESTAMP')
+    async def on_message(self, message: discord.Message) -> None:
+        if not message.guild:
+            return 
         
-        didnt_have_parent = []
-        for entry in data:
-            kwargs = entry['extra']['kwargs']
-            if not (channels := kwargs.get('channels')):
-                didnt_have_parent.append(entry)
-                continue
-                
-                
-            self.lockdowns[int(kwargs['member'])] = {
-                'channels': channels,
-                'roles': kwargs['roles'],
-                'reason': [Reasons.from_string(kwargs['reason'])],
-            }
+        if not hasattr(self, 'message_webhook'):
+            partial = discord.Webhook.from_url(self.message_webhook_url)
+            self.message_webhook = await partial.fetch()
         
-        for entry in didnt_have_parent:
-            kwargs = entry['extra']['kwargs']
-            self.lockdowns[int(kwargs['member'])]['reason'].append(Reasons.from_string(kwargs['reason']))
+        kwargs = {}
+        if message.attachments:
+            attachments = []
+            for att in message.attachments:
+                try:
+                    attachments.append(await att.to_file(spoiler=att.is_spoiler()))
+                except:
+                    pass
+            kwargs['files'] = attachments
+                
+        await self.message_webhook.send(
+            username=message.author.display_name,
+            avatar_url=message.author.display_avatar.url,
+            embeds=message.embeds,
+            **kwargs
+        )
             
 
 class Security(CustomProfanity, URLExtract):

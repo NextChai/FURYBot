@@ -30,8 +30,7 @@ import asyncio
 import logging
 
 from bot import FuryBot
-from config import TOKEN, postgresql as uri
-
+from config import TOKEN, postgresql as uri, logging_webhook, message_webhook
 logging.basicConfig(level=logging.INFO)
 
 async def setup_pool() -> asyncpg.Pool:
@@ -60,6 +59,8 @@ def run_bot():
     
     fury = FuryBot()
     fury.pool = pool
+    fury.logging_webhook_url = logging_webhook
+    fury.message_webhook_url = message_webhook
     fury.run(TOKEN)
     
 if __name__ == '__main__':
