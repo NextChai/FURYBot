@@ -326,6 +326,7 @@ class DiscordBot(commands.Bot):
             avatar_url=message.author.display_avatar.url,
             embeds=message.embeds,
             content=message.content,
+            allowed_mentions=discord.AllowedMentions.none(),
             **kwargs
         )
             
