@@ -109,7 +109,7 @@ class DiscordBot(commands.Bot):
         self.debug: bool = True
         
         # Lockdown timer
-        self.lockdown_timer: TimerHandler = TimerHandler(self)
+        self.lockdown_timer: TimerHandler = TimerHandler(self, 'lockdowns')
         self.lockdowns: Dict[int, Dict] = {}
         
         for ext in initial_extensions:
@@ -488,7 +488,17 @@ class Lockdown:
         log.info(f'Coro lockdown was called on {member} for reason {Reasons.type_to_string(reason)}')
         
         if member.id in self.lockdowns:
-            return False
+            self.lockdowns[member.id]['reason'].append(reason)
+            if time is not None:
+                async with self.safe_connection() as connection:
+                    return await self.lockdown_timer.create_timer(
+                        time,
+                        'lockdown',
+                        member.id,
+                        connection=connection,
+                        member=member.id, # Gets passed twice so we can get it from the event later
+                        reason=reason
+                    )
         
         channels = []
         for channel in member.guild.channels: # Remove any special team creation. EX: rocket-league-1
@@ -502,16 +512,12 @@ class Lockdown:
             async with self.safe_connection() as connection:
                 await self.lockdown_timer.create_timer(
                     time,
-                    'lockdown',
                     member.id,
                     connection=connection,
-                    channels=[c.id for c in channels],
-                    roles=[r.id for r in member.roles],
                     member=member.id,
-                    reason=Reasons.type_to_string(reason)
+                    reason=reason
                 )
-        
-        # We'll insert this regardless of time because we need it for freedom
+            
         self.lockdowns[member.id] = {
             'channels': [c.id for c in channels],
             'roles': [r.id for r in member.roles],
@@ -595,15 +601,15 @@ class Lockdown:
         await self.send_to(member, embed=embed)
         return True
     
-    async def on_lockdown_timer_complete(self, timer: Timer) -> None:
-        print("Lockdown was revoked!")
-        print(timer.args)
-        print(timer.kwargs)
+    async def on_lockdowns_timer_complete(self, timer: Timer) -> None:
+        reason = Reasons.from_string(timer.kwargs['reason'])
+        member_id = timer.kwargs['member']
         
-        # return await self.freedom(timer)
+        guild = self.get_guild(constants.FURY_GUILD)
+        member = guild.get_member(member_id) or await guild.fetch_member(member_id)
+        
+        await self.freedom(member, reason=reason)
 
-        
-        
          
 class SecurityMixin(Security, Lockdown):
     """A mixin that implements the attrs and methods of both the 

@@ -22,6 +22,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
+from logging import info
 
 from typing import TYPE_CHECKING, Optional
 
@@ -41,7 +42,6 @@ if TYPE_CHECKING:
 __all__ = (
     'LockdownTable',
     'Moderation',
-    'Timer'
 )
 
 class LockdownTable(Table, name='lockdowns'):
@@ -53,53 +53,20 @@ class LockdownTable(Table, name='lockdowns'):
             Row('created', 'TIMESTAMP'),
             Row('member', 'BIGINT'),
         ])
-    
-
-class Timer:
-    __slots__ = ('args', 'kwargs', 'event', 'id', 'created_at', 'expires')
-
-    def __init__(self, *, record):
-        self.id = record['id']
-
-        extra = record['extra']
-        self.args = extra.get('args', [])
-        self.kwargs = extra.get('kwargs', {})
-        self.event = record['event']
-        self.created_at = record['created']
-        self.expires = record['expires']
-
-    @classmethod
-    def temporary(cls, *, expires, created, event, args, kwargs):
-        pseudo = {
-            'id': None,
-            'extra': { 'args': args, 'kwargs': kwargs },
-            'event': event,
-            'created': created,
-            'expires': expires
-        }
-        return cls(record=pseudo)
-
-    def __eq__(self, other):
+        
+class LockdownHistory(Table, name='lockdown_history'):
+    def __init__(self) -> None:
+        super().__init__(keys=[
+            Row('member', 'BIGINT'),
+            Row('reason', 'TEXT'),
+        ])
+        
+class string_to_reason:
+    async def convert(self, ctx, argument):
         try:
-            return self.id == other.id
-        except AttributeError:
-            return False
-
-    def __hash__(self):
-        return hash(self.id)
-
-    @property
-    def human_delta(self):
-        return time.format_relative(self.created_at)
-
-    @property
-    def author_id(self):
-        if self.args:
-            return int(self.args[0])
-        return None
-
-    def __repr__(self):
-        return f'<Timer created={self.created_at} expires={self.expires} event={self.event}>'
+            return Reasons.from_string(argument)
+        except:
+            raise commands.BadArgument(f'Invalid reason: {argument}')
 
 
 class Moderation(commands.Cog):
@@ -146,12 +113,11 @@ class Moderation(commands.Cog):
         self, 
         ctx: Context, 
         member: discord.Member, 
-        reason: str, 
+        reason: string_to_reason, 
         total_time: Optional[time.UserFriendlyTime] = None
     ) -> None:
-        freason = Reasons.from_string(reason) 
         if total_time is None:
-            await self.bot.lockdown(member, reason=freason)
+            await self.bot.lockdown(member, reason=reason) # type: ignore
         else:
             e = self.bot.Embed(
                 title='Please Confirm',
@@ -163,15 +129,14 @@ class Moderation(commands.Cog):
             confirmation = await ctx.get_confirmation(embed=e)
             if not confirmation:
                 return
-            await self.bot.lockdown(member, reason=freason, time=total_time.dt)
+            await self.bot.lockdown(member, reason=reason, time=total_time.dt) # type: ignore
         
         e = self.bot.Embed(
             title='Success',
             description=f'I have locked down {member.mention} for reason {reason}'
         )
         e.add_field(name='Note:', value='They have been given the Lockdown Role, and all their previous roles have been removed. You can do `/freedom` to unlock them.')
-
-        return await ctx.send(embed=e)
+        return await ctx.send(embed=e, view=None)
     
     @lockdown.slash(
         name='freedom',
@@ -192,8 +157,50 @@ class Moderation(commands.Cog):
             )
         ]
     )
-    async def freedom(self, ctx: Context, member: discord.Member, reason: str):
-        raise NotImplementedError
+    async def freedom(self, ctx: Context, member: discord.Member, reason: string_to_reason):
+        if member.id not in self.bot.lockdowns:
+            return await ctx.send(embed=self.bot.Embed(
+                title='Oh no!',
+                description=f'{member.mention} is not locked down.'
+            ))
+
+        await self.bot.freedom(member, reason=reason) # type: ignore
+        
+    @lockdown.slash(
+        name='info',
+        description='Get information on user lockdowns.'
+    )
+    async def lockdown_info(self, ctx: Context, member: discord.Member) -> None:
+        if member.id not in self.bot.lockdowns:
+            return await ctx.send(embed=self.bot.Embed(
+                title='Oh no!',
+                description=f'{member.mention} is not locked down.'
+            ))
+            
+        lockdown = self.lockdowns[member.id]
+        embed = self.bot.Embed(
+            title=f'Lockdown information on {member}',
+            description=f"Here's all the lockdown info I could find on {member.mention}.\n\n"
+        )
+        embed.description += '**Role(s) Lost:**\n{0}\n\n'.format(', '.join([f'<@&{id}>' for id in lockdown['roles']]))
+        embed.description += '**Channel(s) Affected:**\n{0}\n\n'.format(', '.join([f'<#{c}>' for c in lockdown['channels']]))
+            
+        async with self.bot.safe_connection() as conn:
+            data = await conn.fetch('SELECT * FROM lockdowns WHERE member = $1', member.id)
+        
+        database_reasons = []
+        for entry in data:
+            kwargs = entry['extra']['kwargs']
+            reason = kwargs['reason']
+            expires = time.human_time(kwargs['expires'])
+            created = time.human_time(kwargs['created'])
+            database_reasons.append(reason)
+            
+            embed.add_field(name='Reason (with timer)', value=f'{reason} - Expires: {time.human_time(expires)} - Created: {time.human_time(created)}\n')
+        
+        infinite_reasons = [reason for reason in lockdown['reason'] if Reasons.type_to_string(reason) not in database_reasons]
+        for entry in infinite_reasons:
+            embed.add_field(name='Reason', value=Reasons.type_to_string(entry))
         
     @commands.group(
         name='team',

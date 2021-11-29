@@ -41,8 +41,8 @@ class Reasons(Enum):
     def type_to_string(cls, type: Reasons) -> str:
         mapping = {
             cls.activity: 'Activity',
-            cls.displayname: "Name",
-            cls.misc: 'Miscellaneous',
+            cls.displayname: "DisplayName",
+            cls.misc: 'Misc',
             cls.avatar: 'Avatar',
             cls.rules: 'Rules',
             cls.profanity: 'Profanity'
@@ -51,7 +51,7 @@ class Reasons(Enum):
     
     @classmethod
     def from_string(cls, string: str) -> Reasons:
-        var = cls.__members__.get(string)
+        var = cls.__members__.get(string.lower())
         if var is None:
             raise Exception(f'class Reasons does not have attribute {string}')
         return var

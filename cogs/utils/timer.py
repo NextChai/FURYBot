@@ -58,7 +58,9 @@ class Timer:
 
 
 class TimerHandler:
-    def __init__(self, bot):
+    def __init__(self, bot, name: str):
+        self.name: str = name
+        
         self.bot = bot
         self._have_data = asyncio.Event(loop=bot.loop)
         self._current_timer = None
@@ -78,7 +80,7 @@ class TimerHandler:
             await ctx.send(f'You called the {ctx.command.name} command with too many arguments.')
             
     async def get_active_timer(self, *, connection=None, days=7):
-        query = "SELECT * FROM lockdowns WHERE expires < (CURRENT_DATE + $1::interval) ORDER BY expires LIMIT 1;"
+        query = f"SELECT * FROM {self.name} WHERE expires < (CURRENT_DATE + $1::interval) ORDER BY expires LIMIT 1;"
         con = connection or self.bot.pool
 
         record = await con.fetchrow(query, datetime.timedelta(days=days))
@@ -98,7 +100,7 @@ class TimerHandler:
         
     async def call_timer(self, timer):
         # delete the timer
-        query = "DELETE FROM lockdowns WHERE id=$1;"
+        query = f"DELETE FROM {self.name} WHERE id=$1;"
         await self.bot.pool.execute(query, timer.id)
 
         # dispatch the event
@@ -124,11 +126,6 @@ class TimerHandler:
         except (OSError, discord.ConnectionClosed, asyncpg.PostgresConnectionError): 
             self._task.cancel()
             self._task = self.bot.loop.create_task(self.dispatch_timers())
-
-    async def short_timer_optimisation(self, seconds, timer):
-        await asyncio.sleep(seconds)
-        event_name = f'{timer.event}_timer_complete'
-        self.bot.dispatch(event_name, timer)
         
     async def create_timer(self, *args, **kwargs):
         r"""Creates a timer.
@@ -158,7 +155,7 @@ class TimerHandler:
         --------
         :class:`Timer`
         """
-        when, event, member, *args = args
+        when, member, *args = args
 
         try:
             connection = kwargs.pop('connection')
@@ -174,19 +171,15 @@ class TimerHandler:
         when = when.astimezone(datetime.timezone.utc).replace(tzinfo=None)
         now = now.astimezone(datetime.timezone.utc).replace(tzinfo=None)
 
-        timer = Timer.temporary(member=member, event=event, args=args, kwargs=kwargs, expires=when, created=now)
+        timer = Timer.temporary(member=member, event=self.name, args=args, kwargs=kwargs, expires=when, created=now)
         delta = (when - now).total_seconds()
-        if delta <= 60:
-            # a shortcut for small timers
-            self.bot.loop.create_task(self.short_timer_optimisation(delta, timer))
-            return timer
 
-        query = """INSERT INTO lockdowns (event, extra, expires, created, member)
+        query = f"""INSERT INTO {self.name} (event, extra, expires, created, member)
                    VALUES ($1, $2::jsonb, $3, $4, $5)
                    RETURNING id;
                 """
 
-        row = await connection.fetchrow(query, event, { 'args': args, 'kwargs': kwargs }, when, now, member)
+        row = await connection.fetchrow(query, self.name, { 'args': args, 'kwargs': kwargs }, when, now, member)
         timer.id = row[0]
 
         # only set the data check if it can be waited on
