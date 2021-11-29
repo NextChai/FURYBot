@@ -116,6 +116,13 @@ class UserFriendlyTime(commands.Converter):
 
         self.converter = converter
         self.default = default
+        
+    @property
+    def human_readable(self) -> str:
+        if not hasattr(self, 'dt'):
+            return ''
+
+        return human_time(self.dt)
 
     async def check_constraints(self, ctx, now, remaining):
         if self.dt < now:

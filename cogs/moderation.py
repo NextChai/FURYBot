@@ -454,6 +454,14 @@ class Moderation(commands.Cog):
                 title='Oh no!',
                 description=f'{member.mention} is already muted.',
             ))
+            
+        if until is not None:
+            confirmation = await ctx.get_confirmation(
+                f'Are you sure you want to mute {member.mention} until {until.human_readable}?', 
+                allowed_mentions=discord.AllowedMentions.none()
+            )
+            if not confirmation:
+                return
         
         original_roles = [r.id for r in member.roles]
         
