@@ -81,7 +81,7 @@ class Safety(commands.Cog):
     @commands.Cog.listener('on_message')
     async def binary_check(self, message: discord.Message) -> None:
         """Used to Check for binary messages, decode them, and check for profanity."""
-        if should_ignore(message.author):
+        if should_ignore(message.author) or message.webhook_id:
             return
         
         binary_regex = r'(?P<number>1|0){1,}(?P<space>\s)?'
@@ -107,7 +107,7 @@ class Safety(commands.Cog):
     @commands.Cog.listener('on_message')
     async def mention_checker(self, message: discord.Message) -> None:
         """"Used to check if a user is trying to mention @here or @everyone"""
-        if should_ignore(message.author):
+        if should_ignore(message.author) or message.webhook_id:
             return
         
         mentions = await self.bot.wrap(re.findall, r'@here|@everyone', message.content)
@@ -136,7 +136,7 @@ class Safety(commands.Cog):
     @commands.Cog.listener('on_message')
     async def file_checker(self, message: discord.Message):
         """Used to check for message attachments. Any message that has them is deleted without correct perms."""
-        if should_ignore(message.author):
+        if should_ignore(message.author) or message.webhook_id:
             return
         
         if message.attachments:
@@ -162,7 +162,7 @@ class Safety(commands.Cog):
         """Used to determine if a message's content legnth is too high.
         
         Anything 700 or over will automatically be deleted."""
-        if should_ignore(message.author):
+        if should_ignore(message.author) or message.webhook_id:
             return
         if len(message.clean_content) >= 700:
             await message.delete()
@@ -209,7 +209,7 @@ class Safety(commands.Cog):
         -------
         None
         """
-        if not message.attachments or should_ignore(message.author):
+        if not message.attachments or should_ignore(message.author) or message.webhook_id:
             return
         
         for attachment in message.attachments:
@@ -242,7 +242,7 @@ class Safety(commands.Cog):
         -------
         None
         """
-        if not message.guild or should_ignore(message.author):
+        if not message.guild or should_ignore(message.author) or message.webhook_id:
             return
         
         if (await self.bot.contains_profanity(message.content)):
@@ -278,7 +278,7 @@ class Safety(commands.Cog):
         -------
         None
         """
-        if not message.guild or should_ignore(message.author):
+        if not message.guild or should_ignore(message.author) or message.webhook_id:
             return
         
         if (await self.bot.contains_links(message.clean_content)):

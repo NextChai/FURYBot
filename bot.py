@@ -221,10 +221,16 @@ class DiscordBot(commands.Bot):
 
         ping_staff = kwargs.pop('ping_staff', True)
         if ping_staff:
+            if args:
+                kwargs['content'] = args[0]
+                
             if content := kwargs.get('content'):
                 content = f'<@&867901004728762399>\n{content}'
             else:
                 kwargs['content'] ='<@&867901004728762399>'
+            kwargs['allowed_mentions'] = discord.AllowedMentions(roles=[discord.Object(id=867901004728762399)])
+        else:
+            kwargs['allowed_mentions'] = discord.AllowedMentions.none()
 
         return await webhook.send(
             username=self.user.display_name, 
@@ -244,16 +250,12 @@ class DiscordBot(commands.Bot):
         
     async def on_ready(self):
         print(f"{self.user.name} has come online.")
+            
+    def _yield_chunks(self, value: str):
+        const = 10
         
-    async def on_guild_join(self, guild: discord.Guild) -> None:
-        """This ensures that Fury bot can't be invited to other discord servers and stay in them.
-        
-        Returns
-        -------
-        None
-        """
-        if guild.id != 757664675864248360:
-            await guild.leave()
+        for i in range(0, len(value), 2000):
+            yield f'```py\n{value[i:i + (2000 - const)]}\n```'
             
     async def on_error(self, event, *args, **kwargs) -> None:
         """Called when the Bot runs into an error that is not handled by `on_command_error`.
@@ -265,7 +267,8 @@ class DiscordBot(commands.Bot):
 
         trace_str = ''.join(traceback.format_exception(type, value, traceback_str))
         print(trace_str)
-        await self.send_to_logging_channel(f'```python\n{trace_str}\n```')
+        for e in self._yield_chunks(trace_str):
+            await self.send_to_logging_channel(e)
         
     async def on_command_error(self, ctx, error) -> None:
         if hasattr(ctx.command, 'on_error'):
@@ -291,14 +294,18 @@ class DiscordBot(commands.Bot):
             
             formatted = lines.replace(traceback_str, f'```python\n{traceback_str}\n```')
             await ctx.send(formatted)
-            await self.send_to_logging_channel(formatted)
+            
+            for e in self._yield_chunks(traceback_str):
+                await self.send_to_logging_channel(e)
         else:
             e.description = f'I ran into an error when doing this command!\n\n**{str(error)}**'
             return await ctx.send(embed=e)
     
     async def on_message(self, message: discord.Message) -> None:
-        if not message.guild:
+        if not message.guild or message.author.bot:
             return 
+        if message.channel.id == constants.MESSAGE_LOG_CHANNEL:
+            return
         
         if not hasattr(self, 'message_webhook'):
             partial = discord.Webhook.from_url(self.message_webhook_url, session=self.session, bot_token=self.http.token)
@@ -318,6 +325,8 @@ class DiscordBot(commands.Bot):
             username=message.author.display_name,
             avatar_url=message.author.display_avatar.url,
             embeds=message.embeds,
+            content=message.content,
+            allowed_mentions=discord.AllowedMentions.none(),
             **kwargs
         )
             
@@ -546,7 +555,6 @@ class Lockdown:
             'reason': Reasons.type_to_string(reason),
             'channels': None,
             'roles': None,
-            'member': member.id
         }
         
         if member.id in self.lockdowns:
@@ -555,16 +563,15 @@ class Lockdown:
                 if time is not None:
                     await self.lockdown_timer.create_timer(
                         time,
-                        'lockdown',
                         member.id,
-                        kwargs.get('moderator', member.id),
+                        kwargs.get('moderator', None),
                         connection=connection,
                         **new_kwargs
                     )
                     return True
                 else:
-                    await connection.execute(
-                        'INSERT INTO lockdowns (event, extra, expires, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)',
+                    await connection.fetchrow(
+                        'INSERT INTO lockdowns (event, extra, expires, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5) RETURNING *',
                         'lockdowns', {'kwargs': new_kwargs, 'args': []}, None, member.id, kwargs.get('moderator', member.id)
                     )
         

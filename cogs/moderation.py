@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Optional
 
 import discord
@@ -37,6 +38,8 @@ from cogs.utils.db import Row, Table
 
 if TYPE_CHECKING:
     from bot import FuryBot
+    
+log = logging.getLogger(__name__)
     
 __all__ = (
     'LockdownTable',
@@ -122,7 +125,7 @@ class Moderation(commands.Cog):
         else:
             e = self.bot.Embed(
                 title='Please Confirm',
-                description=f'Do you want to lockdown {member.mention} until {time.human_time(total_time.dt)}?'
+                description=f'Do you want to lockdown {member.mention} until {discord.utils.format_dt(total_time.dt, stlye="F")}?'
             )
             e.set_author(name=str(member), icon_url=member.display_avatar.url)
             e.set_footer(text=f'Member ID: {member.id}') 
@@ -173,6 +176,11 @@ class Moderation(commands.Cog):
 
         await self.bot.freedom(member, reason=reason) # type: ignore
         
+        return await ctx.send(embed=self.bot.Embed(
+            title='Success!',
+            description=f'I have freed {member.mention} from lockdown.'
+        ))
+        
     @lockdown.slash(
         name='info',
         description='Get information on user lockdowns.'
@@ -197,7 +205,6 @@ class Moderation(commands.Cog):
         embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.', inline=False)
         
         active_lockdowns = [(e, e['expires']) for e in data if not e['dispatched']]
-        embed.add_field(name='Active Lockdowns', value=f'{len(active_lockdowns)} active lockdowns total.', inline=False)
         
         if active_lockdowns:
             embed.add_field(name='Active Lockdowns', value=f'{len(active_lockdowns)} active lockdowns total.', inline=False)
@@ -206,24 +213,24 @@ class Moderation(commands.Cog):
             kwargs = active_lockdown['extra']['kwargs']
             embed.add_field(name='Closest Active Lockdown', value='{0} - Created {1} - Ends {2}'.format(
                 kwargs['reason'], 
-                time.human_time(active_lockdown['created']), 
-                time.human_time(expires)
+                discord.utils.format_dt(active_lockdown['created'], style='F'),
+                discord.utils.format_dt(expires, style='F'),
             ), inline=False)
         
         most_recent = data[0]
         kwargs = most_recent['extra']['kwargs']
         embed.add_field(name='Most Recent Lockdown', value='{0} - Created {1} - Ends {2}'.format(
             kwargs['reason'], 
-            time.human_time(most_recent['created']), 
-            time.human_time(expires) if (expires := most_recent['expires']) is not None else 'never'
+            discord.utils.format_dt(most_recent['created'], style='F'),
+            discord.utils.format_dt(expires, style='F') if (expires := most_recent['expires']) is not None else 'never'
         ), inline=False)
         
         first_lockdown = data[-1]
         kwargs = first_lockdown['extra']['kwargs']
         embed.add_field(name='First Lockdown', value='{0} - Created {1} - Ends {2}'.format(
             kwargs['reason'], 
-            time.human_time(first_lockdown['created']), 
-            time.human_time(expires) if (expires := first_lockdown['expires']) is not None else 'never'
+            discord.utils.format_dt(first_lockdown['created'], style='F'),
+            discord.utils.format_dt(expires, style='F') if (expires := first_lockdown['expires']) is not None else 'never'
         ), inline=False)
             
         return await ctx.send(embed=embed)
@@ -439,14 +446,24 @@ class Moderation(commands.Cog):
     @commands.describe('reason', description='The reason for muting the member.')
     @commands.describe('until', description='How long to mute the member for.')
     async def mute_member(self, ctx, member: discord.Member, reason: Optional[str], until: Optional[time.UserFriendlyTime]) -> None:
+        await ctx.defer(ephemeral=True)
+        
         async with self.bot.safe_connection() as conn:
-            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 WHERE dispatched = $2', member.id, False)
+            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 AND dispatched = $2', member.id, False)
         
         if data:
             return await ctx.send(embed=self.bot.Embed(
                 title='Oh no!',
                 description=f'{member.mention} is already muted.',
             ))
+            
+        if until is not None:
+            confirmation = await ctx.get_confirmation(
+                f'Are you sure you want to mute {member.mention} until {until.human_readable}?', 
+                allowed_mentions=discord.AllowedMentions.none()
+            )
+            if not confirmation:
+                return
         
         original_roles = [r.id for r in member.roles]
         
@@ -471,7 +488,7 @@ class Moderation(commands.Cog):
     
         async with self.bot.safe_connection() as conn:
             if until:
-                await self.bot.mute_timer.create_timer(
+                new = await self.bot.mute_timer.create_timer(
                     until.dt,
                     member.id,
                     ctx.author.id,
@@ -482,17 +499,28 @@ class Moderation(commands.Cog):
                     reason=reason
                 )
             else:
-                await conn.execute(
-                    'INSERT INTO mutes (event, extra, expires, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)', 
+                rec = await conn.execute(
+                    'INSERT INTO mutes (event, extra, expires, member, created, moderator) VALUES ($1, $2::jsonb, $3, $4, $5, $6)', 
                     'mutes', {'args': [], 'kwargs': {'roles': original_roles, 'channels': channels}}, 
                     None, member.id, ctx.created_at, ctx.author.id
                 )
+                new = timer.Timer(record=rec)
+        
+        embed = self.bot.Embed(title='Muted', description=f'{member.mention} has been muted.')
+        embed.add_field(name='Reason', value=reason)
+        embed.add_field(name='Expires', value=discord.utils.format_dt(new.expires, style='F') if new.expires else "Does not expire.")
+        embed.add_field(name='Moderator', value=ctx.author.mention)
+        embed.add_field(name='Role(s) Affected', value=', '.join([f'<@&{r}>' for r in original_roles] or ['No roles.']))
+        embed.add_field(name='Channel(s) Affected', value=', '.join([f'<#{c}>' for c in channels] or ['No channels.']))
+        return await ctx.send(embed=embed)
                 
     @mute.slash(name='remove', description='Remove a mute on a member.')
     @commands.describe('member', description='The member to remove the mute for.')
     async def mute_remove(self, ctx, member: discord.Member) -> None:
+        await ctx.defer(ephemeral=True)
+        
         async with self.bot.safe_connection() as conn:
-            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 WERE dispatched = $2', member.id, False)
+            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 AND dispatched = $2', member.id, False)
         
         if not data:
             return await ctx.send(embed=self.bot.Embed(
@@ -527,8 +555,10 @@ class Moderation(commands.Cog):
     @mute.slash(name='current', description='Get info on a current mute.')
     @commands.describe('member', description='The member to get info on.')
     async def mute_current(self, ctx, member: discord.Member) -> None:
+        await ctx.defer(ephemeral=True)
+        
         async with self.bot.safe_connection() as conn:
-            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 WERE dispatched = $2', member.id, False)
+            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 AND dispatched = $2', member.id, False)
             
         if not data:
             return await ctx.send(embed=self.bot.Embed(
@@ -541,9 +571,10 @@ class Moderation(commands.Cog):
             title='Oh no!',
             description=f'{member.mention} is already muted.'
         )
-        embed.add_field(name='Created At', value=time.human_time(temp.created_at), inline=False)
-        embed.add_field(name='Expires', value=time.human_time(expires) if (expires := temp.expires) else 'Never', inline=False)
+        embed.add_field(name='Created At', value=discord.utils.format_dt(temp.created_at, style='F'), inline=False)
+        embed.add_field(name='Expires', value=discord.utils.format_dt(expires, style='F') if (expires := temp.expires) else 'Never', inline=False)
         embed.add_field(name='Mute Reason', value=temp.kwargs['reason'], inline=False)
+        embed.add_field(name='Moderator', value=f'<@{temp.kwargs["moderator"]}>')
         embed.add_field(
             name='Channel(s) Affected', 
             value=', '.join([f'<#{id}>' for id in temp.kwargs['channels']] or ['No channels affected.']), 
@@ -555,16 +586,43 @@ class Moderation(commands.Cog):
             inline=False
         )
         return await ctx.send(embed=embed)
+    
+    @mute.slash(name='history', description='List the mute history of a member.')
+    @commands.describe('member', description='The member to get info on.')
+    async def mute_history(self, ctx, member: discord.Member) -> None:
+        await ctx.defer(ephemeral=True)
+        
+        async with self.bot.safe_connection() as conn:
+            data = await conn.fetch('SELECT * FROM mutes WHERE member = $1 ORDER by created', member.id)
+        
+        if not data:
+            return await ctx.send(embed=self.bot.Embed(
+                title='No mute history!',
+                description=f'{member.mention} has no mute history.'
+            ))
+        
+        embed = self.bot.Embed(title='Mute History', description=f'{member.mention} has a mute history {len(data)} entries long.')
+        for index, entry in enumerate(data):
+            new = timer.Timer(record=entry)
+            
+            fmt = f"**Reason**: {new.kwargs['reason']}\n" \
+                f"**Created**: {discord.utils.format_dt(new.created_at, style='F')}\n" \
+                f"**Expires**: {discord.utils.format_dt(new.expires, style='F') if new.expires else 'Never'}\n" \
+                "**Moderator**: {0}".format(f'<@{new.moderator}>')
+            embed.add_field(name=f'Mute {index+1}', value=fmt, inline=False)
+        
+        return await ctx.send(embed=embed)
         
     @commands.Cog.listener()
     async def on_lockdowns_timer_complete(self, timer: timer.Timer) -> None:
         await self.bot.wait_until_ready()
         
         reason = Reasons.from_string(timer.kwargs['reason'])
-        member_id = timer.kwargs['member']
         
         guild = self.bot.get_guild(constants.FURY_GUILD)
-        member = guild.get_member(member_id) or await guild.fetch_member(member_id)
+        member = guild.get_member(timer.member) or await guild.fetch_member(timer.member)
+        log.info(f'On lockdowns timer complete for member {member}')
+        
         await self.bot.freedom(member, reason=reason)
         
     @commands.Cog.listener()
@@ -573,12 +631,19 @@ class Moderation(commands.Cog):
         
         guild = self.bot.get_guild(constants.FURY_GUILD)
         member = guild.get_member(timer.member) or await guild.fetch_member(timer.member)
+        log.info(f'On mutes timer complete for member {member}')
+        
         for channel_id in timer.kwargs['channels']:
             channel = guild.get_channel(channel_id)
             overwrites = channel.overwrites
             if overwrites.get(member):
                 overwrites[member].update(send_messages=True)
                 await channel.edit(overwrites=overwrites)
+                
+        roles = timer.kwargs['roles']
+        objs = [discord.Object(id=r) for r in roles]
+        await member.edit(roles=objs)
+        
         
         
 def setup(bot):

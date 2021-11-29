@@ -72,7 +72,7 @@ class TimerHandler:
                 expires TIMESTAMP,
                 member BIGINT,
                 dispatched BOOLEAN,
-                moderator BIGINT,
+                moderator BIGINT
             )""")
     
     
@@ -177,10 +177,11 @@ class TimerHandler:
 
         query = f"""INSERT INTO {self.name} (event, extra, expires, created, member, dispatched, moderator)
                    VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7)
-                   RETURNING id;
+                   RETURNING *;
                 """
 
         row = await connection.fetchrow(query, self.name, { 'args': args, 'kwargs': kwargs }, when, now, member, False, moderator)
+        timer = Timer(record=row)
 
         # only set the data check if it can be waited on
         if delta <= (86400 * 40): # 40 days
@@ -191,3 +192,5 @@ class TimerHandler:
             # cancel the task and re-run it
             self._task.cancel()
             self._task = self.bot.loop.create_task(self.dispatch_timers())
+        
+        return timer
