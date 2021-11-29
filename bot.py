@@ -110,8 +110,8 @@ class DiscordBot(commands.Bot):
         
         # Lockdown timer
         self.lockdown_timer: TimerHandler = TimerHandler(self, 'lockdowns')
-        self.lockdowns: Dict[int, Dict] = {}
-        self.loop.create_task(self.propagate_lockdowns())
+        self.lockdowns: Dict[int, Dict] = {} # Only used for local lockdowns 
+        self.loop.create_task(self._propagate_lockdown_cache())
         
         for ext in initial_extensions:
             try:
@@ -119,6 +119,31 @@ class DiscordBot(commands.Bot):
                 log.info('Loaded ext: {0}'.format(ext))
             except Exception:
                 traceback.print_exc()
+                
+    async def _propagate_lockdown_cache(self) -> None:
+        async with self.safe_connection() as conn:
+            data = await conn.fetch('SELECT * FROM lockdowns WHERE expires IS NOT NULL')
+        
+        for entry in data:
+            channels = entry['kwargs']['channels']
+            roles = entry['kwargs']['roles']
+            reason = entry['kwargs']['reason']
+            
+            member = int(data['member'])
+            lockdowns = self.lockdowns
+            try:
+                current = lockdowns[member]
+                current['reason'].append(entry['kwargs']['reason'])
+                if not current['channels']:
+                    current['channels'] = channels
+                    current['roles'] = roles
+            except KeyError:
+                lockdowns[member] = {
+                    'channels': channels,
+                    'roles': roles,
+                    'reason': [reason]
+                }
+            
                 
     @contextlib.asynccontextmanager
     async def safe_connection(self, timeout: Optional[float] = 10):
@@ -276,7 +301,7 @@ class DiscordBot(commands.Bot):
     
     async def propagate_lockdowns(self) -> None:
         async with self.safe_connection() as conn:
-            data = await conn.fetch('SELECT * FROM lockdowns WHERE expires IS NOT NULL AND expires IS NOT NONE AND expires > CURRENT_TIMESTAMP')
+            data = await conn.fetch('SELECT * FROM lockdowns WHERE expires IS NOT NULL AND expires > CURRENT_TIMESTAMP')
         
         didnt_have_parent = []
         for entry in data:
@@ -284,6 +309,7 @@ class DiscordBot(commands.Bot):
             if not (channels := kwargs.get('channels')):
                 didnt_have_parent.append(entry)
                 continue
+                
                 
             self.lockdowns[int(kwargs['member'])] = {
                 'channels': channels,
@@ -529,8 +555,8 @@ class Lockdown:
                     )
                 else:
                     await connection.execute(
-                        'INSERT INTO lockdowns (event, extra, expires, created, member) VALUES ($1, $2::jsonb, $3, $4, $5)',
-                        'lockdowns', {'kwargs': kwargs, 'args': []}, None, discord.utils.utcnow(), member.id
+                        'INSERT INTO lockdowns (event, extra, expires, member) VALUES ($1, $2::jsonb, $3, $4, $5)',
+                        'lockdowns', {'kwargs': kwargs, 'args': []}, None, member.id
                     )
         
         channels = []
@@ -562,8 +588,8 @@ class Lockdown:
                 )
             else:
                 await connection.execute(
-                    'INSERT INTO lockdowns (event, extra, expires, created, member) VALUES ($1, $2::jsonb, $3, $4, $5)',
-                    'lockdowns', {'kwargs': kwargs, 'args': []}, None, discord.utils.utcnow(), member.id
+                    'INSERT INTO lockdowns (event, extra, created, member) VALUES ($1, $2::jsonb, $3, $4, $5)',
+                    'lockdowns', {'kwargs': kwargs, 'args': []}, discord.utils.utcnow(), member.id
                 )
 
         lr = self.get_lockdown_role(member.guild)
