@@ -502,6 +502,15 @@ class Moderation(commands.Cog):
     async def on_mutes_timer_complete(self, timer: timer.Timer) -> None:
         await self.bot.wait_until_ready()
         
+        guild = self.bot.get_guild(constants.FURY_GUILD)
+        member = guild.get_member(timer.member) or await guild.fetch_member(timer.member)
+        for channel_id in timer.kwargs['channels']:
+            channel = guild.get_channel(channel_id)
+            overwrites = channel.overwrites
+            if overwrites.get(member):
+                overwrites[member].update(send_messages=True)
+                await channel.edit(overwrites=overwrites)
+        
         
 def setup(bot):
     return bot.add_cog(Moderation(bot))
