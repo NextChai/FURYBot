@@ -297,8 +297,10 @@ class DiscordBot(commands.Bot):
             return await ctx.send(embed=e)
     
     async def on_message(self, message: discord.Message) -> None:
-        if not message.guild:
+        if not message.guild or message.bot:
             return 
+        if message.channel.id == constants.MESSAGE_LOG_CHANNEL:
+            return
         
         if not hasattr(self, 'message_webhook'):
             partial = discord.Webhook.from_url(self.message_webhook_url, session=self.session, bot_token=self.http.token)
