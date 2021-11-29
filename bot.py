@@ -130,7 +130,7 @@ class DiscordBot(commands.Bot):
             roles = kwargs['roles']
             reason = kwargs['reason']
             
-            member = int(data['member'])
+            member = data['member']
             lockdowns = self.lockdowns
             try:
                 current = lockdowns[member]
