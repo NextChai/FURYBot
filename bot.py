@@ -519,7 +519,7 @@ class Lockdown:
                 )
             
         self.lockdowns[member.id] = {
-            'channels': [c.id for c in channels],
+            'channels': channels,
             'roles': [r.id for r in member.roles],
             'reason': [reason]
         }
