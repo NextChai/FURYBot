@@ -678,19 +678,6 @@ class Lockdown:
         )
         await self.send_to(member, embed=embed)
         return True
-    
-    async def on_lockdowns_timer_complete(self, timer: Timer) -> None:
-        await self.wait_until_ready() # type: ignore
-        
-        reason = Reasons.from_string(timer.kwargs['reason'])
-        member_id = timer.kwargs['member']
-        
-        guild = self.get_guild(constants.FURY_GUILD)
-        member = guild.get_member(member_id) or await guild.fetch_member(member_id)
-        await self.freedom(member, reason=reason)
-        
-    async def on_mutes(self, timer: Timer) -> None:
-        pass
 
          
 class SecurityMixin(Security, Lockdown):

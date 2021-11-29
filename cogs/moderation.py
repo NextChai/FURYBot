@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Optional
 import discord
 from discord.ext import commands
 
-from cogs.utils import time, constants
+from cogs.utils import time, timer, constants
 from cogs.utils.enums import Reasons
 from cogs.utils.errors import ProfanityFailure
 from cogs.utils.context import Context
@@ -486,6 +486,21 @@ class Moderation(commands.Cog):
                     'mutes', {'args': [], 'kwargs': {'roles': original_roles, 'channels': channels}}, 
                     None, member.id, ctx.created_at, ctx.author.id
                 )
+                
+    @commands.Cog.listener()
+    async def on_lockdowns_timer_complete(self, timer: timer.Timer) -> None:
+        await self.bot.wait_until_ready()
+        
+        reason = Reasons.from_string(timer.kwargs['reason'])
+        member_id = timer.kwargs['member']
+        
+        guild = self.bot.get_guild(constants.FURY_GUILD)
+        member = guild.get_member(member_id) or await guild.fetch_member(member_id)
+        await self.bot.freedom(member, reason=reason)
+        
+    @commands.Cog.listener()
+    async def on_mutes_timer_complete(self, timer: timer.Timer) -> None:
+        await self.bot.wait_until_ready()
         
         
 def setup(bot):
