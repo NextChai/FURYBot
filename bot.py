@@ -113,6 +113,9 @@ class DiscordBot(commands.Bot):
         self.lockdowns: Dict[int, Dict] = {} # Only used for local lockdowns 
         self.loop.create_task(self._propagate_lockdown_cache())
         
+        # Mutes
+        self.mute_timer: TimerHandler = TimerHandler(self, 'mutes')
+        
         for ext in initial_extensions:
             try:
                 self.load_extension(ext)
@@ -666,6 +669,9 @@ class Lockdown:
         guild = self.get_guild(constants.FURY_GUILD)
         member = guild.get_member(member_id) or await guild.fetch_member(member_id)
         await self.freedom(member, reason=reason)
+        
+    async def on_mutes(self, timer: Timer) -> None:
+        pass
 
          
 class SecurityMixin(Security, Lockdown):

@@ -52,6 +52,8 @@ class TimerHandler:
         self.name: str = name
         
         self.bot = bot
+        bot.loop.create_task(self.verify_timer())
+        
         self._have_data = asyncio.Event(loop=bot.loop)
         self._current_timer = None
         self._task = bot.loop.create_task(self.dispatch_timers())
@@ -59,6 +61,20 @@ class TimerHandler:
     @property
     def display_emoji(self) -> discord.PartialEmoji:
         return discord.PartialEmoji(name='\N{ALARM CLOCK}')
+    
+    async def verify_timer(self) -> None:
+        async with self.bot.safe_connection() as con:
+            await con.execute(f"""CREATE TABLE IF NOT EXISTS {self.name} (
+                id BIGSERIAL,
+                extra JSONB,
+                event TEXT,
+                created TIMESTAMP,
+                expires TIMESTAMP,
+                member BIGINT,
+                dispatched BOOLEAN,
+                moderator BIGINT,
+            )""")
+    
     
     def cog_unload(self):
         self._task.cancel()
