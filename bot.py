@@ -297,7 +297,7 @@ class DiscordBot(commands.Bot):
             return await ctx.send(embed=e)
     
     async def on_message(self, message: discord.Message) -> None:
-        if not message.guild or message.bot:
+        if not message.guild or message.author.bot:
             return 
         if message.channel.id == constants.MESSAGE_LOG_CHANNEL:
             return
