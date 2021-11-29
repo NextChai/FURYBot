@@ -655,6 +655,6 @@ class FuryBot(DiscordBot, SecurityMixin):
         self.dispatch('member_lockdown', member, reason)
         return await super().lockdown(member, reason=reason, time=time)
     
-    async def freedom(self, member: discord.Member) -> bool:
+    async def freedom(self, member: discord.Member, *, reason: Reasons) -> bool:
         self.dispatch('member_freedom', member)
-        return await super().freedom(member)
+        return await super().freedom(member, reason=reason)
