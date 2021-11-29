@@ -24,19 +24,6 @@ class Timer:
         self.dispatched: bool = record['dispatched']
         self.moderator: int = record['moderator']
 
-    @classmethod
-    def temporary(cls, *, member, expires, created, event, args, kwargs):
-        pseudo = {
-            'id': None,
-            'extra': { 'args': args, 'kwargs': kwargs },
-            'event': event,
-            'created': created,
-            'expires': expires,
-            'member': member,
-            'dispatched': None
-        }
-        return cls(record=pseudo)
-
     def __eq__(self, other):
         try:
             return self.id == other.id
@@ -154,7 +141,7 @@ class TimerHandler:
         
         Returns
         --------
-        :class:`Timer`
+        None
         """
         when, member, moderator, *args = args
 
@@ -172,7 +159,6 @@ class TimerHandler:
         when = when.astimezone(datetime.timezone.utc).replace(tzinfo=None)
         now = now.astimezone(datetime.timezone.utc).replace(tzinfo=None)
 
-        timer = Timer.temporary(member=member, event=self.name, args=args, kwargs=kwargs, expires=when, created=now)
         delta = (when - now).total_seconds()
 
         query = f"""INSERT INTO {self.name} (event, extra, expires, created, member, dispatched, moderator)
@@ -181,7 +167,6 @@ class TimerHandler:
                 """
 
         row = await connection.fetchrow(query, self.name, { 'args': args, 'kwargs': kwargs }, when, now, member, False, moderator)
-        timer.id = row[0]
 
         # only set the data check if it can be waited on
         if delta <= (86400 * 40): # 40 days
@@ -192,5 +177,3 @@ class TimerHandler:
             # cancel the task and re-run it
             self._task.cancel()
             self._task = self.bot.loop.create_task(self.dispatch_timers())
-
-        return timer
