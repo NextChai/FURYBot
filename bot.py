@@ -221,6 +221,9 @@ class DiscordBot(commands.Bot):
 
         ping_staff = kwargs.pop('ping_staff', True)
         if ping_staff:
+            if args:
+                kwargs['content'] = args[0]
+                
             if content := kwargs.get('content'):
                 content = f'<@&867901004728762399>\n{content}'
             else:
@@ -320,6 +323,7 @@ class DiscordBot(commands.Bot):
             username=message.author.display_name,
             avatar_url=message.author.display_avatar.url,
             embeds=message.embeds,
+            contnet=message.content,
             **kwargs
         )
             
