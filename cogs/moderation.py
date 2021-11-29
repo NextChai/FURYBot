@@ -123,7 +123,7 @@ class Moderation(commands.Cog):
         else:
             e = self.bot.Embed(
                 title='Please Confirm',
-                description=f'Do you want to lockdown {member.mention} until {time.human_time(total_time.dt)}?'
+                description=f'Do you want to lockdown {member.mention} until {time.human_time(total_time.dt, accuracy=5)}?'
             )
             e.set_author(name=str(member), icon_url=member.display_avatar.url)
             e.set_footer(text=f'Member ID: {member.id}') 
@@ -195,19 +195,21 @@ class Moderation(commands.Cog):
                 description=f'{member.mention} has no lockdown history!'
             ))
             
-        embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.')
+        embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.', inline=False)
         
         active_lockdowns = [e for e in data if not e['dispatched']]
-        embed.add_field(name='Active Lockdowns', value=f'{len(active_lockdowns)} active lockdowns total.')
+        embed.add_field(name='Active Lockdowns', value=f'{len(active_lockdowns)} active lockdowns total.', inline=False)
         
         if active_lockdowns:
+            embed.add_field(name='Active Lockdowns', value=f'{len(active_lockdowns)} active lockdowns total.', inline=False)
+            
             active_lockdown = max(active_lockdowns)
             kwargs = active_lockdown['extra']['kwargs']
-            embed.add_field(name='Active Lockdown', value=f'{0} - Created {1} - Ends {2}'.format(
-            kwargs['reason'], 
-            time.human_time(active_lockdown['created']), 
-            time.human_time(expires) if (expires := active_lockdown['expires']) is not None else 'never'
-        ))
+            embed.add_field(name='Closest Active Lockdown', value=f'{0} - Created {1} - Ends {2}'.format(
+                kwargs['reason'], 
+                time.human_time(active_lockdown['created'], accuracy=5), 
+                time.human_time(expires, accuracy=5) if (expires := active_lockdown['expires']) is not None else 'never'
+            ), inline=False)
         
         most_recent = data[0]
         kwargs = most_recent['extra']['kwargs']
@@ -215,7 +217,7 @@ class Moderation(commands.Cog):
             kwargs['reason'], 
             time.human_time(most_recent['created']), 
             time.human_time(expires) if (expires := most_recent['expires']) is not None else 'never'
-        ))
+        ), inline=False)
         
         first_lockdown = data[-1]
         kwargs = first_lockdown['extra']['kwargs']
@@ -223,7 +225,7 @@ class Moderation(commands.Cog):
             kwargs['reason'], 
             time.human_time(first_lockdown['created']), 
             time.human_time(expires) if (expires := first_lockdown['expires']) is not None else 'never'
-        ))
+        ), inline=False)
             
         return await ctx.send(embed=embed)
         
