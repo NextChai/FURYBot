@@ -551,7 +551,6 @@ class Lockdown:
             'reason': Reasons.type_to_string(reason),
             'channels': None,
             'roles': None,
-            'member': member.id
         }
         
         if member.id in self.lockdowns:
@@ -560,9 +559,8 @@ class Lockdown:
                 if time is not None:
                     await self.lockdown_timer.create_timer(
                         time,
-                        'lockdown',
                         member.id,
-                        kwargs.get('moderator', member.id),
+                        kwargs.get('moderator', None),
                         connection=connection,
                         **new_kwargs
                     )
