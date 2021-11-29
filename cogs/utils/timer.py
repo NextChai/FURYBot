@@ -1,226 +1,206 @@
-"""
-The MIT License (MIT)
-
-Copyright (c) 2020-present NextChai
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-"""
-from __future__ import annotations
-
-import logging
-import asyncio
-import async_timeout
 import datetime
-from typing import TYPE_CHECKING, Any, Optional, Type
+import asyncio
+import asyncpg
+from typing import TYPE_CHECKING
 
 import discord
+from discord.ext import commands
 
-from .db import Table, Row
+from . import time
+
 
 if TYPE_CHECKING:
     from bot import FuryBot
     
-log = logging.getLogger(__name__)
-    
-
-class TimerTable(Table, name='timers'):
-    def __init__(self) -> None:
-        super().__init__(keys=[
-            Row('created_at', 'TIMESTAMP'),
-            Row('expires_at', 'TIMESTAMP'),
-            Row('extra', 'JSONB'),
-            Row('member', 'BIGINT'),
-            Row('channel', 'BIGINT'),
-            Row('guild', 'BIGINT'),
-            Row('moderator', 'BIGINT'),
-            Row('id', 'BIGSERIAL'),
-        ])
-
-
-class TimerRow:
-    __slots__ = ('bot', 'created_at', 'expires_at', 'extra', 'member_id', 'channel_id', 'guild_id', 'moderator_id', 'id')
-    
-    def __init__(self, bot: FuryBot, **kwargs: Any) -> None:
-        self.bot: FuryBot = bot
-        
-        self.created_at: datetime.datetime = kwargs.pop('created_at')
-        self.expires_at: datetime.datetime = kwargs.pop('expires_at')
-        self.extra: dict = kwargs.pop('extra')
-        self.member_id: int = kwargs.pop('member')
-        self.channel_id: int = kwargs.pop('channel')
-        self.guild_id: int = kwargs.pop('guild')
-        self.moderator_id: int = kwargs.pop('moderator')
-        self.id: Optional[int] = kwargs.get('id')
-    
-    @property
-    def channel(self) -> Optional[discord.abc.GuildChannel]:
-        return self.bot.get_channel(self.channel_id)
-    
-    @property
-    def guild(self) -> Optional[discord.Guild]:
-        return self.bot.get_guild(self.guild)
-    
-    @property
-    def member(self) -> Optional[discord.Member]:
-        guild = self.guild
-        if not guild:
-            return None
-        
-        return guild.get_member(self.member_id)
-    
-    async def get_member(self) -> discord.Member:
-        member = self.member
-        if member:
-            return member
-        
-        guild = self.guild
-        if guild is None:
-            raise Exception('Guild was none!')
-        
-        member = await guild.fetch_member(self.member_id)
-        return member
-    
-        
-
 class Timer:
-    """Used to handle a "Timer". Will do operations based upon 
-    a time set within the database.
-    
-    We'll subclass this to handle different types of timers.
-    """
-    def __init__(self, table: Table, bot: FuryBot) -> None:
-        self.table: Table = table
+    __slots__ = ('args', 'kwargs', 'event', 'id', 'created_at', 'expires', 'member')
+
+    def __init__(self, *, record):
+        self.id = record['id']
+
+        extra = record['extra']
+        self.args = extra.get('args', [])
+        self.kwargs = extra.get('kwargs', {})
+        self.event = record['event']
+        self.created_at = record['created']
+        self.expires = record['expires']
+        self.member: int = record['member']
+
+    @classmethod
+    def temporary(cls, *, member, expires, created, event, args, kwargs):
+        pseudo = {
+            'id': None,
+            'extra': { 'args': args, 'kwargs': kwargs },
+            'event': event,
+            'created': created,
+            'expires': expires,
+            'member': member
+        }
+        return cls(record=pseudo)
+
+    def __eq__(self, other):
+        try:
+            return self.id == other.id
+        except AttributeError:
+            return False
+
+    def __hash__(self):
+        return hash(self.id)
+
+    @property
+    def human_delta(self):
+        return time.format_relative(self.created_at)
+
+    @property
+    def author_id(self):
+        if self.args:
+            return int(self.args[0])
+        return None
+
+    def __repr__(self):
+        return f'<Timer created={self.created_at} expires={self.expires} event={self.event}>'
+
+
+class TimerHandler:
+    def __init__(self, bot: FuryBot):
         self.bot: FuryBot = bot
-        bot.loop.create_task(self.create_table())
-        
-        self._event: asyncio.Event = asyncio.Event(loop=bot.loop)
-        self._task = bot.loop.create_task(self.send_events())
-        self._current: Optional[TimerRow] = None
-        
-    async def get_row(self, member: discord.Member) -> Optional[TimerRow]:
-        query = f"""
-            SELECT * FROM {self.table.qualified_name} 
-            WHERE member = $1;
-        """
-        async with self.bot.safe_connection() as connection:
-            data = await connection.fetchrow(query, member.id)
-            log.info(f'{self.table.qualified_name} - {data}')
-        
-        return TimerRow(self.bot, **data) if data else None
+        self._have_data = asyncio.Event(loop=bot.loop)
+        self._current_timer = None
+        self._task = bot.loop.create_task(self.dispatch_timers())
     
-    async def create_table(self) -> None:
-        async with self.bot.safe_connection() as connection:
-            query = self.table.create_string()
-            exc = await connection.execute(query)
-            log.info(f'{self.table.qualified_name} - {exc}')
+    @property
+    def display_emoji(self) -> discord.PartialEmoji:
+        return discord.PartialEmoji(name='\N{ALARM CLOCK}')
+    
+    def cog_unload(self):
+        self._task.cancel()
+        
+    async def cog_command_error(self, ctx, error):
+        if isinstance(error, commands.BadArgument):
+            await ctx.send(error)
+        if isinstance(error, commands.TooManyArguments):
+            await ctx.send(f'You called the {ctx.command.name} command with too many arguments.')
             
-    async def insert_row(self, **kwargs) -> Type[TimerRow]:
-        query = f"""
-            INSERT INTO {self.table.qualified_name} (created_at, expires_at, extra, member, channel, guild, moderator) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7);
-        """
-        
-        timer = TimerRow(self.bot, **kwargs)
-        log.info(f'Row getting inserted for {timer.member_id}')
-        
-        # Remove timezone information since the database does not deal with it
-        timer.created_at = timer.created_at.astimezone(datetime.timezone.utc).replace(tzinfo=None)
-        timer.expires_at = timer.expires_at.astimezone(datetime.timezone.utc).replace(tzinfo=None)
-        delta = (timer.created_at - timer.expires_at).total_seconds()
-        
-        async with self.bot.safe_connection() as connection:
-            await connection.fetchrow(
-                query,
-                timer.created_at,
-                timer.expires_at,
-                timer.extra,
-                timer.member_id,
-                timer.channel_id,
-                timer.guild_id,
-                timer.moderator_id
-            )
-        
-        # No matter what happens here,
-        # we need to re-call send_events to check if this new packet is either:
-        # 1. The first packet in the queue
-        # 2. The closest packet in the queue
-        
-        # only set the data check if it can be waited on
-        if delta <= (86400 * 40): # 40 days
-            log.info(f'Setting event because we can wait for it - {delta}')
-            self._event.set()
-            
-        # check if this timer is earlier than our currently run timer
-        if self._current and timer.expires_at < self._current.expires_at:
-            log.info(f'Setting event because we are earlier than the current timer')
-            self._task.cancel()
-            self._task = self.bot.loop.create_task(self.send_events())
-        
-        return TimerRow
+    async def get_active_timer(self, *, connection=None, days=7):
+        query = "SELECT * FROM lockdowns WHERE expires < (CURRENT_DATE + $1::interval) ORDER BY expires LIMIT 1;"
+        con = connection or self.bot.pool
+
+        record = await con.fetchrow(query, datetime.timedelta(days=days))
+        return Timer(record=record) if record else None
     
-    async def get_expired_row(self) -> Optional[TimerRow]:
-        async with self.bot.safe_connection() as connection:
-            query = f'SELECT * FROM {self.table.qualified_name} WHERE expires < (CURRENT_DATE + $1::interval) ORDER BY expires LIMIT 1;'
-            data = await connection.fetchrow(query, datetime.timedelta(days=40))
-            log.info(f'Found data from get_expired_row - {data}')
+    async def wait_for_active_timers(self, *, connection=None, days=7):
+        async with self.bot.safe_connection() as con:
+            timer = await self.get_active_timer(connection=con, days=days)
+            if timer is not None:
+                self._have_data.set()
+                return timer
+
+            self._have_data.clear()
+            self._current_timer = None
+            await self._have_data.wait()
+            return await self.get_active_timer(connection=con, days=days)
         
-        return TimerRow(self.bot, **data) if data else None
+    async def call_timer(self, timer):
+        # delete the timer
+        query = "DELETE FROM lockdowns WHERE id=$1;"
+        await self.bot.pool.execute(query, timer.id)
+
+        # dispatch the event
+        event_name = f'{timer.event}_timer_complete'
+        self.bot.dispatch(event_name, timer)
     
-    async def get_closest_row(self):
-        row = await self.get_expired_row()
-        
-        if row is not None:
-            self._event.set()
-            return row
-            
-        self._event.clear()
-        self._current = None
-        await self._event.wait()
-        return await self.get_expired_row()
-    
-    async def distrubute_event(self, row: TimerRow) -> None:
-        async with self.bot.safe_connection() as connection:
-            query = f'DELETE FROM {self.table.qualified_name} WHERE id = $1;'
-            await connection.execute(query, row.id)
-        
-        member = await row.get_member()
-        return await self.dispatch(member, row)
-    
-    async def send_events(self) -> None:
-        await self.bot.wait_until_ready()
-        
+    async def dispatch_timers(self):
         try:
             while not self.bot.is_closed():
-                row = self._current = await self.get_closest_row()
+                # can only asyncio.sleep for up to ~48 days reliably
+                # so we're gonna cap it off at 40 days
+                # see: http://bugs.python.org/issue20493
+                timer = self._current_timer = await self.wait_for_active_timers(days=40)
                 now = datetime.datetime.utcnow()
-                
-                if row.expires_at > now: # type: ignore
-                    sleeptime = (row.expires_at - now).total_seconds() # type: ignore
-                    log.info(f'Waiting on next event - {sleeptime}')
-                    
-                    await asyncio.sleep(sleeptime)
-                
-                await self.distrubute_event(row) # type: ignore
-        except discord.ConnectionClosed:
+
+                if timer.expires >= now: # type: ignore
+                    to_sleep = (timer.expires - now).total_seconds() # type: ignore
+                    await asyncio.sleep(to_sleep)
+
+                await self.call_timer(timer)
+        except asyncio.CancelledError:
+            raise
+        except (OSError, discord.ConnectionClosed, asyncpg.PostgresConnectionError): 
             self._task.cancel()
-            self._task = self.bot.loop.create_task(self.send_events())   
+            self._task = self.bot.loop.create_task(self.dispatch_timers())
+
+    async def short_timer_optimisation(self, seconds, timer):
+        await asyncio.sleep(seconds)
+        event_name = f'{timer.event}_timer_complete'
+        self.bot.dispatch(event_name, timer)
+        
+    async def create_timer(self, *args, **kwargs):
+        r"""Creates a timer.
+        
+        Parameters
+        -----------
+        when: datetime.datetime
+            When the timer should fire.
+        event: str
+            The name of the event to trigger.
+            Will transform to 'on_{event}_timer_complete'.
+        *args
+            Arguments to pass to the event
+        **kwargs
+            Keyword arguments to pass to the event
+        connection: asyncpg.Connection
+            Special keyword-only argument to use a specific connection
+            for the DB request.
+        created: datetime.datetime
+            Special keyword-only argument to use as the creation time.
+            Should make the timedeltas a bit more consistent.
+        Note
+        ------
+        Arguments and keyword arguments must be JSON serialisable.
+        
+        Returns
+        --------
+        :class:`Timer`
+        """
+        when, event, member, *args = args
+
+        try:
+            connection = kwargs.pop('connection')
+        except KeyError:
+            connection = self.bot.pool
+
+        try:
+            now = kwargs.pop('created')
+        except KeyError:
+            now = discord.utils.utcnow()
             
-    async def dispatch(self, member: discord.Member, row: TimerRow) -> Any:
-        raise NotImplementedError()
-    
+        # Remove timezone information since the database does not deal with it
+        when = when.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        now = now.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+
+        timer = Timer.temporary(member=member, event=event, args=args, kwargs=kwargs, expires=when, created=now)
+        delta = (when - now).total_seconds()
+        if delta <= 60:
+            # a shortcut for small timers
+            self.bot.loop.create_task(self.short_timer_optimisation(delta, timer))
+            return timer
+
+        query = """INSERT INTO reminders (event, extra, expires, created,)
+                   VALUES ($1, $2::jsonb, $3, $4)
+                   RETURNING id;
+                """
+
+        row = await connection.fetchrow(query, event, { 'args': args, 'kwargs': kwargs }, when, now)
+        timer.id = row[0]
+
+        # only set the data check if it can be waited on
+        if delta <= (86400 * 40): # 40 days
+            self._have_data.set()
+
+        # check if this timer is earlier than our currently run timer
+        if self._current_timer and when < self._current_timer.expires:
+            # cancel the task and re-run it
+            self._task.cancel()
+            self._task = self.bot.loop.create_task(self.dispatch_timers())
+
+        return timer

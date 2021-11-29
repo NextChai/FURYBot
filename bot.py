@@ -31,9 +31,10 @@ import traceback
 import functools
 import datetime
 import contextlib
-from typing import TYPE_CHECKING, Callable, List, Dict, Optional, Union, Any
+from typing import TYPE_CHECKING, Callable, List, Dict, Optional, Set, Union, Any
 
 import aiohttp
+from asyncio.subprocess import PIPE
 
 import discord
 from discord.ext import commands
@@ -44,8 +45,7 @@ from cogs.utils.enums import *
 from cogs.utils import copy_doc
 from cogs.utils import context, constants, checks
 from cogs.utils.profanity_filter import CustomProfanity
-from cogs.utils.db import Table, Row
-from cogs.utils.timer import Timer, TimerRow
+from cogs.utils.timer import TimerHandler, Timer
 
 if TYPE_CHECKING:
     import asyncpg
@@ -56,7 +56,6 @@ __all__ = (
     'Lockdown',
     'SecurityMixin',
     'FuryBot',
-    'LockdownTimer'
 )
 
 log = logging.getLogger(__name__)
@@ -78,44 +77,6 @@ def Embed(**kwargs) -> discord.Embed:
     """
     kwargs['color'] = discord.Color.blue()
     return discord.Embed(**kwargs)
-
-
-class LockdownTable(Table, name='lockdowns'):
-    def __init__(self) -> None:
-        super().__init__(keys=[
-            Row('created_at', 'TIMESTAMP'),
-            Row('expires_at', 'TIMESTAMP'),
-            Row('extra', 'JSONB'),
-            Row('member', 'BIGINT'),
-            Row('channel', 'BIGINT'),
-            Row('guild', 'BIGINT'),
-            Row('moderator', 'BIGINT'),
-            Row('id', 'BIGSERIAL'),
-        ])
-    
-        
-class MuteTable(Table, name='mutes'):
-    def __init__(self) -> None:
-        super().__init__(keys=[
-            Row('created_at', 'TIMESTAMP'),
-            Row('expires_at', 'TIMESTAMP'),
-            Row('extra', 'JSONB'),
-            Row('member', 'BIGINT'),
-            Row('channel', 'BIGINT'),
-            Row('guild', 'BIGINT'),
-            Row('moderator', 'BIGINT'),
-            Row('id', 'BIGSERIAL'),
-        ])
-        
-
-class LockdownTimer(Timer):
-    def __init__(self, bot: FuryBot) -> None:
-        super().__init__(LockdownTable(), bot)
-    
-    async def dispatch(self, member: discord.Member, row: TimerRow) -> Any:
-        return await self.bot.freedom(member, row=row)
-    
-    
 
 
 class DiscordBot(commands.Bot):
@@ -147,8 +108,9 @@ class DiscordBot(commands.Bot):
         self.Embed: discord.Embed = Embed
         self.debug: bool = True
         
-        self.lockdown_timer: Timer = LockdownTimer(self) # type: ignore
-        # self.mute_timer: Timer = Timer(MuteTable(), self) 
+        # Lockdown timer
+        self.lockdown_timer: TimerHandler = TimerHandler(self)
+        self.lockdowns: Dict[int, Dict] = {}
         
         for ext in initial_extensions:
             try:
@@ -456,8 +418,10 @@ class Lockdown:
         The locked out members and their corresponding data.
     """
     if TYPE_CHECKING:
-        lockdown_timer: Timer
         safe_connection: Callable
+        lockdown_timer: TimerHandler
+        lockdowns: Dict[int, Dict]
+        get_guild: Callable
     
     @staticmethod
     def get_lockdown_role(guild: discord.Guild):
@@ -523,11 +487,8 @@ class Lockdown:
         """
         log.info(f'Coro lockdown was called on {member} for reason {Reasons.type_to_string(reason)}')
         
-        # Let's check if the member is already locked.
-        async with self.safe_connection() as connection:
-            data = await connection.fetchrow('SELECT * FROM lockdowns WHERE member = $1', member.id)
-            if data: # The member is already locked
-                return False
+        if member.id in self.lockdowns:
+            return False
         
         channels = []
         for channel in member.guild.channels: # Remove any special team creation. EX: rocket-league-1
@@ -537,20 +498,26 @@ class Lockdown:
                 await channel.edit(overwrites=overwrites)
                 channels.append(channel.id)
         
-        await self.lockdown_timer.insert_row(
-            created_at=datetime.datetime.utcnow(),
-            expires_at=time or datetime.datetime(year=2999, month=1, day=1),
-            extra={
-                'roles': [r.id for r in member.roles], 
-                'reason': Reasons.type_to_string(reason), 
-                'channels': channels
-            },
-            member=member.id,
-            channel=1,
-            guild=757664675864248360,
-            moderator=1
-        )
+        if time is not None:
+            async with self.safe_connection() as connection:
+                await self.lockdown_timer.create_timer(
+                    time,
+                    'lockdown',
+                    member.id,
+                    connection=connection,
+                    channels=[c.id for c in channels],
+                    roles=[r.id for r in member.roles],
+                    member=member.id,
+                    reason=Reasons.type_to_string(reason)
+                )
         
+        # We'll insert this regardless of time because we need it for freedom
+        self.lockdowns[member.id] = {
+            'channels': [c.id for c in channels],
+            'roles': [r.id for r in member.roles],
+            'reason': [reason]
+        }
+    
         lr = self.get_lockdown_role(member.guild)
 
         try:
@@ -559,7 +526,6 @@ class Lockdown:
             # We cant do this to this person, re-wind that we did
             async with self.safe_connection() as connection:
                 await connection.execute('DELETE FROM lockdowns WHERE member = $1', member.id)
-            
             return False
         
         e = Embed(
@@ -574,7 +540,7 @@ class Lockdown:
         await self.send_to(member, embed=e)
         return True
         
-    async def freedom(self, member: discord.Member, *, row: Optional[TimerRow] = None) -> bool:
+    async def freedom(self, member: discord.Member, *, reason: Reasons) -> bool:
         """Removes a users lockdown state and restores their original roles.
         
         .. note::   
@@ -594,41 +560,49 @@ class Lockdown:
             Whether or not the unlock was successful.
         """
         log.info(f'Coro freedom called on {member}')
+      
+        if member.id not in self.lockdowns:
+            return False
         
-        if row is None:
-            # Get the current row and dispatch it within discord
-            row = await self.lockdown_timer.get_row(member)
-            if not row:
-                return False
+        guild = self.get_guild(constants.FURY_GUILD)
+        data = self.lockdowns[member.id]
+        reasons = data['reason']
+        try:
+            reasons.remove(reason)
+        except Exception:
+            pass
         
-        async with self.safe_connection() as connection:
-            await connection.execute('DELETE FROM lockdowns WHERE member = $1', member.id)
+        if reasons: # The member has been locked down for more than 1 reason
+            return False
         
-        channels = row.extra['channels']
-        for channel in member.guild.channels:
-            if channel in channels:
-                overwrites = channel.overwrites
+        channels = data['channels']
+        roles = data['roles']
+        
+        for channel_id in channels:
+            channel = guild.get_channel(channel_id)
+            overwrites = channel.overwrites
+            if overwrites.get(member):
                 overwrites[member].update(view_channel=True)
                 await channel.edit(overwrites=overwrites)
-    
-        roles = []
-        for id in row.extra['roles']:
-            role = member.guild.get_role(id) or discord.utils.get(member.guild.roles, id=id)
-            if role is not None:
-                roles.append(role)
-
-        if roles:
-            await member.edit(roles=roles, reason='Member freedom.')
+                
+        clean_roles = [guild.get_role(id) for id in roles]
+        await member.edit(roles=clean_roles)
         
-        e = Embed(
-            title='Oh yea!',
-            description=f'You have been unlocked from {member.guild.name}!'
+        embed = Embed(
+            title='Yay!',
+            description='Your lockdown has ended! Your access to the server has been revoked.'
         )
-        e.set_author(name=str(member), icon_url=member.display_avatar.url)
-        e.set_footer(text=f'Member ID: {member.id}') 
-        
-        await self.send_to(member, embed=e)
+        await self.send_to(member, embed=embed)
         return True
+    
+    async def on_lockdown_timer_complete(self, timer: Timer) -> None:
+        print("Lockdown was revoked!")
+        print(timer.args)
+        print(timer.kwargs)
+        
+        # return await self.freedom(timer)
+
+        
         
          
 class SecurityMixin(Security, Lockdown):
@@ -681,6 +655,6 @@ class FuryBot(DiscordBot, SecurityMixin):
         self.dispatch('member_lockdown', member, reason)
         return await super().lockdown(member, reason=reason, time=time)
     
-    async def freedom(self, member: discord.Member, *, row: Optional[TimerRow] = None) -> bool:
+    async def freedom(self, member: discord.Member) -> bool:
         self.dispatch('member_freedom', member)
         return await super().freedom(member)
