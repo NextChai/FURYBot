@@ -500,7 +500,7 @@ class Moderation(commands.Cog):
                 )
             else:
                 rec = await conn.execute(
-                    'INSERT INTO mutes (event, extra, expires, member, created, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)', 
+                    'INSERT INTO mutes (event, extra, expires, member, created, moderator) VALUES ($1, $2::jsonb, $3, $4, $5, $6)', 
                     'mutes', {'args': [], 'kwargs': {'roles': original_roles, 'channels': channels}}, 
                     None, member.id, ctx.created_at, ctx.author.id
                 )
