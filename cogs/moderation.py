@@ -593,7 +593,7 @@ class Moderation(commands.Cog):
         await ctx.defer(ephemeral=True)
         
         async with self.bot.safe_connection() as conn:
-            data = await conn.fetchrow('SELECT * FROM mutes WHERE member = $1 ORDER BY created', member.id)
+            data = await conn.fetch('SELECT * FROM mutes WHERE member = $1 ORDER by created', member.id)
         
         if not data:
             return await ctx.send(embed=self.bot.Embed(
@@ -603,7 +603,6 @@ class Moderation(commands.Cog):
         
         embed = self.bot.Embed(title='Mute History', description=f'{member.mention} has a mute history.')
         for index, entry in enumerate(data):
-            print(entry)
             new = timer.Timer(record=entry)
             
             fmt = f"**Reason**: {new.kwargs['reason']}\n" \
