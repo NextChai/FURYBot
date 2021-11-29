@@ -182,7 +182,7 @@ class TimerHandler:
             return timer
 
         query = """INSERT INTO lockdowns (event, extra, expires, created, member)
-                   VALUES ($1, $2::jsonb, $3, $4)
+                   VALUES ($1, $2::jsonb, $3, $4, $5)
                    RETURNING id;
                 """
 
