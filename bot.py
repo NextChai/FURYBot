@@ -276,15 +276,10 @@ class DiscordBot(commands.Bot):
     
     async def propagate_lockdowns(self) -> None:
         async with self.safe_connection() as conn:
-            data = await conn.fetch('SELECT * FROM lockdowns')
+            data = await conn.fetch('SELECT * FROM lockdowns WHERE expires IS NOT NULL AND expires > CURRENT_TIME')
         
         didnt_have_parent = []
         for entry in data:
-            if not (expires := entry['expires']):
-                continue
-            if expires < discord.utils.utcnow():
-                continue
-            
             kwargs = entry['extra']['kwargs']
             if not (channels := kwargs.get('channels')):
                 didnt_have_parent.append(entry)
@@ -536,7 +531,7 @@ class Lockdown:
                 else:
                     await connection.execute(
                         'INSERT INTO lockdowns (event, extra, expires, created, member) VALUES ($1, $2::jsonb, $3, $4, $5)',
-                        'lockdowns', {'kwargs': kwargs, 'args': []}, None, None, member.id
+                        'lockdowns', {'kwargs': kwargs, 'args': []}, None, discord.utils.utcnow(), member.id
                     )
         
         channels = []
@@ -547,8 +542,16 @@ class Lockdown:
                 await channel.edit(overwrites=overwrites)
                 channels.append(channel.id)
         
+        roles = [r.id for r in member.roles]
+        
         kwargs['channels'] = channels
-        kwargs['roles'] = [r.id for r in member.roles]
+        kwargs['roles'] = roles
+        
+        self.lockdowns[member.id] = {
+            'reason': reason,
+            'channels': channels,
+            'roles': roles
+        }
         
         async with self.safe_connection() as connection:
             if time is not None:
@@ -561,7 +564,7 @@ class Lockdown:
             else:
                 await connection.execute(
                     'INSERT INTO lockdowns (event, extra, expires, created, member) VALUES ($1, $2::jsonb, $3, $4, $5)',
-                    'lockdowns', {'kwargs': kwargs, 'args': []}, None, None, member.id
+                    'lockdowns', {'kwargs': kwargs, 'args': []}, None, discord.utils.utcnow(), member.id
                 )
 
         lr = self.get_lockdown_role(member.guild)

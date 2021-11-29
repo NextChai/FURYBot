@@ -185,30 +185,29 @@ class Moderation(commands.Cog):
                 description=f'{member.mention} is not locked down.'
             ))
             
-        lockdown = self.bot.lockdowns[member.id]
         embed = self.bot.Embed(
             title=f'Lockdown information on {member}',
             description=f"Here's all the lockdown info I could find on {member.mention}.\n\n"
         )
-        embed.description += '**Role(s) Lost:**\n{0}\n\n'.format(', '.join([f'<@&{id}>' for id in lockdown['roles']]))
-        embed.description += '**Channel(s) Affected:**\n{0}\n\n'.format(', '.join([f'<#{c}>' for c in lockdown['channels']]))
-            
+        
         async with self.bot.safe_connection() as conn:
-            data = await conn.fetch('SELECT * FROM lockdowns WHERE member = $1', member.id)
-        
-        database_reasons = []
-        for entry in data:
-            kwargs = entry['extra']['kwargs']
-            reason = kwargs['reason']
-            expires = time.human_time(kwargs['expires'])
-            created = time.human_time(kwargs['created'])
-            database_reasons.append(reason)
+            data = await conn.fetch('SELECT * FROM lockdowns WHERE member = $1 AND expires > CURRENT_TIME AND expires ORDER BY expires', member.id)
             
-            embed.add_field(name='Reason (with timer)', value=f'{reason} - Expires: {time.human_time(expires)} - Created: {time.human_time(created)}\n')
+        embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.')
         
-        infinite_reasons = [reason for reason in lockdown['reason'] if Reasons.type_to_string(reason) not in database_reasons]
-        for entry in infinite_reasons:
-            embed.add_field(name='Reason', value=Reasons.type_to_string(entry))
+        most_recent = data[0]
+        embed.add_field(name='Most Recent Lockdown', value=f'{0} - Created {1} - Ends {2}'.format(
+            most_recent['kwargs']['reason'], 
+            time.human_time(most_recent['created']), 
+            time.human_time(expires) if (expires := most_recent['expires']) is not None else 'never'
+        ))
+        
+        first_lockdown = data[-1]
+        embed.add_field(name='First Lockdown', value=f'{0} - Created {1} - Ends {2}'.format(
+            most_recent['kwargs']['reason'], 
+            time.human_time(first_lockdown['created']), 
+            time.human_time(expires) if (expires := first_lockdown['expires']) is not None else 'never'
+        ))
             
         return await ctx.send(embed=embed)
         
