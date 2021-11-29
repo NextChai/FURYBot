@@ -80,7 +80,7 @@ class TimerHandler:
             await ctx.send(f'You called the {ctx.command.name} command with too many arguments.')
             
     async def get_active_timer(self, *, connection=None, days=7):
-        query = f"SELECT * FROM {self.name} WHERE expires < (CURRENT_DATE + $1::interval) ORDER BY expires LIMIT 1;"
+        query = f"SELECT * FROM {self.name} WHERE expires < (CURRENT_DATE + $1::interval) AND expires IS NOT NULL ORDER BY expires LIMIT 1;"
         con = connection or self.bot.pool
 
         record = await con.fetchrow(query, datetime.timedelta(days=days))
@@ -99,11 +99,6 @@ class TimerHandler:
             return await self.get_active_timer(connection=con, days=days)
         
     async def call_timer(self, timer):
-        # delete the timer
-        query = f"DELETE FROM {self.name} WHERE id=$1;"
-        await self.bot.pool.execute(query, timer.id)
-
-        # dispatch the event
         event_name = f'{timer.event}_timer_complete'
         self.bot.dispatch(event_name, timer)
     

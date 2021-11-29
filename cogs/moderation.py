@@ -183,7 +183,7 @@ class Moderation(commands.Cog):
                 description=f'{member.mention} is not locked down.'
             ))
             
-        lockdown = self.lockdowns[member.id]
+        lockdown = self.bot.lockdowns[member.id]
         embed = self.bot.Embed(
             title=f'Lockdown information on {member}',
             description=f"Here's all the lockdown info I could find on {member.mention}.\n\n"

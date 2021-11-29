@@ -509,19 +509,28 @@ class Lockdown:
         """
         log.info(f'Coro lockdown was called on {member} for reason {Reasons.type_to_string(reason)}')
         
+        kwargs = {
+            'reason': Reasons.type_to_string(reason),
+            'channels': None,
+            'roles': None,
+            'member': member.id
+        }
+        
         if member.id in self.lockdowns:
             self.lockdowns[member.id]['reason'].append(reason)
-            if time is not None:
-                async with self.safe_connection() as connection:
+            async with self.safe_connection() as connection:
+                if time is not None:
                     return await self.lockdown_timer.create_timer(
                         time,
                         'lockdown',
                         member.id,
                         connection=connection,
-                        member=member.id, # Gets passed twice so we can get it from the event later
-                        reason=Reasons.type_to_string(reason),
-                        channels=None,
-                        roles=None
+                        **kwargs
+                    )
+                else:
+                    await connection.execute(
+                        'INSERT INTO lockdowns (event, extra, expires, created, member) VALUES ($1, $2::jsonb, $3, $4, $5)',
+                        'lockdowns', {'kwargs': kwargs, 'args': []}, None, None, member.id
                     )
         
         channels = []
@@ -532,34 +541,28 @@ class Lockdown:
                 await channel.edit(overwrites=overwrites)
                 channels.append(channel.id)
         
-        roles = [r.id for r in member.roles]
+        kwargs['channels'] = channels
+        kwargs['roles'] = [r.id for r in member.roles]
         
-        if time is not None:
-            async with self.safe_connection() as connection:
+        async with self.safe_connection() as connection:
+            if time is not None:
                 await self.lockdown_timer.create_timer(
                     time,
                     member.id,
                     connection=connection,
-                    member=member.id,
-                    reason=Reasons.type_to_string(reason),
-                    channels=channels,
-                    roles=roles,
+                    **kwargs
                 )
-            
-        self.lockdowns[member.id] = {
-            'channels': channels,
-            'roles': roles,
-            'reason': [reason]
-        }
-    
+            else:
+                await connection.execute(
+                    'INSERT INTO lockdowns (event, extra, expires, created, member) VALUES ($1, $2::jsonb, $3, $4, $5)',
+                    'lockdowns', {'kwargs': kwargs, 'args': []}, None, None, member.id
+                )
+
         lr = self.get_lockdown_role(member.guild)
 
         try:
             await member.edit(roles=[lr], reason='Member is getting locked down.')
         except discord.Forbidden:
-            # We cant do this to this person, re-wind that we did
-            async with self.safe_connection() as connection:
-                await connection.execute('DELETE FROM lockdowns WHERE member = $1', member.id)
             return False
         
         e = Embed(
@@ -608,6 +611,7 @@ class Lockdown:
         
         if reasons: # The member has been locked down for more than 1 reason
             return False
+        self.lockdowns.pop(member.id, None)
         
         channels = data['channels']
         roles = data['roles']
@@ -618,7 +622,7 @@ class Lockdown:
             if overwrites.get(member):
                 overwrites[member].update(view_channel=True)
                 await channel.edit(overwrites=overwrites)
-                
+        
         clean_roles = [guild.get_role(id) for id in roles]
         await member.edit(roles=clean_roles)
         
@@ -635,7 +639,6 @@ class Lockdown:
         
         guild = self.get_guild(constants.FURY_GUILD)
         member = guild.get_member(member_id) or await guild.fetch_member(member_id)
-        
         await self.freedom(member, reason=reason)
 
          
