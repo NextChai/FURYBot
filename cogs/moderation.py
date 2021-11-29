@@ -486,7 +486,7 @@ class Moderation(commands.Cog):
     
         async with self.bot.safe_connection() as conn:
             if until:
-                rec = await self.bot.mute_timer.create_timer(
+                new = await self.bot.mute_timer.create_timer(
                     until.dt,
                     member.id,
                     ctx.author.id,
@@ -502,8 +502,8 @@ class Moderation(commands.Cog):
                     'mutes', {'args': [], 'kwargs': {'roles': original_roles, 'channels': channels}}, 
                     None, member.id, ctx.created_at, ctx.author.id
                 )
+                new = timer.Timer(record=rec)
         
-        new = timer.Timer(record=rec)
         embed = self.bot.Embed(title='Muted', description=f'{member.mention} has been muted.')
         embed.add_field(name='Reason', value=reason)
         embed.add_field(name='Expires', value=time.human_time(new.expires) if new.expires else "Does not expire.")
