@@ -138,7 +138,7 @@ class Moderation(commands.Cog):
         description='The reason for locking the member.',
         choices=[commands.OptionChoice(name=Reasons.type_to_string(value), value=name) for name, value in Reasons.__members__.items()]
     )
-    @commands.describe('datetime', description='A specific date you want to unlock them.')
+    @commands.describe('total_time', description='A specific date you want to unlock them.')
     async def lockdown_member(
         self, 
         ctx: Context, 
