@@ -292,11 +292,30 @@ class Moderation(commands.Cog):
         
     @commands.slash(
         name='sub',
-        description='Give a sub access to a channel.'
+        description='Give a sub access to a channel.',
+        options=[
+            commands.Option(
+                name='member',
+                description='The member to give sub access to.',
+                type=commands.OptionType.member
+            ),
+            commands.Option(
+                name='channel',
+                description='The type of channel',
+                type=commands.OptionType.channel,
+                channels=[
+                    commands.ChannelType.text_channel, 
+                    commands.ChannelType.voice_channel,
+                    commands.ChannelType.category
+                ]
+            ),
+            commands.Option(
+                name='permission',
+                description='The permission to access or deny.',
+                type=commands.OptionType.boolean
+            )
+        ]
     )
-    @commands.describe('member', description='The member to give access to.')
-    @commands.describe('channel', description='The channel to give access to.')
-    @commands.describe('permission', description='Whether to allow or deny access.')
     @commands.check_any(is_captain(), is_coach(), is_mod())
     async def sub(
         self, 
@@ -305,14 +324,13 @@ class Moderation(commands.Cog):
         channel: discord.TextChannel, 
         permission: bool
     ) -> None:
-        value = True if permission == 'allow' else False
         kwargs = {}
-        if not value:
+        if not permission:
             kwargs['overwrite'] = None
         else:
             kwargs['view_channel'] = True
         
-        formatted = 'given' if value is True else 'removed'
+        formatted = 'given' if permission is True else 'removed'
         await channel.set_permissions(member, reason=f'Invoked by {ctx.author}', **kwargs)
         return await ctx.send(f'I have {formatted} {member.mention} the permission to view the channel {channel.mention}')
 
