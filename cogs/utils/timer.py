@@ -72,7 +72,7 @@ class TimerHandler:
                 expires TIMESTAMP,
                 member BIGINT,
                 dispatched BOOLEAN,
-                moderator BIGINT,
+                moderator BIGINT
             )""")
     
     
