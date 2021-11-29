@@ -125,15 +125,16 @@ class DiscordBot(commands.Bot):
             data = await conn.fetch('SELECT * FROM lockdowns WHERE expires IS NOT NULL')
         
         for entry in data:
-            channels = entry['kwargs']['channels']
-            roles = entry['kwargs']['roles']
-            reason = entry['kwargs']['reason']
+            kwargs = entry['extra']['kwargs']
+            channels = kwargs['channels']
+            roles = kwargs['roles']
+            reason = kwargs['reason']
             
             member = int(data['member'])
             lockdowns = self.lockdowns
             try:
                 current = lockdowns[member]
-                current['reason'].append(entry['kwargs']['reason'])
+                current['reason'].append(kwargs['reason'])
                 if not current['channels']:
                     current['channels'] = channels
                     current['roles'] = roles
