@@ -7,9 +7,6 @@ import discord
 from discord.ext import commands
 
 from . import time
-
-if TYPE_CHECKING:
-    from bot import FuryBot
     
 class Timer:
     __slots__ = ('args', 'kwargs', 'event', 'id', 'created_at', 'expires',  'member')
@@ -61,8 +58,8 @@ class Timer:
 
 
 class TimerHandler:
-    def __init__(self, bot: FuryBot):
-        self.bot: FuryBot = bot
+    def __init__(self, bot):
+        self.bot = bot
         self._have_data = asyncio.Event(loop=bot.loop)
         self._current_timer = None
         self._task = bot.loop.create_task(self.dispatch_timers())
