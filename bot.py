@@ -276,7 +276,7 @@ class DiscordBot(commands.Bot):
     
     async def propagate_lockdowns(self) -> None:
         async with self.safe_connection() as conn:
-            data = await conn.fetch('SELECT * FROM lockdowns WHERE expires IS NOT NULL AND expires > CURRENT_TIMESTAMP')
+            data = await conn.fetch('SELECT * FROM lockdowns WHERE expires IS NOT NULL AND expires IS NOT NONE AND expires > CURRENT_TIMESTAMP')
         
         didnt_have_parent = []
         for entry in data:
@@ -284,7 +284,6 @@ class DiscordBot(commands.Bot):
             if not (channels := kwargs.get('channels')):
                 didnt_have_parent.append(entry)
                 continue
-                
                 
             self.lockdowns[int(kwargs['member'])] = {
                 'channels': channels,
