@@ -81,7 +81,6 @@ class Moderation(commands.Cog):
             or constants.COACH_ROLE in roles
             or constants.BYPASS_FURY in roles
         )
-    
         
     @commands.group(
         name='lockdown',

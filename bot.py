@@ -111,6 +111,7 @@ class DiscordBot(commands.Bot):
         # Lockdown timer
         self.lockdown_timer: TimerHandler = TimerHandler(self, 'lockdowns')
         self.lockdowns: Dict[int, Dict] = {}
+        self.loop.create_task(self.propagate_lockdowns())
         
         for ext in initial_extensions:
             try:
@@ -272,7 +273,28 @@ class DiscordBot(commands.Bot):
         e.set_footer(text=f'Member ID: {member.id}') 
         
         return await self.send_to_logging_channel(embed=e)
-
+    
+    async def propagate_lockdowns(self) -> None:
+        async with self.safe_connection() as conn:
+            data = await conn.fetch('SELECT * FROM lockdowns')
+        
+        didnt_have_parent = []
+        for entry in data:
+            kwargs = entry['extra']['kwargs']
+            if not (channels := kwargs.get('channels')):
+                didnt_have_parent.append(entry)
+                continue
+                
+            self.lockdowns[int(kwargs['member'])] = {
+                'channels': channels,
+                'roles': kwargs['roles'],
+                'reason': [Reasons.from_string(kwargs['reason'])],
+            }
+        
+        for entry in didnt_have_parent:
+            kwargs = entry['extra']['kwargs']
+            self.lockdowns[int(kwargs['member'])]['reason'].append(Reasons.from_string(kwargs['reason']))
+            
 
 class Security(CustomProfanity, URLExtract):
     def __init__(self):
@@ -497,7 +519,9 @@ class Lockdown:
                         member.id,
                         connection=connection,
                         member=member.id, # Gets passed twice so we can get it from the event later
-                        reason=Reasons.type_to_string(reason)
+                        reason=Reasons.type_to_string(reason),
+                        channels=None,
+                        roles=None
                     )
         
         channels = []
@@ -508,6 +532,8 @@ class Lockdown:
                 await channel.edit(overwrites=overwrites)
                 channels.append(channel.id)
         
+        roles = [r.id for r in member.roles]
+        
         if time is not None:
             async with self.safe_connection() as connection:
                 await self.lockdown_timer.create_timer(
@@ -515,12 +541,14 @@ class Lockdown:
                     member.id,
                     connection=connection,
                     member=member.id,
-                    reason=Reasons.type_to_string(reason)
+                    reason=Reasons.type_to_string(reason),
+                    channels=channels,
+                    roles=roles,
                 )
             
         self.lockdowns[member.id] = {
             'channels': channels,
-            'roles': [r.id for r in member.roles],
+            'roles': roles,
             'reason': [reason]
         }
     
