@@ -497,7 +497,7 @@ class Lockdown:
                         member.id,
                         connection=connection,
                         member=member.id, # Gets passed twice so we can get it from the event later
-                        reason=reason
+                        reason=Reasons.type_to_string(reason)
                     )
         
         channels = []
@@ -515,7 +515,7 @@ class Lockdown:
                     member.id,
                     connection=connection,
                     member=member.id,
-                    reason=reason
+                    reason=Reasons.type_to_string(reason)
                 )
             
         self.lockdowns[member.id] = {
