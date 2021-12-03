@@ -471,7 +471,7 @@ class Moderation(commands.Cog):
         for channel in ctx.guild.text_channels:
             overwrites = channel.overwrites
             if overwrites.get(member):
-                specific = discord.utils.find(lambda e: e[0] == 'send_messages' and e[1] == True, overwrites)
+                specific = discord.utils.find(lambda e: e[0] == 'send_messages' and e[1] == True, overwrites.items())
                 if specific:
                     overwrites[member].update(send_messages=False)
                     await channel.edit(overwrites=overwrites)

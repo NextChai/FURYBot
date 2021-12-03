@@ -579,7 +579,7 @@ class Lockdown:
         for channel in member.guild.channels: # Remove any special team creation. EX: rocket-league-1
             overwrites = channel.overwrites
             if overwrites.get(member):
-                specific = discord.utils.find(lambda e: e[0] == 'view_channel' and e[1] == True, overwrites)
+                specific = discord.utils.find(lambda e: e[0] == 'view_channel' and e[1] == True, overwrites.items())
                 if specific:
                     overwrites.update(view_channel=False)
                     await channel.edit(overwrites=overwrites)
