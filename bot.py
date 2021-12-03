@@ -320,15 +320,18 @@ class DiscordBot(commands.Bot):
                 except:
                     pass
             kwargs['files'] = attachments
-                
-        await self.message_webhook.send(
-            username=message.author.display_name,
-            avatar_url=message.author.display_avatar.url,
-            embeds=message.embeds,
-            content=message.content,
-            allowed_mentions=discord.AllowedMentions.none(),
-            **kwargs
-        )
+           
+        try:     
+            await self.message_webhook.send(
+                username=message.author.display_name,
+                avatar_url=message.author.display_avatar.url,
+                embeds=message.embeds,
+                content=message.content,
+                allowed_mentions=discord.AllowedMentions.none(),
+                **kwargs
+            )
+        except discord.HTTPException:
+            pass
             
 
 class Security(CustomProfanity, URLExtract):
