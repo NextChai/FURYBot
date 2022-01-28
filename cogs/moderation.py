@@ -254,7 +254,6 @@ class Moderation(commands.Cog):
         captain: discord.Role,
         members: commands.Greedy[discord.Member]
     ) -> None:
-        members = [m for m in ctx.args if isinstance(m, discord.Member)]
         t_members = [m.mention for m in members]
         
         c_name = name.capitalize()
