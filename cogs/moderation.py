@@ -245,35 +245,14 @@ class Moderation(commands.Cog):
     
     @team.slash(
         name='create',
-        description='Create a team.',
-        options=[
-            commands.Option(
-                name='name',
-                description='The team name.',
-                type=commands.OptionType.string,
-                required=True
-            ),
-            commands.Option(
-                name='captain_role',
-                description='Mention the correct captain role to have access to the channel.',
-                type=commands.OptionType.role,
-                required=True
-            )
-        ] + [
-            commands.Option(
-                name=f'mem{index+1}', 
-                description=f'Add a member.',
-                type=commands.OptionType.user,
-                required=True if index+1 <= 3 else False
-            ) for index in range(6)
-        ]
+        description='Create a team.'
     )
     async def team_create(
         self, 
         ctx: Context, 
-        name: str, 
-        captain_role: discord.Role,
-        *args
+        name: str,
+        captain: discord.Role,
+        members: commands.Greedy[discord.Member]
     ) -> None:
         members = [m for m in ctx.args if isinstance(m, discord.Member)]
         t_members = [m.mention for m in members]
@@ -295,7 +274,7 @@ class Moderation(commands.Cog):
         
         overwrites = {m: discord.PermissionOverwrite(view_channel=True) for m in members}
         overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(view_channel=False)
-        overwrites[captain_role] = discord.PermissionOverwrite(view_channel=True)
+        overwrites[captain] = discord.PermissionOverwrite(view_channel=True)
         
         category = await ctx.guild.create_category(c_name, overwrites=overwrites)
         text = await category.create_text_channel(c_name)
