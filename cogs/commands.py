@@ -24,6 +24,7 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
+import json
 from math import ceil
 from typing import TYPE_CHECKING
 
@@ -111,16 +112,19 @@ class Commands(commands.Cog):
     def __init__(self, bot):
         self.bot: FuryBot = bot
 
-    @commands.slash(
-        name='ping',
-        description='Ping the bot to ensure it is online.',
-    )
+    @commands.slash(name='ping',description='Ping the bot to ensure it is online.',)
     async def ping(self, ctx: Context):
         return await ctx.send(f"Pong! {ceil(round(self.bot.latency * 1000))} ms.")
     
     @commands.message()
     async def wave(self, ctx: Context):
         await ctx.send("👋")
+        
+    @commands.message()
+    async def user(self, ctx: Context):
+        message = await self.bot.http.get_message(ctx.channel.id, ctx.target.id)
+        post = await self.bot.post_to_mystbin(json.dumps(message, indent=4), syntax='json')
+        return await ctx.send(f'Raw message: <{post}>')
         
     @commands.slash(name='report', description='Report a bug!')
     @commands.guild_only()
@@ -138,7 +142,7 @@ class Commands(commands.Cog):
     @commands.slash(name='uptime', description='Get the uptime of the bot.')
     async def uptime(self, ctx: Context) -> None:
         return await ctx.send(f'The bot has been online for {human_time(self.bot.start_time)}')
-        
+    
         
 def setup(bot):
     return bot.add_cog(Commands(bot))

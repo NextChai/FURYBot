@@ -34,6 +34,7 @@ import contextlib
 from typing import TYPE_CHECKING, Callable, List, Dict, Optional, Union
 
 import aiohttp
+import mystbin
 
 import discord
 from discord.ext import commands
@@ -133,6 +134,7 @@ class DiscordBot(commands.Bot):
         self.lockdowns: Dict[int, Dict] = {} # Only used for local lockdowns 
         self.loop.create_task(self._propagate_lockdown_cache())
         self.start_time: datetime.datetime = datetime.datetime.utcnow()
+        self.mystbin: mystbin.Client = mystbin.Client(session=self.session)
         
         # Mutes
         self.mute_timer: TimerHandler = TimerHandler(self, 'mutes')
@@ -258,15 +260,21 @@ class DiscordBot(commands.Bot):
             **kwargs
         )
     
-    async def update_activity(self) -> None:
-        """Updates the bot's activity to the current set name and type.
+    async def post_to_mystbin(self, content: str, syntax: str = 'python') -> mystbin.Post:
+        """Post content to Mystbin and get the response back.
         
+        Parameters
+        ----------
+        content: :class:`str`
+            The content to pass along to mystbin
+        syntax: :class:`str`
+            The syntax to use with your upload.
+            
         Returns
         -------
-        None
+        :class:`mystbin.Post`
         """
-        await self.wait_until_ready()
-        await self.change_presence(activity=discord.Activity(type=self.activity_type, name=self.activity_message))
+        return await self.mystbin.post(content, syntax)
         
     async def on_ready(self):
         print(f"{self.user.name} has come online.")
