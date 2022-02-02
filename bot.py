@@ -670,7 +670,6 @@ class Lockdown:
         log.info(f'Coro freedom called on {member}')
       
         if member.id not in self.lockdowns:
-            print("member.id not in lockdowns.")
             return False
         
         guild = self.get_guild(constants.FURY_GUILD)
@@ -682,7 +681,6 @@ class Lockdown:
             pass
         
         if reasons: # The member has been locked down for more than 1 reason
-            print("Remaining reasons", reasons)
             return False
         
         self.lockdowns.pop(member.id, None)
@@ -700,14 +698,12 @@ class Lockdown:
         clean_roles = [guild.get_role(id) for id in roles]
         await member.edit(roles=clean_roles)
         
-        print("updating embed")
         embed = Embed(
             title='Lockdown Ended',
             description='Your lockdown has ended! Your access to the server has been revoked. Feel free to review the rules and enjoy the server.'
         )
         embed.set_author(name=str(member), icon_url=member.display_avatar.url)
         embed.set_footer(text=f'ID: {member.id}')
-        print(embed) 
         
         await self.send_to(member, embed=embed)
         return True
