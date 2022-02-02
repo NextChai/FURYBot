@@ -637,7 +637,9 @@ class Lockdown:
             }
             
         lr = self.get_lockdown_role(member.guild)
-        roles = [lr].extend(keep_roles)
+        
+        roles = [lr]
+        roles.extend(keep_roles)
 
         try:
             await member.edit(roles=roles, reason='Member is getting locked down.')
