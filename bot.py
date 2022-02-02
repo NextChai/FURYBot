@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import re
 import sys
-import orjson
 import json
 import logging
 import traceback
@@ -158,10 +157,10 @@ class DiscordBot(commands.Bot):
     @classmethod
     async def setup_pool(cls) -> asyncpg.Pool:
         def _encode_jsonb(value):
-            return orjson.dumps(value).decode('utf-8')
+            return json.dumps(value)
 
         def _decode_jsonb(value):
-            return orjson.loads(value)
+            return json.loads(value)
         
         async def init(con):
             await con.set_type_codec('jsonb', schema='pg_catalog', encoder=_encode_jsonb, decoder=_decode_jsonb, format='text')
