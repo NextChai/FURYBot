@@ -44,8 +44,6 @@ from cogs.utils.context import Context
 if TYPE_CHECKING:
     from bot import FuryBot
     
-
-
 __all__ = (
     'Owner',
 )
@@ -207,26 +205,12 @@ class Owner(commands.Cog):
         
     @commands.slash(
         name='debug',
-        description='Toggle the debug feature of the bot.',
-        options=[
-            commands.Option(
-                name='enabled',
-                description='To enable or disable debug',
-                type=commands.OptionType.string,
-                choices=[
-                    commands.OptionChoice(name='Enabled', value='true'),
-                    commands.OptionChoice(name='Disabled', value='false')
-                ]
-            )
-        ]
+        description='Toggle the debug feature of the bot.'
     )
     @commands.is_owner()
-    async def debug(self, ctx: Context, enable: str):
-        converter = {
-            'true': True,
-            'false': False
-        }
-        self.bot.debug = converter[enable]
+    @commands.describe('value', description='Enable or disable debugging.')
+    async def debug(self, ctx: Context, value: bool):
+        self.bot.debug = value
         
         e = self.bot.Embed(
             title='Success!',
