@@ -23,7 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import ClassVar, List
+from typing import ClassVar, List, Tuple
 from functools import cached_property
 
 
@@ -37,7 +37,7 @@ class Row:
     value: :class:`str`
         The key's value.
     """
-    __slots__ = ('name', 'value', '_original_args')
+    __slots__: Tuple[str, ...] = ('name', 'value', '_original_args')
     
     def __init__(self, name: str, type: str, *args) -> None:
         self.name = name
@@ -67,13 +67,25 @@ class TableMeta(type):
 
 
 class Table(metaclass=TableMeta):
+    """Represents a Table within the database.
+    
+    Attributes
+    ----------
+    keys: List[:class:`Row`]
+        A list of rows (keys) belonging to this table.
+    """
     __table_name__: ClassVar[str]
+    
+    __slots__: Tuple[str, ...] = (
+        'keys',
+    )
     
     def __init__(self, *, keys: List[Row]) -> None:
         self.keys: List[Row] = keys
 
     @cached_property
     def qualified_name(self) -> str:
+        """:class:`str`: Returns the qualified name of the table."""
         return self.__table_name__
         
     def create_string(self) -> str:
