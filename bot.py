@@ -617,7 +617,8 @@ class Lockdown:
                     await channel.edit(overwrites=overwrites)
                     channels.append(channel.id)
         
-        roles = [r.id for r in member.roles if not r.is_assignable()]
+        roles = [r.id for r in member.roles if r.is_assignable()]
+        keep_roles = [r for r in member.roles if r not in roles]
         
         new_kwargs['channels'] = channels
         new_kwargs['roles'] = roles
@@ -638,7 +639,7 @@ class Lockdown:
         lr = self.get_lockdown_role(member.guild)
 
         try:
-            await member.edit(roles=[lr], reason='Member is getting locked down.')
+            await member.edit(roles=[lr] + [keep_roles], reason='Member is getting locked down.')
         except discord.Forbidden:
             return False
             
