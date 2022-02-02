@@ -635,6 +635,13 @@ class Lockdown:
                 'roles': roles
             }
             
+        lr = self.get_lockdown_role(member.guild)
+
+        try:
+            await member.edit(roles=[lr], reason='Member is getting locked down.')
+        except discord.Forbidden:
+            return False
+            
         async with self.safe_connection() as connection:
             if time is not None:
                 await self.lockdown_timer.create_timer(
@@ -649,13 +656,6 @@ class Lockdown:
                     'INSERT INTO lockdowns (event, extra, created, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)',
                     'lockdowns', {'kwargs': new_kwargs, 'args': []}, discord.utils.utcnow(), member.id, kwargs.get('moderator', member.id)
                 )
-
-        lr = self.get_lockdown_role(member.guild)
-
-        try:
-            await member.edit(roles=[lr], reason='Member is getting locked down.')
-        except discord.Forbidden:
-            return False
         
         embed = Embed(
             title='Oh no!',

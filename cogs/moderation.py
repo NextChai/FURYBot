@@ -118,7 +118,7 @@ class Moderation(commands.Cog):
         await ctx.defer(ephemeral=True)
         
         if total_time is None:
-            await self.bot.lockdown(member, reason=reason, moderator=ctx.author.id) # type: ignore
+            result = await self.bot.lockdown(member, reason=reason, moderator=ctx.author.id) # type: ignore
         else:
             e = self.bot.Embed(
                 title='Please Confirm',
@@ -136,13 +136,17 @@ class Moderation(commands.Cog):
                 description=f'Locking down {member.mention}.'
             ), view=None)
             
-            await self.bot.lockdown(member, reason=reason, time=total_time.dt, moderator=ctx.author.id) # type: ignore
+            result = await self.bot.lockdown(member, reason=reason, time=total_time.dt, moderator=ctx.author.id) # type: ignore
         
         e = self.bot.Embed(
-            title='Success',
-            description=f'I have locked down {member.mention} for reason {reason}'
+            title='Success' if result else 'Oh No!',
+            description=f'I have locked down {member.mention} for reason {reason}' if result else f'I was not able to lockdown {member.mention}'
         )
-        e.add_field(name='Note:', value='They have been given the Lockdown Role, and all their previous roles have been removed. You can do `/freedom` to unlock them.')
+        if result:
+            e.add_field(name='Note:', value='They have been given the Lockdown Role, and all their previous roles have been removed. You can do `/freedom` to unlock them.')
+        else:
+            e.add_field(name='Reason', value='This is due to a role issue, they have higher permissions than I do.')
+            
         return await ctx.send(embed=e)
     
     @lockdown.slash(name='freedom', description='Remove a lockdown from a member.')
