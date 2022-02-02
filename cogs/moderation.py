@@ -400,8 +400,8 @@ class Moderation(commands.Cog):
     @mute.slash(name='member', description='Mute a member.')
     @commands.describe('member', description='The member to mute.')
     @commands.describe('reason', description='The reason for muting the member.')
-    @commands.describe('until', description='How long to mute the member for.')
-    async def mute_member(self, ctx, member: discord.Member, reason: Optional[str], until: Optional[time.UserFriendlyTime]) -> None:
+    @commands.describe('time', description='How long to mute the member for. Ex: 10h')
+    async def mute_member(self, ctx, member: discord.Member, reason: Optional[str], time: Optional[time.UserFriendlyTime]) -> None:
         await ctx.defer(ephemeral=True)
         
         async with self.bot.safe_connection() as conn:
@@ -413,9 +413,9 @@ class Moderation(commands.Cog):
                 description=f'{member.mention} is already muted.',
             ))
             
-        if until is not None:
+        if time is not None:
             confirmation = await ctx.get_confirmation(
-                f'Are you sure you want to mute {member.mention} until {until.human_readable}?', 
+                f'Are you sure you want to mute {member.mention} until {time.human_readable}?', 
                 allowed_mentions=discord.AllowedMentions.none()
             )
             if not confirmation:
@@ -443,9 +443,9 @@ class Moderation(commands.Cog):
             ))
     
         async with self.bot.safe_connection() as conn:
-            if until:
+            if time:
                 new = await self.bot.mute_timer.create_timer(
-                    until.dt,
+                    time.dt,
                     member.id,
                     ctx.author.id,
                     connection=conn,
@@ -468,7 +468,7 @@ class Moderation(commands.Cog):
         embed.add_field(name='Moderator', value=ctx.author.mention)
         embed.add_field(name='Role(s) Affected', value=', '.join([f'<@&{r}>' for r in original_roles] or ['No roles.']))
         embed.add_field(name='Channel(s) Affected', value=', '.join([f'<#{c}>' for c in channels] or ['No channels.']))
-        return await ctx.send(embed=embed)
+        return await ctx.send(embed=embed, view=None, content=None)
                 
     @mute.slash(name='remove', description='Remove a mute on a member.')
     @commands.describe('member', description='The member to remove the mute for.')
