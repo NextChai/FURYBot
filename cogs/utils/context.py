@@ -22,7 +22,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 
-from typing import Tuple
+from typing import Optional, Tuple, Union
 import discord
 from discord.ext import commands
 
@@ -32,15 +32,24 @@ __all__ = (
 )
 
 class Confirmation(discord.ui.View):
+    """Used to get confirmation from the user in a simple way.
+    
+    Attributes
+    ----------
+    value: :class:`bool`
+        Denotes if the user has confirmed to the operation.
+    author: Union[:class:`discord.Member`, :class:`discord.User`]
+        The user who is confirming the operation.
+    """
     __slots__: Tuple[str, ...] = (
         'value',
         'author'
     )
     
-    def __init__(self, author):
+    def __init__(self, author: Union[discord.Member, discord.User]):
         super().__init__()
-        self.value = False
-        self.author = author
+        self.value: bool = False
+        self.author: Union[discord.Member, discord.User] = author
         
     async def interaction_check(self, interaction):
         return interaction.user == self.author
@@ -59,17 +68,28 @@ class Confirmation(discord.ui.View):
 
 
 class DummyContext:
+    """A dummy context used to convert human time without a context obj.
+    
+    Attributes
+    ----------
+    created_at: :class:`datetime.datetime`
+        When the context was created.
+    """
     __slots__: Tuple[str, ...] = (
         'created_at',
     )
     
     def __init__(self) -> None:
         self.created_at = discord.utils.utcnow()
-        
+    
+    def __repr__(self) -> str:
+        return '<DummyContext created_at={}>'.format(self.created_at)
         
 class Context(commands.Context):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    """The overridden Context class. Used to provide some simple
+    functionality to the bot, which can home in handy for commands.
+    """
+    __slots__: Tuple[str, ...] = ()
     
     async def get_confirmation(self, *args, **kwargs) -> bool:
         """Get confirmation fromt he user.
@@ -93,13 +113,29 @@ class Context(commands.Context):
         
         return view.value
         
-    def tick(self, opt, label=None):
+    def tick(self, opt: Optional[bool], label: Optional[str] = None) -> str:
+        """Used to tick a message based on the operation.
+        
+        Parameters
+        ----------
+        opt: Optional[:class:`bool`]
+            The operation to tick.
+        label: Optional[:class:`str`]
+            A label for the tick, if any.
+            
+        Returns
+        -------
+        :class:`str`
+            The ticked message.
+        """
         lookup = {
             True: '✅',
             False: '❌',
             None: '❔',
         }
         emoji = lookup.get(opt, '❌')
+        
         if label is not None:
             return f'{emoji}: {label}'
+        
         return emoji
