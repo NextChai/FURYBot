@@ -105,8 +105,9 @@ class Safety(commands.Cog):
                         'We\'re very sorry for the inconvience, but we\'ve locked this channel down '
                         'in the meant time until we can resolve this issue.',
         )
+        embed.add_field(name='Role(s) affected', value=', '.join(r.mention for r in message.role_mentions))
         embed.set_author(name=message.guild.name, icon_url=message.guild.icon.url if message.guild.icon else None)
-        await channel.send(embed=embed)
+        await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
         
         # DM the author now about the issues
         embed = self.bot.Embed(
@@ -116,7 +117,7 @@ class Safety(commands.Cog):
         )
         embed.set_author(name=str(message.author), icon_url=message.author.display_avatar.url)
         embed.add_field(name='Role(s) mentioned', value=', '.join(r.mention for r in message.role_mentions))
-        await self.send_to(message.author, embed=embed)
+        await self.bot.send_to(message.author, embed=embed)
         
         # Now let's send it to the logging channel
         embed = self.bot.Embed(
@@ -175,7 +176,7 @@ class Safety(commands.Cog):
         )
         embed.set_author(name=str(message.author), icon_url=message.author.display_avatar.url)
         embed.add_field(name='Message Content', value=discord.utils.escape_mentions(message.content))
-        await self.send_to(message.author, embed=embed)
+        await self.bot.send_to(message.author, embed=embed)
         
         # Now let's send to logging channel.
         embed = self.bot.Embed(

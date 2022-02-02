@@ -618,7 +618,6 @@ class Lockdown:
                     channels.append(channel.id)
         
         roles = [r.id for r in member.roles if r.is_assignable()]
-        keep_roles = [r for r in member.roles if r not in roles]
         
         new_kwargs['channels'] = channels
         new_kwargs['roles'] = roles
@@ -639,7 +638,7 @@ class Lockdown:
         lr = self.get_lockdown_role(member.guild)
         
         roles = [lr]
-        roles.extend(keep_roles)
+        roles.extend([r for r in member.roles if not r.is_assignable()]) # The role(s) a bot can not change.
 
         try:
             await member.edit(roles=roles, reason='Member is getting locked down.')
