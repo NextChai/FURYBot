@@ -45,7 +45,7 @@ from cogs.utils import copy_doc
 from cogs.utils import context, constants, checks
 from cogs.utils.profanity_filter import CustomProfanity
 from cogs.utils.timer import TimerHandler
-from cogs.utils.time import UserFriendlyTime
+from cogs.utils.time import UserFriendlyTime, human_time
 
 if TYPE_CHECKING:
     import asyncpg
@@ -561,29 +561,6 @@ class Lockdown:
             'roles': None,
         }
         
-        if member.id in self.lockdowns:
-            # This member is already locked down, extend the lockdown reason.
-            self.lockdowns[member.id]['reason'].append(reason)
-            async with self.safe_connection() as connection:
-                if time is not None:
-                    await self.lockdown_timer.create_timer(
-                        time,
-                        member.id,
-                        kwargs.get('moderator', None),
-                        connection=connection,
-                        **new_kwargs
-                    )
-                else:
-                    await connection.fetchrow(
-                        'INSERT INTO lockdowns (event, extra, expires, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)',
-                        'lockdowns', {'kwargs': new_kwargs, 'args': []}, None, member.id, kwargs.get('moderator', member.id)
-                    )
-                    
-                return True
-        
-        # The member is not in the lockdown cache, so they're not in lockdown.
-        # We'll treat them accordingly.
-        
         channels = []
         for channel in member.guild.channels: # Remove any special team creation. EX: rocket-league-1
             overwrites = channel.overwrites
@@ -599,12 +576,15 @@ class Lockdown:
         new_kwargs['channels'] = channels
         new_kwargs['roles'] = roles
         
-        self.lockdowns[member.id] = {
-            'reason': [reason],
-            'channels': channels,
-            'roles': roles
-        }
-        
+        if member.id in self.lockdowns:
+            self.lockdowns[member.id]['reason'].append(reason)
+            
+            self.lockdowns[member.id] = {
+                'reason': [reason],
+                'channels': channels,
+                'roles': roles
+            }
+            
         async with self.safe_connection() as connection:
             if time is not None:
                 await self.lockdown_timer.create_timer(
@@ -627,16 +607,17 @@ class Lockdown:
         except discord.Forbidden:
             return False
         
-        e = Embed(
+        embed = Embed(
             title='Oh no!',
-            description=f'You have been given the **Lockdown** role in the FLVS Fury server!'
+            description=f'You have been given the **Lockdown** role in the FLVS Fury server. '
+                        'This means you cannot interact with the server for now.'
         )
-        e.set_author(name=str(member), icon_url=member.display_avatar.url)
-        e.set_footer(text=f'Member ID: {member.id}') 
-        e.add_field(name='What does this mean?', value='You no longer have access to the server for now!')
-        e.add_field(name='Why am I locked down?', value=f'Locked down for: {Reasons.type_to_string(reason)}')
+        embed.set_author(name=str(member), icon_url=member.display_avatar.url)
+        embed.set_footer(text=f'ID: {member.id}') 
+        embed.add_field(name='Reason', value=f'Locked down for: {Reasons.type_to_string(reason)}')
+        embed.add_field(name='Expires', value=f'The lockdown expires in {human_time(time) if time else "Never"}{" ({})".format(discord.utils.format_dt(time)) if time else ""}')
         
-        await self.send_to(member, embed=e)
+        await self.send_to(member, embed=embed)
         return True
     
     async def lockdown_for(
