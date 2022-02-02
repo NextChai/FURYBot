@@ -21,20 +21,32 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+from __future__ import annotations
 
-from typing import Callable, ClassVar, Dict, Iterable, List, Literal
 import aiofile
-
 from profanityfilter import ProfanityFilter
+from typing import (
+    Callable, 
+    ClassVar, 
+    Dict, 
+    Iterable, 
+    List, 
+    Literal, 
+    Tuple
+)
 
 from cogs.utils.errors import ProfanityFailure
 
-__all__ = (
+__all__: Tuple[str, ...] = (
     'PermeateProfanity',
     'CustomProfanity'
 )
 
 class PermeateProfanity:
+    """A helper class used to permeate a list of swear words into all possible combinations.
+    
+    This is mainly used so cheeky members in the server who use profanity can be caught easily.
+    """
     mapping: ClassVar[Dict[str, List[str]]] = {
         'a': ['@'],
         'i': ['!', 'l', '1'],
@@ -50,13 +62,19 @@ class PermeateProfanity:
         
     def __await__(self):
         return self.permeate_swears().__await__()
-        
+    
+    @property
+    def swears(self) -> List[str]:
+        """List[:class:`str`]: Returns the current list of swears."""
+        return self._swears
+    
     async def permeate_swears(self) -> List[str]:
-        """Used to fill up all possible combinations of a swear word.
+        """|coro|
         
-        .. note::
-            
-            `soysauce` would turn into: 'soysauce', '$oysauce', '$0ysauce', '$0isauce', etc."""
+        Used to fill up all possible combinations of a swear word.
+        
+        For example, `soysauce` would turn into: 'soysauce', '$oysauce', '$0ysauce', '$0isauce', etc.
+        """
         for swear in self._swears:
             if swear.endswith('er'):
                 self._swears.append(swear.replace('er', 'a')) # type: ignore
@@ -71,6 +89,7 @@ class PermeateProfanity:
                     self._swears.append(formatted) # type: ignore
                 break 
         return self._swears
+            
             
 class CustomProfanity(ProfanityFilter):
     """The base profanity filter for the bot.
