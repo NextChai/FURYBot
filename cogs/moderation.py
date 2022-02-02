@@ -100,10 +100,7 @@ class Moderation(commands.Cog):
         """
         return
         
-    @lockdown.slash(
-        name='member',
-        description='Lock down a member for a specific reason.'
-    )
+    @lockdown.slash(name='member',description='Lock down a member for a specific reason.')
     @commands.describe('member', description='The member to lock.')
     @commands.describe(
         'reason', 
@@ -148,24 +145,12 @@ class Moderation(commands.Cog):
         e.add_field(name='Note:', value='They have been given the Lockdown Role, and all their previous roles have been removed. You can do `/freedom` to unlock them.')
         return await ctx.send(embed=e)
     
-    @lockdown.slash(
-        name='freedom',
-        description='Remove a lockdown from a member.',
-        options=[
-            commands.Option(
-                name='member',
-                description='The member to free',
-                type=commands.OptionType.user,
-                required=True
-            ),
-            commands.Option(
-                name='reason',
-                description='The reason for freeing the member.',
-                type=commands.OptionType.string,
-                choices=[commands.OptionChoice(name=Reasons.type_to_string(value), value=name) for name, value in Reasons.__members__.items()],
-                required=True
-            )
-        ]
+    @lockdown.slash(name='freedom', description='Remove a lockdown from a member.')
+    @commands.describe('member', description='The member to set free')
+    @commands.describe(
+        'reason', 
+        description='The reason for freeing the member.',
+        choices=[commands.OptionChoice(name=Reasons.type_to_string(value), value=name) for name, value in Reasons.__members__.items()]
     )
     async def freedom(self, ctx: Context, member: discord.Member, reason: string_to_reason):
         if member.id not in self.bot.lockdowns:
@@ -181,10 +166,8 @@ class Moderation(commands.Cog):
             description=f'I have freed {member.mention} from lockdown.'
         ))
         
-    @lockdown.slash(
-        name='info',
-        description='Get information on user lockdowns.'
-    )
+    @lockdown.slash(name='info', description='Get information on user lockdowns.')
+    @commands.describe('member', description='The member to get information on.')
     async def lockdown_info(self, ctx: Context, member: discord.Member) -> None:
         embed = self.bot.Embed(
             title=f'Lockdown information on {member}',
@@ -235,18 +218,15 @@ class Moderation(commands.Cog):
             
         return await ctx.send(embed=embed)
         
-    @commands.group(
-        name='team',
-        description='Edit, manage, and view teams.'
-    )
+    @commands.group(name='team',description='Edit, manage, and view teams.')
     @commands.guild_only()
-    async def team(self) -> None:
+    async def team(self, ctx: Context) -> None:
         return
     
-    @team.slash(
-        name='create',
-        description='Create a team.'
-    )
+    @team.slash(name='create',description='Create a team.')
+    @commands.describe('name', description='The name of the team to create.')
+    @commands.describe('captain', description='The captain of the team.')
+    @commands.describe('members', description='A list of members to add to the team (mention them).')
     async def team_create(
         self, 
         ctx: Context, 
@@ -254,8 +234,6 @@ class Moderation(commands.Cog):
         captain: discord.Role,
         members: commands.Greedy[discord.Member]
     ) -> None:
-        t_members = [m.mention for m in members]
-        
         c_name = name.capitalize()
         tc_name = name.lower().replace(' ', '-')
         vc_name = f'{name.capitalize()} Voice'
@@ -265,7 +243,7 @@ class Moderation(commands.Cog):
             description=f'You will be creating a team named: {name}'
         )
         embed.add_field(name='Guild Actions:', value=f'**New category named**: {c_name}\n**New text channel named**: {tc_name}\n**New voice channel named**: {vc_name}')
-        embed.add_field(name='Team Members', value=', '.join(t_members) if t_members else 'No members.')
+        embed.add_field(name='Team Members', value=', '.join([m.mention for m in members]) if members else 'No members.')
         
         value = await ctx.get_confirmation(embed=embed)
         if not value:
