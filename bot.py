@@ -129,8 +129,6 @@ class DiscordBot(commands.Bot):
         async with self.safe_connection() as conn:
             data = await conn.fetch('SELECT * FROM lockdowns WHERE expires IS NOT NULL AND dispatched IS FALSE;')
         
-        print(data)
-        
         for entry in data:
             kwargs = entry['extra']['kwargs']
             channels = kwargs['channels']
@@ -564,7 +562,6 @@ class Lockdown:
         }
         
         if member.id in self.lockdowns:
-            print('Member in lockdowns cache, updating.')
             # This member is already locked down, extend the lockdown reason.
             self.lockdowns[member.id]['reason'].append(reason)
             async with self.safe_connection() as connection:
