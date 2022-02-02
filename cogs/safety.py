@@ -193,41 +193,6 @@ class Safety(commands.Cog):
         
         self.bot.loop.create_task(self.profanity_checker(after))
         self.bot.loop.create_task(self.link_checker(after))
-        
-    #@commands.Cog.listener('on_message')
-    async def nsfw_image_checker(self, message: discord.Message) -> None:
-        """Used to determine if an image a user uploaded is nsfw.
-        
-        .. NOTE:: NOT IN USE RIGHT NOW!
-        
-        Parameters
-        ----------
-        message: :class:`discord.Message`
-            The message to check.
-        
-        Returns
-        -------
-        None
-        """
-        if not message.attachments or should_ignore(message.author) or message.webhook_id:
-            return
-        
-        for attachment in message.attachments:
-            if (await self.bot.is_nsfw(attachment.url)):
-                await message.delete()
-                
-                e = self.bot.Embed(
-                    title='Oh no!',
-                    description='You can not upload an image that contains profanity!'
-                )
-                e.set_image(url=attachment.url)
-                e.set_thumbnail(url=attachment.url)
-                e.set_author(name=str(message.author), icon_url=message.author.display_avatar.url)
-                await self.bot.send_to(message.author, embed=e)
-                
-                e.title = 'Profane Image detected!'
-                e.description = f'{message.author.mention} has uploaded an image that is profane in {message.channel.mention}.'
-                await self.bot.send_to_logging_channel(embed=e)
                     
     @commands.Cog.listener('on_message')
     async def profanity_checker(self, message: discord.Message) -> None:
