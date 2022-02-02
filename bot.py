@@ -543,7 +543,7 @@ class Lockdown:
             The message returned from sending to the member. Is none if sending failed.
         """
         try:
-            await member.send(*args, **kwargs)
+            return await member.send(*args, **kwargs)
         except (discord.HTTPException, discord.Forbidden):
             return None
         
@@ -700,7 +700,7 @@ class Lockdown:
         
         embed = Embed(
             title='Lockdown Ended',
-            description='Your lockdown has ended! Your access to the server has been revoked.'
+            description='Your lockdown has ended! Your access to the server has been revoked. '
                         'Feel free to review the rules and enjoy the server.'
         )
         embed.set_author(name=str(member), icon_url=member.display_avatar.url)
