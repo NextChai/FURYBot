@@ -642,7 +642,7 @@ class Lockdown:
     ) -> bool:
         # Let's convert the time first
         when = await UserFriendlyTime(converter=None, default='for lockdown').convert(context.DummyContext(), f'{seconds}s')
-        return await self.lockdown(member, reason=reason, time=when)
+        return await self.lockdown(member, reason=reason, time=when.dt)
         
     async def freedom(self, member: discord.Member, *, reason: Reasons) -> bool:
         """Removes a users lockdown state and restores their original roles.
