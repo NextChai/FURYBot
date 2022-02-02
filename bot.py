@@ -37,6 +37,7 @@ import aiohttp
 
 import discord
 from discord.ext import commands
+from discord.embeds import EmptyEmbed
 
 from urlextract import URLExtract
 
@@ -60,6 +61,8 @@ __all__ = (
 
 log = logging.getLogger(__name__)
 
+MISSING = discord.utils.MISSING
+
 initial_extensions = (
     'cogs.commands',
     'cogs.moderation',
@@ -68,15 +71,30 @@ initial_extensions = (
 )
 
 @copy_doc(discord.Embed)
-def Embed(**kwargs) -> discord.Embed:
+def Embed(
+    *,
+    title: str = EmptyEmbed,
+    description: str = EmptyEmbed,
+    url: str = EmptyEmbed,
+    timestamp: datetime.datetime = datetime.datetime.now(),
+    color: Union[discord.Color, int] = MISSING,
+) -> discord.Embed:
     """A method used to have a consistent color across all bot Embeds.
     
     .. note::
         
         This is also so I can change the bots color easily when needed.
     """
-    kwargs['color'] = discord.Color.blue()
-    return discord.Embed(**kwargs)
+    if color is MISSING:
+        color = discord.Color.blue()
+        
+    return discord.Embed(
+        title=title,
+        description=description,
+        timestamp=timestamp,
+        color=color,
+        url=url
+    )
 
 
 class DiscordBot(commands.Bot):
@@ -664,6 +682,7 @@ class Lockdown:
         
         if reasons: # The member has been locked down for more than 1 reason
             return False
+        
         self.lockdowns.pop(member.id, None)
         
         channels = data['channels']
@@ -680,9 +699,13 @@ class Lockdown:
         await member.edit(roles=clean_roles)
         
         embed = Embed(
-            title='Yay!',
+            title='Lockdown Ended',
             description='Your lockdown has ended! Your access to the server has been revoked.'
+                        'Feel free to review the rules and enjoy the server.'
         )
+        embed.set_author(name=str(member), icon_url=member.display_avatar.url)
+        embed.set_footer(text=f'ID: {member.id}') 
+        
         await self.send_to(member, embed=embed)
         return True
 
