@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 import discord
 from discord.ext import commands
 
-from cogs.utils.constants import CAPTAIN_ROLE, MOD_ROLE, BYPASS_FURY, COACH_ROLE
+from cogs.utils.constants import CAPTAIN_ROLE, MOD_ROLE, BYPASS_FURY, COACH_ROLE, GAME_CONSULTANT_ROLE
 
 if TYPE_CHECKING:
     from .context import Context
@@ -43,24 +43,28 @@ __all__ = (
 def is_captain():
     """Used to determine if a member is a captain."""
     async def predicate(ctx: Context) -> bool:
-        roles = [r.id for r in ctx.author.roles]
-        return CAPTAIN_ROLE in roles
+        return CAPTAIN_ROLE in (r.id for r in ctx.author.roles)
     
     return commands.check(predicate)
 
 def is_mod():
     """Determenes if a member is a mod."""
     async def predicate(ctx: Context):
-        roles = [r.id for r in ctx.author.roles]
-        return MOD_ROLE in roles
+        return MOD_ROLE in (r.id for r in ctx.author.roles)
     
     return commands.check(predicate)
 
 def is_coach():
     """Used to determine if a member is a coach."""
     async def predicate(ctx: Context):
-        roles = [r.id for r in ctx.author.roles]
-        return COACH_ROLE in roles
+        return COACH_ROLE in (r.id for r in ctx.author.roles)
+    
+    return commands.check(predicate)
+
+def is_game_consultant():
+    """Used to dertermine if a member is a game consultant."""
+    async def predicate(ctx: Context):
+        return GAME_CONSULTANT_ROLE in (r.id for r in ctx.author.roles)
     
     return commands.check(predicate)
         

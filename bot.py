@@ -404,7 +404,7 @@ class Security(CustomProfanity, URLExtract):
         wrapped = functools.partial(method, *args, **kwargs)
         return await self.loop.run_in_executor(None, wrapped)
     
-    async def contains_profanity(self, message: str) -> bool:
+    def contains_profanity(self, message: str) -> bool:
         """Used to determine if a message has profanity.
         
         Parameters
@@ -416,9 +416,9 @@ class Security(CustomProfanity, URLExtract):
         -------
         :class:`bool`
         """
-        return await self.wrap(self.has_bad_word, message)
+        return self.has_bad_word(message)
     
-    async def censor_message(self, message: str) -> str:
+    def censor_message(self, message: str) -> str:
         """Used to censor a message.
         
         Parameters
@@ -431,7 +431,7 @@ class Security(CustomProfanity, URLExtract):
         :class:`str`
             The message that was censored
         """
-        return await self.wrap(self.censor, message)
+        return self.censor(message)
     
     async def get_links(self, message: str) -> List[str]:
         """Extreact links from a certain message.
