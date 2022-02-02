@@ -23,11 +23,14 @@ DEALINGS IN THE SOFTWARE.
 """
 
 from __future__ import annotations
+
+from typing import Type
 from enum import Enum
 
 __all__ = (
     'Reasons',
 )
+
 
 class Reasons(Enum):
     activity      = 1         # Member was locked out due to bad activity
@@ -39,9 +42,21 @@ class Reasons(Enum):
     
     @classmethod
     def type_to_string(cls, type: Reasons) -> str:
+        """Converts a reason type to a human readable string.
+        
+        Parameters
+        ----------
+        type: :class:`Reasons`
+            The type of reason to convert.
+        
+        Returns
+        -------
+        :class:`str`
+            The formatted string.
+        """
         mapping = {
             cls.activity: 'Activity',
-            cls.displayname: "DisplayName",
+            cls.displayname: 'DisplayName',
             cls.misc: 'Misc',
             cls.avatar: 'Avatar',
             cls.rules: 'Rules',
@@ -50,8 +65,26 @@ class Reasons(Enum):
         return mapping.get(type, 'Undefined')
     
     @classmethod
-    def from_string(cls, string: str) -> Reasons:
-        var = cls.__members__.get(string.lower())
+    def from_string(cls: Type[Reasons], string: str) -> Reasons:
+        """Converts a human readable string to a reason type.
+        
+        Parameters
+        ----------
+        string: :class:`str`
+            The string to convert.
+            
+        Returns
+        -------
+        :class:`Reasons`
+            The converted type.
+        
+        Raises
+        ------
+        ValueError
+            The string was not a valid reason type.
+        """
+        var = cls.__members__.get(string.lower()) 
         if var is None:
-            raise Exception(f'class Reasons does not have attribute {string}')
+            raise ValueError(f'class Reasons does not have attribute {string}')
+        
         return var
