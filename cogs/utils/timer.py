@@ -1,17 +1,96 @@
+"""
+The MIT License (MIT)
+
+Copyright (c) 2020-present NextChai
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+"""
+from __future__ import annotations
+
 import datetime
 import asyncio
 import asyncpg
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import discord
 from discord.ext import commands
 
 from . import time
+
+if TYPE_CHECKING:
+    from asyncpg import Record, Connection
+    from bot import FuryBot
+    from .context import Context
+    
     
 class Timer:
-    __slots__ = ('args', 'kwargs', 'event', 'id', 'created_at', 'expires',  'member', 'dispatched', 'moderator')
+    """Represents a Timer within the DB.
+    
+    .. container:: operations
 
-    def __init__(self, *, record):
+        .. describe:: x == y
+
+            Denotes if two Timers are equal.
+        
+        .. describe:: x != y
+
+            Denotes if two Timers are not equal.
+        
+        .. describe:: repr(x)
+
+            Retutns the string representation of the Timer.
+        
+        
+    Attributes
+    ----------
+    id: :class:`int`
+        The ID of the timer.
+    args: :class:`list`
+        A list of args passed into :meth:`create_timer`.
+    kwargs: :class:`dict`
+        A dict of kwargs passed into :meth:`create_timer`.
+    event: :class:`str`
+        The event to dispatch when the timer ends.
+    created_at: :class:`datetime.datetime`
+        The time the timer was created.
+    expires: :class:`datetime.datetime`
+        The time the timer expires.
+    member: :class:`int`
+        The ID of the member who created the timer.
+    dispatched: :class:`bool`
+        Whether the timer has been dispatched.
+    moderator: :class:`int`
+        The ID of the moderator who created the timer.
+    """
+    __slots__: Tuple[str, ...] = (
+        'args',
+        'kwargs', 
+        'event', 
+        'id', 
+        'created_at',
+        'expires',
+        'member', 
+        'dispatched',
+        'moderator'
+    )
+
+    def __init__(self, *, record: Record):
         self.id = record['id']
 
         extra = record['extra']
@@ -32,37 +111,41 @@ class Timer:
 
     def __hash__(self):
         return hash(self.id)
-
-    @property
-    def human_delta(self):
-        return time.format_relative(self.created_at)
-
-    @property
-    def author_id(self):
-        if self.args:
-            return int(self.args[0])
-        return None
-
+    
     def __repr__(self):
         return f'<Timer created={self.created_at} expires={self.expires} event={self.event}>'
 
+    @property
+    def human_delta(self):
+        """:class:`str`: The human readable time delta for when the timer was created."""
+        return time.format_relative(self.created_at)
+
 
 class TimerHandler:
-    def __init__(self, bot, name: str):
+    """A Timer Handler. Used to manage, create, and delete timers easily.
+    
+    Atributes
+    ---------
+    name: :class:`str`
+        The name of the timer handler.
+    bot: :class:`FuryBot`
+        The main bot instance.
+    """
+    def __init__(self, bot: FuryBot, name: str) -> None:
         self.name: str = name
         
-        self.bot = bot
+        self.bot: FuryBot = bot
         bot.loop.create_task(self.verify_timer())
         
         self._have_data = asyncio.Event(loop=bot.loop)
         self._current_timer = None
         self._task = bot.loop.create_task(self.dispatch_timers())
-    
-    @property
-    def display_emoji(self) -> discord.PartialEmoji:
-        return discord.PartialEmoji(name='\N{ALARM CLOCK}')
-    
+
     async def verify_timer(self) -> None:
+        """|coro|
+        
+        Used to verify a timer's integrity within the DB.
+        """
         async with self.bot.safe_connection() as con:
             await con.execute(f"""CREATE TABLE IF NOT EXISTS {self.name} (
                 id BIGSERIAL,
@@ -77,22 +160,58 @@ class TimerHandler:
     
     
     def cog_unload(self):
+        """Called upon unloading the cog. Will cancel the task."""
         self._task.cancel()
         
-    async def cog_command_error(self, ctx, error):
+    async def cog_command_error(self, ctx: Context, error):
+        """|coro|
+        
+        Used to handle errors in the cog.
+        
+        Parameters
+        ----------
+        ctx: :class:`Context`
+            The context of the command.
+        error: :class:`Exception`
+            The error that occured.
+        """
         if isinstance(error, commands.BadArgument):
             await ctx.send(error)
         if isinstance(error, commands.TooManyArguments):
             await ctx.send(f'You called the {ctx.command.name} command with too many arguments.')
             
-    async def get_active_timer(self, *, connection=None, days=7):
+    async def get_active_timer(self, *, connection: Optional[Connection] = None, days: int = 7) -> Optional[Timer]:
+        """|coro|
+        
+        Used to get an active timer from the DB.
+        
+        Parameters
+        ----------
+        connection: Optional[:class:`asyncpg.Connection`]
+            The connection to use.
+        days: :class:`int`
+            The number of days to check for.
+        """
         query = f"SELECT * FROM {self.name} WHERE (expires IS NOT NULL AND expires < (CURRENT_DATE + $1::interval)) AND dispatched = $2 ORDER BY expires LIMIT 1;"
         con = connection or self.bot.pool
 
         record = await con.fetchrow(query, datetime.timedelta(days=days), False)
         return Timer(record=record) if record else None
     
-    async def wait_for_active_timers(self, *, connection=None, days=7):
+    async def wait_for_active_timers(self, *, days: int = 7):
+        """|coro|
+        
+        Used to wait for an active timer.
+        
+        Parameters
+        ----------
+        days: :class:`int`
+            The number of days to check for.
+        
+        Returns
+        -------
+        :class:`Timer`
+        """
         async with self.bot.safe_connection() as con:
             timer = await self.get_active_timer(connection=con, days=days)
             if timer is not None:
@@ -104,7 +223,16 @@ class TimerHandler:
             await self._have_data.wait()
             return await self.get_active_timer(connection=con, days=days)
         
-    async def call_timer(self, timer):
+    async def call_timer(self, timer: Timer) -> None:
+        """|coro|
+        
+        Used to call a timer and dispatch its listener.
+        
+        Parameters
+        ----------
+        timer: :class:`Timer`
+            The timer to dispatch.
+        """
         async with self.bot.safe_connection() as con:
             await con.execute(f"UPDATE {self.name} SET dispatched = $1 WHERE id = $2;", True, timer.id)
         
@@ -112,16 +240,22 @@ class TimerHandler:
         self.bot.dispatch(event_name, timer)
     
     async def dispatch_timers(self):
+        """|coro|
+        
+        The main dispatch loop. Will dispatch timers that are due.
+        """
         try:
             while not self.bot.is_closed():
+                timer: Timer
                 # can only asyncio.sleep for up to ~48 days reliably
                 # so we're gonna cap it off at 40 days
                 # see: http://bugs.python.org/issue20493
-                timer = self._current_timer = await self.wait_for_active_timers(days=40)
+                
+                timer = self._current_timer = await self.wait_for_active_timers(days=40) # type: ignore
                 now = datetime.datetime.utcnow()
 
-                if timer.expires >= now: # type: ignore
-                    to_sleep = (timer.expires - now).total_seconds() # type: ignore
+                if timer.expires >= now: 
+                    to_sleep = (timer.expires - now).total_seconds() 
                     await asyncio.sleep(to_sleep)
 
                 await self.call_timer(timer)
