@@ -22,6 +22,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
+import traceback
 
 import aiohttp
 import asyncio
@@ -75,6 +76,7 @@ async def run_bot():
         pool = await FuryBot.setup_pool()
     except Exception:
         logging.warning('Could not setup PostgreSQL Pool, Exiting.')
+        traceback.print_exc()
         raise
     
     try:
