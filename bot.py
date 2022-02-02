@@ -638,6 +638,7 @@ class Lockdown:
             
         lr = self.get_lockdown_role(member.guild)
 
+        print([lr] + [keep_roles])
         try:
             await member.edit(roles=[lr] + [keep_roles], reason='Member is getting locked down.')
         except discord.Forbidden:
