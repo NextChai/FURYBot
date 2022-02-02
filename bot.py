@@ -36,6 +36,7 @@ from typing import TYPE_CHECKING, Callable, List, Dict, Optional, Union
 
 import aiohttp
 import mystbin
+import asyncpg
 
 import discord
 from discord.ext import commands
@@ -50,9 +51,6 @@ from cogs.utils.profanity_filter import CustomProfanity
 from cogs.utils.timer import TimerHandler
 from cogs.utils.time import UserFriendlyTime, human_time
 from config import postgresql as uri, logging_webhook, message_webhook
-
-if TYPE_CHECKING:
-    import asyncpg
 
 __all__ = (
     'DiscordBot',
