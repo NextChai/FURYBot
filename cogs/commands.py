@@ -31,6 +31,7 @@ import discord
 from discord.ext import commands
 
 from cogs.utils.context import Context
+from .utils.time import human_time
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -121,7 +122,7 @@ class Commands(commands.Cog):
     async def wave(self, ctx: Context):
         await ctx.send("👋")
         
-    @commands.slash(name='report',description='Report a bug!')
+    @commands.slash(name='report', description='Report a bug!')
     @commands.guild_only()
     @commands.describe('message', description='The message to report')
     async def report(self, ctx: Context, message: str):
@@ -133,6 +134,10 @@ class Commands(commands.Cog):
         await self.bot.send_to_logging_channel('<@!146348630926819328>', embed=e, view=ReportView(ctx.channel.id))
         
         return await ctx.send("I've reported this issue, you should get a response back from Trevor F. soon, thank you!", ephemeral=True)
+    
+    @commands.slash(name='uptime', description='Get the uptime of the bot.')
+    async def uptime(self, ctx: Context) -> None:
+        return await ctx.send(f'The bot has been online for {human_time(self.bot.start_time)}')
         
         
 def setup(bot):

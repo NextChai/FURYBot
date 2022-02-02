@@ -132,6 +132,7 @@ class DiscordBot(commands.Bot):
         self.lockdown_timer: TimerHandler = TimerHandler(self, 'lockdowns')
         self.lockdowns: Dict[int, Dict] = {} # Only used for local lockdowns 
         self.loop.create_task(self._propagate_lockdown_cache())
+        self.start_time: datetime.datetime = datetime.datetime.utcnow()
         
         # Mutes
         self.mute_timer: TimerHandler = TimerHandler(self, 'mutes')
