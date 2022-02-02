@@ -120,11 +120,17 @@ class Commands(commands.Cog):
     async def wave(self, ctx: Context):
         await ctx.send("👋")
         
-    @commands.message()
-    async def raw(self, ctx: Context):
+    @commands.message(name='raw')
+    async def raw_message(self, ctx: Context):
         message = await self.bot.http.get_message(ctx.channel.id, ctx.target.id)
         post = await self.bot.post_to_mystbin(json.dumps(message, indent=4), syntax='json')
         return await ctx.send(f'Raw message: <{post}>')
+    
+    @commands.user(name='raw')
+    async def raw_user(self, ctx: Context):
+        member = await self.bot.http.get_member(ctx.guild.id, ctx.target.id)
+        post = await self.bot.post_to_mystbin(json.dumps(member, indent=4), syntax='json')
+        return await ctx.send(f'Raw member: <{post}>')
         
     @commands.slash(name='report', description='Report a bug!')
     @commands.guild_only()
