@@ -44,7 +44,8 @@ from cogs.utils.enums import *
 from cogs.utils import copy_doc
 from cogs.utils import context, constants, checks
 from cogs.utils.profanity_filter import CustomProfanity
-from cogs.utils.timer import TimerHandler, Timer
+from cogs.utils.timer import TimerHandler
+from cogs.utils.time import UserFriendlyTime
 
 if TYPE_CHECKING:
     import asyncpg
@@ -632,6 +633,16 @@ class Lockdown:
         
         await self.send_to(member, embed=e)
         return True
+    
+    async def lockdown_for(
+        self,
+        seconds: int,
+        member: discord.Member,
+        reason: Reasons
+    ) -> bool:
+        # Let's convert the time first
+        when = await UserFriendlyTime(converter=None, default='for lockdown').convert(context.DummyContext(), f'{seconds}s')
+        return await self.lockdown(member, reason=reason, time=when)
         
     async def freedom(self, member: discord.Member, *, reason: Reasons) -> bool:
         """Removes a users lockdown state and restores their original roles.

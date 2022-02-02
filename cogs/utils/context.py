@@ -22,6 +22,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 
+from typing import Tuple
 import discord
 from discord.ext import commands
 
@@ -31,6 +32,11 @@ __all__ = (
 )
 
 class Confirmation(discord.ui.View):
+    __slots__: Tuple[str, ...] = (
+        'value',
+        'author'
+    )
+    
     def __init__(self, author):
         super().__init__()
         self.value = False
@@ -51,6 +57,16 @@ class Confirmation(discord.ui.View):
         self.value = False
         self.stop()
 
+
+class DummyContext:
+    __slots__: Tuple[str, ...] = (
+        'created_at',
+    )
+    
+    def __init__(self) -> None:
+        self.created_at = discord.utils.utcnow()
+        
+        
 class Context(commands.Context):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
