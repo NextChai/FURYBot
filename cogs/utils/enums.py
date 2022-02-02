@@ -39,8 +39,8 @@ class Reasons(Enum):
     avatar             = 4         # Member was locked for a bad avatar
     rules              = 5         # Member was locked for breaking rules.
     profanity          = 6         # Member has used terms that are profane.
-    role_mention       = 7         # Member was locked for mentioning a role.
-    mass_mention       = 8         # Member was locked for mentioning @here or @everyone
+    rolemention       = 7         # Member was locked for mentioning a role.
+    massmention       = 8         # Member was locked for mentioning @here or @everyone
     
     @classmethod
     def type_to_string(cls, type: Reasons) -> str:
@@ -63,8 +63,8 @@ class Reasons(Enum):
             cls.avatar: 'Avatar',
             cls.rules: 'Rules',
             cls.profanity: 'Profanity',
-            cls.role_mention: 'RoleMention',
-            cls.mass_mention: 'MassMention'
+            cls.rolemention: 'RoleMention',
+            cls.massmention: 'MassMention'
         }
         return mapping.get(type, 'Undefined')
     

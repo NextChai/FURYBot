@@ -89,7 +89,7 @@ class Safety(commands.Cog):
         
         await message.delete()
         
-        await self.bot.lockdown_for(60*10, member=message.author, reason=Reasons.role_mention)
+        await self.bot.lockdown_for(60*10, member=message.author, reason=Reasons.rolemention)
         
         # The user has mentioned a role in their message, let's manage cleanup.
         # Let's limit the channel to only moderators.
@@ -147,7 +147,7 @@ class Safety(commands.Cog):
         
         await message.delete()
 
-        await self.bot.lockdown_for(60*10, member=message.author, reason=Reasons.mass_mention)
+        await self.bot.lockdown_for(60*10, member=message.author, reason=Reasons.massmention)
         
         # The user has mentioned a role in their message, let's manage cleanup.
         # Let's limit the channel to only moderators.
