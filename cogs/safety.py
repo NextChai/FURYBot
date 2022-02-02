@@ -73,36 +73,6 @@ class Safety(commands.Cog):
         
         self.name_checker.start()
         self.load_profanity.start()
-        
-    async def decode_binary_string(self, string: str) -> str:
-        string = string.replace(' ', '')
-        return ''.join(chr(int(string[i*8:i*8+8],2)) for i in range(len(string)//8))
-        
-    @commands.Cog.listener('on_message')
-    async def binary_check(self, message: discord.Message) -> None:
-        """Used to Check for binary messages, decode them, and check for profanity."""
-        if should_ignore(message.author) or message.webhook_id:
-            return
-        
-        binary_regex = r'(?P<number>1|0){1,}(?P<space>\s)?'
-        contains_binary = await self.bot.wrap(re.findall, binary_regex, message.content)
-        
-        if contains_binary:
-            # NOTE: I am wrapping this because it could be time consuming and I dont want it to break the bot.
-            all_binary = await self.bot.wrap( 
-                lambda msg: ''.join([m for m in msg if m.isdigit()]),
-                message.content
-            )
-            
-            # Instead of checking for profanity here and handling it,
-            # let's pass this onto profanity_checker for checking.
-            try:
-                decoded = await self.decode_binary_string(all_binary)
-            except ValueError:
-                return
-            
-            message.content = decoded
-            await self.profanity_checker(message)
             
     @commands.Cog.listener('on_message')
     async def mention_checker(self, message: discord.Message) -> None:
