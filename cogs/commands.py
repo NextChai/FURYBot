@@ -126,7 +126,7 @@ class Commands(commands.Cog):
         post = await self.bot.post_to_mystbin(json.dumps(message, indent=4), syntax='json')
         return await ctx.send(f'Raw message: <{post}>')
     
-    @commands.user(name='raw')
+    @commands.user(name='json')
     async def raw_user(self, ctx: Context):
         member = await self.bot.http.get_member(ctx.guild.id, ctx.target.id)
         post = await self.bot.post_to_mystbin(json.dumps(member, indent=4), syntax='json')
