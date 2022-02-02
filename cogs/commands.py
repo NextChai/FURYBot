@@ -115,50 +115,16 @@ class Commands(commands.Cog):
         description='Ping the bot to ensure it is online.',
     )
     async def ping(self, ctx: Context):
-        """A simple ping slash command.
-        
-        Used to determine if the bot has been heartbeat blocked by some bad code.
-        
-        Parameters
-        ----------
-        None
-        """
         return await ctx.send(f"Pong! {ceil(round(self.bot.latency * 1000))} ms.")
     
     @commands.message()
     async def wave(self, ctx: Context):
-        """A simple command that allows users to wave to a user via a User based Application Command.
-        
-        Parameters
-        ----------
-        None
-        
-        Returns
-        ------
-        None
-        """
         await ctx.send("👋")
         
-    @commands.slash(
-        name='report',
-        description='Report a bug!',
-        options=[
-            commands.Option(
-                name='message',
-                description='The message to report',
-                required=True
-            )
-        ]
-    )
+    @commands.slash(name='report',description='Report a bug!')
     @commands.guild_only()
+    @commands.describe('message', description='The message to report')
     async def report(self, ctx: Context, message: str):
-        """Created to users can report issues related to the bot, other members, or anyhting else related to it.
-        
-        Parameters
-        ---------
-        message: :class:`str`
-            The message the user would like to report.
-        """
         e = self.bot.Embed(
             title=f'Report from {ctx.author}',
             description=f'{ctx.author.mention} used the report command in {ctx.channel.mention}'
