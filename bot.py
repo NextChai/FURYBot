@@ -624,6 +624,10 @@ class Lockdown:
         
         if member.id in self.lockdowns:
             self.lockdowns[member.id]['reason'].append(reason)
+            
+            # Ensure that when the timer pops the member will have their original roles and channels back
+            new_kwargs['roles'] = self.lockdowns[member.id]['roles']
+            new_kwargs['channels'] = self.lockdowns[member.id]['channels']
         else:
             self.lockdowns[member.id] = {
                 'reason': [reason],
