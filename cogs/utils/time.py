@@ -21,6 +21,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+from __future__ import annotations
+
+from typing import Tuple
 
 import re
 import datetime
@@ -29,7 +32,8 @@ import parsedatetime as pdt
 
 from discord.ext import commands
 
-__all__ = (
+
+__all__: Tuple[str, ...] = (
     'plural',
     'human_join',
     'human_time',
