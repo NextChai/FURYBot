@@ -129,7 +129,7 @@ class Safety(commands.Cog):
             )
             embed.add_field(name='Message Content', value=message.content)
             embed.add_field(name='Actions taken', value='They have been automatically locked out of the server for 5 minutes.')
-            await self.bot.send_to_logging_channel(embed=embed, ping_staff=False)
+            await self.bot.send_to_logging_channel(embed=embed)
             
             self.bot.loop.create_task(self.bot.lockdown_for(5*60, member=message.author, reason=Reasons.rules))
             
@@ -263,7 +263,7 @@ class Safety(commands.Cog):
             e.title = 'Profanity Found'
             e.description = f'{message.author.mention} has said a word that contains profanity in {message.channel.mention}.'
             e.add_field(name='Action Taken', value='I have locked them out of the server for 5 minutes.')
-            await self.bot.send_to_logging_channel(embed=e, ping_staff=False)
+            await self.bot.send_to_logging_channel(embed=e)
         
     @commands.Cog.listener('on_message')
     async def link_checker(self, message: discord.Message) -> None:

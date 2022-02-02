@@ -130,7 +130,7 @@ class Commands(commands.Cog):
             description=f'{ctx.author.mention} used the report command in {ctx.channel.mention}'
         )
         e.add_field(name='Message', value=message)
-        await self.bot.send_to_logging_channel('<@!146348630926819328>', embed=e, view=ReportView(ctx.channel.id), ping_staff=False)
+        await self.bot.send_to_logging_channel('<@!146348630926819328>', embed=e, view=ReportView(ctx.channel.id))
         
         return await ctx.send("I've reported this issue, you should get a response back from Trevor F. soon, thank you!", ephemeral=True)
         
