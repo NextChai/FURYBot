@@ -26,6 +26,8 @@ from __future__ import annotations
 
 import re
 import sys
+import orjson
+import json
 import logging
 import traceback
 import functools
@@ -48,6 +50,7 @@ from cogs.utils import context, constants, checks
 from cogs.utils.profanity_filter import CustomProfanity
 from cogs.utils.timer import TimerHandler
 from cogs.utils.time import UserFriendlyTime, human_time
+from config import postgresql as uri, logging_webhook, message_webhook
 
 if TYPE_CHECKING:
     import asyncpg
@@ -114,11 +117,10 @@ class DiscordBot(commands.Bot):
         The bot's current activity type.
     """
     if TYPE_CHECKING:
-        pool: asyncpg.Pool
         logging_webhook_url: str
         message_webhook_url: str
         
-    def __init__(self):
+    def __init__(self, pool: asyncpg.Pool, session: aiohttp.ClientSession):
         super().__init__(
             help_command=None,
             description='The Discord bot for the FLVS Fury server.',
@@ -126,15 +128,22 @@ class DiscordBot(commands.Bot):
             guild_ids=[757664675864248360]
         )
         
+        self.pool: asyncpg.Pool = pool
+        self.session: aiohttp.ClientSession = session
+        
         self.Embed: discord.Embed = Embed
         self.debug: bool = True
+        self.start_time: datetime.datetime = datetime.datetime.utcnow()
+        self.mystbin: mystbin.Client = mystbin.Client(session=self.session)
         
         # Lockdown timer
         self.lockdown_timer: TimerHandler = TimerHandler(self, 'lockdowns')
         self.lockdowns: Dict[int, Dict] = {} # Only used for local lockdowns 
         self.loop.create_task(self._propagate_lockdown_cache())
-        self.start_time: datetime.datetime = datetime.datetime.utcnow()
-        self.mystbin: mystbin.Client = mystbin.Client(session=self.session)
+        
+        # Webhooks
+        self.logging_webhook_url = logging_webhook
+        self.message_webhook_url = message_webhook
         
         # Mutes
         self.mute_timer: TimerHandler = TimerHandler(self, 'mutes')
@@ -146,6 +155,20 @@ class DiscordBot(commands.Bot):
             except Exception:
                 traceback.print_exc()
                 
+    @classmethod
+    async def setup_pool(cls) -> asyncpg.Pool:
+        def _encode_jsonb(value):
+            return orjson.dumps(value).decode('utf-8')
+
+        def _decode_jsonb(value):
+            return orjson.loads(value)
+        
+        async def init(con):
+            await con.set_type_codec('jsonb', schema='pg_catalog', encoder=_encode_jsonb, decoder=_decode_jsonb, format='text')
+                
+        pool = await asyncpg.create_pool(uri, init=init)
+        return pool
+                    
     async def _propagate_lockdown_cache(self) -> None:
         async with self.safe_connection() as conn:
             data = await conn.fetch('SELECT * FROM lockdowns WHERE expires IS NOT NULL AND dispatched IS FALSE;')
@@ -367,7 +390,6 @@ class Security(CustomProfanity, URLExtract):
         URLExtract.__init__(self)
         super().__init__()
         self.update()
-        self.session: aiohttp.ClientSession = aiohttp.ClientSession()
         
     async def setup_profanity(self) -> None:
         """Used to load the wordsets of the profanity filter.
@@ -760,6 +782,6 @@ class FuryBot(DiscordBot, SecurityMixin):
     session: :class:`aiohttp.ClientSession`
         The bot's session to use for http requests.
     """
-    def __init__(self):
+    def __init__(self, pool: asyncpg.Pool, session: aiohttp.ClientSession):
+        super().__init__(pool, session)
         SecurityMixin.__init__(self)
-        super().__init__()

@@ -23,45 +23,69 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import json
-import asyncpg
+import aiohttp
 import asyncio
-
 import logging
+import contextlib
+from typing import Tuple
 
 from bot import FuryBot
-from config import TOKEN, postgresql as uri, logging_webhook, message_webhook
+from config import TOKEN
+
 logging.basicConfig(level=logging.INFO)
 
-async def setup_pool() -> asyncpg.Pool:
-    def _encode_jsonb(value):
-        return json.dumps(value)
+__all__: Tuple[str, ...] = (
+    'RemoveNoise',
+    'setup_logging',
+    'run_bot'
+)
 
-    def _decode_jsonb(value):
-        return json.loads(value)
+class RemoveNoise(logging.Filter):
+    def __init__(self):
+        super().__init__(name='discord.state')
+
+    def filter(self, record):
+        if record.levelname == 'WARNING' and 'referencing an unknown' in record.msg:
+            return False
+        return True
     
-    async def init(con):
-        await con.set_type_codec('jsonb', schema='pg_catalog', encoder=_encode_jsonb, decoder=_decode_jsonb, format='text')
-            
-    pool = await asyncpg.create_pool(uri, init=init)
-    return pool
+
+@contextlib.contextmanager
+def setup_logging():
+    try:
+        logging.getLogger('discord').setLevel(logging.INFO)
+        logging.getLogger('discord.http').setLevel(logging.WARNING)
+        logging.getLogger('discord.state').addFilter(RemoveNoise())
+        
+        log = logging.getLogger('chai')
+        log.setLevel(logging.INFO)
+        
+        ch = logging.StreamHandler()
+        
+        dt_fmt = '%Y-%m-%d %H:%M:%S'
+        fmt = logging.Formatter('[{asctime}] [{levelname:<7}] {name}: {message}', dt_fmt, style='{')
+        ch.setFormatter(fmt)
+        yield
+    finally:
+        return
+
     
-    
-def run_bot():
-    loop = asyncio.get_event_loop()
-    log = logging.getLogger()
+async def run_bot():
+    try:
+        pool = await FuryBot.setup_pool()
+    except Exception:
+        logging.warning('Could not setup PostgreSQL Pool, Exiting.')
+        raise
     
     try:
-        pool = loop.run_until_complete(setup_pool())
-    except Exception:
-        log.exception('Could not setup PostgreSQL Pool, Exiting.')
-        return
+        async with aiohttp.ClientSession() as session:
+            fury = FuryBot(pool=pool, session=session)
+            
+            await fury.start(TOKEN, reconnect=True)
+    finally:
+        await fury.pool.close() # type: ignore
     
-    fury = FuryBot()
-    fury.pool = pool
-    fury.logging_webhook_url = logging_webhook
-    fury.message_webhook_url = message_webhook
-    fury.run(TOKEN)
-    
+
 if __name__ == '__main__':
-    run_bot()
+    with setup_logging():
+        asyncio.run(run_bot())
