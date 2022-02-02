@@ -112,7 +112,7 @@ class Commands(commands.Cog):
     def __init__(self, bot):
         self.bot: FuryBot = bot
 
-    @commands.slash(name='ping',description='Ping the bot to ensure it is online.',)
+    @commands.slash(name='ping', description='Ping the bot to ensure it is online.',)
     async def ping(self, ctx: Context):
         return await ctx.send(f"Pong! {ceil(round(self.bot.latency * 1000))} ms.")
     
@@ -121,7 +121,7 @@ class Commands(commands.Cog):
         await ctx.send("👋")
         
     @commands.message()
-    async def user(self, ctx: Context):
+    async def raw(self, ctx: Context):
         message = await self.bot.http.get_message(ctx.channel.id, ctx.target.id)
         post = await self.bot.post_to_mystbin(json.dumps(message, indent=4), syntax='json')
         return await ctx.send(f'Raw message: <{post}>')
