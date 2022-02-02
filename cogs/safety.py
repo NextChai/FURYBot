@@ -280,7 +280,7 @@ class Safety(commands.Cog):
         if not message.guild or should_ignore(message.author) or message.webhook_id:
             return
         
-        censored = self.bot.censor_message(message.content)
+        censored = await self.bot.censor_message(message.content)
         if censored.lower() == message.content.lower():
             return
         
@@ -368,7 +368,7 @@ class Safety(commands.Cog):
         if before.name == after.name:
             return
         
-        if self.bot.contains_profanity(after.name):
+        if await self.bot.contains_profanity(after.name):
             guild = self.bot.get_guild(constants.FURY_GUILD)
             member = guild.get_member(after.id) or (await guild.fetch_member(after.id))
             await self.bot.lockdown(member, reason=Reasons.displayname)
@@ -393,7 +393,7 @@ class Safety(commands.Cog):
         guild = self.bot.get_guild(constants.FURY_GUILD)
         
         async for member in guild.fetch_members(limit=None):
-            if (censored := self.bot.censor_message(member.display_name)) != member.display_name:
+            if (censored := await self.bot.censor_message(member.display_name)) != member.display_name:
                 await self.bot.lockdown(member, reason=Reasons.displayname)
                 
                 e = self.bot.Embed(
@@ -407,7 +407,7 @@ class Safety(commands.Cog):
             if member.activities:
                 activity = discord.utils.find(lambda activity: isinstance(activity, discord.CustomActivity), member.activities)
                 if activity and activity.name:
-                    if (censored := self.bot.censor_message(activity.name)) != activity.name:
+                    if (censored := await self.bot.censor_message(activity.name)) != activity.name:
                         await self.bot.lockdown(member, reason=Reasons.activity)
                         
                         e = self.bot.Embed(

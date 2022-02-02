@@ -32,7 +32,7 @@ import traceback
 import functools
 import datetime
 import contextlib
-from typing import TYPE_CHECKING, Callable, List, Dict, Optional, Union
+from typing import TYPE_CHECKING, Callable, List, Dict, Optional, Union, Coroutine, Any
 
 import aiohttp
 import mystbin
@@ -404,7 +404,7 @@ class Security(CustomProfanity, URLExtract):
         wrapped = functools.partial(method, *args, **kwargs)
         return await self.loop.run_in_executor(None, wrapped)
     
-    def contains_profanity(self, message: str) -> bool:
+    def contains_profanity(self, message: str) -> Coroutine[Any, Any, bool]:
         """Used to determine if a message has profanity.
         
         Parameters
@@ -416,9 +416,9 @@ class Security(CustomProfanity, URLExtract):
         -------
         :class:`bool`
         """
-        return self.has_bad_word(message)
+        return self.wrap(self.has_bad_word, message)
     
-    def censor_message(self, message: str) -> str:
+    def censor_message(self, message: str) -> Coroutine[Any, Any, str]:
         """Used to censor a message.
         
         Parameters
@@ -431,7 +431,7 @@ class Security(CustomProfanity, URLExtract):
         :class:`str`
             The message that was censored
         """
-        return self.censor(message)
+        return self.wrap(self.censor, message)
     
     async def get_links(self, message: str) -> List[str]:
         """Extreact links from a certain message.

@@ -379,7 +379,7 @@ class Moderation(commands.Cog):
     )
     @commands.describe('word', description='The word to check for profanity.')
     async def wordset_contains_profanity(self, ctx: Context,  word: str) -> None:
-        check = self.bot.contains_profanity(word)
+        check = await self.bot.contains_profanity(word)
         fmt = ' not' if check is False else ''
         return await ctx.send(f"Word {word} does{fmt} contain profanity.", ephemeral=True)
     
@@ -389,7 +389,7 @@ class Moderation(commands.Cog):
     )
     @commands.describe('sentence', description='The sentence to censor.')
     async def wordset_censor(self, ctx: Context, sentence: str) -> None:
-        check = self.bot.censor_message(sentence)
+        check = await self.bot.censor_message(sentence)
         return await ctx.send(check, ephemeral=True)
     
     # Muting members
