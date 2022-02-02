@@ -617,7 +617,7 @@ class Lockdown:
                     await channel.edit(overwrites=overwrites)
                     channels.append(channel.id)
         
-        roles = [r.id for r in member.roles if r.is_assignable()]
+        roles = [r.id for r in member.roles if not r.is_assignable()]
         
         new_kwargs['channels'] = channels
         new_kwargs['roles'] = roles
