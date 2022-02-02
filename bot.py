@@ -562,6 +562,8 @@ class Lockdown:
         }
         
         if member.id in self.lockdowns:
+            print('Member in lockdowns cache, updating.')
+            # This member is already locked down, extend the lockdown reason.
             self.lockdowns[member.id]['reason'].append(reason)
             async with self.safe_connection() as connection:
                 if time is not None:
@@ -572,12 +574,16 @@ class Lockdown:
                         connection=connection,
                         **new_kwargs
                     )
-                    return True
                 else:
                     await connection.fetchrow(
-                        'INSERT INTO lockdowns (event, extra, expires, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5) RETURNING *',
+                        'INSERT INTO lockdowns (event, extra, expires, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)',
                         'lockdowns', {'kwargs': new_kwargs, 'args': []}, None, member.id, kwargs.get('moderator', member.id)
                     )
+                    
+                return True
+        
+        # The member is not in the lockdown cache, so they're not in lockdown.
+        # We'll treat them accordingly.
         
         channels = []
         for channel in member.guild.channels: # Remove any special team creation. EX: rocket-league-1
