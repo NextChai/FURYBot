@@ -129,6 +129,8 @@ class DiscordBot(commands.Bot):
         async with self.safe_connection() as conn:
             data = await conn.fetch('SELECT * FROM lockdowns WHERE expires IS NOT NULL AND dispatched IS FALSE;')
         
+        print(data)
+        
         for entry in data:
             kwargs = entry['extra']['kwargs']
             channels = kwargs['channels']
