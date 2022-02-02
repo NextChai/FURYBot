@@ -22,14 +22,20 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+from __future__ import annotations
 
-__all__ = (
+from typing import Tuple
+
+__all__: Tuple[str, ...] = (
     'FuryException',
     'ProfanityFailure'
 )
 
 class FuryException(Exception):
+    """The base Fury Exception for all custom Fury bot excpetions."""
     pass
 
+
 class ProfanityFailure(FuryException):
+    """The exception raised when a profanity filter fails."""
     pass
