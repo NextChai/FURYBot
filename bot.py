@@ -136,7 +136,6 @@ class DiscordBot(commands.Bot):
         
         # Lockdown timer
         self.lockdown_timer: TimerHandler = TimerHandler(self, 'lockdowns')
-        self.loop.create_task(self._propagate_lockdown_cache())
         
         # Webhooks
         self.logging_webhook_url = logging_webhook
