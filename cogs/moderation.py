@@ -146,6 +146,7 @@ class Moderation(commands.Cog):
             description=f'I have freed {member.mention} from lockdown.'
         ))
         
+    # TODO: Rewrite this pls
     @lockdown.slash(name='info', description='Get information on user lockdowns.')
     @commands.describe('member', description='The member to get information on.')
     async def lockdown_info(self, ctx: Context, member: discord.Member) -> None:
