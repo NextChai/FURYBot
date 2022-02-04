@@ -745,7 +745,9 @@ class Lockdown:
         except:
             pass
         
-        keep_roles += [discord.Object(id=r) for r in roles]
+        keep_roles.extend([discord.Object(id=r) for r in roles])
+        print(keep_roles)
+        
         await member.edit(roles=keep_roles)
         
         embed = Embed(
