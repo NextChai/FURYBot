@@ -147,7 +147,7 @@ class Moderation(commands.Cog):
         ))
         
     # TODO: Rewrite this pls
-    @lockdown.slash(name='info', description='Get information on user lockdowns.')
+    @lockdown.slash(name='history', description='Get information on user lockdowns.')
     @commands.describe('member', description='The member to get information on.')
     async def lockdown_info(self, ctx: Context, member: discord.Member) -> None:
         embed = self.bot.Embed(
