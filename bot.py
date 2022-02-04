@@ -33,7 +33,17 @@ import functools
 import datetime
 import contextlib
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Callable, List, Dict, Optional, Union, Coroutine, Any
+from typing import (
+    TYPE_CHECKING, 
+    Callable, 
+    List, 
+    Dict, 
+    Optional, 
+    Union, 
+    Coroutine, 
+    Any,
+    Tuple
+)
 
 import aiohttp
 import mystbin
@@ -59,6 +69,7 @@ __all__ = (
     'Lockdown',
     'SecurityMixin',
     'FuryBot',
+    'BotEmbed',
 )
 
 log = logging.getLogger(__name__)
@@ -71,6 +82,15 @@ initial_extensions = (
     'cogs.safety',
     'cogs.owner'
 )
+
+
+class BotEmbed(discord.Embed):
+    __slots__: Tuple[str, ...] = ()
+    
+    def custom_author(self, _o: Union[discord.Member, discord.User]) -> None:
+        self.set_author(name=_o.display_name, icon_url=_o.display_avatar.url)
+        self.set_footer(text=f'ID: {_o.id}')
+
 
 @copy_doc(discord.Embed)
 def Embed(
@@ -90,7 +110,7 @@ def Embed(
     if color is MISSING:
         color = discord.Color.blue()
         
-    return discord.Embed(
+    return BotEmbed(
         title=title,
         description=description,
         timestamp=timestamp,

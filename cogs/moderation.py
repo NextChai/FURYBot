@@ -198,7 +198,28 @@ class Moderation(commands.Cog):
         ), inline=False)
             
         return await ctx.send(embed=embed)
+    
+    @lockdown.slash(name='clear', description='Clear all lockdown history from a member.')
+    @commands.describe('member', description='The member to clear history for.')
+    async def lockdown_clear(self, ctx: Context, member: discord.Member) -> None:
+        embed = self.bot.Embed(
+            title='Are you sure?',
+            description=f'This will clear **all** lockdown history on {member.mention}'
+        )
+        value = await ctx.get_confirmation(embed=embed)
+        if not value:
+            return
         
+        async with self.bot.safe_connection() as conn:
+            await conn.fetchrow('DELETE FROM lockdowns WHERE member = $1', member.id)
+        
+        embed = self.bot.Embed(
+            title='Done',
+            description=f'I have cleared all lockdown history for {member.mention}.'
+        )
+        embed.custom_author(member)
+        return await ctx.send(embed=embed)
+    
     @commands.group(name='team',description='Edit, manage, and view teams.')
     @commands.guild_only()
     async def team(self, ctx: Context) -> None:
