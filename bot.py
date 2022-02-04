@@ -599,12 +599,14 @@ class Lockdown:
                     overwrites.update(view_channel=False)
                     await channel.edit(overwrites=overwrites)
                     channels.append(channel.id)
+                    
+        kwargs['channels'] = channels
+        kwargs['roles'] = [r.id for r in member.roles if r.is_assignable()]
         
         lr = self.get_lockdown_role(member.guild)
-        
         roles = [lr]
         roles.extend([r for r in member.roles if not r.is_assignable()]) # The role(s) a bot can not change.
-
+        
         try:
             await member.edit(roles=roles, reason='Member is getting locked down.')
         except discord.Forbidden:
