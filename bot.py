@@ -744,7 +744,8 @@ class Lockdown:
             keep_roles.remove(self.get_lockdown_role(guild))
         except:
             pass
-        keep_roles.extend(discord.Object(id=r) for r in roles)
+        
+        keep_roles += [discord.Object(id=r) for r in roles]
         await member.edit(roles=keep_roles)
         
         embed = Embed(
