@@ -513,7 +513,7 @@ class Lockdown:
         -------
         :class:`bool`
         """
-        query = 'SELECT * FROM lockdowns WHERE member = $1 WHERE dispatched = $2'
+        query = 'SELECT * FROM lockdowns WHERE member = $1 AND dispatched = $2'
         if not connection:
             async with self.safe_connection() as conn:
                 data = await conn.fetchrow(query, member.id, False)
