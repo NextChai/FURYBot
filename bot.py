@@ -739,15 +739,13 @@ class Lockdown:
                 overwrites[member].update(view_channel=True)
                 await channel.edit(overwrites=overwrites)
         
-        keep_roles = [member.roles]
+        keep_roles = member.roles
         try:
             keep_roles.remove(self.get_lockdown_role(guild))
         except:
             pass
         
         keep_roles.extend([discord.Object(id=r) for r in roles])
-        print(keep_roles)
-        
         await member.edit(roles=keep_roles)
         
         embed = Embed(
