@@ -602,6 +602,7 @@ class Lockdown:
                     
         kwargs['channels'] = channels
         kwargs['roles'] = [r.id for r in member.roles if r.is_assignable()]
+        kwargs['reason'] = reason
         
         lr = self.get_lockdown_role(member.guild)
         roles = [lr]
