@@ -754,6 +754,7 @@ class Lockdown:
         )
         embed.set_author(name=str(member), icon_url=member.display_avatar.url)
         embed.set_footer(text=f'ID: {member.id}')
+        embed.add_field(name='Locked Since', value=f'For {human_time(timer.created_at)} ({discord.utils.format_dt(timer.created_at)}).')
         await self.send_to(member, embed=embed)
         
          
