@@ -95,7 +95,7 @@ class Moderation(commands.Cog):
     @lockdown.slash(name='member',description='Lock down a member for a specific reason.')
     @commands.describe('member', description='The member to lock.')
     @commands.describe('reason', description='The reason for the lockdown.')
-    @commands.describe('time', description='A specific date you want to unlock them.')
+    @commands.describe('total_time', description='A specific date you want to unlock them.')
     async def lockdown_member(
         self, 
         ctx: Context, 
