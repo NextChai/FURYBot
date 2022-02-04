@@ -79,13 +79,19 @@ async def run_bot():
         traceback.print_exc()
         raise
     
+    fury = None
     try:
         async with aiohttp.ClientSession() as session:
-            fury = FuryBot(pool=pool, session=session)
+            try:
+                fury = FuryBot(pool=pool, session=session)
+            except:
+                traceback.print_exc()
+                return
             
             await fury.start(TOKEN, reconnect=True)
     finally:
-        await fury.pool.close() # type: ignore
+        if fury:
+            await fury.pool.close() 
     
 
 if __name__ == '__main__':
