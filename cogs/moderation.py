@@ -106,7 +106,7 @@ class Moderation(commands.Cog):
         await ctx.defer(ephemeral=True)
         
         if total_time is None:
-            result = await self.bot.lockdown(member, reason=reason, moderator=ctx.author.id, raise_for_exception=False) 
+            result = await self.bot.lockdown(member, reason=reason, moderator=ctx.author.id) 
         else:
             embed = self.bot.Embed(
                 title='Please Confirm',
@@ -124,7 +124,7 @@ class Moderation(commands.Cog):
                 description=f'Locking down {member.mention}.'
             ), view=None)
             
-            result = await self.bot.lockdown(member, reason=reason, time=total_time.dt, moderator=ctx.author.id, raise_for_exception=False) 
+            result = await self.bot.lockdown(member, reason=reason, time=total_time.dt, moderator=ctx.author.id) 
         
         embed = self.bot.Embed(
             title='Success' if result else 'Oh No!',
