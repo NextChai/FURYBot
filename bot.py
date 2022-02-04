@@ -32,6 +32,7 @@ import traceback
 import functools
 import datetime
 import contextlib
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Callable, List, Dict, Optional, Union, Coroutine, Any
 
 import aiohttp
@@ -44,11 +45,11 @@ from discord.embeds import EmptyEmbed
 
 from urlextract import URLExtract
 
-from cogs.utils.enums import *
 from cogs.utils import copy_doc
 from cogs.utils import context, constants, checks
+from cogs.utils.errors import *
 from cogs.utils.profanity_filter import CustomProfanity
-from cogs.utils.timer import TimerHandler
+from cogs.utils.timer import TimerHandler, Timer
 from cogs.utils.time import UserFriendlyTime, human_time
 from config import postgresql as uri, logging_webhook, message_webhook
 
@@ -135,7 +136,6 @@ class DiscordBot(commands.Bot):
         
         # Lockdown timer
         self.lockdown_timer: TimerHandler = TimerHandler(self, 'lockdowns')
-        self.lockdowns: Dict[int, Dict] = {} # Only used for local lockdowns 
         self.loop.create_task(self._propagate_lockdown_cache())
         
         # Webhooks
@@ -165,31 +165,6 @@ class DiscordBot(commands.Bot):
                 
         pool = await asyncpg.create_pool(uri, init=init)
         return pool
-                    
-    async def _propagate_lockdown_cache(self) -> None:
-        async with self.safe_connection() as conn:
-            data = await conn.fetch('SELECT * FROM lockdowns WHERE expires IS NOT NULL AND dispatched IS FALSE;')
-        
-        for entry in data:
-            kwargs = entry['extra']['kwargs']
-            channels = kwargs['channels']
-            roles = kwargs['roles']
-            reason = kwargs['reason']
-            
-            member = entry['member']
-            lockdowns = self.lockdowns
-            try:
-                current = lockdowns[member]
-                current['reason'].append(Reasons.from_string(kwargs['reason']))
-                if not current['channels']:
-                    current['channels'] = channels
-                    current['roles'] = roles
-            except KeyError:
-                lockdowns[member] = {
-                    'channels': channels,
-                    'roles': roles,
-                    'reason': [Reasons.from_string(reason)]
-                }
                 
     @contextlib.asynccontextmanager
     async def safe_connection(self, timeout: Optional[float] = 10):
@@ -315,12 +290,15 @@ class DiscordBot(commands.Bot):
 
         trace_str = ''.join(traceback.format_exception(type, value, traceback_str))
         print(trace_str)
+        
         for e in self._yield_chunks(trace_str):
             await self.send_to_logging_channel(e)
         
     async def on_command_error(self, ctx, error) -> None:
         if hasattr(ctx.command, 'on_error'):
             return
+        
+        error = getattr(error, 'original', error)
         
         cog = ctx.cog
         if cog:
@@ -331,6 +309,9 @@ class DiscordBot(commands.Bot):
             
         if isinstance(error, commands.MissingPermissions):
             e.description = 'You do not have the permissions to do this command!'
+            return await ctx.send(embed=e)
+        if isinstance(error, (MemberAlreadyLocked, MemberNotLocked)):
+            e.description = str(error)
             return await ctx.send(embed=e)
 
         if checks.should_ignore(ctx.author) and self.debug:
@@ -387,6 +368,7 @@ class Security(CustomProfanity, URLExtract):
         URLExtract.__init__(self)
         super().__init__()
         self.update()
+        self.executor = ThreadPoolExecutor(max_workers=15)
         
     async def setup_profanity(self) -> None:
         """Used to load the wordsets of the profanity filter.
@@ -402,7 +384,7 @@ class Security(CustomProfanity, URLExtract):
     async def wrap(self, method: Callable, *args, **kwargs):
         """A utility coro used to wrap a blocking call in a `run_in_executor` to not block the bot."""
         wrapped = functools.partial(method, *args, **kwargs)
-        return await self.loop.run_in_executor(None, wrapped)
+        return await self.loop.run_in_executor(self.executor, wrapped)
     
     def contains_profanity(self, message: str) -> Coroutine[Any, Any, bool]:
         """Used to determine if a message has profanity.
@@ -449,6 +431,7 @@ class Security(CustomProfanity, URLExtract):
         links = await self.wrap(self.find_urls, message)
         if not links:
             links = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', message)
+        
         return links
     
     async def contains_links(self, message: str) -> bool:
@@ -467,13 +450,7 @@ class Security(CustomProfanity, URLExtract):
         -------
         :class:`bool`
         """
-        links = await self.get_links(message)
-        if not links:
-            links = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', message)
-            if not links:
-                return False
-            
-        return links != []
+        return (await self.get_links(message)) != []
     
     async def is_valid_link(self, link: str) -> bool:
         """Determine if a link is valid.
@@ -490,28 +467,7 @@ class Security(CustomProfanity, URLExtract):
             Pass in a channel to determine if the link is in a valid gif channel.
         """
         check = await self.wrap(re.findall, r'gifyourgame|streamable|lowkey.gg|smash.gg|app.playvs.com', link)
-        if not check:
-            return False
-        return True
-    
-    async def get_nsfw(self, url: str) -> Dict:
-        """Get NSFW data from the local api to determine if an image is NSFW.
-        
-        Parameters
-        ----------
-        url: :class:`str`
-            The image to use.
-        
-        Returns
-        -------
-        Dict
-        """
-        async with self.session.get(url='http://localhost:8000/', params={'url': url}) as resp:
-            return await resp.json()
-        
-    async def is_nsfw(self, url: str) -> bool:
-        data = await self.get_nsfw(url)
-        return data['data']['is_nsfw']
+        return True if check else False
         
         
 class Lockdown:
@@ -529,29 +485,46 @@ class Lockdown:
         lockdown_timer: TimerHandler
         lockdowns: Dict[int, Dict]
         get_guild: Callable
+        get_cog: Callable[[str], Optional[commands.Cog]]
+        wait_until_ready: Callable
     
     @staticmethod
     def get_lockdown_role(guild: discord.Guild):
         return guild.get_role(constants.LOCKDOWN_ROLE)
     
-    async def is_locked(self, member: Union[discord.Member, discord.User]) -> bool:
+    async def is_locked(
+        self, 
+        member: Union[discord.Member, discord.User], 
+        *, 
+        return_record: bool = False, 
+        connection: Optional[asyncpg.Connection] = None
+    ) -> bool:
         """Determine if a member is locked.
         
         Parameters
         ----------
         member: Union[:class:`discord.Member`, :class:`discord.User`]
             The member to check.
-            
+        return_record: Optional[:class:`bool`]
+            Denotes if the record should be returned.
+        connection: Optional[:class:`asyncpg.Connection`]
+            The connection to use, if any.
+
         Returns
         -------
         :class:`bool`
         """
-        async with self.safe_connection() as connection:
-            data = await connection.fetchrow('SELECT * FROM lockdowns WHERE member = $1', member.id)
+        query = 'SELECT * FROM lockdowns WHERE member = $1 WHERE dispatched = $2'
+        if not connection:
+            async with self.safe_connection() as conn:
+                data = await conn.fetchrow(query, member.id, False)
+        else:
+            data = await connection.fetchrow(query, member.id, False)
         
-        if not data:
-            return False
-        return True
+        if return_record:
+            return data
+        
+        return False if not data else True
     
     async def send_to(self, member: discord.Member, *args, **kwargs) -> Optional[discord.Message]:
         """Neatly sends a message to a member. Any exceptions thrown will be quietly handled.
@@ -579,7 +552,7 @@ class Lockdown:
         self, 
         member: discord.Member, 
         *, 
-        reason: Reasons, 
+        reason: Optional[str] = None, 
         time: Optional[datetime.datetime] = None,
         **kwargs
     ) -> bool:
@@ -589,8 +562,10 @@ class Lockdown:
         ----------
         member: :class:`discord.Member`
             The member to Lockdown.
-        reason: :class:`Reasons`
+        reason: Optional[:class:`str`]
             The reason for locking down the member.
+        raise_for_exception: Optional[:class:`bool`]
+            Whether or not to raise an exception if the member is already locked.
             
         Returns
         -------
@@ -598,15 +573,24 @@ class Lockdown:
             Tells you if the member's Lockdown role is new. 
                 - True = lockdown is new
                 - False = the user's lockdown has been extended for another reason.
+                
+        Raises
+        ------
+        MemberAlreadyLocked
+            The member is already locked.
         """
-        log.info(f'Coro lockdown was called on {member} for reason {Reasons.type_to_string(reason)}')
+        log.info('Coro lockdown was called on %s for reason %s', member, reason)
         
-        new_kwargs = {
-            'reason': Reasons.type_to_string(reason),
-            'channels': None,
-            'roles': None,
-        }
+        raise_for_exception = kwargs.pop('raise_for_exception', True)
         
+        if await self.is_locked(member):
+            if not raise_for_exception:
+                return False
+            
+            raise MemberAlreadyLocked(f'Member {member} is already locked.')
+        
+        moderator = kwargs.pop('moderator', None)
+
         channels = []
         for channel in member.guild.channels: # Remove any special team creation. EX: rocket-league-1
             overwrites = channel.overwrites
@@ -617,24 +601,6 @@ class Lockdown:
                     await channel.edit(overwrites=overwrites)
                     channels.append(channel.id)
         
-        roles = [r.id for r in member.roles if r.is_assignable()]
-        
-        new_kwargs['channels'] = channels
-        new_kwargs['roles'] = roles
-        
-        if member.id in self.lockdowns:
-            self.lockdowns[member.id]['reason'].append(reason)
-            
-            # Ensure that when the timer pops the member will have their original roles and channels back
-            new_kwargs['roles'] = self.lockdowns[member.id]['roles']
-            new_kwargs['channels'] = self.lockdowns[member.id]['channels']
-        else:
-            self.lockdowns[member.id] = {
-                'reason': [reason],
-                'channels': channels,
-                'roles': roles
-            }
-            
         lr = self.get_lockdown_role(member.guild)
         
         roles = [lr]
@@ -650,14 +616,14 @@ class Lockdown:
                 await self.lockdown_timer.create_timer(
                     time,
                     member.id,
-                    kwargs.get('moderator', None),
+                    moderator,
                     connection=connection,
-                    **new_kwargs
+                    **kwargs
                 )
             else:
                 await connection.execute(
-                    'INSERT INTO lockdowns (event, extra, created, member, moderator) VALUES ($1, $2::jsonb, $3, $4, $5)',
-                    'lockdowns', {'kwargs': new_kwargs, 'args': []}, discord.utils.utcnow(), member.id, kwargs.get('moderator', member.id)
+                    'INSERT INTO lockdowns (event, extra, created, member, moderator, dispatched) VALUES ($1, $2::jsonb, $3, $4, $5)',
+                    'lockdowns', {'kwargs': kwargs, 'args': []}, discord.utils.utcnow(), member.id, moderator or member.id, False
                 )
         
         embed = Embed(
@@ -667,7 +633,7 @@ class Lockdown:
         )
         embed.set_author(name=str(member), icon_url=member.display_avatar.url)
         embed.set_footer(text=f'ID: {member.id}') 
-        embed.add_field(name='Reason', value=f'Locked down for: {Reasons.type_to_string(reason)}')
+        embed.add_field(name='Reason', value=f'Locked down for reason: {reason}')
         embed.add_field(name='Expires', value=f'The lockdown expires in {human_time(time) if time else "Never"}{" ({})".format(discord.utils.format_dt(time)) if time else ""}')
         
         await self.send_to(member, embed=embed)
@@ -677,72 +643,117 @@ class Lockdown:
         self,
         seconds: int,
         member: discord.Member,
-        reason: Reasons
+        *,
+        reason: Optional[str] = None,
+        **kwargs
     ) -> bool:
+        """|coro|
+        
+        Used to lockdown a member for a specific amount of time.
+        
+        Parameters
+        ----------
+        seconds: :class:`int`
+            The total time, in seconds, to lockdown the member.
+        member: :class:`discord.Member`
+            The member to Lockdown.
+        reason: Optional[:class:`str`]
+            The reason for locking down the member.
+        raise_for_exception: Optional[:class:`bool`]
+            Whether or not to raise an exception if the member is already locked.
+            
+        Returns
+        -------
+        :class:`bool`
+            Tells you if the member's Lockdown role is new. 
+                - True = lockdown is new
+                - False = the user's lockdown has been extended for another reason.
+                
+        Raises
+        ------
+        MemberAlreadyLocked
+            The member is already locked.
+        
+        """
         # Let's convert the time first
         when = await UserFriendlyTime(converter=None, default='for lockdown').convert(context.DummyContext(), f'{seconds}s')
-        return await self.lockdown(member, reason=reason, time=when.dt)
+        return await self.lockdown(member, reason=reason, time=when.dt, **kwargs)
         
-    async def freedom(self, member: discord.Member, *, reason: Reasons) -> bool:
-        """Removes a users lockdown state and restores their original roles.
+    async def freedom(self, member: discord.Member, *, raise_for_exception: bool = True) -> bool:
+        """|coro|
         
-        .. note::   
-        
-            This will not remove the members lockdown if the user has other outstanding lockdown reasons.
+        Called to prematurely remove the lockdown timer, this will override the existing timer.
         
         Parameters
         ----------
         member: :class:`discord.Member`
             The member to free from lockdown.
-        reason: :class:`Reasons`
-            The reason for unlocking the member.
+        raise_for_exception: Optional[:class:`bool`]
+            Whether or not to raise an exception if the member is not locked.
             
         Returns
         -------
         :class:`bool`
             Whether or not the unlock was successful.
+            
+        Raises
+        ------
+        MemberNotLocked
+            The Member was not locked.
         """
         log.info(f'Coro freedom called on {member}')
-      
-        if member.id not in self.lockdowns:
-            return False
+        
+        # Called to prematurely remove the lockdown timer.
+        async with self.safe_connection() as conn:
+            if not (data := await self.is_locked(member, return_record=True, connection=conn)):
+                if not raise_for_exception:
+                    return False
+                
+                raise MemberNotLocked(f'Member {member} is not locked.')
+            
+            timer = Timer(record=data)
+            await conn.execute('UPDATE lockdowns SET dispatched = $1 WHERE id = $2', True, timer.id)
+        
+        await self.on_lockdowns_timer_complete(timer)
+        return True
+    
+    async def on_lockdowns_timer_complete(self, timer: Timer) -> None:
+        await self.wait_until_ready()
         
         guild = self.get_guild(constants.FURY_GUILD)
-        data = self.lockdowns[member.id]
-        reasons = data['reason']
-        try:
-            reasons.remove(reason)
-        except Exception:
-            pass
+        member = guild.get_member(timer.member) or await guild.fetch_member(timer.member)
+        log.info(f'On lockdowns timer complete for member {member}')
         
-        if reasons: # The member has been locked down for more than 1 reason
-            return False
+        # Restore roles here
+        channels = timer.kwargs['channels']
+        roles = timer.kwargs['roles']
         
-        self.lockdowns.pop(member.id, None)
-        
-        channels = data['channels']
-        roles = data['roles']
-        
-        for channel_id in channels:
-            channel = guild.get_channel(channel_id)
+        for channel in channels:
+            channel = guild.get_channel(channel)
+            if not channel:
+                continue
+            
             overwrites = channel.overwrites
             if overwrites.get(member):
                 overwrites[member].update(view_channel=True)
                 await channel.edit(overwrites=overwrites)
         
-        clean_roles = [guild.get_role(id) for id in roles]
-        await member.edit(roles=clean_roles)
+        keep_roles = [member.roles]
+        try:
+            keep_roles.remove(self.get_lockdown_role(guild))
+        except:
+            pass
+        keep_roles.extend(discord.Object(id=r) for r in roles)
+        await member.edit(roles=keep_roles)
         
         embed = Embed(
             title='Lockdown Ended',
-            description='Your lockdown has ended! Your access to the server has been revoked. Feel free to review the rules and enjoy the server.'
+            description='Your lockdown has ended! You access tot he server has been restored. Feel free to review the rules and enjoy the server.'
         )
         embed.set_author(name=str(member), icon_url=member.display_avatar.url)
         embed.set_footer(text=f'ID: {member.id}')
-        
         await self.send_to(member, embed=embed)
-        return True
-
+        
          
 class SecurityMixin(Security, Lockdown):
     """A mixin that implements the attrs and methods of both the 

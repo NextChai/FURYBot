@@ -30,7 +30,6 @@ import discord
 from discord.ext import commands
 
 from cogs.utils import time, timer, constants
-from cogs.utils.enums import Reasons
 from cogs.utils.errors import ProfanityFailure
 from cogs.utils.context import Context
 from cogs.utils.db import Row, Table
@@ -62,13 +61,6 @@ class LockdownHistory(Table, name='lockdown_history'):
             Row('member', 'BIGINT'),
             Row('reason', 'TEXT'),
         ])
-        
-class string_to_reason:
-    async def convert(self, ctx, argument):
-        try:
-            return Reasons.from_string(argument)
-        except:
-            raise commands.BadArgument(f'Invalid reason: {argument}')
 
 
 class Moderation(commands.Cog):
@@ -102,32 +94,28 @@ class Moderation(commands.Cog):
         
     @lockdown.slash(name='member',description='Lock down a member for a specific reason.')
     @commands.describe('member', description='The member to lock.')
-    @commands.describe(
-        'reason', 
-        description='The reason for locking the member.',
-        choices=[commands.OptionChoice(name=Reasons.type_to_string(value), value=name) for name, value in Reasons.__members__.items()]
-    )
-    @commands.describe('total_time', description='A specific date you want to unlock them.')
+    @commands.describe('reason', description='The reason for the lockdown.')
+    @commands.describe('time', description='A specific date you want to unlock them.')
     async def lockdown_member(
         self, 
         ctx: Context, 
         member: discord.Member, 
-        reason: string_to_reason, 
+        reason: Optional[str] = None,
         total_time: Optional[time.UserFriendlyTime] = None 
     ) -> None:
         await ctx.defer(ephemeral=True)
         
         if total_time is None:
-            result = await self.bot.lockdown(member, reason=reason, moderator=ctx.author.id) # type: ignore
+            result = await self.bot.lockdown(member, reason=reason, moderator=ctx.author.id, raise_for_exception=False) 
         else:
-            e = self.bot.Embed(
+            embed = self.bot.Embed(
                 title='Please Confirm',
-                description=f'Do you want to lockdown {member.mention} until {discord.utils.format_dt(total_time.dt, style="F")}?'
+                description=f'Do you want to lockdown {member.mention} for {time.human_time(total_time.dt)} (until {discord.utils.format_dt(total_time.dt, style="F")})?'
             )
-            e.set_author(name=str(member), icon_url=member.display_avatar.url)
-            e.set_footer(text=f'Member ID: {member.id}') 
+            embed.set_author(name=str(member), icon_url=member.display_avatar.url)
+            embed.set_footer(text=f'Member ID: {member.id}') 
         
-            confirmation = await ctx.get_confirmation(embed=e)
+            confirmation = await ctx.get_confirmation(embed=embed)
             if not confirmation:
                 return
             
@@ -136,33 +124,22 @@ class Moderation(commands.Cog):
                 description=f'Locking down {member.mention}.'
             ), view=None)
             
-            result = await self.bot.lockdown(member, reason=reason, time=total_time.dt, moderator=ctx.author.id) # type: ignore
+            result = await self.bot.lockdown(member, reason=reason, time=total_time.dt, moderator=ctx.author.id, raise_for_exception=False) 
         
-        e = self.bot.Embed(
+        embed = self.bot.Embed(
             title='Success' if result else 'Oh No!',
             description=f'I have locked down {member.mention} for reason {reason}' if result else f'I was not able to lockdown {member.mention}'
         )
         if result:
-            e.add_field(name='Note:', value='They have been given the Lockdown Role, and all their previous roles have been removed. You can do `/freedom` to unlock them.')
+            embed.add_field(name='Note:', value='They have been given the Lockdown Role, and all their previous roles have been removed. You can do `/freedom` to unlock them.')
         else:
-            e.add_field(name='Reason', value='This is due to a role issue, they have higher permissions than I do.')
+            embed.add_field(name='Reason', value='This is due to a role issue, they have higher permissions than I do.')
             
-        return await ctx.send(embed=e)
+        return await ctx.send(embed=embed)
     
     @lockdown.slash(name='freedom', description='Remove a lockdown from a member.')
     @commands.describe('member', description='The member to set free')
-    @commands.describe(
-        'reason', 
-        description='The reason for freeing the member.',
-        choices=[commands.OptionChoice(name=Reasons.type_to_string(value), value=name) for name, value in Reasons.__members__.items()]
-    )
-    async def freedom(self, ctx: Context, member: discord.Member, reason: string_to_reason):
-        if member.id not in self.bot.lockdowns:
-            return await ctx.send(embed=self.bot.Embed(
-                title='Oh no!',
-                description=f'{member.mention} is not locked down.'
-            ))
-
+    async def freedom(self, ctx: Context, member: discord.Member):
         await self.bot.freedom(member, reason=reason) # type: ignore
         
         return await ctx.send(embed=self.bot.Embed(
@@ -572,18 +549,6 @@ class Moderation(commands.Cog):
             embed.add_field(name=f'Mute {index+1}', value=fmt, inline=False)
         
         return await ctx.send(embed=embed)
-        
-    @commands.Cog.listener()
-    async def on_lockdowns_timer_complete(self, timer: timer.Timer) -> None:
-        await self.bot.wait_until_ready()
-        
-        reason = Reasons.from_string(timer.kwargs['reason'])
-        
-        guild = self.bot.get_guild(constants.FURY_GUILD)
-        member = guild.get_member(timer.member) or await guild.fetch_member(timer.member)
-        log.info(f'On lockdowns timer complete for member {member}')
-        
-        await self.bot.freedom(member, reason=reason)
         
     @commands.Cog.listener()
     async def on_mutes_timer_complete(self, timer: timer.Timer) -> None:

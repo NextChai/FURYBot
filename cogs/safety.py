@@ -34,7 +34,6 @@ from typing import TYPE_CHECKING
 
 from cogs.utils.checks import should_ignore
 from cogs.utils import constants
-from cogs.utils.enums import Reasons
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -89,7 +88,7 @@ class Safety(commands.Cog):
         
         await message.delete()
         
-        await self.bot.lockdown_for(60*10, member=message.author, reason=Reasons.rolemention)
+        await self.bot.lockdown_for(60*10, member=message.author, reason='Mentioning Roles')
         
         # The user has mentioned a role in their message, let's manage cleanup.
         # Let's limit the channel to only moderators.
@@ -147,7 +146,7 @@ class Safety(commands.Cog):
         
         await message.delete()
 
-        await self.bot.lockdown_for(60*10, member=message.author, reason=Reasons.massmention)
+        await self.bot.lockdown_for(60*10, member=message.author, reason='Mass mentioning roles.')
         
         # The user has mentioned a role in their message, let's manage cleanup.
         # Let's limit the channel to only moderators.
@@ -287,7 +286,7 @@ class Safety(commands.Cog):
         
         await message.delete()
         
-        await self.bot.lockdown_for(5*60, member=message.author, reason=Reasons.profanity)
+        await self.bot.lockdown_for(5*60, member=message.author, reason='Profanity.')
         
         embed = self.bot.Embed(
             title='Oh no!',
@@ -372,12 +371,7 @@ class Safety(commands.Cog):
         if await self.bot.contains_profanity(after.name):
             guild = self.bot.get_guild(constants.FURY_GUILD)
             member = guild.get_member(after.id) or (await guild.fetch_member(after.id))
-            await self.bot.lockdown(member, reason=Reasons.displayname)
-        else:
-            if await self.bot.is_locked(after):
-                guild = self.bot.get_guild(constants.FURY_GUILD)
-                member = guild.get_member(after.id) or (await guild.fetch_member(after.id))
-                await self.bot.freedom(member, reason=Reasons.displayname) 
+            await self.bot.lockdown(member, reason='Bad display name.')
 
     @tasks.loop(count=1)
     async def name_checker(self) -> None:
@@ -395,11 +389,11 @@ class Safety(commands.Cog):
         
         async for member in guild.fetch_members(limit=None):
             if (censored := await self.bot.censor_message(member.display_name)) != member.display_name:
-                await self.bot.lockdown(member, reason=Reasons.displayname)
+                await self.bot.lockdown(member, reason='Bad display name.')
                 
                 e = self.bot.Embed(
                     title='Lockdown Incoming!',
-                    description=f'Member {member.mention} has been locked down for {Reasons.type_to_string(Reasons.displayname)}'
+                    description=f'Member {member.mention} has been locked down for a bad display name.'
                 )
                 e.add_field(name='Name:', value=member.display_name)
                 e.add_field(name='Censored:', value=censored)
@@ -409,7 +403,7 @@ class Safety(commands.Cog):
                 activity = discord.utils.find(lambda activity: isinstance(activity, discord.CustomActivity), member.activities)
                 if activity and activity.name:
                     if (censored := await self.bot.censor_message(activity.name)) != activity.name:
-                        await self.bot.lockdown(member, reason=Reasons.activity)
+                        await self.bot.lockdown(member, reason='Bad activity')
                         
                         e = self.bot.Embed(
                             title='Bad Status Found',

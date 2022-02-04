@@ -28,7 +28,9 @@ from typing import Tuple
 
 __all__: Tuple[str, ...] = (
     'FuryException',
-    'ProfanityFailure'
+    'ProfanityFailure',
+    'MemberAlreadyLocked',
+    'MemberNotLocked'
 )
 
 class FuryException(Exception):
@@ -38,4 +40,14 @@ class FuryException(Exception):
 
 class ProfanityFailure(FuryException):
     """The exception raised when a profanity filter fails."""
+    pass
+
+
+class MemberAlreadyLocked(FuryException):
+    """Raised when a member is already locked."""
+    pass
+
+
+class MemberNotLocked(FuryException):
+    """Raised when a member is not locked."""
     pass
