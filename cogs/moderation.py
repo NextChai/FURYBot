@@ -140,7 +140,7 @@ class Moderation(commands.Cog):
     @lockdown.slash(name='freedom', description='Remove a lockdown from a member.')
     @commands.describe('member', description='The member to set free')
     async def freedom(self, ctx: Context, member: discord.Member):
-        await self.bot.freedom(member, reason=reason) # type: ignore
+        await self.bot.freedom(member)
         
         return await ctx.send(embed=self.bot.Embed(
             title='Success!',
