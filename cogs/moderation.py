@@ -112,9 +112,8 @@ class Moderation(commands.Cog):
                 title='Please Confirm',
                 description=f'Do you want to lockdown {member.mention} for {time.human_time(total_time.dt)} (until {discord.utils.format_dt(total_time.dt, style="F")})?'
             )
-            embed.set_author(name=str(member), icon_url=member.display_avatar.url)
-            embed.set_footer(text=f'Member ID: {member.id}') 
-        
+            embed.custom_author(member)
+            
             confirmation = await ctx.get_confirmation(embed=embed)
             if not confirmation:
                 return
@@ -154,7 +153,7 @@ class Moderation(commands.Cog):
             title=f'Lockdown information on {member}',
             description=f"Here's all the lockdown info I could find on {member.mention}.\n\n"
         )
-        embed.set_author(name=str(member), icon_url=member.display_avatar.url)
+        embed.custom_author(member)
         embed.set_thumbnail(url=member.display_avatar.url)
         
         async with self.bot.safe_connection() as conn:

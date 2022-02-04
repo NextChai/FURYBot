@@ -114,7 +114,7 @@ class Safety(commands.Cog):
             description=f'{message.author.mention}, it seems you\'ve mentioned a role in your message. This should not '
                         'be possible.'
         )
-        embed.set_author(name=str(message.author), icon_url=message.author.display_avatar.url)
+        embed.custom_author(message.author)
         embed.add_field(name='Role(s) mentioned', value=', '.join(r.mention for r in message.role_mentions))
         await self.bot.send_to(message.author, embed=embed)
         
@@ -123,7 +123,7 @@ class Safety(commands.Cog):
             title='Role Mentions Found',
             description=f'A role mention was found in {channel.mention} sent by {message.author.mention}'
         )
-        embed.set_author(name=str(message.author), icon_url=message.author.display_avatar.url)
+        embed.custom_author(message.author)
         embed.add_field(name='Role(s) mentioned', value=', '.join(r.mention for r in message.role_mentions))
         await self.bot.send_to_logging_channel(embed=embed, allowed_mentions=discord.AllowedMentions.none())
         
@@ -162,7 +162,7 @@ class Safety(commands.Cog):
                         'We\'re very sorry for the inconvience, I\'ll be locking this channel down in the '
                         'meant time until we can resolve this issue.',
         )
-        embed.set_author(name=str(message.author), icon_url=message.author.display_avatar.url)
+        embed.custom_author(message.author)
         embed.add_field(name='Actions Taken', value='This channel has been locked until further notice.'
                                                 'The member in question has been placed in lockdown.')
         await message.channel.send(embed=embed)
@@ -173,8 +173,9 @@ class Safety(commands.Cog):
             description=f'You have pinged @everyone or @here in {message.channel.mention}. This is not allowed.'
                         'I\'ve placed you in Lockdown until further notice.'
         )
-        embed.set_author(name=str(message.author), icon_url=message.author.display_avatar.url)
+        embed.custom_author(message.author)
         embed.add_field(name='Message Content', value=discord.utils.escape_mentions(message.content))
+        
         await self.bot.send_to(message.author, embed=embed)
         
         # Now let's send to logging channel.
@@ -210,8 +211,7 @@ class Safety(commands.Cog):
             title='Message attachments found',
             description='Please do not post files!'
         )
-        embed.set_author(name=str(message.author), icon_url=message.author.display_avatar.url)
-        embed.set_footer(text=f'Message ID: {message.id}')
+        embed.custom_author(message.author)
         await message.channel.send(embed=embed)
         
         embed.description = f'{message.author.mention} has posted an attachment in {message.channel.mention}\n\nI have attached the files for you to view.'
@@ -239,8 +239,7 @@ class Safety(commands.Cog):
             title='Oh no!',
             description='Please do not post messages that long!'
         )
-        embed.set_author(name=str(message.author), icon_url=message.author.display_avatar.url)
-        embed.set_footer(text=f'Message ID: {message.id}')
+        embed.custom_author(message.authro)
         return await message.channel.send(embed=embed, content=message.author.mention)
         
     @commands.Cog.listener('on_message_edit')

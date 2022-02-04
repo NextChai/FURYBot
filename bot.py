@@ -88,7 +88,7 @@ class BotEmbed(discord.Embed):
     __slots__: Tuple[str, ...] = ()
     
     def custom_author(self, _o: Union[discord.Member, discord.User]) -> None:
-        self.set_author(name=_o.display_name, icon_url=_o.display_avatar.url)
+        self.set_author(name=_o.__str__(), icon_url=_o.display_avatar.url)
         self.set_footer(text=f'ID: {_o.id}')
 
 
@@ -653,8 +653,7 @@ class Lockdown:
             description=f'You have been given the **Lockdown** role in the FLVS Fury server. '
                         'This means you cannot interact with the server for now.'
         )
-        embed.set_author(name=str(member), icon_url=member.display_avatar.url)
-        embed.set_footer(text=f'ID: {member.id}') 
+        embed.custom_author(member)
         embed.add_field(name='Reason', value=f'Locked down for reason: {reason}')
         embed.add_field(name='Expires', value=f'The lockdown expires in {human_time(time) if time else "Never"}{" ({})".format(discord.utils.format_dt(time)) if time else ""}')
         
