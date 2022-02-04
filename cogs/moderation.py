@@ -217,7 +217,7 @@ class Moderation(commands.Cog):
             description=f'I have cleared all lockdown history for {member.mention}.'
         )
         embed.custom_author(member)
-        return await ctx.send(embed=embed)
+        return await ctx.send(embed=embed, view=None)
     
     @commands.group(name='team',description='Edit, manage, and view teams.')
     @commands.guild_only()
