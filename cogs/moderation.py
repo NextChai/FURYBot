@@ -179,7 +179,7 @@ class Moderation(commands.Cog):
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.', inline=False)
         
-        active = discord.utils.find(lambda timer: timer.dispatched == False, timers)
+        active = discord.utils.get(timers, dispatched=False)
         if active:
             data = [
                 f'Expires: {_format_dt(active.expires) if active.expires else "Does not expire."}',
@@ -193,11 +193,11 @@ class Moderation(commands.Cog):
             counter[moderator] += 1
         
         data = [
-            f'<@{moderator}>: {count}' for moderator, count in counter.most_common()
+            f'<@{moderator}>: **{count}**' for moderator, count in counter.most_common()
         ]
         embed.add_field(
             name='Moderator Count', 
-            value='{counter} moderators.\n\n{data}'.format(counter=len(counter), data='\n'.join(data)),
+            value='{counter} moderators.\n{data}'.format(counter=len(counter), data='\n'.join(data)),
             inline=False
         )
         return await ctx.send(embed=embed)
