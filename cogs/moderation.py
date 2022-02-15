@@ -119,9 +119,9 @@ class Moderation(commands.Cog):
         else:
             embed = self.bot.Embed(
                 title='Please Confirm',
-                description=f'Do you want to lockdown {member.mention} for {time.human_time(total_time.dt)} (until {discord.utils.format_dt(total_time.dt, style="F")})?'
+                description=f'Do you want to lockdown {member.mention} for {time.human_time(total_time.dt)} (until {discord.utils.format_dt(total_time.dt, style="F")})?',
+                author=member
             )
-            embed.custom_author(member)
             
             confirmation = await ctx.get_confirmation(embed=embed)
             if not confirmation:
@@ -173,13 +173,11 @@ class Moderation(commands.Cog):
         
         embed = self.bot.Embed(
             title=f'Lockdown History for {member}',
-            description='This is a list of all the lockdowns that have been placed on this member.'
+            description='This is a list of all the lockdowns that have been placed on this member.',
+            author=member
         )
-        print(embed)
-        #embed.custom_author(member)
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.', inline=False)
-        print(embed)
         
         active = discord.utils.find(lambda timer: timer.dispatched == False, timers)
         if active:
@@ -202,7 +200,6 @@ class Moderation(commands.Cog):
             value='{counter} moderators.\n\n{data}'.format(counter=len(counter), data='\n'.join(data)),
             inline=False
         )
-        print("SENDING")
         return await ctx.send(embed=embed)
         
     @lockdown.slash(name='clear', description='Clear all lockdown history from a member.')
@@ -221,9 +218,9 @@ class Moderation(commands.Cog):
         
         embed = self.bot.Embed(
             title='Done',
-            description=f'I have cleared all lockdown history for {member.mention}.'
+            description=f'I have cleared all lockdown history for {member.mention}.',
+            author=member
         )
-        embed.custom_author(member)
         return await ctx.send(embed=embed, view=None)
     
     @commands.group(name='team',description='Edit, manage, and view teams.')

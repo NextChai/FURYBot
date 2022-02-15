@@ -84,17 +84,6 @@ initial_extensions = (
 )
 
 
-class BotEmbed(discord.Embed):
-    """A custom embed sued to assist in setting a custom author."""
-    __slots__: Tuple[str, ...] = ()
-    
-    def custom_author(self, _o: Union[discord.Member, discord.User]) -> BotEmbed:
-        """Set the author of the embed to the given object."""
-        self.set_author(name=_o.__str__(), icon_url=_o.display_avatar.url)
-        self.set_footer(text=f'ID: {_o.id}')
-        return self
-
-
 @copy_doc(discord.Embed)
 def Embed(
     *,
@@ -103,6 +92,7 @@ def Embed(
     url: str = EmptyEmbed,
     timestamp: datetime.datetime = datetime.datetime.now(),
     color: Union[discord.Color, int] = MISSING,
+    author: Union[discord.User, discord.member] = MISSING
 ) -> discord.Embed:
     """A method used to have a consistent color across all bot Embeds.
     
@@ -113,7 +103,7 @@ def Embed(
     if color is MISSING:
         color = discord.Color.blue()
         
-    return BotEmbed(
+    embed = discord.Embed(
         title=title,
         description=description,
         timestamp=timestamp,
@@ -121,6 +111,11 @@ def Embed(
         url=url
     )
 
+    if author is not MISSING:
+        embed.set_author(name=str(author), icon_url=author.display_avatar.url)
+        embed.set_footer(text=f'ID: {author.id}')
+        
+    return embed
 
 class DiscordBot(commands.Bot):
     """The base container for FURY Bot.
@@ -656,9 +651,9 @@ class Lockdown:
         embed = Embed(
             title='Oh no!',
             description=f'You have been given the **Lockdown** role in the FLVS Fury server. '
-                        'This means you cannot interact with the server for now.'
+                        'This means you cannot interact with the server for now.',
+            author=member
         )
-        embed.custom_author(member)
         embed.add_field(name='Reason', value=f'Locked down for reason: {reason}')
         embed.add_field(name='Expires', value=f'The lockdown expires in {human_time(time) if time else "Never"}{" ({})".format(discord.utils.format_dt(time)) if time else ""}')
         

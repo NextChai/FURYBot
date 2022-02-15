@@ -112,18 +112,18 @@ class Safety(commands.Cog):
         embed = self.bot.Embed(
             title='Role Mentions Found',
             description=f'{message.author.mention}, it seems you\'ve mentioned a role in your message. This should not '
-                        'be possible.'
+                        'be possible.',
+            author=message.author,
         )
-        embed.custom_author(message.author)
         embed.add_field(name='Role(s) mentioned', value=', '.join(r.mention for r in message.role_mentions))
         await self.bot.send_to(message.author, embed=embed)
         
         # Now let's send it to the logging channel
         embed = self.bot.Embed(
             title='Role Mentions Found',
-            description=f'A role mention was found in {channel.mention} sent by {message.author.mention}'
+            description=f'A role mention was found in {channel.mention} sent by {message.author.mention}',
+            author=message.author,
         )
-        embed.custom_author(message.author)
         embed.add_field(name='Role(s) mentioned', value=', '.join(r.mention for r in message.role_mentions))
         await self.bot.send_to_logging_channel(embed=embed, allowed_mentions=discord.AllowedMentions.none())
         
@@ -161,8 +161,8 @@ class Safety(commands.Cog):
             description='It seems an anauthorized user was able to ping @everyone or @here in this channel. '
                         'We\'re very sorry for the inconvience, I\'ll be locking this channel down in the '
                         'meant time until we can resolve this issue.',
+            author=message.author,
         )
-        embed.custom_author(message.author)
         embed.add_field(name='Actions Taken', value='This channel has been locked until further notice.'
                                                 'The member in question has been placed in lockdown.')
         await message.channel.send(embed=embed)
@@ -171,9 +171,9 @@ class Safety(commands.Cog):
         embed = self.bot.Embed(
             title=f'You Pinged {message.guild.member_count} people...',
             description=f'You have pinged @everyone or @here in {message.channel.mention}. This is not allowed.'
-                        'I\'ve placed you in Lockdown until further notice.'
+                        'I\'ve placed you in Lockdown until further notice.',
+            author=message.author,
         )
-        embed.custom_author(message.author)
         embed.add_field(name='Message Content', value=discord.utils.escape_mentions(message.content))
         
         await self.bot.send_to(message.author, embed=embed)
@@ -209,9 +209,9 @@ class Safety(commands.Cog):
                 
         embed = self.bot.Embed(
             title='Message attachments found',
-            description='Please do not post files!'
+            description='Please do not post files!',
+            author=message.author,
         )
-        embed.custom_author(message.author)
         await message.channel.send(embed=embed)
         
         embed.description = f'{message.author.mention} has posted an attachment in {message.channel.mention}\n\nI have attached the files for you to view.'
@@ -237,9 +237,9 @@ class Safety(commands.Cog):
     
         embed = self.bot.Embed(
             title='Oh no!',
-            description='Please do not post messages that long!'
+            description='Please do not post messages that long!',
+            author=message.author,
         )
-        embed.custom_author(message.authro)
         return await message.channel.send(embed=embed, content=message.author.mention)
         
     @commands.Cog.listener('on_message_edit')
