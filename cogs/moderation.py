@@ -158,12 +158,10 @@ class Moderation(commands.Cog):
     @lockdown.slash(name='history', description='Get the history of a member\'s lockdowns.')
     @commands.describe('member', description='The member to get information on.')
     async def lockdown_history(self, ctx: Context, member: discord.Member) -> None:
-        print("IT GOT CALLED")
         async with self.bot.safe_connection() as conn:
             data = await conn.fetch('SELECT * FROM lockdowns WHERE member = $1', member.id)
         
         timers: List[timer.Timer] = [timer.Timer(record=record) for record in data]
-        print(timers)
             
         if not timers:
             return await ctx.send(embed=self.bot.Embed(
