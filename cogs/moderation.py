@@ -158,15 +158,8 @@ class Moderation(commands.Cog):
     @lockdown.slash(name='history', description='Get the history of a member\'s lockdowns.')
     @commands.describe('member', description='The member to get information on.')
     async def lockdown_history(self, ctx: Context, member: discord.Member) -> None:
-        embed = self.bot.Embed(
-            title=f'Lockdown History for {member}',
-            description='This is a list of all the lockdowns that have been placed on this member.'
-        )
-        embed.custom_author(member)
-        embed.set_thumbnail(url=member.display_avatar.url)
-        
         async with self.bot.safe_connection() as conn:
-            data = await conn.fetch('SELECT * FROM lockdowns WHERE member = $1 AND expires > CURRENT_TIMESTAMP AND expires IS NOT NULL ORDER BY expires', member.id)
+            data = await conn.fetch('SELECT * FROM lockdowns WHERE member = $1', member.id)
             timers: List[timer.Timer] = [timer.Timer(record=record) for record in data]
             
         if not timers:
@@ -175,6 +168,12 @@ class Moderation(commands.Cog):
                 description=f'{member.mention} has no lockdown history!'
             ))
         
+        embed = self.bot.Embed(
+            title=f'Lockdown History for {member}',
+            description='This is a list of all the lockdowns that have been placed on this member.'
+        )
+        embed.custom_author(member)
+        embed.set_thumbnail(url=member.display_avatar.url)
         embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.', inline=False)
         
         active = discord.utils.find(lambda timer: timer.dispatched == False, timers)
