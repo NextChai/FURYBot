@@ -343,8 +343,9 @@ class DiscordBot(commands.Bot):
             print(lines)
             
             formatted = lines.replace(traceback_str, f'```python\n{traceback_str}\n```')
-            await ctx.send(formatted)
-            
+            if len(formatted) < 2000:
+                await ctx.send(formatted)
+
             for e in self._yield_chunks(traceback_str):
                 await self.send_to_logging_channel(e)
         else:
