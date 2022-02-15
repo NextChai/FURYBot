@@ -646,7 +646,7 @@ class Lockdown:
                 )
             else:
                 await connection.execute(
-                    'INSERT INTO lockdowns (event, extra, created, member, moderator, dispatched) VALUES ($1, $2::jsonb, $3, $4, $5)',
+                    'INSERT INTO lockdowns (event, extra, created, member, moderator, dispatched) VALUES ($1, $2::jsonb, $3, $4, $5, $6)',
                     'lockdowns', {'kwargs': kwargs, 'args': []}, discord.utils.utcnow(), member.id, moderator or member.id, False
                 )
         
