@@ -24,7 +24,8 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional
+from collections import Counter
+from typing import TYPE_CHECKING, Optional, List
 
 import discord
 from discord.ext import commands
@@ -37,6 +38,7 @@ from cogs.utils.db import Row, Table
 
 if TYPE_CHECKING:
     from bot import FuryBot
+    import datetime
     
 log = logging.getLogger(__name__)
     
@@ -44,6 +46,13 @@ __all__ = (
     'LockdownTable',
     'Moderation',
 )
+
+def _format_dt(dt: datetime.datetime) -> str:
+    try:
+        return discord.utils.format_dt(dt, style='F')
+    except OverflowError:
+        return 'Time is too far in the future.'
+            
 
 class LockdownTable(Table, name='lockdowns'):
     def __init__(self) -> None:
@@ -146,59 +155,51 @@ class Moderation(commands.Cog):
             description=f'I have freed {member.mention} from lockdown.'
         ))
         
-    # TODO: Rewrite this pls
-    @lockdown.slash(name='history', description='Get information on user lockdowns.')
+    @lockdown.slash(name='history', description='Get the history of a member\'s lockdowns.')
     @commands.describe('member', description='The member to get information on.')
-    async def lockdown_info(self, ctx: Context, member: discord.Member) -> None:
+    async def lockdown_history(self, ctx: Context, member: discord.Member) -> None:
         embed = self.bot.Embed(
-            title=f'Lockdown information on {member}',
-            description=f"Here's all the lockdown info I could find on {member.mention}.\n\n"
+            title=f'Lockdown History for {member}',
+            description='This is a list of all the lockdowns that have been placed on this member.'
         )
         embed.custom_author(member)
         embed.set_thumbnail(url=member.display_avatar.url)
         
         async with self.bot.safe_connection() as conn:
             data = await conn.fetch('SELECT * FROM lockdowns WHERE member = $1 AND expires > CURRENT_TIMESTAMP AND expires IS NOT NULL ORDER BY expires', member.id)
+            timers: List[timer.Timer] = [timer.Timer(record=record) for record in data]
             
-        if not data:
+        if not timers:
             return await ctx.send(embed=self.bot.Embed(
                 title='Oh no!',
                 description=f'{member.mention} has no lockdown history!'
             ))
-            
+        
         embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.', inline=False)
         
-        active_lockdowns = [(e, e['expires']) for e in data if not e['dispatched']]
+        active = discord.utils.find(lambda timer: timer.dispatched == False, timers)
+        if active:
+            data = [
+                f'Expires: {_format_dt(active.expires) if active.expires else "Does not expire."}',
+                f'Created: {_format_dt(active.created_at)}',
+                f'Moderator: <@{active.moderator}>',
+            ]
+            embed.add_field(name='Active Lockdown', value='\n'.join(data), inline=False)
         
-        if active_lockdowns:
-            embed.add_field(name='Active Lockdowns', value=f'{len(active_lockdowns)} active lockdowns total.', inline=False)
-            
-            active_lockdown, expires = max(active_lockdowns, key=lambda e: e[1])
-            kwargs = active_lockdown['extra']['kwargs']
-            embed.add_field(name='Closest Active Lockdown', value='{0} - Created {1} - Ends {2}'.format(
-                kwargs['reason'], 
-                discord.utils.format_dt(active_lockdown['created'], style='F'),
-                discord.utils.format_dt(expires, style='F'),
-            ), inline=False)
+        counter = Counter()
+        for moderator in [timer.moderator for timer in timers]:
+            counter[moderator] += 1
         
-        most_recent = data[0]
-        kwargs = most_recent['extra']['kwargs']
-        embed.add_field(name='Most Recent Lockdown', value='{0} - Created {1} - Ends {2}'.format(
-            kwargs['reason'], 
-            discord.utils.format_dt(most_recent['created'], style='F'),
-            discord.utils.format_dt(expires, style='F') if (expires := most_recent['expires']) is not None else 'never'
-        ), inline=False)
-        
-        first_lockdown = data[-1]
-        kwargs = first_lockdown['extra']['kwargs']
-        embed.add_field(name='First Lockdown', value='{0} - Created {1} - Ends {2}'.format(
-            kwargs['reason'], 
-            discord.utils.format_dt(first_lockdown['created'], style='F'),
-            discord.utils.format_dt(expires, style='F') if (expires := first_lockdown['expires']) is not None else 'never'
-        ), inline=False)
-            
+        data = [
+            f'<@{moderator}>: {count}' for moderator, count in counter.most_common()
+        ]
+        embed.add_field(
+            name='Moderator Count', 
+            value='{0} moderators.\n\n{1}'.format(len(counter), '\n'.join(data)),
+            inline=False
+        )
         return await ctx.send(embed=embed)
-    
+        
     @lockdown.slash(name='clear', description='Clear all lockdown history from a member.')
     @commands.describe('member', description='The member to clear history for.')
     async def lockdown_clear(self, ctx: Context, member: discord.Member) -> None:
