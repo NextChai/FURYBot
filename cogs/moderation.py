@@ -158,10 +158,12 @@ class Moderation(commands.Cog):
     @lockdown.slash(name='history', description='Get the history of a member\'s lockdowns.')
     @commands.describe('member', description='The member to get information on.')
     async def lockdown_history(self, ctx: Context, member: discord.Member) -> None:
+        print("IT GOT CALLED")
         async with self.bot.safe_connection() as conn:
             data = await conn.fetch('SELECT * FROM lockdowns WHERE member = $1', member.id)
         
         timers: List[timer.Timer] = [timer.Timer(record=record) for record in data]
+        print(timers)
             
         if not timers:
             return await ctx.send(embed=self.bot.Embed(
@@ -173,9 +175,11 @@ class Moderation(commands.Cog):
             title=f'Lockdown History for {member}',
             description='This is a list of all the lockdowns that have been placed on this member.'
         )
+        print(embed)
         #embed.custom_author(member)
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.', inline=False)
+        print(embed)
         
         active = discord.utils.find(lambda timer: timer.dispatched == False, timers)
         if active:
@@ -198,6 +202,7 @@ class Moderation(commands.Cog):
             value='{counter} moderators.\n\n{data}'.format(counter=len(counter), data='\n'.join(data)),
             inline=False
         )
+        print("SENDING")
         return await ctx.send(embed=embed)
         
     @lockdown.slash(name='clear', description='Clear all lockdown history from a member.')
