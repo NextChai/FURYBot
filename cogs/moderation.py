@@ -160,7 +160,8 @@ class Moderation(commands.Cog):
     async def lockdown_history(self, ctx: Context, member: discord.Member) -> None:
         async with self.bot.safe_connection() as conn:
             data = await conn.fetch('SELECT * FROM lockdowns WHERE member = $1', member.id)
-            timers: List[timer.Timer] = [timer.Timer(record=record) for record in data]
+        
+        timers: List[timer.Timer] = [timer.Timer(record=record) for record in data]
             
         if not timers:
             return await ctx.send(embed=self.bot.Embed(
@@ -194,7 +195,7 @@ class Moderation(commands.Cog):
         ]
         embed.add_field(
             name='Moderator Count', 
-            value='{0} moderators.\n\n{1}'.format(len(counter), '\n'.join(data)),
+            value='{counter} moderators.\n\n{data}'.format(counter=len(counter), data='\n'.join(data)),
             inline=False
         )
         return await ctx.send(embed=embed)
