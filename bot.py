@@ -88,10 +88,11 @@ class BotEmbed(discord.Embed):
     """A custom embed sued to assist in setting a custom author."""
     __slots__: Tuple[str, ...] = ()
     
-    def custom_author(self, _o: Union[discord.Member, discord.User]) -> None:
+    def custom_author(self, _o: Union[discord.Member, discord.User]) -> BotEmbed:
         """Set the author of the embed to the given object."""
         self.set_author(name=_o.__str__(), icon_url=_o.display_avatar.url)
         self.set_footer(text=f'ID: {_o.id}')
+        return self
 
 
 @copy_doc(discord.Embed)

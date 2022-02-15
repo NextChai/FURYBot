@@ -173,7 +173,7 @@ class Moderation(commands.Cog):
             title=f'Lockdown History for {member}',
             description='This is a list of all the lockdowns that have been placed on this member.'
         )
-        embed.custom_author(member)
+        #embed.custom_author(member)
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.add_field(name='Total Lockdowns', value=f'{len(data)} lockdowns total.', inline=False)
         
