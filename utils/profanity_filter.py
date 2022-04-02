@@ -24,7 +24,6 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import aiofile
-from profanityfilter import ProfanityFilter
 from typing import (
     Callable, 
     ClassVar, 
@@ -35,7 +34,9 @@ from typing import (
     Tuple
 )
 
-from cogs.utils.errors import ProfanityFailure
+from profanityfilter import ProfanityFilter
+
+from utils.errors import ProfanityFailure
 
 __all__: Tuple[str, ...] = (
     'PermeateProfanity',
@@ -190,7 +191,10 @@ class CustomProfanity(ProfanityFilter):
             if word not in self.clean_wordset:
                 for invalid in self.invalid_regex:
                     word = word.replace(invalid, r'\{0}'.format(invalid))
-                    
+                
+                if word.isdigit(): # No numbers
+                    continue
+                
                 clean.append(word)
         
         return clean

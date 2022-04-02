@@ -9,10 +9,8 @@ to deal in the Software without restriction, including without limitation
 the rights to use, copy, modify, merge, publish, distribute, sublicense,
 and/or sell copies of the Software, and to permit persons to whom the
 Software is furnished to do so, subject to the following conditions:
-
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
-
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
 OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -23,30 +21,52 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import Tuple
-
 import re
 import datetime
 from dateutil.relativedelta import relativedelta
 import parsedatetime as pdt
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union
+)
 
 from discord.ext import commands
 
+if TYPE_CHECKING:
+    from .context import Context
+
+# Monkey patch mins and secs into the units
+units = pdt.pdtLocales['en_US'].units
+units['minutes'].append('mins')
+units['seconds'].append('secs')
+
+STT = TypeVar('STT', bound='ShortTime')
+HTT = TypeVar('HTT', bound='HumanTime')
+TT = TypeVar('TT', bound='Time')
 
 __all__: Tuple[str, ...] = (
+    'ShortTime',
+    'HumanTime',
+    'Time',
+    'FutureTime',
+    'UserFriendlyTime',
     'plural',
     'human_join',
-    'human_time',
-    'HumanTime',
-    'UserFriendlyTime',
-    'FutureTime',
-    'Time',
-    'HumanTime',
-    'ShortTime'
+    'human_timedelta',
 )
 
-
 class ShortTime:
+    __slots__: Tuple[str, ...] = (
+        'dt',
+    )
+    
     compiled = re.compile("""(?:(?P<years>[0-9])(?:years?|y))?             # e.g. 2y
                              (?:(?P<months>[0-9]{1,2})(?:months?|mo))?     # e.g. 2months
                              (?:(?P<weeks>[0-9]{1,4})(?:weeks?|w))?        # e.g. 10w
@@ -56,24 +76,30 @@ class ShortTime:
                              (?:(?P<seconds>[0-9]{1,5})(?:seconds?|s))?    # e.g. 15s
                           """, re.VERBOSE)
 
-    def __init__(self, argument, *, now=None):
+    def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None) -> None:
         match = self.compiled.fullmatch(argument)
         if match is None or not match.group(0):
             raise commands.BadArgument('invalid time provided')
 
-        data = { k: int(v) for k, v in match.groupdict(default=0).items() }
+        data = {k: int(v) for k, v in match.groupdict(default=0).items()}
         now = now or datetime.datetime.now(datetime.timezone.utc)
         self.dt = now + relativedelta(**data)
 
     @classmethod
-    async def convert(cls, ctx, argument):
-        return cls(argument, now=ctx.created_at)
+    async def convert(cls: Type[STT], ctx: Context, argument: str) -> STT:
+        now = ctx.message.created_at
+        return cls(argument, now=now)
 
 
 class HumanTime:
+    __slots__: Tuple[str, ...] = (
+        'dt',
+        '_past'
+    )
+    
     calendar = pdt.Calendar(version=pdt.VERSION_CONTEXT_STYLE)
 
-    def __init__(self, argument, *, now=None):
+    def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None) -> None:
         now = now or datetime.datetime.utcnow()
         dt, status = self.calendar.parseDT(argument, sourceTime=now)
         if not status.hasDateOrTime:
@@ -87,11 +113,15 @@ class HumanTime:
         self._past = dt < now
 
     @classmethod
-    async def convert(cls, ctx, argument):
-        return cls(argument, now=ctx.created_at)
-
+    async def convert(cls: Type[HTT], ctx: Context, argument: str) -> HTT:
+        now = ctx.message.created_at
+        return cls(argument, now=now)
+    
+    
 class Time(HumanTime):
-    def __init__(self, argument, *, now=None):
+    __slots__: Tuple[str, ...] = ()
+    
+    def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None) -> None:
         try:
             o = ShortTime(argument, now=now)
         except Exception as e:
@@ -99,10 +129,12 @@ class Time(HumanTime):
         else:
             self.dt = o.dt
             self._past = False
-    
-    
+
+
 class FutureTime(Time):
-    def __init__(self, argument, *, now=None):
+    __slots__: Tuple[str, ...] = ()
+    
+    def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None) -> None:
         super().__init__(argument, now=now)
 
         if self._past:
@@ -111,52 +143,65 @@ class FutureTime(Time):
         
 class UserFriendlyTime(commands.Converter):
     """That way quotes aren't absolutely necessary."""
-    def __init__(self, converter=None, *, default=None):
+    __slots__: Tuple[str, ...] = (
+        'converter',
+        'dt',
+        'arg',
+        'default',
+    )
+    
+    def __init__(
+        self, 
+        converter: Optional[Union[Callable[[Context, str], Any], Type[commands.Converter], commands.Converter]] = None, 
+        *, 
+        default: Optional[str] = None
+    ) -> None:
         if isinstance(converter, type) and issubclass(converter, commands.Converter):
-            converter = converter()
+            converter = converter() # type: ignore
 
         if converter is not None and not isinstance(converter, commands.Converter):
             raise TypeError('commands.Converter subclass necessary.')
 
-        self.converter = converter
-        self.default = default
+        self.converter: Optional[Union[
+            Callable[[Context, str], Any],
+            Type[commands.Converter], 
+            commands.Converter
+        ]] = converter
         
-    @property
-    def human_readable(self) -> str:
-        if not hasattr(self, 'dt'):
-            return ''
+        self.default: Optional[str] = default
 
-        return human_time(self.dt)
-
-    async def check_constraints(self, ctx, now, remaining):
+    async def check_constraints(self, ctx: Context, now: datetime.datetime, remaining: str) -> UserFriendlyTime: 
         if self.dt < now:
             raise commands.BadArgument('This time is in the past.')
 
         if not remaining:
+            if self.default is None:
+                raise commands.BadArgument('Missing argument after the time.')
             remaining = self.default
 
         if self.converter is not None:
             self.arg = await self.converter.convert(ctx, remaining) # type: ignore
         else:
             self.arg = remaining
-        
+            
         return self
 
-    def copy(self):
+    def copy(self) -> UserFriendlyTime:
         cls = self.__class__
         obj = cls.__new__(cls)
         obj.converter = self.converter
         obj.default = self.default
         return obj
 
-    async def convert(self, ctx, argument):
+    async def convert(self, ctx: Context, argument: str) -> UserFriendlyTime:
         # Create a copy of ourselves to prevent race conditions from two
         # events modifying the same instance of a converter
         result = self.copy()
         try:
             calendar = HumanTime.calendar
             regex = ShortTime.compiled
-            now = ctx.created_at
+            
+            now = ctx.message.created_at
 
             match = regex.match(argument)
             if match is not None and match.group(0):
@@ -164,7 +209,6 @@ class UserFriendlyTime(commands.Converter):
                 remaining = argument[match.end():].strip()
                 result.dt = now + relativedelta(**data)
                 return await result.check_constraints(ctx, now, remaining)
-
 
             # apparently nlp does not like "from now"
             # it likes "from x" in other cases though so let me handle the 'now' case
@@ -204,7 +248,7 @@ class UserFriendlyTime(commands.Converter):
             if status.accuracy == pdt.pdtContext.ACU_HALFDAY:
                 dt = dt.replace(day=now.day + 1)
 
-            result.dt = dt.replace(tzinfo=datetime.timezone.utc)
+            result.dt =  dt.replace(tzinfo=datetime.timezone.utc)
 
             if begin in (0, 1):
                 if begin == 1:
@@ -226,19 +270,23 @@ class UserFriendlyTime(commands.Converter):
             import traceback
             traceback.print_exc()
             raise
-
+            
 class plural:
-    def __init__(self, value):
-        self.value = value
-    def __format__(self, format_spec):
+    def __init__(self, value: int) -> None:
+        self.value: int = value
+        
+    def __format__(self, format_spec: str) -> str:
         v = self.value
         singular, sep, plural = format_spec.partition('|')
         plural = plural or f'{singular}s'
+        
         if abs(v) != 1:
             return f'{v} {plural}'
+        
         return f'{v} {singular}'
-    
-def human_join(seq, delim=', ', final='or'):
+
+
+def human_join(seq: List[str], delim=', ', final='or') -> str:
     size = len(seq)
     if size == 0:
         return ''
@@ -251,7 +299,15 @@ def human_join(seq, delim=', ', final='or'):
 
     return delim.join(seq[:-1]) + f' {final} {seq[-1]}'
 
-def human_time(dt, *, source=None, accuracy=3, brief=False, suffix=False) -> str:
+
+def human_timedelta(
+    dt: datetime.datetime, 
+    *, 
+    source: Optional[datetime.datetime] = None, 
+    accuracy: int = 3, 
+    brief: bool = False, 
+    suffix: Union[bool, str] =True
+) -> str:
     now = source or datetime.datetime.now(datetime.timezone.utc)
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=datetime.timezone.utc)
@@ -318,13 +374,24 @@ def human_time(dt, *, source=None, accuracy=3, brief=False, suffix=False) -> str
         else:
             return ' '.join(output) + suffix
 
-def format_dt(dt, style=None):
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=datetime.timezone.utc)
+def td_format(td_object: datetime.timedelta) -> str:
+    seconds = int(td_object.total_seconds())
+    periods: List[Tuple[str, float]] = [
+        ('year', 60*60*24*365),
+        ('month', 60*60*24*30),
+        ('day', 60*60*24),
+        ('hour', 60*60),
+        ('minute', 60),
+        ('second', 1),
+        ('millisecond', 1/1000),
+        ('microsecond', 1/1e+6)
+    ]
 
-    if style is None:
-        return f'<t:{int(dt.timestamp())}>'
-    return f'<t:{int(dt.timestamp())}:{style}>'  
-        
-def format_relative(dt):
-    return format_dt(dt, 'R') 
+    strings: List[str] = []
+    for period_name, period_seconds in periods:
+        if seconds > period_seconds:
+            period_value , seconds = divmod(seconds, period_seconds)
+            has_s = 's' if period_value > 1 else ''
+            strings.append("%s %s%s" % (period_value, period_name, has_s))
+
+    return human_join(strings, final='and')

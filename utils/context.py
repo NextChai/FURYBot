@@ -21,15 +21,33 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+from __future__ import annotations
 
-from typing import Optional, Tuple, Union
+import asyncio
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Optional, 
+    Tuple, 
+    Union,
+    TYPE_CHECKING,
+    Generic,
+    TypeVar
+)
+
 import discord
 from discord.ext import commands
+
+if TYPE_CHECKING:
+    from bot import FuryBot
 
 __all__ = (
     'Confirmation',
     'Context',
 )
+
+FuryT = TypeVar('FuryT', bound='FuryBot')
 
 class Confirmation(discord.ui.View):
     """Used to get confirmation from the user in a simple way.
@@ -55,7 +73,7 @@ class Confirmation(discord.ui.View):
         return interaction.user == self.author
     
     @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green)
-    async def confirm(self, button: discord.Button, interaction: discord.Interaction) -> None:
+    async def confirm(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         await interaction.response.send_message('Confirming', ephemeral=True)
         self.value = True
         self.stop()
@@ -67,6 +85,9 @@ class Confirmation(discord.ui.View):
         self.stop()
 
 
+class DummyMessage:
+    created_at = discord.utils.utcnow()
+
 class DummyContext:
     """A dummy context used to convert human time without a context obj.
     
@@ -76,20 +97,24 @@ class DummyContext:
         When the context was created.
     """
     __slots__: Tuple[str, ...] = (
-        'created_at',
+        'message',
     )
     
     def __init__(self) -> None:
-        self.created_at = discord.utils.utcnow()
+        self.message = DummyMessage()
     
     def __repr__(self) -> str:
-        return '<DummyContext created_at={}>'.format(self.created_at)
+        return '<DummyContext created_at={0.created_at}>'.format(self)
         
-class Context(commands.Context):
+        
+class Context(commands.Context, Generic[FuryT]):
     """The overridden Context class. Used to provide some simple
     functionality to the bot, which can home in handy for commands.
     """
     __slots__: Tuple[str, ...] = ()
+    
+    if TYPE_CHECKING:
+        bot: FuryT
     
     async def get_confirmation(self, *args, **kwargs) -> bool:
         """Get confirmation fromt he user.
@@ -108,6 +133,8 @@ class Context(commands.Context):
         """
         view = Confirmation(author=self.author)
         kwargs['view'] = view
+        kwargs['allowed_mentions'] = discord.AllowedMentions.none()
+        
         await self.send(*args, **kwargs)
         await view.wait()
         
@@ -139,3 +166,65 @@ class Context(commands.Context):
             return f'{emoji}: {label}'
         
         return emoji
+    
+    
+    @discord.utils.copy_doc(commands.Context.send)
+    async def send(self, *args, **kwargs) -> discord.Message:
+        if not kwargs.get('allowed_mentions', None):
+            kwargs['allowed_mentions'] = discord.AllowedMentions.none()
+            
+        return await super().send(*args, **kwargs)
+    
+    async def prompt(
+        self, 
+        content: Optional[str] = None, 
+        *, 
+        timeout: float = 60.0, 
+        check: Optional[Callable[[discord.Message], Optional[bool]]] = None, 
+        destination: Optional[discord.abc.MessageableChannel] = None,
+        delete_after: bool = False,
+        **kwargs: Dict[Any, Any]
+    ) -> Optional[discord.Message]:
+        """|coro|
+        
+        Prompt the user with a question and get wait for a response.
+        
+        Parameters
+        ----------
+        content: :class:`str`
+            The content to pass to :meth:`Context.send`.
+        timeout: :class:`float`
+            The max amount of time to wait for a response. If the user doesn't respond in time,
+            the prompt will be cancelled.
+        check: Callable[[:class:`discord.Message`], Optional[:class:`bool`]]
+            A function used to check if the response is valid. If none is provided
+            a default check will be used which checks for author and channel.
+        destination: Optional[:class:`discord.abc.MessageableChannel`]
+            The destination channel to send the prompt to. If none is provided,
+            the context channel will be used.
+        delete_after: :class:`bool`
+            Whether to delete the message sent by the client after the user has finished responding.
+            Defaults to ``False``.
+        kwargs: Dict[str, Any]
+            A dict of keyword arguments to pass to :meth:`Context.send`.
+            
+        Returns
+        -------
+        Optional[:class:`discord.Message`]
+            The response message if the user responded, otherwise ``None``.
+        """
+        if not check:
+            check = lambda message: message.channel == self.channel and message.author == self.author
+        
+        message = await (destination or self.channel).send(content, **kwargs)
+        try:
+            response = await self.bot.wait_for('message', check=lambda m: m.author == self.author, timeout=timeout)
+        except asyncio.TimeoutError:
+            await message.reply('Prompt timed out, you need to re-do this operation.')
+            return None
+        
+        if delete_after:
+            await message.delete()
+        
+        return response
+    
