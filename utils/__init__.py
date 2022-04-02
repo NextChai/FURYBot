@@ -23,6 +23,18 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import inspect
+from typing import (
+    Any,
+    Callable,
+    Optional, 
+    TypeVar,
+    TYPE_CHECKING
+)
+
+import discord
+from discord.ext import commands
+
 from .checks import *
 from .constants import *
 from .context import *
@@ -30,12 +42,8 @@ from .errors import *
 from .profanity_filter import *
 from .time import *
 
-from typing import (
-    Any,
-    Callable, 
-    TypeVar
-)
-from inspect import signature 
+if TYPE_CHECKING:
+    from bot import FuryBot
 
 T = TypeVar('T')
 
@@ -60,7 +68,22 @@ def copy_doc(original: Callable[..., Any]) -> Callable[[T], T]:
         else:
             overriden.__doc__ = original.__doc__
             
-        overriden.__signature__ = signature(original)  # type: ignore
+        overriden.__signature__ = inspect.signature(original)  # type: ignore
         return overriden
 
     return decorator
+
+
+class BaseCog(commands.Cog):
+    """The base class for all cogs.
+    
+    Attributes
+    ----------
+    bot: :class:`FuryBot`
+        The bot that this cog is attached to.
+    """
+    emoji: Optional[discord.PartialEmoji] = None
+    
+    def __init__(self, bot: FuryBot) -> None:
+        self.bot: FuryBot = bot
+        

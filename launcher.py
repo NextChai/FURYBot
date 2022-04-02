@@ -22,16 +22,23 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
-import traceback
 
+import os
+import traceback
 import aiohttp
 import asyncio
 import logging
 import contextlib
-from typing import Tuple
+from typing import (
+    Tuple,
+)
 
 from bot import FuryBot
 from config import TOKEN
+
+os.environ['JISHAKU_NO_UNDERSCORE'] = 'true'
+os.environ['JISHAKU_NO_DM_TRACEBACK'] = 'true'
+os.environ['JISHAKU_RETAIN'] = 'true'
 
 logging.basicConfig(level=logging.INFO)
 
@@ -66,7 +73,7 @@ def setup_logging():
         dt_fmt = '%Y-%m-%d %H:%M:%S'
         fmt = logging.Formatter('[{asctime}] [{levelname:<7}] {name}: {message}', dt_fmt, style='{')
         ch.setFormatter(fmt)
-        yield
+        yield log
     finally:
         return
 
@@ -79,21 +86,15 @@ async def run_bot():
         traceback.print_exc()
         raise
     
-    fury = None
-    try:
-        async with aiohttp.ClientSession() as session:
-            try:
-                fury = FuryBot(pool=pool, session=session)
-            except:
-                traceback.print_exc()
-                return
-            
-            await fury.start(TOKEN, reconnect=True)
-    finally:
-        if fury:
-            await fury.pool.close() 
-    
+    loop = asyncio.get_event_loop()
+    with setup_logging() as logger:
+        try:
+            async with aiohttp.ClientSession() as session:
+                fury = FuryBot(pool=pool, session=session, loop=loop)
+                async with fury:
+                    await fury.start(TOKEN, reconnect=True)
+        except Exception as e:
+            logger.warning('An unknown exception has occurred', exc_info=e)
 
 if __name__ == '__main__':
-    with setup_logging():
-        asyncio.run(run_bot())
+    asyncio.run(run_bot())

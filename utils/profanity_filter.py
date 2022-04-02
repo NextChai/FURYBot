@@ -77,8 +77,8 @@ class PermeateProfanity:
         For example, `soysauce` would turn into: 'soysauce', '$oysauce', '$0ysauce', '$0isauce', etc.
         """
         for swear in self._swears:
-            if swear.endswith('er'):
-                self._swears.append(swear.replace('er', 'a')) # type: ignore
+            if swear.endswith('er'): 
+                self._swears.append(swear.replace('er', 'a')) 
                 
             for index, char in enumerate(swear):
                 current = self.mapping.get(char.lower())
@@ -89,6 +89,7 @@ class PermeateProfanity:
                     formatted = swear[0:index] + switch + swear[index+1:]
                     self._swears.append(formatted) # type: ignore
                 break 
+            
         return self._swears
             
             
@@ -106,14 +107,12 @@ class CustomProfanity(ProfanityFilter):
     extra_profanity: List[:class:`str`]
         The bad words of the bot, aka the words that will get flagged.
     """
-    def __init__(self) -> None:
-        super().__init__() 
-        self.invalid_regex = (
-            '.',
-            '^',
-            '$',
-            '.'
-        )
+    invalid_regex = (
+        '.',
+        '^',
+        '$',
+        '.'
+    )
         
     async def _split_filename_lines(self, filename: str) -> List[str]:
         """Used to async-open a file, decode its content, and split it by a new line.

@@ -45,9 +45,39 @@ if TYPE_CHECKING:
 __all__ = (
     'Confirmation',
     'Context',
+    'tick',
 )
 
 FuryT = TypeVar('FuryT', bound='FuryBot')
+
+
+def tick(opt: Optional[bool], label: Optional[str] = None) -> str:
+    """Used to tick a message based on the operation.
+    
+    Parameters
+    ----------
+    opt: Optional[:class:`bool`]
+        The operation to tick.
+    label: Optional[:class:`str`]
+        A label for the tick, if any.
+        
+    Returns
+    -------
+    :class:`str`
+        The ticked message.
+    """
+    lookup = {
+        True: '✅',
+        False: '❌',
+        None: '❔',
+    }
+    emoji = lookup.get(opt, '❌')
+    
+    if label is not None:
+        return f'{emoji}: {label}'
+    
+    return emoji
+    
 
 class Confirmation(discord.ui.View):
     """Used to get confirmation from the user in a simple way.
@@ -84,10 +114,6 @@ class Confirmation(discord.ui.View):
         self.value = False
         self.stop()
 
-
-class DummyMessage:
-    created_at = discord.utils.utcnow()
-
 class DummyContext:
     """A dummy context used to convert human time without a context obj.
     
@@ -101,7 +127,9 @@ class DummyContext:
     )
     
     def __init__(self) -> None:
-        self.message = DummyMessage()
+        self.message = type('DummyContext', (object,), {
+            'created_at': discord.utils.utcnow()
+        })
     
     def __repr__(self) -> str:
         return '<DummyContext created_at={0.created_at}>'.format(self)
@@ -140,32 +168,9 @@ class Context(commands.Context, Generic[FuryT]):
         
         return view.value
         
+    @discord.utils.copy_doc(tick)
     def tick(self, opt: Optional[bool], label: Optional[str] = None) -> str:
-        """Used to tick a message based on the operation.
-        
-        Parameters
-        ----------
-        opt: Optional[:class:`bool`]
-            The operation to tick.
-        label: Optional[:class:`str`]
-            A label for the tick, if any.
-            
-        Returns
-        -------
-        :class:`str`
-            The ticked message.
-        """
-        lookup = {
-            True: '✅',
-            False: '❌',
-            None: '❔',
-        }
-        emoji = lookup.get(opt, '❌')
-        
-        if label is not None:
-            return f'{emoji}: {label}'
-        
-        return emoji
+        return tick(opt, label)
     
     
     @discord.utils.copy_doc(commands.Context.send)

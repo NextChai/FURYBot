@@ -154,7 +154,8 @@ class UserFriendlyTime(commands.Converter):
         self, 
         converter: Optional[Union[Callable[[Context, str], Any], Type[commands.Converter], commands.Converter]] = None, 
         *, 
-        default: Optional[str] = None
+        default: Optional[str] = None,
+        force_future: bool = True
     ) -> None:
         if isinstance(converter, type) and issubclass(converter, commands.Converter):
             converter = converter() # type: ignore
@@ -169,10 +170,12 @@ class UserFriendlyTime(commands.Converter):
         ]] = converter
         
         self.default: Optional[str] = default
+        self.force_future: bool = force_future
 
     async def check_constraints(self, ctx: Context, now: datetime.datetime, remaining: str) -> UserFriendlyTime: 
-        if self.dt < now:
-            raise commands.BadArgument('This time is in the past.')
+        if self.force_future:
+            if self.dt < now:
+                raise commands.BadArgument('This time is in the past.')
 
         if not remaining:
             if self.default is None:

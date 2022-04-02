@@ -21,249 +21,151 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
-
 from __future__ import annotations
 
 import io
-import os
-import re
-import sys
-import asyncio
-import textwrap
-import subprocess
+import logging
+import platform
 import traceback
-import importlib
-from contextlib import redirect_stdout
-from typing import TYPE_CHECKING, List, Literal
+import contextlib
+from typing import (
+    TYPE_CHECKING,
+)
 
 import discord
 from discord.ext import commands
 
-from cogs.utils.context import Context
+from jishaku.modules import ExtensionConverter
+from jishaku.repl.compilation import AsyncCodeExecutor
+from jishaku.repl.scope import Scope
+from jishaku.codeblocks import codeblock_converter
+
+from utils import BaseCog, Context, tick
+from utils.paginator import AsyncCodePaginator
 
 if TYPE_CHECKING:
     from bot import FuryBot
     
-__all__ = (
-    'Owner',
-)
+log = logging.getLogger(__name__)
 
-
-class Owner(commands.Cog):
-    """The Owner cog for the bot. All commands inside of this cog are owner specific,
-    meaning all commands are limited to the owner of the bot.
     
-    Attributes
-    ----------
-    bot: :class:`FuryBot`
-        The main bot client.
-    _GIT_PULL_REGEX: :class:`re.Pattern`
-        Used to find cogs in a git pull resp.
-    """
-    def __init__(self, bot):
-        self.bot: FuryBot = bot
-        self._GIT_PULL_REGEX: re.Pattern = re.compile(r'\s*(?P<filename>.+?)\s*\|\s*[0-9]+\s*[+-]+')
-        
-    async def cog_check(self, ctx: Context):
-        """A blanket cog check limiting all commands to the Owner of the bot.
-        
-        Parameters
-        ----------
-        ctx: :class:`Context`
-            The invoke context for the command.
-        """
-        if not (await self.bot.is_owner(ctx.author)):
-            raise commands.NotOwner('You do not own this bot.')
-        return True
-        
-    async def run_process(self, command: str) -> List:
-        """Used to run a command via subprocess.
-        
-        Parameters
-        ----------
-        command: :class:`str`
-            The command to run.
-        
-        Returns
-        -------
-        List
-        """
-        try:
-            process = await asyncio.create_subprocess_shell(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            result = await process.communicate()
-        except NotImplementedError:
-            process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            result = await self.bot.loop.run_in_executor(None, process.communicate)
-
-        return [output.decode() for output in result]
-        
-    def find_modules_from_git(self, output: str) -> List[str]:
-        """Used to find modules from a git pull resp.
-        
-        Parameters
-        ---------
-        output: :class:`str`
-            The output from the `git pull` command.
-        
-        Returns
-        -------
-        List[:class:`str`]
-            Any modules found to reload.
-        """
-        files = self._GIT_PULL_REGEX.findall(output)
-        ret = []
-        for file in files:
-            root, ext = os.path.splitext(file)
-            if ext != '.py':
-                continue
-
-            if root.startswith('cogs/'):
-                # A submodule is a directory inside the main cog directory for
-                # my purposes
-                ret.append((root.count('/') - 1, root.replace('/', '.')))
-
-        # For reload order, the submodules should be reloaded first
-        ret.sort(reverse=True)
-        return ret
-
-    def reload_or_load_extension(self, module: str) -> None:
-        """Used to reload or load the extension given.
-        
-        Parameters
-        ----------
-        module: :class:`str`
-            The module to reload or load.
-        
-        Returns
-        -------
-        None
-        """
-        try:
-            self.bot.reload_extension(module)
-        except commands.ExtensionNotLoaded:
-            self.bot.load_extension(module)
-            
-    @commands.group(name='git', description='Handle git interactions.')
-    @commands.is_owner()
-    async def git(self) -> None:
-        """A command group to use and manage git interactions.
-        
-        
-        Subcommands
-        -----------
-        pull: `/git pull`
-            A simple command used to pull from the repo and recieve updates.
-        """
-        pass
+class Owner(BaseCog):
     
-    @git.slash(
-        name='pull',
-        description='Pull from the github to update the bot'
-    )
-    async def git_pull(self, ctx: Context) -> None:
-        async with ctx.typing():
-            stdout, stderr = await self.run_process('git pull')
-
-        # progress and stuff is redirected to stderr in git pull
-        # however, things like "fast forward" and files
-        # along with the text "already up-to-date" are in stdout
-
-        if stdout.lower().startswith('already'):
-            return await ctx.send(stdout)
-
-        modules = self.find_modules_from_git(stdout)
-        mods_text = '\n'.join(f'{index}. `{module}`' for index, (_, module) in enumerate(modules, start=1))
-        prompt_text = f'This will update the following modules, are you sure?\n{mods_text}'
-        confirm = await ctx.get_confirmation(prompt_text)
-        if not confirm:
-            return await ctx.interaction.delete_original_message()
-
-        statuses = []
-        for is_submodule, module in modules:
-            if is_submodule:
+    async def cog_check(self, ctx: Context[FuryBot]) -> bool:
+        return await self.bot.is_owner(ctx.author)
+    
+    @commands.command(name='load', description='Loads an extension.', aliases=['reload',])
+    async def load(self, ctx: Context[FuryBot], *, extensions: ExtensionConverter) -> discord.Message:
+        """|coro|
+        
+        Loads / reloads an extension.
+        
+        Parameters
+        ----------
+        extensions: :class:`str`
+            The extension(s) to load / reload.
+        """
+        stauses = []
+        for extension in extensions:
+            if extension not in self.bot.extensions:
                 try:
-                    actual_module = sys.modules[module]
-                except KeyError:
-                    statuses.append((ctx.tick(None), module))
+                    await self.bot.load_extension(extension)
+                except Exception as exc:
+                    log.warning('Could not load extension %s', extension, exc_info=exc)
+                    stauses.append(tick(False, f'`{extension}`'))
                 else:
-                    try:
-                        importlib.reload(actual_module)
-                    except Exception as e:
-                        statuses.append((ctx.tick(False), module))
-                    else:
-                        statuses.append((ctx.tick(True), module))
+                    stauses.append(tick(True, f'`{extension}`'))
             else:
                 try:
-                    self.reload_or_load_extension(module)
-                except commands.ExtensionError:
-                    statuses.append((ctx.tick(False), module))
+                    await self.bot.reload_extension(extension)
+                except Exception as exc:
+                    log.warning('Could not reloadload extension %s', extension, exc_info=exc)
+                    stauses.append(tick(False, f'`{extension}`'))
                 else:
-                    statuses.append((ctx.tick(True), module))
-
-        await ctx.send('\n'.join(f'{status}: `{module}`' for status, module in statuses))
+                    stauses.append(tick(True, f'`{extension}`'))
         
-        
-    @commands.slash(
-        name='debug',
-        description='Toggle the debug feature of the bot.'
-    )
-    @commands.is_owner()
-    @commands.describe('value', description='Enable or disable debugging.')
-    async def debug(self, ctx: Context, value: bool):
-        self.bot.debug = value
-        
-        e = self.bot.Embed(
-            title='Success!',
-            description='The bots debug has been toggled.'
-        )
-        return await ctx.send(embed=e)
+        return await ctx.send('\n'.join(stauses))
     
-    @commands.slash(
-        name='python',
-        description='Run code.'
-    )
-    @commands.describe('code', description='The code to run.')
-    @commands.is_owner()
-    async def python(self, ctx: Context, code: str):
-        globalns = {
+    @commands.command(name='unload', description='Unloads an extension.')
+    async def unload(self, ctx: Context[FuryBot], *, extensions: ExtensionConverter) -> discord.Message:
+        """|coro|
+        
+        Unloads an extension.
+        
+        Parameters
+        ----------
+        extensions: :class:`str`
+            The extension(s) to unload.
+        """
+        stauses = []
+        for extension in extensions:
+            if extension in self.bot.extensions:
+                try:
+                    await self.bot.unload_extension(extension)
+                except Exception as exc:
+                    log.warning('Could not unload extension %s', extension, exc_info=exc)
+                    stauses.append(tick(False, f'`{extension}`'))
+                else:
+                    stauses.append(tick(True, f'`{extension}`'))
+            else:
+                stauses.append(tick(False, f'`Not loaded: {extension}`'))
+        
+        return await ctx.send('\n'.join(stauses))
+    
+    @commands.command(name='python', description='Execute Python code and get the result.', aliases=['py'])
+    async def python(self, ctx: Context[FuryBot], *, code: codeblock_converter) -> None:
+        """|coro|
+        
+        Execute Python code and return the result.
+        
+        Parameters
+        ----------
+        code: :class:`str`
+            The code to execute.
+        """
+        custom_globals = {
             'ctx': ctx,
+            'context': ctx,
             'guild': ctx.guild,
-            'author': ctx.author,
-            'discord': discord,
-            'utils': discord.utils,
+            'message': ctx.message,
+            'self': self,
             'bot': ctx.bot,
+            'cog': self,
         }
+        custom_globals.update(globals())
         
-        globalns.update(globals())
+        await ctx.trigger_typing()
         
-        stdout = io.StringIO()
-        code = code.replace('```python', '```').replace('```', '')
-        to_compile = f'async def func():\n{textwrap.indent(code, "  ")}'
+        version_info = f'+ Running Python {platform.python_version()} ({platform.system()}), W/ Compiler {platform.python_compiler()}'
+        message = await ctx.send(f'```diff\n{version_info}```')
         
-        try:
-            exec(to_compile, globalns)
-        except Exception as e:
-            return await ctx.send(f'```py\n{e.__class__.__name__}: {e}\n```')
+        paginator = AsyncCodePaginator(message, ctx.author, prefix='```diff')
+        await paginator.add_line(version_info) # This ensures the python info is kept
         
-        func = globalns['func']
-        try:
-            with redirect_stdout(stdout):
-                ret = await func()
-        except Exception as e:
-            value = stdout.getvalue()
-            await ctx.send(f'```py\n{value}{traceback.format_exc()}\n```')
-        else:
-            value = stdout.getvalue()
+        # Checks and redirect stdout info
+        redirected = []
+        contained_content: bool = False
+        
+        stringity = io.StringIO()
+        scope = Scope(custom_globals, locals())
+        with contextlib.redirect_stdout(stringity):
             try:
-                await ctx.message.add_reaction('\u2705')
-            except:
-                pass
-
-            if ret is None:
-                if value:
-                    await ctx.send(f'```py\n{value}\n```')
-            else:
-                await ctx.send(f'```py\n{value}{ret}\n```')
+                async for line in AsyncCodeExecutor(code.content, scope=scope, loop=self.bot.loop):
+                    if line:
+                        contained_content = True
+                        await paginator(str(line))
+                    
+                    decoded = stringity.getvalue()
+                    if decoded != '' and (not redirected) or (redirected and redirected[-1] != decoded):
+                        redirected.append(decoded)
+                        contained_content = True
+                        await paginator(decoded)
+            except Exception as exc:
+                traceback_string = ''.join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+                await paginator(traceback_string)
                 
-def setup(bot):
-    return bot.add_cog(Owner(bot))
+        if not contained_content:
+            await paginator('Code ran with no output.')
+    
+async def setup(bot: FuryBot) -> None:
+    return await bot.add_cog(Owner(bot))

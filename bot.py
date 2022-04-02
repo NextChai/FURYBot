@@ -26,24 +26,29 @@ from __future__ import annotations
 
 import re
 import sys
-import json
+import time
 import logging
 import traceback
 import functools
 import datetime
-import contextlib
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import (
-    TYPE_CHECKING, 
-    Callable, 
-    List, 
+    TYPE_CHECKING,
+    Awaitable,
+    List,
     Dict, 
     Optional, 
     Union, 
-    Coroutine, 
-    Any,
-    Tuple
+    Coroutine,
+    Type,
+    Generic,
+    Tuple,
+    TypeVar,
+    Callable,
+    Any
 )
+from typing_extensions import ParamSpec
 
 import aiohttp
 import mystbin
@@ -51,17 +56,20 @@ import asyncpg
 
 import discord
 from discord.ext import commands
-from discord.embeds import EmptyEmbed
 
 from urlextract import URLExtract
 
-from cogs.utils import copy_doc
-from cogs.utils import context, constants, checks
-from cogs.utils.errors import *
-from cogs.utils.profanity_filter import CustomProfanity
-from cogs.utils.timer import TimerHandler, Timer
-from cogs.utils.time import UserFriendlyTime, human_time
+from utils import context, checks, constants
+from utils.errors import *
+from utils import CustomProfanity
+from utils.timer import TimerManager, Timer
+from utils.time import UserFriendlyTime, human_timedelta
 from config import postgresql as uri, logging_webhook, message_webhook
+
+
+T = TypeVar('T')
+P = ParamSpec('P')
+FuryT = TypeVar('FuryT', bound='FuryBot')
 
 __all__ = (
     'DiscordBot',
@@ -69,7 +77,6 @@ __all__ = (
     'Lockdown',
     'SecurityMixin',
     'FuryBot',
-    'BotEmbed',
 )
 
 log = logging.getLogger(__name__)
@@ -77,53 +84,147 @@ log = logging.getLogger(__name__)
 MISSING = discord.utils.MISSING
 
 initial_extensions = (
+    # Utilities
+    'utils.error_handler',
+    'utils.help',
+    'utils.jishaku',
+    
     'cogs.commands',
+    'cogs.owner',
     'cogs.moderation',
-    'cogs.safety',
-    'cogs.owner'
+    #'cogs.safety',
+    'cogs.teams',
 )
 
 
-@copy_doc(discord.Embed)
+@discord.utils.copy_doc(discord.Embed)
 def Embed(
     *,
-    title: str = EmptyEmbed,
-    description: str = EmptyEmbed,
-    url: str = EmptyEmbed,
+    title: str = MISSING,
+    description: str = MISSING,
+    url: str = MISSING,
     timestamp: datetime.datetime = datetime.datetime.now(),
     color: Union[discord.Color, int] = MISSING,
-    author: Union[discord.User, discord.member] = MISSING
+    author: Union[discord.User, discord.Member] = MISSING,
+    cls: Optional[Type[discord.Embed]] = None
 ) -> discord.Embed:
     """A method used to have a consistent color across all bot Embeds.
     
-    .. note::
-        
-        This is also so I can change the bots color easily when needed.
+    Parameters
+    ----------
+    title: :class:`str`
+        The title of the embed.
+    description: :class:`str`
+        The description of the embed.
+    url: :class:`str`
+        The url of the embed.
+    timestamp: :class:`datetime.datetime`
+        The timestamp of the embed. Defaults to the current time.
+    color: :class:`discord.Color`
+        The color of the embed.
+    author: Union[:class:`discord.User`, :class:`discord.Member`]
+        The author of the embed.
+    cls: Optional[Type[:class:`discord.Embed`]]
+        The embed class to use. Defaults to :class:`discord.Embed`.
     """
+    new_cls = cls or discord.Embed
+    
+    kwargs: Dict[str, Union[str, datetime.datetime, discord.Color]] = {
+        'timestamp': timestamp
+    }
+    
     if color is MISSING:
-        color = discord.Color.blue()
-        
-    embed = discord.Embed(
-        title=title,
-        description=description,
-        timestamp=timestamp,
-        color=color,
-        url=url
-    )
+        kwargs['color'] = discord.Color.blue()
+    if title is not MISSING:
+        kwargs['title'] = title
+    if description is not MISSING:
+        kwargs['description'] = description
+    if url is not MISSING:
+        kwargs['url'] = url
+    
+    new = new_cls(**kwargs)
 
     if author is not MISSING:
-        embed.set_author(name=str(author), icon_url=author.display_avatar.url)
-        embed.set_footer(text=f'ID: {author.id}')
+        new.set_author(name=str(author), icon_url=author.display_avatar.url)
+        new.set_footer(text=f'ID: {author.id}')
         
-    return embed
+    return new
 
-class DiscordBot(commands.Bot):
+def _wrap_extension(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[Optional[T]]]:
+    async def wrapped(*args: P.args, **kwargs: P.kwargs) -> Optional[T]:
+        fmt_args = 'on ext "{}"{}'.format(args[1], f' with kwargs {kwargs}' if kwargs else '')
+        start = time.perf_counter()
+        
+        try:
+            result = await func(*args, **kwargs)
+        except Exception as exc:
+            log.warning(f'Failed to load extension in {time.perf_counter() - start:.2f} seconds {fmt_args}', exc_info=exc)
+            return
+        
+        fmt = f'{func.__name__} took {time.perf_counter() - start:.2f} seconds {fmt_args}'
+        log.info(fmt)
+        
+        return result
+    
+    return wrapped
+
+
+class DbContextManager(Generic[FuryT]):
+    """A simple context manager used to manage database connections.
+    
+    Please note this was created instead of using `contextlib.asynccontextmanager` because
+    I plan to add additional functionality to this class in the future.
+    
+    Attributes
+    ----------
+    bot: :class:`FuryBot`
+        The bot instance.
+    timeout: :class:`float`
+        The timeout for acquiring a connection.
+    """
+    
+    __slots__: Tuple[str, ...] = (
+        'bot',
+        'timeout',
+        '_pool',
+        '_conn',
+        '_tr'
+    )
+    
+    def __init__(self, bot: FuryT, *, timeout: float = 10.0) -> None:
+        self.bot: FuryT = bot
+        self.timeout: float = timeout
+        self._pool: asyncpg.Pool = bot.pool
+        self._conn: Optional[asyncpg.Connection] = None
+        self._tr: Optional[asyncpg.Transaction] = None
+        
+    async def acquire(self) -> asyncpg.Connection:
+        return await self.__aenter__()
+    
+    async def release(self) -> None:
+        return await self.__aexit__(None, None, None)
+    
+    async def __aenter__(self) -> asyncpg.Connection:
+        self._conn = conn = await self._pool.acquire(timeout=self.timeout)
+        self._tr = conn.transaction()
+        await self._tr.start()
+        return conn
+    
+    async def __aexit__(self, exc_type, exc, tb):
+        if exc and self._tr:
+            await self._tr.rollback()
+            
+        elif not exc and self._tr:
+            await self._tr.commit()
+            
+        if self._conn:
+            await self._pool.release(self._conn)
+
+
+class DiscordBot(commands.Bot, TimerManager):
     """The base container for FURY Bot.
     
     Will contain all discord.py related activities and methods.
-    
-    Fury bot will also have a complete spam detector. This will check for both
-    infractions within a certain time frame and a user spamming messages.
     
     Attributes
     ----------
@@ -136,55 +237,104 @@ class DiscordBot(commands.Bot):
         logging_webhook_url: str
         message_webhook_url: str
         
-    def __init__(self, pool: asyncpg.Pool, session: aiohttp.ClientSession):
-        super().__init__(
-            help_command=None,
-            description='The Discord bot for the FLVS Fury server.',
-            intents=discord.Intents.all(),
-            guild_ids=[757664675864248360]
-        )
+        # This is mainly to ignore NoneType errors.
+        # This won't be used unless the bot is ready and this
+        # is not None.
+        user: discord.ClientUser
         
+    def __init__(self, pool: asyncpg.Pool, session: aiohttp.ClientSession, *args, **kwargs):
         self.pool: asyncpg.Pool = pool
         self.session: aiohttp.ClientSession = session
         
-        self.Embed: discord.Embed = Embed
+        super().__init__(
+            help_command=commands.MinimalHelpCommand(),
+            description='The Discord bot for the FLVS Fury server.',
+            intents=discord.Intents.all(),
+            command_prefix={'fury.', 'f.'},
+            strip_after_prefix=True,
+            hartbeat_timeout=180,
+            case_insensitive=True,
+            owner_ids=[757663899532132418, 146348630926819328] 
+        ) 
+        TimerManager.__init__(self, self) # type: ignore
+    
+        self.Embed: Callable[..., discord.Embed] = Embed
         self.debug: bool = True
-        self.start_time: datetime.datetime = datetime.datetime.utcnow()
-        self.mystbin: mystbin.Client = mystbin.Client(session=self.session)
+        self.mystbin: mystbin.Client = mystbin.Client(session=self.session) # type: ignore
         
-        # Lockdown timer
-        self.lockdown_timer: TimerHandler = TimerHandler(self, 'lockdowns')
+        # TODO: Implement me
+        self.spam_control = commands.CooldownMapping.from_cooldown(10, 12.0, commands.BucketType.user)
         
         # Webhooks
         self.logging_webhook_url = logging_webhook
         self.message_webhook_url = message_webhook
-        
-        # Mutes
-        self.mute_timer: TimerHandler = TimerHandler(self, 'mutes')
-        
-        for ext in initial_extensions:
-            try:
-                self.load_extension(ext)
-                log.info('Loaded ext: {0}'.format(ext))
-            except Exception:
-                traceback.print_exc()
+        self._webhook_lock: asyncio.Lock = asyncio.Lock()
                 
     @classmethod
     async def setup_pool(cls) -> asyncpg.Pool:
+        """:meth: `asyncpg.create_pool` with some extra functionality.
+
+        Parameters
+        ----------
+        uri: :class:`str`
+            The Postgres connection URI.
+        **kwargs:
+            Extra keyword arguments to pass to :meth:`asyncpg.create_pool`.
+        """
         def _encode_jsonb(value):
-            return json.dumps(value)
+            return discord.utils._to_json(value)
 
         def _decode_jsonb(value):
-            return json.loads(value)
+            return discord.utils._from_json(value)
         
         async def init(con):
             await con.set_type_codec('jsonb', schema='pg_catalog', encoder=_encode_jsonb, decoder=_decode_jsonb, format='text')
                 
         pool = await asyncpg.create_pool(uri, init=init)
         return pool
-                
-    @contextlib.asynccontextmanager
-    async def safe_connection(self, timeout: Optional[float] = 10):
+    
+    @_wrap_extension
+    @discord.utils.copy_doc(commands.Bot.load_extension)
+    def load_extension(self, name: str, *, package: Optional[str] = None) -> Coroutine[Any, Any, None]:
+        return super().load_extension(name, package=package)
+    
+    @_wrap_extension
+    @discord.utils.copy_doc(commands.Bot.unload_extension)
+    def unload_extension(self, name: str, *, package: Optional[str] = None) -> Coroutine[Any, Any, None]:
+        return super().unload_extension(name, package=package)
+    
+    @_wrap_extension
+    @discord.utils.copy_doc(commands.Bot.reload_extension)
+    def reload_extension(self, name: str, *, package: Optional[str] = None) -> Coroutine[Any, Any, None]:
+        return super().reload_extension(name, package=package)
+    
+    async def load_extensions(self, /, *, force_task: bool = True) -> List[Optional[asyncio.Task[None]]]:
+        """Loads the bot's extensions.
+        
+        Parameters
+        ----------
+        force_task: :class:`bool`
+            Whether or not to force the task to run :meth:`Scott.load_extensions`. This is for any
+            modules that wish to wait for an event to be fired before loading.
+        """
+        if force_task:
+            return [self.loop.create_task(self.load_extension(ext)) for ext in initial_extensions] # type: ignore
+        
+        return [await self.load_extension(ext) for ext in initial_extensions] # type: ignore
+    
+    async def setup_hook(self) -> None:
+        """|coro|
+        
+        Called before the bot is ready to setup all extensions.
+        """
+        self._task: Optional[asyncio.Task] = self.loop.create_task(self.dispatch_timers())
+        
+        await self.load_clean_words() # type: ignore
+        await self.load_dirty_words() # type: ignore
+        
+        await self.load_extensions()
+            
+    def safe_connection(self, timeout: float = 10) -> DbContextManager:
         """|coro|
         
         Generates a safe connection used to make database calls.
@@ -194,13 +344,9 @@ class DiscordBot(commands.Bot):
         timeout: Optional[:class:`float`]
             The timeout to use for the connection. Defaults to 10.
         """
-        conn = await self.pool.acquire(timeout=timeout)
-        try:
-            yield conn
-        finally:
-            await self.pool.release(conn)
+        return DbContextManager(self, timeout=timeout) # type: ignore
         
-    async def get_context(self, interaction: discord.Interaction, *, cls=context.Context):
+    async def get_context(self, message: discord.Message, *, cls: Type[context.Context] = context.Context) -> Any:
         """Used to get context when invoking a command.
         
         Parameters
@@ -214,16 +360,21 @@ class DiscordBot(commands.Bot):
         --------
         :class:`context.Context`
         """
-        return await super().get_context(interaction, cls=cls)
+        return await super().get_context(message, cls=cls)
     
     async def get_logging_webhook(self) -> discord.Webhook:
-        if not hasattr(self, 'logging_webhook'):
-            partial = discord.Webhook.from_url(self.logging_webhook_url, session=self.session, bot_token=self.http.token)
-            self.logging_webhook = await partial.fetch()
+        """|coro|
         
-        return self.logging_webhook
+        Used to get the logging webhook for fury bot. This is the webhook that will be used to log events
+        to the logging channel.
+        """
+        if not (webhook := getattr(self, 'logging_webhook', None)):
+            partial = discord.Webhook.from_url(self.logging_webhook_url, session=self.session, bot_token=self.http.token)
+            self.logging_webhook = webhook = await partial.fetch()
+        
+        return webhook
     
-    async def send_to_logging_channel(self, *args, **kwargs) -> None:
+    async def send_to_logging_channel(self, *args, **kwargs) -> discord.WebhookMessage:
         """Send a message to the logging channel.
         
         This is the only non-native dpy related coro. This is so the on_error can get placed here and not
@@ -253,6 +404,7 @@ class DiscordBot(commands.Bot):
         
         webhook = await self.get_logging_webhook()
 
+        # NOTE: Update this later
         ping_staff = kwargs.pop('ping_staff', True)
         if ping_staff:
             if args:
@@ -272,7 +424,7 @@ class DiscordBot(commands.Bot):
             **kwargs
         )
     
-    async def post_to_mystbin(self, content: str, syntax: str = 'python') -> mystbin.Post:
+    async def post_to_mystbin(self, content: str, syntax: str = 'python'):
         """Post content to Mystbin and get the response back.
         
         Parameters
@@ -286,14 +438,18 @@ class DiscordBot(commands.Bot):
         -------
         :class:`mystbin.Post`
         """
-        return await self.mystbin.post(content, syntax)
+        return await self.mystbin.post(content, syntax) # type: ignore
         
     async def on_ready(self):
-        print(f"{self.user.name} has come online.")
+        log.info(f"{self.user.name} has come online.")
+        log.info(discord.utils.oauth_url(
+            self.application_id, # type: ignore
+            permissions=discord.Permissions(8), 
+            scopes=('bot', 'applications.commands')
+        ))
             
     def _yield_chunks(self, value: str):
         const = 10
-        
         for i in range(0, len(value), 2000):
             yield f'```py\n{value[i:i + (2000 - const)]}\n```'
             
@@ -310,75 +466,47 @@ class DiscordBot(commands.Bot):
         
         for e in self._yield_chunks(trace_str):
             await self.send_to_logging_channel(e)
-        
-    async def on_command_error(self, ctx, error) -> None:
-        if hasattr(ctx.command, 'on_error'):
-            return
-        
-        error = getattr(error, 'original', error)
-        
-        cog = ctx.cog
-        if cog:
-            if cog._get_overridden_method(cog.cog_command_error) is not None:
-                return
-            
-        e = self.Embed(title='Oh no!')
-            
-        if isinstance(error, commands.MissingPermissions):
-            e.description = 'You do not have the permissions to do this command!'
-            return await ctx.send(embed=e)
-        if isinstance(error, (MemberAlreadyLocked, MemberNotLocked)):
-            e.description = str(error)
-            return await ctx.send(embed=e)
-
-        if checks.should_ignore(ctx.author) and self.debug:
-            exc = getattr(error, 'original', error)
-            traceback_str = ''.join(traceback.format_exception(exc.__class__, exc, exc.__traceback__)) # type: ignore
-            
-            lines = f'Ignoring exception in command {ctx.command}:\n{traceback_str}'
-            print(lines)
-            
-            formatted = lines.replace(traceback_str, f'```python\n{traceback_str}\n```')
-            if len(formatted) < 2000:
-                await ctx.send(formatted)
-
-            for e in self._yield_chunks(traceback_str):
-                await self.send_to_logging_channel(e)
-        else:
-            e.description = f'I ran into an error when doing this command!\n\n**{str(error)}**'
-            return await ctx.send(embed=e)
     
     async def on_message(self, message: discord.Message) -> None:
-        if not message.guild or message.author.bot:
-            return 
-        if message.channel.id == constants.MESSAGE_LOG_CHANNEL:
+        await self.process_commands(message)
+        
+        if any((
+            message.channel.id == constants.MESSAGE_LOG_CHANNEL,
+            message.author.bot,
+            not message.guild,
+        )):
+            return
+        
+        # Make the type checker happy here:
+        channel = message.channel
+        if isinstance(channel, (discord.DMChannel, discord.PartialMessageable, discord.GroupChannel)):
             return
         
         if not hasattr(self, 'message_webhook'):
             partial = discord.Webhook.from_url(self.message_webhook_url, session=self.session, bot_token=self.http.token)
             self.message_webhook = await partial.fetch()
         
-        kwargs = {}
+        attachments = []
         if message.attachments:
-            attachments = []
             for att in message.attachments:
                 try:
                     attachments.append(await att.to_file(spoiler=att.is_spoiler()))
                 except:
                     pass
-            kwargs['files'] = attachments
-           
-        try:     
-            await self.message_webhook.send(
-                username=message.author.display_name,
-                avatar_url=message.author.display_avatar.url,
-                embeds=message.embeds,
-                content=message.content,
-                allowed_mentions=discord.AllowedMentions.none(),
-                **kwargs
-            )
-        except discord.HTTPException:
-            pass
+        
+        embed = discord.Embed(description=message.content)
+        embed.add_field(name='Channel', value=channel.mention)
+        async with self._webhook_lock:
+            try:     
+                await self.message_webhook.send(
+                    username=message.author.display_name,
+                    avatar_url=message.author.display_avatar.url,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                    files=attachments,
+                    embed=embed
+                )
+            except discord.HTTPException:
+                pass
             
 
 class Security(CustomProfanity, URLExtract):
@@ -500,15 +628,18 @@ class Lockdown:
     """
     if TYPE_CHECKING:
         safe_connection: Callable
-        lockdown_timer: TimerHandler
-        lockdowns: Dict[int, Dict]
         get_guild: Callable
         get_cog: Callable[[str], Optional[commands.Cog]]
         wait_until_ready: Callable
+        create_timer: Callable
     
     @staticmethod
-    def get_lockdown_role(guild: discord.Guild):
-        return guild.get_role(constants.LOCKDOWN_ROLE)
+    def get_lockdown_role(guild: discord.Guild) -> discord.Role:
+        role = guild.get_role(constants.LOCKDOWN_ROLE)
+        if not role:
+            raise RuntimeError('Get lockdown role returned None')
+
+        return role
     
     async def is_locked(
         self, 
@@ -532,25 +663,25 @@ class Lockdown:
         -------
         :class:`bool`
         """
-        query = 'SELECT * FROM lockdowns WHERE member = $1 AND dispatched = $2'
+        query = 'SELECT * FROM timers WHERE extra#>\'{kwargs, member}\' = $1 AND extra#>\'{kwargs, type}\' = $2 AND dispatched = $3'
         if not connection:
             async with self.safe_connection() as conn:
-                data = await conn.fetchrow(query, member.id, False)
+                data = await conn.fetchrow(query, member.id, 'lockdowns', False)
         else:
-            data = await connection.fetchrow(query, member.id, False)
+            data = await connection.fetchrow(query, member.id, 'lockdowns', False)
         
-        if return_record:
+        if return_record: 
             return data
         
         return False if not data else True
     
-    async def send_to(self, member: discord.Member, *args, **kwargs) -> Optional[discord.Message]:
+    async def send_to(self, member: Union[discord.Member, discord.User], *args, **kwargs) -> Optional[discord.Message]:
         """Neatly sends a message to a member. Any exceptions thrown will be quietly handled.
         
         Parameters
         ----------
-        member: :class:`discord.Member`
-            The member to send to.
+        member: Union[:class:`discord.Member`, :class:`discord.User`]
+            The member or user to send to.
         args: List[Any]
             The args to pass along to the send function.
         kwargs: Dict[Any, Any]
@@ -607,16 +738,14 @@ class Lockdown:
             
             raise MemberAlreadyLocked(f'Member {member} is already locked.')
         
-        moderator = kwargs.pop('moderator', None)
-
         channels = []
         for channel in member.guild.channels: # Remove any special team creation. EX: rocket-league-1
             overwrites = channel.overwrites
             if overwrites.get(member):
                 specific = discord.utils.find(lambda e: e[0] == 'view_channel' and e[1] == True, overwrites.items())
                 if specific:
-                    overwrites.update(view_channel=False)
-                    await channel.edit(overwrites=overwrites)
+                    overwrites[member].update(view_channel=False) 
+                    await channel.edit(overwrites=overwrites) # type: ignore
                     channels.append(channel.id)
                     
         kwargs['channels'] = channels
@@ -632,21 +761,14 @@ class Lockdown:
         except discord.Forbidden:
             return False
             
-        async with self.safe_connection() as connection:
-            if time is not None:
-                await self.lockdown_timer.create_timer(
-                    time,
-                    member.id,
-                    moderator,
-                    connection=connection,
-                    **kwargs
-                )
-            else:
-                now = discord.utils.utcnow().replace(tzinfo=None)
-                await connection.execute(
-                    'INSERT INTO lockdowns (event, extra, created, member, moderator, dispatched) VALUES ($1, $2::jsonb, $3, $4, $5, $6)',
-                    'lockdowns', {'kwargs': kwargs, 'args': []}, now, member.id, moderator or member.id, False
-                )
+        await self.create_timer(
+            time,
+            'lockdowns',
+            precise=False,
+            member=member.id,
+            type='lockdowns',
+            **kwargs
+        )
         
         embed = Embed(
             title='Oh no!',
@@ -655,7 +777,7 @@ class Lockdown:
             author=member
         )
         embed.add_field(name='Reason', value=f'Locked down for reason: {reason}')
-        embed.add_field(name='Expires', value=f'The lockdown expires in {human_time(time) if time else "Never"}{" ({})".format(discord.utils.format_dt(time)) if time else ""}')
+        embed.add_field(name='Expires', value=f'The lockdown expires in {human_timedelta(time) if time else "Never"}{" ({})".format(discord.utils.format_dt(time)) if time else ""}')
         
         await self.send_to(member, embed=embed)
         return True
@@ -697,7 +819,7 @@ class Lockdown:
         
         """
         # Let's convert the time first
-        when = await UserFriendlyTime(converter=None, default='for lockdown').convert(context.DummyContext(), f'{seconds}s')
+        when = await UserFriendlyTime(converter=None, default='for lockdown').convert(context.DummyContext(), f'{seconds}s') # type: ignore
         return await self.lockdown(member, reason=reason, time=when.dt, **kwargs)
         
     async def freedom(self, member: discord.Member, *, raise_for_exception: bool = True) -> bool:
@@ -733,7 +855,9 @@ class Lockdown:
                 raise MemberNotLocked(f'Member {member} is not locked.')
             
             timer = Timer(record=data)
-            await conn.execute('UPDATE lockdowns SET dispatched = $1 WHERE id = $2', True, timer.id)
+            await conn.execute('UPDATE timers SET dispatched = $1 WHERE id = $2', True, timer.id)
+            
+        timer.member = member
         
         await self.on_lockdowns_timer_complete(timer)
         return True
@@ -742,7 +866,10 @@ class Lockdown:
         await self.wait_until_ready()
         
         guild = self.get_guild(constants.FURY_GUILD)
-        member = guild.get_member(timer.member) or await guild.fetch_member(timer.member)
+        
+        if not (member := getattr(timer, 'member', None)):
+            member = guild.get_member(timer.kwargs['member']) or await guild.fetch_member(timer.kwargs['member'])
+        
         log.info(f'On lockdowns timer complete for member {member}')
         
         # Restore roles here
@@ -760,12 +887,13 @@ class Lockdown:
                 await channel.edit(overwrites=overwrites)
         
         keep_roles = member.roles
+        keep_roles_fmt = [kr.id for kr in keep_roles]
         try:
             keep_roles.remove(self.get_lockdown_role(guild))
         except:
             pass
         
-        keep_roles.extend([discord.Object(id=r) for r in roles])
+        keep_roles.extend([discord.Object(id=r) for r in roles if r not in keep_roles_fmt])
         await member.edit(roles=keep_roles)
         
         embed = Embed(
@@ -774,7 +902,7 @@ class Lockdown:
         )
         embed.set_author(name=str(member), icon_url=member.display_avatar.url)
         embed.set_footer(text=f'ID: {member.id}')
-        embed.add_field(name='Locked Since', value=f'For {human_time(timer.created_at)} ({discord.utils.format_dt(timer.created_at)}).')
+        embed.add_field(name='Locked Since', value=f'{human_timedelta(timer.created_at)} ({discord.utils.format_dt(timer.created_at)}).')
         await self.send_to(member, embed=embed)
         
          
@@ -820,6 +948,8 @@ class FuryBot(DiscordBot, SecurityMixin):
     session: :class:`aiohttp.ClientSession`
         The bot's session to use for http requests.
     """
-    def __init__(self, pool: asyncpg.Pool, session: aiohttp.ClientSession):
-        super().__init__(pool, session)
+    __is_fury_bot__ = True
+    
+    def __init__(self, pool: asyncpg.Pool, session: aiohttp.ClientSession, loop: asyncio.AbstractEventLoop):
+        super().__init__(pool, session, loop)
         SecurityMixin.__init__(self)

@@ -24,15 +24,17 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-import json
 from math import ceil
-from typing import TYPE_CHECKING
+from typing import (
+    TYPE_CHECKING,    
+)
 
 import discord
 from discord.ext import commands
+from discord import app_commands
 
-from cogs.utils.context import Context
-from .utils.time import human_time
+from utils import human_timedelta, BaseCog
+from utils.context import Context
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -92,63 +94,49 @@ class ReportView(discord.ui.View):
         self.add_item(JumpButton(channel_id))
         
 
-class Commands(commands.Cog):
+class Commands(BaseCog):
     """The base Commands cog for the bot.
     
-    .. note::
-        
-        Any user in the server is allowed to use these commands.
-        
-    .. note::
-
-        Commands will not have the :class:`Context` parameter filled in the Parameters section.
-        This is because the ctx parameter is not a required one for the user.
-        
-    Attributes
-    ----------
-    bot: :class:`FuryBot`
-        The main bot.
+    Any user in the server are allowed to use these commands.
     """
-    def __init__(self, bot):
-        self.bot: FuryBot = bot
-
-    @commands.slash(name='ping', description='Ping the bot to ensure it is online.',)
-    async def ping(self, ctx: Context):
-        return await ctx.send(f"Pong! {ceil(round(self.bot.latency * 1000))} ms.")
     
-    @commands.message()
-    async def wave(self, ctx: Context):
-        await ctx.send("👋")
+    @commands.command(name='ping', description='Pong!')
+    async def _ping(self, ctx: Context) -> discord.Message:
+        """|coro|
         
-    @commands.message(name='raw')
-    async def raw_message(self, ctx: Context):
-        message = await self.bot.http.get_message(ctx.channel.id, ctx.target.id)
-        post = await self.bot.post_to_mystbin(json.dumps(message, indent=4), syntax='json')
-        return await ctx.send(f'Raw message: <{post}>')
+        Ping the bot and return it's latency.
+        """
+        return await ctx.send(f'Pong! {ceil(round(self.bot.latency * 1000))}')
+        
+    @app_commands.command(name='ping', description='Pong!')
+    async def ping(self, interaction: discord.Interaction) -> None:
+        return await interaction.response.send_message(f"Pong! {ceil(round(self.bot.latency * 1000))} ms.")
     
-    @commands.user(name='json')
-    async def raw_user(self, ctx: Context):
-        member = await self.bot.http.get_member(ctx.guild.id, ctx.target.id)
-        post = await self.bot.post_to_mystbin(json.dumps(member, indent=4), syntax='json')
-        return await ctx.send(f'Raw member: <{post}>')
+    @app_commands.command(name='wave', description='Wave!')
+    async def wave(self, interaction: discord.Interaction) -> None:
+        return await interaction.response.send_message(f"\N{WAVING HAND SIGN} {ceil(round(self.bot.latency * 1000))} ms.")
+    
+    @app_commands.command(name='report', description='Report a bug with Fury Bot.')
+    @app_commands.describe(
+        message='The report message to send to the logging channel.'
+    )
+    async def report(self, interaction: discord.Interaction, message: str):
+        if not interaction.guild or not interaction.channel:
+            return
         
-    @commands.slash(name='report', description='Report a bug!')
-    @commands.guild_only()
-    @commands.describe('message', description='The message to report')
-    async def report(self, ctx: Context, message: str):
-        e = self.bot.Embed(
-            title=f'Report from {ctx.author}',
-            description=f'{ctx.author.mention} used the report command in {ctx.channel.mention}'
+        embed = self.bot.Embed(
+            title=f'Report from {interaction.user}',
+            description=f'{interaction.user.mention} used the report command in {interaction.channel.mention}' # type: ignore
         )
-        e.add_field(name='Message', value=message)
-        await self.bot.send_to_logging_channel('<@!146348630926819328>', embed=e, view=ReportView(ctx.channel.id))
-        
-        return await ctx.send("I've reported this issue, you should get a response back from Trevor F. soon, thank you!", ephemeral=True)
+        embed.add_field(name='Message', value=message)
+        await self.bot.send_to_logging_channel('<@!146348630926819328>', embed=embed, view=ReportView(interaction.channel_id)) 
+
+        return await interaction.response.send_message("I've reported this issue, you should get a response back from Trevor F. soon, thank you!", ephemeral=True)
     
-    @commands.slash(name='uptime', description='Get the uptime of the bot.')
-    async def uptime(self, ctx: Context) -> None:
-        return await ctx.send(f'The bot has been online for {human_time(self.bot.start_time)}')
+    @app_commands.command(name='uptime', description='Get the current total uptime')
+    async def uptime(self, interaction: discord.Interaction) -> None:
+        return await interaction.response.send_message(f'The bot has been online for {human_timedelta(self.bot.start_time)}')
     
         
-def setup(bot):
-    return bot.add_cog(Commands(bot))
+async def setup(bot):
+    return await bot.add_cog(Commands(bot))

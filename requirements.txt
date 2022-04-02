@@ -1,0 +1,7 @@
+aiohttp[speedup]
+orjson
+git+https://github.com/Rapptz/discord.py
+profanityfilter
+asyncpg
+numpydoc
+fuzzywuzzy[speedup]

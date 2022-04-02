@@ -21,7 +21,7 @@ Bot will detect and auto mod any message or member if:
 # Credit
 Some code used from [Robo Danny](https://github.com/Rapptz/RoboDanny/), made by [Rapptz](https://github.com/Rapptz/).
 
-- `cogs.utils.context.Context.tick` 
+- `utils.context.Context.tick` 
 - `cogs.moderation.Moderation.reload_or_load_extension`
 - `cogs.moderation.Moderation.find_modules_from_git`
 - `cogs.moderation.Moderation.git_pull`
