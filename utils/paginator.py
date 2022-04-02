@@ -92,7 +92,7 @@ class AsyncCodePaginator(discord.ui.View, IncompletePaginator):
         await self.message.edit(content=self.current_page, view=self)
     
     @discord.ui.button(emoji=discord.PartialEmoji(name='\N{BLACK LEFT-POINTING TRIANGLE}'), style=discord.ButtonStyle.primary)
-    async def backward(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def backward(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         if self.current > 0:
             self.current -= 1
         else:
@@ -101,7 +101,7 @@ class AsyncCodePaginator(discord.ui.View, IncompletePaginator):
         return await interaction.response.edit_message(content=self.current_page, view=self)
     
     @discord.ui.button(emoji=discord.PartialEmoji(name='\N{BLACK RIGHT-POINTING TRIANGLE}'), style=discord.ButtonStyle.primary)
-    async def forward(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def forward(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         if self.current < len(self.incomplete_pages) - 1:
             self.current += 1
         else:
@@ -110,7 +110,7 @@ class AsyncCodePaginator(discord.ui.View, IncompletePaginator):
         return await interaction.response.edit_message(content=self.current_page, view=self)
     
     @discord.ui.button(label='Stop Pagination', style=discord.ButtonStyle.danger)
-    async def stop_pagination(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def stop_pagination(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         for child in self.children:
             child.disabled = True # type: ignore
         

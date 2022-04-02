@@ -103,13 +103,13 @@ class Confirmation(discord.ui.View):
         return interaction.user == self.author
     
     @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green)
-    async def confirm(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_message('Confirming', ephemeral=True)
         self.value = True
         self.stop()
 
     @discord.ui.button(label='Cancel', style=discord.ButtonStyle.grey)
-    async def cancel(self, button: discord.ui.Button, interaction: discord.Interaction):
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message('Cancelling', ephemeral=True)
         self.value = False
         self.stop()

@@ -485,34 +485,34 @@ class TeamPaginator(discord.ui.View):
         super().__init__(timeout=90)
         
     @discord.ui.button(emoji='\N{LEFTWARDS BLACK ARROW}')
-    async def previous_embed(self, button: discord.ui.Button, interaction: discord.Interaction):
+    async def previous_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
         """|coro|
         
         Called to go back a page.
         
         Parameters
         ----------
-        button: :class:`discord.ui.Button`
-            The button that was pressed on the view.
         interaction: :class:`discord.Interaction`
             The interaction that was created from the user interacting with the button.
+        button: :class:`discord.ui.Button`
+            The button that was pressed on the view.
         """
         self._queue.rotate(-1)
         embed = self._queue[0]
         await interaction.response.edit_message(embed=embed)
 
-    @discord.ui.button( emoji='\N{BLACK RIGHTWARDS ARROW}')
-    async def next_embed(self, button: discord.ui.Button, interaction: discord.Interaction):
+    @discord.ui.button(emoji='\N{BLACK RIGHTWARDS ARROW}')
+    async def next_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
         """|coro|
         
         Called to go forward a page.
         
         Parameters
         ----------
-        button: :class:`discord.ui.Button`
-            The button that was pressed on the view.
         interaction: :class:`discord.Interaction`
             The interaction that was created from the user interacting with the button.
+        button: :class:`discord.ui.Button`
+            The button that was pressed on the view.
         """
         self._queue.rotate(1)
         embed = self._queue[0]
