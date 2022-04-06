@@ -104,12 +104,36 @@ class Confirmation(discord.ui.View):
     
     @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        """|coro|
+        
+        The callback for the confirm button. When pressed, will set the internal
+        marker to True and stop the view.
+        
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction object.
+        button: :class:`discord.ui.Button`
+            The button that was pressed.
+        """
         await interaction.response.send_message('Confirming', ephemeral=True)
         self.value = True
         self.stop()
 
     @discord.ui.button(label='Cancel', style=discord.ButtonStyle.grey)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """|coro|
+        
+        The callback for the confirm button. When pressed, will set the internal
+        marker to False and stop the view.
+        
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction object.
+        button: :class:`discord.ui.Button`
+            The button that was pressed.
+        """
         await interaction.response.send_message('Cancelling', ephemeral=True)
         self.value = False
         self.stop()
@@ -171,7 +195,6 @@ class Context(commands.Context, Generic[FuryT]):
     @discord.utils.copy_doc(tick)
     def tick(self, opt: Optional[bool], label: Optional[str] = None) -> str:
         return tick(opt, label)
-    
     
     @discord.utils.copy_doc(commands.Context.send)
     async def send(self, *args, **kwargs) -> discord.Message:
