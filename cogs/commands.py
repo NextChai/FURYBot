@@ -110,33 +110,52 @@ class Commands(BaseCog):
         
     @app_commands.command(name='ping', description='Pong!')
     async def ping(self, interaction: discord.Interaction) -> None:
+        """|coro|
+        
+        An application command to ping the bot.
+        """
         return await interaction.response.send_message(f"Pong! {ceil(round(self.bot.latency * 1000))} ms.")
     
     @app_commands.command(name='wave', description='Wave!')
     async def wave(self, interaction: discord.Interaction) -> None:
+        """|coro|
+        
+        An application command to wave to the bot and get a ping back.
+        """
         return await interaction.response.send_message(f"\N{WAVING HAND SIGN} {ceil(round(self.bot.latency * 1000))} ms.")
     
-    @app_commands.command(name='report', description='Report a bug with Fury Bot.')
-    @app_commands.describe(
-        message='The report message to send to the logging channel.'
-    )
-    async def report(self, interaction: discord.Interaction, message: str):
-        if not interaction.guild or not interaction.channel:
-            return
+    @commands.command(name='report', description='Report a bug with Fury Bot.')
+    @commands.guild_only()
+    async def report(self, ctx: Context, message: str):
+        """|coro|
+        Used to report a bug with Fury Bot."""
         
         embed = self.bot.Embed(
-            title=f'Report from {interaction.user}',
-            description=f'{interaction.user.mention} used the report command in {interaction.channel.mention}' # type: ignore
+            title=f'Report from {ctx.author}',
+            description=f'{ctx.author.mention} used the report command in {ctx.channel.mention}' # type: ignore
         )
         embed.add_field(name='Message', value=message)
-        await self.bot.send_to_logging_channel('<@!146348630926819328>', embed=embed, view=ReportView(interaction.channel_id)) 
+        
+        await self.bot.send_to_logging_channel('<@!146348630926819328>', embed=embed, view=ReportView(ctx.channel.id))  # 146348630926819328 -> Trevor F discord ID.
 
-        return await interaction.response.send_message("I've reported this issue, you should get a response back from Trevor F. soon, thank you!", ephemeral=True)
+        return await ctx.reply("I've reported this issue, you should get a response back from Trevor F. soon, thank you!", ephemeral=True)
     
     @app_commands.command(name='uptime', description='Get the current total uptime')
-    async def uptime(self, interaction: discord.Interaction) -> None:
+    async def app_command_uptime(self, interaction: discord.Interaction) -> None:
+        """|coro|
+        
+        Get the current total uptime of the bot.
+        """
         return await interaction.response.send_message(f'The bot has been online for {human_timedelta(self.bot.start_time)}')
     
+    @commands.command(name='uptime', description='Get the current total uptime')
+    async def uptime(self, ctx: Context) -> discord.Message:
+        """|coro|
+        
+        Get the current total uptime of the bot.
+        """
+        return await ctx.reply(f'The bot has been online for {human_timedelta(self.bot.start_time)}', mention_author=False)
+        
         
 async def setup(bot):
     return await bot.add_cog(Commands(bot))
