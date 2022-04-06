@@ -25,6 +25,8 @@ from __future__ import annotations
 
 from typing import (
     TYPE_CHECKING,
+    Awaitable,
+    Callable,
     Union,
 )
 
@@ -49,7 +51,7 @@ __all__ = (
     'should_ignore',
 )
 
-def is_captain():
+def is_captain() -> Callable[[Context], Context]:
     """Used to determine if a member is a captain."""
     async def predicate(ctx: Context) -> bool:
         if not isinstance(ctx.author, discord.Member):
@@ -59,7 +61,7 @@ def is_captain():
     
     return commands.check(predicate)
 
-def is_mod():
+def is_mod() -> Callable[[Context], Context]:
     """Determenes if a member is a mod."""
     async def predicate(ctx: Context):
         if not isinstance(ctx.author, discord.Member):
@@ -69,7 +71,7 @@ def is_mod():
     
     return commands.check(predicate)
 
-def is_coach():
+def is_coach() -> Callable[[Context], Context]:
     """Used to determine if a member is a coach."""
     async def predicate(ctx: Context):
         if not isinstance(ctx.author, discord.Member):
@@ -79,7 +81,7 @@ def is_coach():
     
     return commands.check(predicate)
 
-def is_game_consultant():
+def is_game_consultant() -> Callable[[Context], Context]:
     """Used to dertermine if a member is a game consultant."""
     async def predicate(ctx: Context):
         if not isinstance(ctx.author, discord.Member):
