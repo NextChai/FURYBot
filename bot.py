@@ -88,7 +88,6 @@ initial_extensions = (
     'utils.jishaku',
     
     'cogs.commands',
-    'cogs.owner',
     'cogs.moderation',
     #'cogs.safety',
     'cogs.teams',
