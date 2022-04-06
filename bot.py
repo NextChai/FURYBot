@@ -24,7 +24,6 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-import re
 import sys
 import time
 import logging
@@ -38,7 +37,8 @@ from typing import (
     Awaitable,
     List,
     Dict, 
-    Optional, 
+    Optional,
+    Protocol,
     Union, 
     Coroutine,
     Type,
@@ -46,24 +46,25 @@ from typing import (
     Tuple,
     TypeVar,
     Callable,
-    Any
+    Any,
+    Generator
 )
 from typing_extensions import ParamSpec
 
 import aiohttp
 import mystbin
 import asyncpg
+import googletrans
 
 import discord
 from discord.ext import commands
 
-from urlextract import URLExtract
-
-from utils import context, checks, constants
+from utils import context, constants
 from utils.errors import *
-from utils import CustomProfanity
+from utils import ProfanityChecker
 from utils.timer import TimerManager, Timer
 from utils.time import UserFriendlyTime, human_timedelta
+from utils.links import LinkChecker
 from config import postgresql as uri, logging_webhook, message_webhook
 
 
@@ -73,9 +74,6 @@ FuryT = TypeVar('FuryT', bound='FuryBot')
 
 __all__ = (
     'DiscordBot',
-    'Security',
-    'Lockdown',
-    'SecurityMixin',
     'FuryBot',
 )
 
@@ -95,6 +93,12 @@ initial_extensions = (
     #'cogs.safety',
     'cogs.teams',
 )
+
+def _yield_chunks(value: str):
+    const = 2000 - 10 # The legnth of 2000 (total content legnth) - "```py\n```"
+    
+    for i in range(0, len(value), const):
+        yield f'```py\n{value[i:i + const]}\n```'
 
 
 @discord.utils.copy_doc(discord.Embed)
@@ -168,6 +172,14 @@ def _wrap_extension(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[Op
     
     return wrapped
 
+class _Chunkable(Protocol):
+    def __len__(self) -> int:
+        ...
+        
+    def __getitem__(self, __k) -> Any:
+        ...
+    
+    
 
 class DbContextManager(Generic[FuryT]):
     """A simple context manager used to manage database connections.
@@ -221,17 +233,29 @@ class DbContextManager(Generic[FuryT]):
             await self._pool.release(self._conn)
 
 
-class DiscordBot(commands.Bot, TimerManager):
+class DiscordBot(commands.Bot):
     """The base container for FURY Bot.
     
     Will contain all discord.py related activities and methods.
     
     Attributes
     ----------
-    activity_message: :class:`str`
-        The bot's activity message.
-    activity_type: :class:`discord.ActivityType`
-        The bot's current activity type.
+    pool: :class:`asyncpg.Pool`
+        The connection pool for the bot to use.
+    session: :class:`aiohttp.ClientSession`
+        The session for the bot to use.
+    Embed: Callable[..., :class:`discord.Embed`]
+        An embed callable to use. This gives you the bots embed to
+        use across all commands.
+    debug: :class:`bool`
+        Whether or not the bot is in debug mode.
+    spam_control: :class:`commands.CooldownMapping`
+        A spam control mapping to use for members who try
+        and spam messages.
+    logging_webhook_url: :class:`str`
+        The logging webhook url to use for the bot.
+    message_webhook_url: :class:`str`
+        The message webhook url to use for the bot.
     """
     if TYPE_CHECKING:
         logging_webhook_url: str
@@ -254,13 +278,13 @@ class DiscordBot(commands.Bot, TimerManager):
             strip_after_prefix=True,
             hartbeat_timeout=180,
             case_insensitive=True,
-            owner_ids=[757663899532132418, 146348630926819328] 
+            owner_ids=[757663899532132418, 146348630926819328],
+            *args,
+            **kwargs
         ) 
-        TimerManager.__init__(self, self) # type: ignore
-    
+        
         self.Embed: Callable[..., discord.Embed] = Embed
         self.debug: bool = True
-        self.mystbin: mystbin.Client = mystbin.Client(session=self.session) # type: ignore
         
         # TODO: Implement me
         self.spam_control = commands.CooldownMapping.from_cooldown(10, 12.0, commands.BucketType.user)
@@ -327,11 +351,6 @@ class DiscordBot(commands.Bot, TimerManager):
         
         Called before the bot is ready to setup all extensions.
         """
-        self._task: Optional[asyncio.Task] = self.loop.create_task(self.dispatch_timers())
-        
-        await self.load_clean_words() # type: ignore
-        await self.load_dirty_words() # type: ignore
-        
         await self.load_extensions()
             
     def safe_connection(self, timeout: float = 10) -> DbContextManager:
@@ -347,7 +366,9 @@ class DiscordBot(commands.Bot, TimerManager):
         return DbContextManager(self, timeout=timeout) # type: ignore
         
     async def get_context(self, message: discord.Message, *, cls: Type[context.Context] = context.Context) -> Any:
-        """Used to get context when invoking a command.
+        """|coro|
+        
+        Used to get context of a :class:`discord.Message`.
         
         Parameters
         ----------
@@ -365,8 +386,8 @@ class DiscordBot(commands.Bot, TimerManager):
     async def get_logging_webhook(self) -> discord.Webhook:
         """|coro|
         
-        Used to get the logging webhook for fury bot. This is the webhook that will be used to log events
-        to the logging channel.
+        Used to get the logging webhook for Fury Bot. This is the webhook that
+        is used to log anything the moderation needs to know about.
         """
         if not (webhook := getattr(self, 'logging_webhook', None)):
             partial = discord.Webhook.from_url(self.logging_webhook_url, session=self.session, bot_token=self.http.token)
@@ -382,9 +403,9 @@ class DiscordBot(commands.Bot, TimerManager):
         
         Parameters
         ----------
-        args: List[Any]
+        *args: Tuple[Any]
             The args to send along to the channel
-        kwargs: Dict[Any, Any]
+        **kwargs: Dict[Any, Any]
             The kwargs to send along to the channel.
             
         Raises
@@ -398,31 +419,272 @@ class DiscordBot(commands.Bot, TimerManager):
         
         Returns
         -------
-        None
+        :class:`discord.WebhookMessage`
+            The message that was sent.
         """
         await self.wait_until_ready()
+        if args:
+            kwargs['content'] = args[0]
         
-        webhook = await self.get_logging_webhook()
-
-        # NOTE: Update this later
         ping_staff = kwargs.pop('ping_staff', True)
+        
         if ping_staff:
-            if args:
-                kwargs['content'] = args[0]
-                
-            if content := kwargs.get('content'):
-                content = f'<@&867901004728762399>\n{content}'
+            mentions = discord.AllowedMentions(roles=[discord.Object(id=constants.LOCKDOWN_NOTIFICATIONS_ROLE)])
+            
+            if (content := kwargs.get('content')):
+                content = f'<@&{constants.LOCKDOWN_NOTIFICATIONS_ROLE}>\n{content}'
             else:
-                kwargs['content'] ='<@&867901004728762399>'
-            kwargs['allowed_mentions'] = discord.AllowedMentions(roles=[discord.Object(id=867901004728762399)])
+                content = f'<@&{constants.LOCKDOWN_NOTIFICATIONS_ROLE}>'
+            
+            kwargs['content'] = content
         else:
-            kwargs['allowed_mentions'] = discord.AllowedMentions.none()
+            mentions = discord.AllowedMentions.none()
+        
+        kwargs['allowed_mentions'] = mentions
 
+        webhook = await self.get_logging_webhook()
         return await webhook.send(
             username=self.user.display_name, 
             avatar_url=self.user.display_avatar.url,
             **kwargs
         )
+        
+    async def on_ready(self):
+        """|coro|
+        
+        An event that's called when the bot's internal state reaches ready. At this point,
+        cahce has been fully populated and the bot is ready to be used.
+        """
+        log.info(f"{self.user.name} has come online.")
+        log.info(discord.utils.oauth_url(
+            self.application_id, # type: ignore
+            permissions=discord.Permissions(8), 
+        ))
+            
+    async def on_error(self, event_method: str, /, *args: Any, **kwargs: Any) -> None:
+        """Called when the Bot runs into an error that is not handled by `on_command_error`.
+        
+        This will log error and send it to the logging channel.
+        
+        Parameters
+        ----------
+        event_method: :class:`str`
+            The name of the method that created the error.
+        *args: Any
+            The arguments that were passed to the method.
+        **kwargs: Any
+            The keyword arguments that were passed to the method.
+        """
+        type, value, traceback_str = sys.exc_info()
+        if not type:
+            raise
+
+        trace_str = ''.join(traceback.format_exception(type, value, traceback_str))
+        log.exception(f'Exception in {event_method}', exc_info=value)
+        
+        for e in _yield_chunks(trace_str):
+            await self.send_to_logging_channel(e)
+
+
+class FuryBot(DiscordBot, TimerManager):
+    """
+    The main implementation of Fury Bot. This combines
+    both the Discord Bot and the Timer Manager into one, and adds
+    methods to the bot that are used to manage lockdowns, profanity,
+    and link checking.
+    
+    Attributes
+    ----------
+    profanity: :class:`ProfanityChecker`
+        The profanity manager for the bot.
+    links: :class:`LinkChecker`
+        The link checker for the bot.
+    executor: :class:`concurrent.futures.ThreadPoolExecutor`
+        The executor used to run tasks in the background.
+    mystbin: :class:`Mystbin`   
+        The mystbin manager for the bot.
+    start_time: :class:`datetime.datetime`
+        The time the bot started, in utc.
+    """
+    def __init__(self, *, pool: asyncpg.Pool, session: aiohttp.ClientSession, loop: asyncio.AbstractEventLoop) -> None:
+        super().__init__(pool=pool, session=session, loop=loop)
+        self.profanity = ProfanityChecker(wrap=self.wrap, safe_connection=self.safe_connection)
+        self.links: LinkChecker = LinkChecker(wrap=self.wrap, safe_connection=self.safe_connection, extract_email=True)
+        
+        self.executor = ThreadPoolExecutor(max_workers=15)
+        self.mystbin: mystbin.Client = mystbin.Client(session=self.session) # type: ignore
+        self.start_time: datetime.datetime = datetime.datetime.utcnow()
+        self.translator = googletrans.Translator()
+    
+        self._have_data = asyncio.Event()
+        self._current_timer = None
+        
+    @staticmethod
+    def chunker(iterable: Union[str, _Chunkable], /, *, size: int = 2000) -> Generator[Union[str, _Chunkable], None, None]:
+        """
+        A generator used to chunk a string or iterable.
+        
+        Parameters
+        ----------
+        iterable: Union[:class:`str`, :class:`_Chunkable`]
+            The iterable to chunk.
+        size: :class:`int`
+            The size of each chunk.
+        
+        Yields
+        -------
+        Union[:class:`str`, :class:`_Chunkable`]
+            The chunked iterable.
+        """
+        for i in range(0, len(iterable), size):
+            yield iterable[i:i + size]
+        
+    @discord.utils.cached_property
+    def uptime_timestamp(self) -> str:
+        """:class:`str`: The uptime of the bot in a human-readable Discord timestamp format.
+        
+        Raises
+        ------
+        AttributeError
+            The bot has not hit on-ready yet.
+        """
+        if not self.is_ready():
+            raise AttributeError('The bot has not hit on-ready yet.')
+        
+        return discord.utils.format_dt(self.start_time)
+    
+    @discord.utils.cached_property
+    def fury_guild(self) -> discord.Guild:
+        """:class:`discord.Guild`: The FLVS Fury guild."""
+        guild = self.get_guild(constants.FURY_GUILD)
+        if not guild:
+            raise ValueError(f'Could not find guild {constants.FURY_GUILD}')
+
+        return guild
+    
+    def get_lockdown_role(self) -> discord.Role:
+        """:class:`discord.Role`: Get the lockdown role for the guild."""
+        role = self.fury_guild.get_role(constants.LOCKDOWN_ROLE)
+        if not role:
+            raise RuntimeError('Get lockdown role returned None')
+
+        return role
+    
+    async def setup_hook(self) -> None:
+        """|coro|
+        
+        Called before the bot is ready to setup all extensions.
+        """
+        self.loop.create_task(self.dispatch_timers())
+        await super().setup_hook()
+        
+    async def wrap(self, method: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
+        """|coro|
+        
+        A utility method used to wrap a blocking call in a `run_in_executor` to not block the bot.
+        
+        Parameters
+        ----------
+        method: Callable[P, T]
+            The method to wrap.
+        *args: P.args
+            The arguments to pass to the method.
+        **kwargs: P.kwargs
+            The keyword arguments to pass to the method.
+        
+        Returns
+        -------
+        T
+            The result of the method.
+        """
+        wrapped = functools.partial(method, *args, **kwargs)
+        return await self.loop.run_in_executor(self.executor, wrapped)
+
+    async def censor(self, text: str) -> str:
+        """|coro|
+        
+        Censor a text string using the profanity manager.
+        
+        Parameters
+        ----------
+        text: :class:`str`
+            The text to censor.
+        
+        Returns
+        -------
+        :class:`str`
+            The censored text.
+        """
+        return await self.profanity.censor(text)
+    
+    async def contains_profanity(self, text: str) -> bool:
+        """|coro|
+        
+        Used to determine if a message has profanity.
+        
+        Parameters
+        ----------
+        text: :class:`str`
+            The text to check.
+        
+        Returns
+        -------
+        :class:`bool`
+            Whether or not the text contains profanity.
+        """
+        return await self.profanity.censor(text, fast=True) != text
+    
+    async def get_links(self, text: str) -> List[str]:
+        """|coro|
+        
+        Extract links from a a text string.
+        
+        Parameters
+        ----------
+        text: :class:`str`
+            The text to extract URL's from.
+        
+        Returns
+        -------
+        List[:class:`str`]
+            The list of url's extracted from the text.
+        """
+        return await self.links.get_links(text)
+    
+    async def contains_links(self, text: str) -> bool:
+        """|coro|
+        
+        Determine if a text contains links.
+            
+        Parameters
+        ----------
+        text: :class:`str`
+            The text to determine.
+            
+        Returns
+        -------
+        :class:`bool
+            Whether or not the text contains links.
+        """
+        return await self.links.contains_links(text)
+    
+    async def is_valid_link(self, link: str) -> bool:
+        """|coro|
+        
+        A method used to determine if a link is valid or not. A valid
+        link is one that has been authorized for use by the moderation team.
+        
+        Parameters
+        ----------
+        link: :class:`str`
+            The link to check.
+        
+        Returns
+        -------
+        :class:`bool`
+            Whether or not the link is valid.
+        """
+        return await self.links.is_valid_link(link)
     
     async def post_to_mystbin(self, content: str, syntax: str = 'python'):
         """Post content to Mystbin and get the response back.
@@ -438,209 +700,25 @@ class DiscordBot(commands.Bot, TimerManager):
         -------
         :class:`mystbin.Post`
         """
-        return await self.mystbin.post(content, syntax) # type: ignore
-        
-    async def on_ready(self):
-        log.info(f"{self.user.name} has come online.")
-        log.info(discord.utils.oauth_url(
-            self.application_id, # type: ignore
-            permissions=discord.Permissions(8), 
-            scopes=('bot', 'applications.commands')
-        ))
-            
-    def _yield_chunks(self, value: str):
-        const = 10
-        for i in range(0, len(value), 2000):
-            yield f'```py\n{value[i:i + (2000 - const)]}\n```'
-            
-    async def on_error(self, event, *args, **kwargs) -> None:
-        """Called when the Bot runs into an error that is not handled by `on_command_error`.
-        
-        This will print out the error and send it to the logging channel."""
-        type, value, traceback_str = sys.exc_info()
-        if not type:
-            raise
-
-        trace_str = ''.join(traceback.format_exception(type, value, traceback_str))
-        print(trace_str)
-        
-        for e in self._yield_chunks(trace_str):
-            await self.send_to_logging_channel(e)
+        return await self.mystbin.post(content, syntax) # type: ignore # This is not of concern to us.
     
-    async def on_message(self, message: discord.Message) -> None:
-        await self.process_commands(message)
+    async def translate(self, text: str) -> str:
+        """|coro|
         
-        if any((
-            message.channel.id == constants.MESSAGE_LOG_CHANNEL,
-            message.author.bot,
-            not message.guild,
-        )):
-            return
-        
-        # Make the type checker happy here:
-        channel = message.channel
-        if isinstance(channel, (discord.DMChannel, discord.PartialMessageable, discord.GroupChannel)):
-            return
-        
-        if not hasattr(self, 'message_webhook'):
-            partial = discord.Webhook.from_url(self.message_webhook_url, session=self.session, bot_token=self.http.token)
-            self.message_webhook = await partial.fetch()
-        
-        attachments = []
-        if message.attachments:
-            for att in message.attachments:
-                try:
-                    attachments.append(await att.to_file(spoiler=att.is_spoiler()))
-                except:
-                    pass
-        
-        embed = discord.Embed(description=message.content)
-        embed.add_field(name='Channel', value=channel.mention)
-        async with self._webhook_lock:
-            try:     
-                await self.message_webhook.send(
-                    username=message.author.display_name,
-                    avatar_url=message.author.display_avatar.url,
-                    allowed_mentions=discord.AllowedMentions.none(),
-                    files=attachments,
-                    embed=embed
-                )
-            except discord.HTTPException:
-                pass
-            
-
-class Security(CustomProfanity, URLExtract):
-    def __init__(self):
-        URLExtract.__init__(self)
-        super().__init__()
-        self.update()
-        self.executor = ThreadPoolExecutor(max_workers=15)
-        
-    async def setup_profanity(self) -> None:
-        """Used to load the wordsets of the profanity filter.
-        
-        .. note::
-            
-            This is not done in the ProfanityFilter class because 
-            I didn't want to pass in the bots loop.
-        """
-        await self.load_dirty_words()
-        await self.load_clean_words()
-        
-    async def wrap(self, method: Callable, *args, **kwargs):
-        """A utility coro used to wrap a blocking call in a `run_in_executor` to not block the bot."""
-        wrapped = functools.partial(method, *args, **kwargs)
-        return await self.loop.run_in_executor(self.executor, wrapped)
-    
-    def contains_profanity(self, message: str) -> Coroutine[Any, Any, bool]:
-        """Used to determine if a message has profanity.
+        Used to translate text from one language to another.
         
         Parameters
         ----------
-        message: :class:`str`
-            The message to check.
-        
-        Returns
-        -------
-        :class:`bool`
-        """
-        return self.wrap(self.has_bad_word, message)
-    
-    def censor_message(self, message: str) -> Coroutine[Any, Any, str]:
-        """Used to censor a message.
-        
-        Parameters
-        ----------
-        message: :class:`str`
-            The message to censor.
-        
+        text: :class:`str`
+            The text to translate.
+            
         Returns
         -------
         :class:`str`
-            The message that was censored
+            The translated text.
         """
-        return self.wrap(self.censor, message)
-    
-    async def get_links(self, message: str) -> List[str]:
-        """Extreact links from a certain message.
+        return await self.wrap(self.translator.translate(text))
         
-        Parameters
-        ----------
-        message: :class:`str`
-            The message to extract URL's from.
-        
-        Returns
-        -------
-        List[:class:`str`]
-            The list of url's extracted from a message.
-        """
-        links = await self.wrap(self.find_urls, message)
-        if not links:
-            links = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', message)
-        
-        return links
-    
-    async def contains_links(self, message: str) -> bool:
-        """Determine if a message contains links.
-        
-        .. note:
-            
-            Returns the bool value from :meth:`Security.get_links`
-            
-        Parameters
-        ----------
-        message: :class:`str`
-            The message to determine.
-            
-        Returns
-        -------
-        :class:`bool`
-        """
-        return (await self.get_links(message)) != []
-    
-    async def is_valid_link(self, link: str) -> bool:
-        """Determine if a link is valid.
-        
-        .. note::
-            
-            Valid means any link that is from `gifyourgame`, `streambale`, or `lowkey.gg` and in a valid gif channel.
-            
-        Parameters
-        ----------
-        link: :class:`str`
-            The link to check.
-        channel: Optional[:class:`discord.Guild.Channel`]
-            Pass in a channel to determine if the link is in a valid gif channel.
-        """
-        check = await self.wrap(re.findall, r'gifyourgame|streamable|lowkey.gg|smash.gg|app.playvs.com', link)
-        return True if check else False
-        
-        
-class Lockdown:
-    """The Lockdown implementation of the bot.
-    
-    This will manage all lockdown based methods and handle unlocking.
-    
-    Attributes
-    ----------
-    locked_out: Dict[:class:`int`, Dict[:class:`str`, List[Any]]]
-        The locked out members and their corresponding data.
-    """
-    if TYPE_CHECKING:
-        safe_connection: Callable
-        get_guild: Callable
-        get_cog: Callable[[str], Optional[commands.Cog]]
-        wait_until_ready: Callable
-        create_timer: Callable
-    
-    @staticmethod
-    def get_lockdown_role(guild: discord.Guild) -> discord.Role:
-        role = guild.get_role(constants.LOCKDOWN_ROLE)
-        if not role:
-            raise RuntimeError('Get lockdown role returned None')
-
-        return role
-    
     async def is_locked(
         self, 
         member: Union[discord.Member, discord.User], 
@@ -675,7 +753,7 @@ class Lockdown:
         
         return False if not data else True
     
-    async def send_to(self, member: Union[discord.Member, discord.User], *args, **kwargs) -> Optional[discord.Message]:
+    async def send_to(self, member: discord.abc.Messageable, *args, **kwargs) -> Optional[discord.Message]:
         """Neatly sends a message to a member. Any exceptions thrown will be quietly handled.
         
         Parameters
@@ -752,7 +830,7 @@ class Lockdown:
         kwargs['roles'] = [r.id for r in member.roles if r.is_assignable()]
         kwargs['reason'] = reason
         
-        lr = self.get_lockdown_role(member.guild)
+        lr = self.get_lockdown_role()
         roles = [lr]
         roles.extend([r for r in member.roles if not r.is_assignable()]) # The role(s) a bot can not change.
         
@@ -859,97 +937,5 @@ class Lockdown:
             
         timer.member = member
         
-        await self.on_lockdowns_timer_complete(timer)
+        self.dispatch('lockdowns_timer_complete', timer)
         return True
-    
-    async def on_lockdowns_timer_complete(self, timer: Timer) -> None:
-        await self.wait_until_ready()
-        
-        guild = self.get_guild(constants.FURY_GUILD)
-        
-        if not (member := getattr(timer, 'member', None)):
-            member = guild.get_member(timer.kwargs['member']) or await guild.fetch_member(timer.kwargs['member'])
-        
-        log.info(f'On lockdowns timer complete for member {member}')
-        
-        # Restore roles here
-        channels = timer.kwargs['channels']
-        roles = timer.kwargs['roles']
-        
-        for channel in channels:
-            channel = guild.get_channel(channel)
-            if not channel:
-                continue
-            
-            overwrites = channel.overwrites
-            if overwrites.get(member):
-                overwrites[member].update(view_channel=True)
-                await channel.edit(overwrites=overwrites)
-        
-        keep_roles = member.roles
-        keep_roles_fmt = [kr.id for kr in keep_roles]
-        try:
-            keep_roles.remove(self.get_lockdown_role(guild))
-        except:
-            pass
-        
-        keep_roles.extend([discord.Object(id=r) for r in roles if r not in keep_roles_fmt])
-        await member.edit(roles=keep_roles)
-        
-        embed = Embed(
-            title='Lockdown Ended',
-            description='Your lockdown has ended! You access tot he server has been restored. Feel free to review the rules and enjoy the server.'
-        )
-        embed.set_author(name=str(member), icon_url=member.display_avatar.url)
-        embed.set_footer(text=f'ID: {member.id}')
-        embed.add_field(name='Locked Since', value=f'{human_timedelta(timer.created_at)} ({discord.utils.format_dt(timer.created_at)}).')
-        await self.send_to(member, embed=embed)
-        
-         
-class SecurityMixin(Security, Lockdown):
-    """A mixin that implements the attrs and methods of both the 
-    Lockdown and Secury classes into one.
-    
-    This will be used to inherit onto FuryBot, the main the bot class."""
-    def __init__(self):
-        Lockdown.__init__(self)
-        super().__init__()
-        
-                 
-class FuryBot(DiscordBot, SecurityMixin):
-    """The actual implmentation of Fury Bot. This is where we'll
-    keep all guild-specific related items.
-    
-    Attributes
-    ----------
-    locked_out: Dict[:class:`int`, Dict[Any, Any]]
-        The locked out dict of members.
-    Embed: :class:`discord.Embed`
-        The base embed for the bot.
-        
-        ..note::
-
-            Attribute is a callable.
-    activity_message: :class:`str`
-        The activitiy message for the bot. When this gets updated the activity will change as well.
-        
-        .. note::   
-
-            This has been wrapped in `create_task`
-    activity_type: :class:`discord.ActivityType`
-        The type of activity for the bot. When this gets updated the activity will change as well.
-        
-        .. note::   
-
-            This has been wrapped in `create_task`
-    debug: :class:`bool`
-        Whether or not the bot is in "Debug mode". This will spit back
-        raw errors to qualified users.
-    session: :class:`aiohttp.ClientSession`
-        The bot's session to use for http requests.
-    """
-    __is_fury_bot__ = True
-    
-    def __init__(self, pool: asyncpg.Pool, session: aiohttp.ClientSession, loop: asyncio.AbstractEventLoop):
-        super().__init__(pool, session, loop)
-        SecurityMixin.__init__(self)

@@ -45,7 +45,6 @@ from jishaku.repl import AsyncCodeExecutor, get_var_dict_from_ctx
 from jishaku.paginators import use_file_check, PaginatorInterface, WrappedPaginator
 
 from .context import Context
-from . import BaseCog
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -53,7 +52,9 @@ if TYPE_CHECKING:
 T = TypeVar('T')
 
 
-class Jishaku(BaseCog, *STANDARD_FEATURES, *OPTIONAL_FEATURES):
+class Jishaku(*STANDARD_FEATURES, *OPTIONAL_FEATURES):
+    __is_jishaku__: bool = True
+    emoji: str = '\N{CONSTRUCTION WORKER}'
     
     async def jsk_python_result_handling(
         self, 

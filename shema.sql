@@ -30,3 +30,16 @@ CREATE TABLE IF NOT EXISTS tracking (
     notifications BOOLEAN DEFAULT FALSE
 );
 
+
+CREATE TABLE IF NOT EXISTS profanity(
+    id BIGSERIAL PRIMARY KEY,
+    word TEXT,
+    created_at TIMESTAMP DEFAULT now()
+);
+
+
+CREATE TABLE IF NOT EXISTS links (
+    id BIGSERIAL PRIMARY KEY,
+    url TEXT,
+    created_at TIMESTAMP DEFAULT now()
+);

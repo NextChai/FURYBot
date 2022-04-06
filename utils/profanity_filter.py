@@ -23,25 +23,39 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import aiofile
+import re
+import inflection
+import cachetools
+import asyncio
+import asyncache 
 from typing import (
+    TYPE_CHECKING,
+    AsyncContextManager,
+    Awaitable,
     Callable, 
-    ClassVar, 
+    ClassVar,
     Dict, 
     Iterable, 
     List, 
-    Literal, 
-    Tuple
+    Optional, 
+    Tuple,
+    TypeVar,
+    Any
 )
+from typing_extensions import ParamSpec
 
-from profanityfilter import ProfanityFilter
-
-from utils.errors import ProfanityFailure
+if TYPE_CHECKING:
+    from asyncpg import Connection
 
 __all__: Tuple[str, ...] = (
     'PermeateProfanity',
-    'CustomProfanity'
+    'ProfanityChecker'
 )
+
+T = TypeVar('T')
+P = ParamSpec('P')
+
+PROFANITY_CHACHE = cachetools.Cache(maxsize=1024)
 
 class PermeateProfanity:
     """A helper class used to permeate a list of swear words into all possible combinations.
@@ -60,16 +74,13 @@ class PermeateProfanity:
     
     def __init__(self, *, swears: Iterable[str]):
         self._swears: List[str] = list(swears)
-        
-    def __await__(self):
-        return self.permeate_swears().__await__()
-    
+
     @property
     def swears(self) -> List[str]:
         """List[:class:`str`]: Returns the current list of swears."""
         return self._swears
     
-    async def permeate_swears(self) -> List[str]:
+    def permeate_swears(self) -> List[str]:
         """|coro|
         
         Used to fill up all possible combinations of a swear word.
@@ -93,12 +104,12 @@ class PermeateProfanity:
         return self._swears
             
             
-class CustomProfanity(ProfanityFilter):
+class ProfanityChecker:
     """The base profanity filter for the bot.
     
     .. note::
     
-        :meth:`CustomProfanity.get_profane_words` is overwritten so a whitelist can be used.
+        :meth:`ProfanityChecker.get_profane_words` is overwritten so a whitelist can be used.
         
     Attributes
     ----------
@@ -107,124 +118,64 @@ class CustomProfanity(ProfanityFilter):
     extra_profanity: List[:class:`str`]
         The bad words of the bot, aka the words that will get flagged.
     """
+    
     invalid_regex = (
         '.',
         '^',
         '$',
         '.'
     )
-        
-    async def _split_filename_lines(self, filename: str) -> List[str]:
-        """Used to async-open a file, decode its content, and split it by a new line.
-        
-        Parameters
-        ----------
-        filename: :class:`str`
-            The filename to open and parse.
-        
-        Returns
-        -------
-        List[:class:`str`]
-        """
-        async with aiofile.async_open(filename, 'rb') as f:
-            data = (await f.read()).decode('utf-8').split('\n')
-            return [i for n, i in enumerate(data) if i not in data[:n]]
-        
-    async def load_dirty_words(self) -> None:
-        """Loads the dirty words from our custom wordset and adds it to the profanity filter.
-        
-        Returns
-        -------
-        None
-        """
-        data = await self._split_filename_lines('txt/profanity.txt')
-        swears = await PermeateProfanity(swears=data)
-        
-        self.append_words(swears)
-            
-    async def load_clean_words(self) -> None:
-        """Loads the clean words mistaken for bad words and removes them from the profanity filter.
-        
-        Returns
-        -------
-        None
-        """
-        data = await self._split_filename_lines('txt/clean.txt')
-        self.clean_wordset = data
-        
-    async def reload_words(self, wrapper: Callable) -> None:
-        """Used to reload all clean and dirty words to the bot.
-        
-        Parameters
-        ----------
-        wrapper: Callable
-            A wrapper that uses `loop.run_in_executr` to make non-async code async.
-        
-        Returns
-        -------
-        None
-        """
-        await wrapper(self.restore_words)
-        await self.load_dirty_words()
-        await self.load_clean_words()
-            
-    def get_profane_words(self) -> List[str]:
-        """A workaround to adding a whitelist to FURY Bot.
-        
-        .. note::
-
-            If the bot's custom profanity hasn't been loaded the default one
-            will be returned.
-        
-        Returns
-        -------
-        None
-        """
-        words = super().get_profane_words()
-        
-        if not hasattr(self, 'clean_wordset'):
-            return words
-
-        clean = []
-        for word in words:
-            if word not in self.clean_wordset:
-                for invalid in self.invalid_regex:
-                    word = word.replace(invalid, r'\{0}'.format(invalid))
-                
-                if word.isdigit(): # No numbers
-                    continue
-                
-                clean.append(word)
-        
-        return clean
     
-    async def add_word_to(self, filename: Literal['profanity', 'clean'], word: str, *, wrapper: Callable) -> None:
-        """Add a word to the black and whitelists of the profanity filter.
+    def __init__(self, *, wrap: Callable[..., Awaitable[Any]], safe_connection: Callable[[], AsyncContextManager[Connection]]) -> None:
+        self._profanity: Optional[List[str]] = None
+        self._censor_char = '*'
+        self.wrap: Callable[..., Awaitable[Any]] = wrap
+        self.profanity_cache = cachetools.Cache(maxsize=1024)
+        self.safe_connection: Callable[[], AsyncContextManager[Connection]] = safe_connection
         
-        Parameters
-        ----------
-        filename: Literal[:class:`str`]
-            The filename to add to. Can be either `profanity` or `clean`
-        word: :class:`str`
-            The word to add to the list
-        wrapper: Callable
-            An async wrapper we can use to make non-async code async.
+        asyncache.cached(cache=self.profanity_cache, lock=asyncio.Lock())(self.get_profane_words)
+        
+    async def get_profanity(self) -> List[str]:
+        async with self.safe_connection() as connection:
+            data = await connection.fetch('SELECT word FROM profanity')
+        
+        return PermeateProfanity(swears=[element['word'] for element in data]).permeate_swears()
+    
+    async def get_profane_words(self) -> List[str]:
+        profane = []
+        
+        if not self._profanity:
+            self._profanity = await self.get_profanity()
+        
+        if self._profanity:
+            profane.extend(self._profanity)
+            profane.extend(inflection.pluralize(word) for word in self._profanity)
             
-        Returns
-        -------
-        None
+        profane = list(set(profane)) # Clean duplicates
+        profane.sort(key=len)
+        profane.reverse()
         
-        Raises
-        ------
-        :class:`ProfanityFailure`
-            Raised if the word you are trying to add is already in the profanity wordset you're trying
-            to add to.
-        """
-        data = await self._split_filename_lines(f'txt/{filename}.txt')
-        if word in data:
-            raise ProfanityFailure(f'word {word} is already in file {filename}')
+        for word in profane:
+            for invalid in self.invalid_regex:
+                word = word.replace(invalid, r'\{0}'.format(invalid))
         
-        async with aiofile.async_open(f'txt/{filename}.txt', 'a') as f:
-            await f.write(f'\n{word}')
+        return profane
+    
+    async def censor(self, text: str, *, fast: bool = False) -> str:
+        """Returns input_text with any profane words censored."""
+        profane = await self.get_profane_words()
         
-        await self.reload_words(wrapper=wrapper)
+        def _wrapped(text: str, *, fast: bool = False) -> str:
+            res = text
+
+            for word in profane:
+                # Apply word boundaries to the bad word
+                regex_string = r'\b{0}\b'.format(word)
+                res = re.sub(regex_string, self._censor_char * len(word), res)
+                
+                if res != text and fast:
+                    return res
+
+            return res
+        
+        return await self.wrap(_wrapped, text=text, fast=fast)

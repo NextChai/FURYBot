@@ -1,32 +1,11 @@
-"""
-The MIT License (MIT)
-
-Copyright (c) 2020-present NextChai
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-"""
 from __future__ import annotations
 
 import re
 import copy
 import logging
 from fuzzywuzzy import process
+from functools import partial
+import cachetools
 from numpydoc.docscrape import (
     NumpyDocString as process_doc,
     Parameter
@@ -34,55 +13,65 @@ from numpydoc.docscrape import (
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
+    Awaitable,
+    Generator,
     List,
     Mapping,
     Optional,
+    Protocol,
+    Tuple,
+    Union,
+    Callable,
 )
-
-from bot import Embed
-from utils.context import Context
-from .time import human_join
 
 import discord
 from discord.ext import commands
 
+from .time import human_join
+from .context import Context
+from . import BaseCog
+
+from bot import FuryBot
+
 if TYPE_CHECKING:
-    from bot import FuryBot
-    from . import BaseCog
-    from .context import Context
-
-log = logging.getLogger(__name__)
+    class _Parentable(Protocol):
+        parent: Union[_Parentable, FuryBot]
+        bot: Optional[FuryBot] 
     
-CORO_REGEX = re.compile(r'\|[a-z]+\|', flags=re.IGNORECASE)
+    ParentType = Union[FuryBot, _Parentable, discord.ui.View] 
 
-def _find_bot(finder: Any) -> FuryBot:
-    if hasattr(finder, '__is_fury_bot__'):
-        return finder 
+NUMPY_ITEM_REGEX = re.compile(r'(?P<type>\:[a-z]{1,}\:)\`(?P<name>[a-z\.]{1,})\`', flags=re.IGNORECASE)
+DOC_HEADER_REGEX = re.compile(r'\|[a-z]{1,}\|', flags=re.IGNORECASE)
     
-    bot: Optional[FuryBot] = None
-    parent = finder
-    while not bot:
-        bot = getattr(parent, 'bot')
-        if bot:
-            break
-        
-        parent = getattr(finder, 'parent', None)
-        if not parent:
-            raise RuntimeError('Could not find bot.')
-        
-    if bot is None:
-        raise TypeError('Could not find bot attribute')
-    
-    return bot
+QUESTION_MARK = '\N{BLACK QUESTION MARK ORNAMENT}'
+HOME = '\N{HOUSE BUILDING}'
+NON_MARDKWON_INFORMATION_SOURCE = '\N{INFORMATION SOURCE}'
 
-def _parse_command_doc(command: commands.Command, embed: discord.Embed) -> discord.Embed:
+InteractionCheckCallback = Callable[[discord.ui.View, discord.Interaction], Awaitable[bool]]
+
+log = logging.getLogger('FuryBot.utils.help')
+
+def _subber(match: re.Match) -> str:
+    _, name = match.groups()
+    return name
+
+def help_mapping(command) -> Mapping[str, str]:
+    """Parses the :class:`commands.Command`'s help text into a mapping
+    that can be used to generate a help embed or give the user more
+    inforamtion about the command.
+    
+    Returns
+    -------
+        Mapping[:class:`str`, :class:`str`]
+    """
+    mapping = {}
+    
     help_doc = command.help
     if not help_doc:
-        return embed
+        return mapping
     
-    for found in CORO_REGEX.findall(help_doc):
-        help_doc = help_doc.replace(found, '')
+    help_doc = NUMPY_ITEM_REGEX.sub(_subber, help_doc)
+    help_doc = DOC_HEADER_REGEX.sub('', help_doc).lstrip()
     
     processed = process_doc(help_doc)
     for name, value in processed._parsed_data.items():
@@ -92,222 +81,604 @@ def _parse_command_doc(command: commands.Command, embed: discord.Embed) -> disco
         if isinstance(value, list) and isinstance(value[0], Parameter):
             fmt = []
             for item in value:
-                fmt.append('`{0}`: {1}'.format(item.name, ' '.join(item.desc)))
+                fmt.append('- `{0}`: {1}'.format(item.name, ' '.join(item.desc)))
             
-            value = '\n\n'.join(fmt)
+            value = '\n'.join(fmt)
         elif isinstance(value, list):            
             value = ' '.join(value)
-            
-        embed.add_field(name=name, value=value, inline=False)
+        
+        mapping[name.lower()] = value
+    
+    return mapping
+
+def help_embed(command) -> discord.Embed:
+    """:class:`discord.Embed`: Creates a help embed for the command. """
+    embed = discord.Embed(title=command.qualified_name,)
+    
+    for key, value in help_mapping(command).items():
+        embed.add_field(name=key.title(), value=value, inline=False)
+    
+    embed.add_field(name='How to use', value=f'`fury.{command.qualified_name} {command.signature}'.strip() + '`')
+    
+    if (group_commands := getattr(command, 'commands', None)):
+        embed.add_field(name='Subcommands', value=human_join([f'`{c.name}`' for c in group_commands], final='and'), inline=False)
+        
+    if isinstance(command, commands.Group):
+        embed.set_footer(text=f'Select a subcommand to get more information about it.')
     
     return embed
 
+def _find_bot(parentable: ParentType) -> FuryBot:
+    """A helper function used to find the bot in the parent chain"""
+    base = parentable
+    
+    if isinstance(parentable, FuryBot):
+        return parentable
+    if (db := getattr(parentable, 'bot', None)):
+        return db
+    
+    while hasattr(parentable, 'parent'):
+        if isinstance(parentable, FuryBot):
+            return parentable
 
-class GoHome(discord.ui.Button):
-    def __init__(self, parent: Any) -> None:
-        super().__init__(label='Go Home')
+        if (db := getattr(parentable, 'bot', None)):
+            return db
         
-        self.bot: FuryBot = _find_bot(parent)
-        
-        home = None
-        if not isinstance(parent, HomeView) and self.bot != parent:
-            while hasattr(parent, 'parent'):
-                parent = parent.parent
-                if isinstance(parent, HomeView):
-                    home = parent
-                    break
-        else:
-            home = parent
-        
-        self.home: Optional[HomeView] = home
-        
-    async def callback(self, interaction: discord.Interaction) -> None:
-        if self.home:
-            return await interaction.response.edit_message(embed=self.home.embed, view=self.home)
-        
-        help_command = self.bot.help_command
-        if not help_command:
-            raise RuntimeError('Help command is not enabled')
-        
-        mapping = {cog: cog.get_commands() for cog in self.bot.cogs.values()}
-        self.home = view = HomeView(self.bot, mapping) # type: ignore
-        return await interaction.response.edit_message(embed=view.embed, view=view)
-    
+        parentable = parentable.parent # type: ignore # Can not use isinstance for FuryBot so we have to ignore this
 
-class GoBack(discord.ui.Button):
-    def __init__(self, parent: Any) -> None:
-        super().__init__(label='Go Back')
-        self.parent: Any = parent
-        self.bot: FuryBot = _find_bot(parent)
+    raise ValueError(f'Could not find FuryBot from base parentable {base}, {repr(base)}.')
+
+def _walk_through_parents(parentable: ParentType) -> Generator[ParentType, None, None]:
+    """Used to walk through the parent chain of a parentable object"""
+    if isinstance(parentable, FuryBot):
+        print('parent is FuryBot')
+        yield from []
     
-    async def callback(self, interaction: discord.Interaction) -> None:
-        if self.parent != self.bot:
-            return await interaction.response.edit_message(embed=self.parent.embed, view=self.parent)
-        
-        mapping = {cog: cog.get_commands() for cog in self.bot.cogs.values()}
-        home = HomeView(self.bot, mapping) # type: ignore
-        home.bot = self.bot
-        
-        return await interaction.response.edit_message(embed=home.embed, view=home)
+    while hasattr(parentable, 'parent'):
+        yield parentable
+        parentable = getattr(parentable, 'parent') 
+
+@cachetools.cached(cache=cachetools.TTLCache(maxsize=500, ttl=30))
+def _find_author_from_parent(parentable: ParentType) -> Optional[Union[discord.Member, discord.User]]:
+    """Used to find the author of the help command from the parent chain"""
+    author: Optional[Union[discord.Member, discord.User]] = None
     
+    if maybe_author := getattr(parentable, 'author', None):
+        author = maybe_author
+    
+    if not author and (context := getattr(parentable, 'context', None)):
+        author = context.author
+    
+    if not author:
+        for parent in _walk_through_parents(parentable):
+            if maybe_author := getattr(parent, 'author', None):
+                author = maybe_author
+                break
+            if context := getattr(parent, 'context', None):
+                author = context.author
+                break
+            
+    return author
+
+async def _interaction_check(view: discord.ui.View, interaction: discord.Interaction) -> Optional[bool]:
+    """An internal helper used to check if the interaction is valid."""
+    # Let's find the original author of the help command
+    author = _find_author_from_parent(view) # type: ignore
+    if not author:
+        raise ValueError('Could not find author from parentable.')
+    
+    if interaction.user != author:
+        return await interaction.response.send_message('You do not have permission to use this help command!', ephemeral=True)
+        
+    return True
+
+
 class Stop(discord.ui.Button):
+    """A button used to stop the help command.
+    
+    Attributes
+    ----------
+    parent: :class:`discord.ui.View`
+        The parent view of the help command.
+    """
+    __slots__: Tuple[str, ...] = (
+        'parent',
+    )
+     
     def __init__(self, parent: discord.ui.View) -> None:
-        super().__init__(label='Stop', style=discord.ButtonStyle.red)
         self.parent: discord.ui.View = parent
+        super().__init__(
+            style=discord.ButtonStyle.danger,
+            label='Stop',
+        )
     
     async def callback(self, interaction: discord.Interaction) -> None:
+        """|coro|
+        
+        When called, will respond to the interaction by editing the message
+        with the diabled view.
+        
+        Parameters
+        ----------
+        intraction: :class:`discord.Interaction`
+            The interaction that was created by interacting with the button.
+        """
         for child in self.parent.children:
             child.disabled = True # type: ignore
         
-        await interaction.response.edit_message(view=self.parent)
         self.parent.stop()
-             
-        
-class CommandView(discord.ui.View):
-    def __init__(self, parent: Any, command: commands.Command) -> None:
-        super().__init__()
-        self.bot: FuryBot = _find_bot(parent)
-        self.command: commands.Command = command
-        self.parent: Any = parent
-        
-        self.add_item(GoBack(parent))
-        self.add_item(GoHome(self))
-        self.add_item(Stop(self))
+        return await interaction.response.edit_message(view=self.parent)
+
+
+class GoHome(discord.ui.Button):
+    """A button used to go home within the parent tree. Home
+    is considered the root of the parent tree.
     
-    @discord.utils.cached_property
-    def embed(self) -> discord.Embed:
-        embed = Embed(title=self.command.qualified_name, description=f'How to use this command: `fury.{self.command.qualified_name} {self.command.signature}`')
-        _parse_command_doc(self.command, embed)
-        return embed
+    Attributes
+    ----------
+    parent: Any
+        The parent of the help command.
+    bot: :class:`FuryBot`
+        The bot that the help command is running on.
+    """
+    __slots__: Tuple[str, ...] = (
+        'parent',
+        'bot',
+    )
+    
+    def __init__(self, parent: ParentType) -> None:
+        self.parent: ParentType = parent
+        self.bot: FuryBot = _find_bot(parent)
+        super().__init__(
+            label='Go Home',
+            emoji=HOME,
+        )
+    
+    async def _get_help_from_parent(self) -> HelpView:
+        main_parent: Optional[FuryHelp] = discord.utils.find(lambda p: isinstance(p, FuryHelp), _walk_through_parents(self.parent)) # type: ignore
+        if main_parent:
+            clean_mapping = await main_parent._filter_mapping({ # type: ignore # We're gonna pretend we're using TS today
+                cog: cog.get_commands() for cog in self.bot.cogs.values()
+            }) 
+        else:
+            clean_mapping = {cog: None for cog in self.bot.cogs.values()}
+        
+        return HelpView(parent=self.parent, cogs=clean_mapping.keys(), author=_find_author_from_parent(self.parent)) # type: ignore
+        
+    async def callback(self, interaction: discord.Interaction) -> None:
+        """|coro|
+        
+        When called, will respond to the interaction by finding the root
+        within the parent tree and editing the message with the highest 
+        parent.
+        
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that was created by interacting with the button.
+        """
+        # We need to find the base parent
+        if self.parent is self.bot:
+            # There is no home in cache, we need to create one
+            view = await self._get_help_from_parent()
+        else:
+            # Let's try and find the home in cache
+            for parent in _walk_through_parents(self.parent):
+                if isinstance(parent, HelpView):
+                    view = parent
+                    break
+            else:
+                # No parent in parents history, we need to create one
+                view = await self._get_help_from_parent()
+                
+        return await interaction.response.edit_message(embed=view.embed, view=view)
+    
+    
+class GoBack(discord.ui.Button):
+    """A button used to go back within the parent tree.
+    
+    Attributes
+    ----------
+    parent: :class:`discord.ui.View`
+        The parent view of the help command.
+    """
+    __slots__: Tuple[str, ...] = (
+        'parent',
+    )
+    
+    def __init__(self, parent: discord.ui.View) -> None:
+        super().__init__(label='Go Back')
+        self.parent: discord.ui.View = parent
+        
+    async def callback(self, interaction: discord.Interaction) -> None:
+        """|coro|
+        
+        When called, will respond to the interaction by editing the message with the previous parent.
+        
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that was created by interacting with the button.
+        """
+        return await interaction.response.edit_message(embed=self.parent.embed, view=self.parent) # type: ignore
 
 
-class CommandSelect(discord.ui.Select):
-    def __init__(self, parent: Any, commands: List[commands.Command]) -> None:
+class CommandSelecter(discord.ui.Select):
+    """A select used to have the user select a command
+    from a list of commands.
+    
+    Parameters
+    ----------
+    parent: ParentType
+        The parent that created this select.
+    """
+    __slots__: Tuple[str, ...] = (
+        'parent',
+        '_command_mapping',
+    )
+    
+    def __init__(self, *, parent: ParentType, commands: List[commands.Command]) -> None:
+        self.parent: ParentType = parent
+        
+        self._command_mapping: Mapping[str, commands.Command] = {c.qualified_name: c for c in commands}
         super().__init__(
             placeholder='Select a command...',
             options=[
-                discord.SelectOption(label=command.qualified_name, value=command.qualified_name) for command in commands
+                discord.SelectOption(
+                    label=command.qualified_name,
+                    description=(command.brief and command.brief[:100]) or '',
+                    value=command.qualified_name
+                )
+                for command in commands
             ]
         )
         
-        self.command_mapping: Dict[str, commands.Command] = {command.qualified_name: command for command in commands}
-        self.bot: FuryBot = _find_bot(parent)
-        self.parent: Any = parent
-        
     async def callback(self, interaction: discord.Interaction) -> None:
-        # Get command view here
-        command = self.command_mapping[self.values[0]]
-        view = CommandView(self.parent, command)
-        await interaction.response.edit_message(embed=view.embed, view=view)
-
-
-class GroupView(discord.ui.View):
-    def __init__(self, parent: Any, group: commands.Group) -> None:
-        super().__init__()
-        self.bot: FuryBot = _find_bot(parent)
-        self.parent: Any = parent
-        self.group: commands.Group = group
+        """|coro|
         
-        self.add_item(CommandSelect(self, list(group.commands)))
-        self.add_item(Stop(self))
-    
-    @discord.utils.cached_property
-    def embed(self) -> discord.Embed:
-        embed = Embed(title=self.group.qualified_name, description=f'How to use this command: `fury.{self.group.qualified_name} {self.group.signature}`')
-        _parse_command_doc(self.group, embed)
-        embed.add_field(name='Subcommands', value=human_join([f'`{c.qualified_name}`' for c in self.group.commands]))
-        return embed
+        When called, will respond to the interaction by editing th emessage with 
+        a new view representing the selected command.
         
-
-# Cog view, will show help for a cog 
-class CogView(discord.ui.View):
-    def __init__(self, parent: Any, cog: BaseCog) -> None:
-        super().__init__()
-        self.cog: BaseCog = cog
-        self.parent: Any = parent
-        self.bot: FuryBot = _find_bot(parent)
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that was created by interacting with the button.
+        """
+        selected = self.values
+        if not selected:
+            return
         
-        self.add_item(CommandSelect(self, list(cog.get_commands())))
-        self.add_item(GoBack(parent))
-        self.add_item(GoHome(self))
-        self.add_item(Stop(self))
-    
-    @discord.utils.cached_property
-    def embed(self) -> discord.Embed:
-        new = Embed(
-            title=f'{self.cog.emoji if self.cog.emoji else ""}{self.cog.qualified_name}',
-            description=self.cog.description,
-        )
+        command = self._command_mapping[selected[0]]
+        if isinstance(command, commands.Group):
+            view = HelpGroup(parent=self.parent, group=command)
+        else:
+            view = HelpCommand(parent=self.parent, command=command) # type: ignore
         
-        commands = self.cog.get_commands()
-        cmd_fmt = human_join([f'`{c.qualified_name}`' for c in commands])
-        new.add_field(name='Commands', value=f'There are {len(commands)} commands in this group, select one in the dropdown menu to learn a bit more about it.\n\n{cmd_fmt}')
-        
-        return new
-
-# Cog selection select menu
-class HomeViewSelect(discord.ui.Select):
-    def __init__(self, parent: Any, cogs: List[BaseCog]):
-        super().__init__(
-            placeholder='Select a category',
-            options=[
-                discord.SelectOption(label=cog.qualified_name, value=cog.qualified_name, emoji=cog.emoji) for cog in cogs
-            ]
-        )
-        self.bot: FuryBot = _find_bot(parent)
-        self.parent: Any = parent
-        self.cog_mapping = {cog.qualified_name: cog for cog in cogs}
-    
-    async def callback(self, interaction: discord.Interaction) -> None:
-        selected_cog = self.cog_mapping[self.values[0]]
-        view = CogView(self.parent, selected_cog)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
 
-# Main home view, allows you to select cogs
-class HomeView(discord.ui.View):
-    def __init__(self, parent: Any, mapping: Mapping[Optional[BaseCog], List[commands.Command]]) -> None:
+class HelpGroup(discord.ui.View):
+    """A view representing the help for a command group.
+    
+    Attributes
+    ----------
+    parent: ParentType
+        The parent thaty created this view.
+    group: :class:`commands.Group`
+        The group that this view represents.
+    author: Optional[Union[:class:`discord.Member`, :class:`discord.User`]]
+        The author of the message that created this view.
+    bot: :class:`FuryBot`
+        The bot that this view is running on.
+    """
+    __slots__: Tuple[str, ...] = (
+        'parent',
+        '_command_mapping',
+        '_cs_embed',
+    )
+    
+    def __init__(
+        self, 
+        *, 
+        parent: ParentType,
+        group: commands.Group, 
+        author: Optional[Union[discord.Member, discord.User]] = None
+    ) -> None:
         super().__init__()
+        
+        self.parent: ParentType = parent
+        self.group: commands.Group = group
+        self.author: Optional[Union[discord.Member, discord.User]] = author
+        
+        self.bot: FuryBot = _find_bot(parent)
+        self.interaction_check: InteractionCheckCallback = partial(_interaction_check, self) # type: ignore
+        
+        group_commands = list(group.commands)
+        for command in group_commands:
+            if isinstance(command, commands.Group):
+                group_commands.extend(command.commands)
+        
+        for chunk in self.bot.chunker(group_commands, size=20):
+            self.add_item(CommandSelecter(parent=self, commands=chunk)) # type: ignore
+        
+        self.add_item(GoHome(self))
+        if isinstance(self.parent, discord.ui.View):
+            self.add_item(GoBack(self.parent))
+            
+        self.add_item(Stop(self))
+        
+    @discord.utils.cached_slot_property('_cs_embed')
+    def embed(self) -> discord.Embed:
+        """:class:`discord.Embed`: Returns an embed representing the help for the group."""
+        return help_embed(self.group)
+    
+    
+class HelpCommand(discord.ui.View):
+    """A view representing the help for a command.
+    
+    Attributes
+    ----------
+    parent: ParentType
+        The parent thaty created this view.
+    command: :class:`commands.Command`
+        The group that this view represents.
+    author: Optional[Union[:class:`discord.Member`, :class:`discord.User`]]
+        The author of the message that created this view.
+    bot: :class:`FuryBot`
+        The bot that this view is running on.
+    """
+    __slots__: Tuple[str, ...] = (
+        'parent',
+        'command',
+        'author',
+        'interaction_check',
+        'bot',
+        '_cs_embed',
+    )
+    
+    def __init__(
+        self,
+        *, 
+        parent: ParentType,
+        command: commands.Command,
+        author: Optional[Union[discord.Member, discord.User]] = None
+    ) -> None:
+        super().__init__()
+        
+        self.parent: ParentType = parent
+        self.command: commands.Command = command
+        self.author: Optional[Union[discord.Member, discord.User]] = author
+        
+        self.interaction_check: InteractionCheckCallback = partial(_interaction_check, self) # type: ignore
         self.bot: FuryBot = _find_bot(parent)
         
-        clean_cogs = [c for c in mapping.keys() if c]
-        self.add_item(HomeViewSelect(self.bot, clean_cogs))
+        self.add_item(GoHome(self))
+        if isinstance(self.parent, discord.ui.View):
+            self.add_item(GoBack(self.parent))
+            
         self.add_item(Stop(self))
     
-    @discord.utils.cached_property
+    @discord.utils.cached_slot_property('_cs_embed')
     def embed(self) -> discord.Embed:
-        embed = Embed(
-            title='FuryBot Help',
-            description='FuryBot is a Discord bot that is designed to be a moderation tool for the FLVS Fury Administrators '
-                        'to use. It does many things, such as moderation, logging, and more.\n\n'
-                        'Use "fury.help command" for help on a command.\n'
-                        'Use "fury.help category" for help on a category.\n'
+        """:class:`discord.Embed`: Returns an embed representing the help for the command."""
+        return help_embed(self.command)
+
+
+class HelpCog(discord.ui.View):
+    """A view representing the help for a cog.
+    
+    Attributes
+    ----------
+    parent: ParentType
+        The parent thaty created this view.
+    cog: :class:`BaseCog`
+        The group that this view represents.
+    author: Optional[Union[:class:`discord.Member`, :class:`discord.User`]]
+        The author of the message that created this view.
+    bot: :class:`FuryBot`
+        The bot that this view is running on.
+    """
+    __slots__: Tuple[str, ...] = (
+        'parent',
+        'cog',
+        'author',
+        'interaction_check',
+        'bot',
+        '_cs_embed',
+    )
+    
+    def __init__(
+        self, 
+        *, 
+        parent: ParentType,
+        cog: BaseCog,
+        author: Optional[Union[discord.Member, discord.User]] = None
+    ) -> None:
+        super().__init__()
+        
+        self.parent: ParentType = parent
+        self.cog: BaseCog = cog
+        self.author: Optional[Union[discord.Member, discord.User]] = author
+        
+        self.bot: FuryBot = _find_bot(parent)
+        self.interaction_check: InteractionCheckCallback = partial(_interaction_check, self) # type: ignore
+        
+        for item in self.bot.chunker(cog.get_commands(), size=20):
+            self.add_item(CommandSelecter(parent=self, commands=list(item))) # type: ignore
+        
+        self.add_item(GoHome(self))
+        if isinstance(self.parent, discord.ui.View):
+            self.add_item(GoBack(self.parent))
+            
+        self.add_item(Stop(self))
+
+    @discord.utils.cached_slot_property('_cs_embed')
+    def embed(self) -> discord.Embed:
+        """:class:`discord.Embed`: Returns an embed representing the help for the cog."""
+        cog = self.cog
+        embed = discord.Embed(
+            title=f'{cog.emoji or QUESTION_MARK} {cog.qualified_name}',
+            description=cog.description,
         )
-        embed.add_field(name='Open Source!', value='I am [open source](https://github.com/NextChai/Fury-Bot), feel free to check out my source code.')
+        
+        embed.add_field(
+            name='Commands',
+            value=human_join([f'`{command.qualified_name}`' for command in cog.get_commands()], final='and') or 'No Commands.'
+        )
+        embed.set_footer(text='Use the dropdown to get more info on a command.')
         return embed
 
 
-class FuryHelp(commands.HelpCommand[Context]):
-    def __init__(self, *args, **kwargs) -> None:
+class HelpSelect(discord.ui.Select):
+    """A select prompting the user to select a cog.
+    
+    Attributes
+    ----------
+    parent: ParentType
+        The parent thaty created this view.
+    """
+    __slots__: Tuple[str, ...] = (
+        'parent',
+        '_cog_mapping',
+    )
+    
+    def __init__(self, *, parent: ParentType, cogs: List[BaseCog]) -> None:
+        self.parent: ParentType = parent
+        self._cog_mapping: Mapping[int, BaseCog] = {c.id: c for c in cogs}
+        
+        super().__init__(
+            placeholder='Select a group...',
+            options=[
+                discord.SelectOption(
+                    label=cog.qualified_name,
+                    value=str(cog.id),
+                    description=cog.brief or 'No description...',
+                    emoji=cog.emoji
+                )
+                for cog in cogs
+            ]
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        """|coro|
+        
+        When called, this will create a new view representing the selected cog.
+        
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that was used to select this option.
+        """
+        selected = self.values
+        if not selected:
+            return
+        
+        current_cog = self._cog_mapping[int(selected[0])]
+        view = HelpCog(parent=self.parent, cog=current_cog, author=_find_author_from_parent(self.parent))
+        return await interaction.response.edit_message(embed=view.embed, view=view)
+        
+        
+class HelpView(discord.ui.View):
+    """The main Help View for the FuryHelper.
+    
+    When sending the initial Help Message with no arguments,
+    this will be sent.
+    
+    Attributes
+    ----------
+    bot: :class:`FuryBot`
+        The bot instance.
+    """
+    __slots__: Tuple[str, ...] = (
+        'parent',
+        'bot',
+        'author',
+        'interaction_check',
+        '_cs_embed'
+    )
+    
+    def __init__(
+        self, 
+        /,
+        *,
+        parent: ParentType, 
+        cogs: List[BaseCog],
+        author: Optional[Union[discord.Member, discord.User]] = None
+    ) -> None:
+        super().__init__()
+        self.parent: ParentType = parent
+        self.bot: FuryBot = _find_bot(parent)
+        self.author: Optional[Union[discord.Member, discord.User]] = author
+        self.interaction_check: InteractionCheckCallback = partial(_interaction_check, self) # type: ignore
+        
+        self.add_item(HelpSelect(parent=self, cogs=cogs))
+        if isinstance(self.parent, discord.ui.View):
+            self.add_item(GoBack(self.parent))
+            
+        self.add_item(Stop(self))
+    
+    @discord.utils.cached_slot_property('_cs_embed')
+    def embed(self) -> discord.Embed:
+        """:class:`discord.Embed`: The master embed for this view."""
+        getting_help: List[str] = [
+            'Use `fury.help <command>` for more info on a command.',
+            'There is also `fury.help <command> [subcommand]`.',
+            'Use `fury.help <category>` for more info on a category.',
+            'You can also use the menu below to view a category.',
+        ]
+        getting_support: List[str] = [
+            'To get help, mention any of the admins!',
+        ]
+        
+        embed = discord.Embed(
+            title='FuryBot Help Menu',
+            description='Hello, I\'m FuryBot! A multi-purpose bot with a lot of features.'
+        )
+        embed.set_author(name=self.bot.user.name, icon_url=self.bot.user.display_avatar.url)
+        embed.add_field(name='Getting Help', value='\n'.join(getting_help), inline=False)
+        embed.add_field(name='Getting Support', value='\n'.join(getting_support), inline=False)
+        embed.add_field(name='Who am I?', value=f'I\'m FuryBot, a multipurpose bot created and maintained by [NextChai](https://github.com/NextChai).'
+                        'Check out all my features using the dropdown below.\n\n'
+                        f'I\'ve been online since {self.bot.uptime_timestamp}.\n'
+                        f'You can find my source code on [GitHub](https://github.com/NextChai/Fury-Bot).', inline=False)
+        embed.set_footer(text=f'{NON_MARDKWON_INFORMATION_SOURCE} For more info on a command press {QUESTION_MARK} help.')
+        return embed
+    
+    
+class FuryHelp(commands.HelpCommand):
+    """The main Help Command for the FuryBot.
+    
+    This help command works on a parential basis. This means there is a parent hierarchy
+    that can be tracked per invoke by going up the parent chain.
+    """
+    if TYPE_CHECKING:
+        context: Context[FuryBot]
+    
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs, verify_checks=True)
         
     @property
     def bot(self) -> FuryBot:
+        """:class:`FuryBot`: The bot instance."""
         if (bot := getattr(self, '_bot', None)):
             return bot
         
-        return self.context.bot
+        return self.context.bot 
     
     @bot.setter
     def bot(self, new: FuryBot) -> None:
         self._bot = new
         
     async def _filter_mapping(self, mapping: Mapping[Optional[BaseCog], List[commands.Command]]) -> Mapping[Optional[BaseCog], List[commands.Command]]:
+        """An internal helper method to filter all commands."""
         commands = sum(mapping.values(), [])
         await self.filter_commands(commands)
         
         cogs = {}
         for command in commands:
+            if not command.cog:
+                continue
+            
             key = command.cog
             if key not in cogs:
                 cogs[key] = [command]
@@ -317,34 +688,128 @@ class FuryHelp(commands.HelpCommand[Context]):
         return cogs
     
     async def send_bot_help(self, mapping: Mapping[Optional[BaseCog], List[commands.Command]]) -> discord.Message:
+        """|coro|
+        
+        A method used to send the bot's main help message.
+        
+        Parameters
+        ----------
+        mapping: Mapping[Optional[:class:`BaseCog`], List[:class:`commands.Command`]]
+            A mapping of :class:`BaseCog` to its list of commands.
+            
+        Returns
+        -------
+        :class:`discord.Message`
+            The message that was sent to the user.
+        """
+        self.bot = self.context.bot
         mapping = await self._filter_mapping(mapping)
-        view = HomeView(self.bot, mapping)
+        view = HelpView(parent=self.bot, cogs=list(cog for cog in mapping if cog), author=self.context.author) 
         return await self.context.send(embed=view.embed, view=view)
     
     async def send_cog_help(self, cog: BaseCog, /) -> discord.Message:
+        """|coro|
         
+        A method used to send the cog help message for the given cog.
+        
+        Parameters
+        ----------
+        cog: :class:`BaseCog`
+            The cog to get the help message for.
+            
+        Returns
+        -------
+        :class:`discord.Message`
+            The message that was sent to the user.
+        """
+        
+        # We need to filter the command ourselves. To do this, let's
+        # make a copy of the cog and fuck it a bit.
         keep_commands = [c for c in cog.__cog_commands__ if c.parent]
-        filtered = await self.filter_commands(cog.get_commands())
+        filtered = await self.filter_commands(cog.get_commands(), sort=True)
         
         new_cog = copy.copy(cog)
         new_cog.__cog_commands__ = keep_commands + filtered
-        
-        view = CogView(self.bot, new_cog)
+        view = HelpCog(parent=self.context.bot, cog=new_cog, author=self.context.author)
         return await self.context.send(embed=view.embed, view=view)
 
     async def send_group_help(self, group: commands.Group[Any, ..., Any], /) -> discord.Message:
-        view = GroupView(self.bot, group)
+        """|coro|
+        
+        A method used to display the help message for the given group.
+        
+        Parameters
+        ----------
+        cog: :class:`commands.Group`
+            The group to display help for.
+            
+        Returns
+        -------
+        :class:`discord.Message`
+            The message that was sent to the user.
+        """
+        view = HelpGroup(parent=self.context.bot, group=group, author=self.context.author)
         return await self.context.send(embed=view.embed, view=view)
     
     async def send_command_help(self, command: commands.Command[Any, ..., Any], /) -> discord.Message:
-        view = CommandView(self.bot, command)
-        return await self.context.send(embed=view.embed, view=view) 
+        """|coro|
+        
+        A method used to display the help message for the given command.
+        
+        Parameters
+        ----------
+        cog: :class:`commands.Command`
+            The group to display help for.
+            
+        Returns
+        -------
+        :class:`discord.Message`
+            The message that was sent to the user.
+        """
+        view = HelpCommand(parent=self.context.bot, command=command, author=self.context.author)
+        return await self.context.send(embed=view.embed, view=view)
     
     async def command_not_found(self, string: str, /) -> str:
-        maybe_found = await self.bot.wrap(process.extractOne, string, [c.qualified_name for c in self.bot.commands])
-        return f'The command called "{string}" was not found. Maybe you meant `{self.context.prefix}{maybe_found[0]}`?'
+        """|coro|
+        
+        A coroutine called when a command is not found. This will return any matches that are similar
+        to what was searched for.
+        
+        Parameters
+        ----------
+        string: :class:`str`
+            The command that the user tried to search for but couldn't find.
+            
+        Returns
+        -------
+        :class:`str`
+            The string that will be sent to the user alerting them that the command was not found.
+        """
+        matches = [c.qualified_name for c in self.bot.commands]
+        matches.extend(c.qualified_name for c in self.bot.cogs.values())
+        
+        maybe_found = await self.bot.wrap(process.extractOne, string, matches)
+        return f'The command / group called "{string}" was not found. Maybe you meant `{self.context.prefix}{maybe_found[0]}`?'
     
     async def subcommand_not_found(self, command: commands.Command[Any, ..., Any], string: str, /) -> str:
+        """|coro|
+        
+        A coroutine called when a subcommand is not found. This will return any matches that are similar
+        to what was searched for.
+        
+        Parameters
+        ----------
+        command: :class:`commands.Command`
+            The command that doesn't have a subcommand requested.
+        string: :class:`str`
+            The command that the user tried to search for but couldn't find.
+            
+        Returns
+        -------
+        :class:`str`
+            The string that will be sent to the user alerting them that the command was not found.
+        """
+        
         fmt = [f'There was no subcommand named "{string}" found on that command.']
         if isinstance(command, commands.Group):
             maybe_found = await self.bot.wrap(process.extractOne, string, [c.qualified_name for c in command.commands])
@@ -352,11 +817,26 @@ class FuryHelp(commands.HelpCommand[Context]):
         
         return ''.join(fmt)
     
-    async def on_help_command_error(self, ctx: Context, error: commands.CommandError, /) -> None:
-        await ctx.send('I ran into a new error! I apologize for the inconvenience.')
+    async def on_help_command_error(self, ctx: Context, error: commands.CommandError, /) -> discord.Message:
+        """|coro|
         
+        A coroutine called when an error occurs while displaying the help command.
+        
+        Parameters
+        ----------
+        ctx: :class:`Context`
+            The context of the command.
+        error: :class:`commands.CommandError`
+            The error that occurred.
+        
+        Returns
+        -------
+        :class:`discord.Message`
+            The message that was sent to the user.
+        """
         log.warning('New error in help command', exc_info=error)
-    
+        return await ctx.send('I ran into a new error! I apologize for the inconvenience.')
+
 
 async def setup(bot: FuryBot) -> None:
     bot.help_command = FuryHelp()

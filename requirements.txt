@@ -5,3 +5,5 @@ profanityfilter
 asyncpg
 numpydoc
 fuzzywuzzy[speedup]
+asyncache 
+googletrans

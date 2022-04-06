@@ -526,16 +526,6 @@ class TeamPaginator(discord.ui.View):
     
 class Teams(BaseCog):
     """A cog to manage, create, and view teams within the FLVS Fury Discord server."""
-    # Let's make sure commands are easy to call
-    def __init__(self, bot: FuryBot) -> None:
-        super().__init__(bot)
-        
-        # This is so we can invoke as both "fury.team roster" and  "fury.roster"
-        self.team.add_command(self.roster)
-        self.team.add_command(self.sub) 
-        
-        self.bot.add_command(self.roster) # type: ignore
-        self.bot.add_command(self.sub) # type: ignore
         
     async def cog_check(self, ctx: Context) -> bool:
         """|coro|

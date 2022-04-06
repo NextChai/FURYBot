@@ -24,10 +24,12 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import inspect
+import uuid
 from typing import (
     Any,
     Callable,
-    Optional, 
+    Optional,
+    Type, 
     TypeVar,
     TYPE_CHECKING
 )
@@ -44,6 +46,7 @@ from .time import *
 
 if TYPE_CHECKING:
     from bot import FuryBot
+    import datetime
 
 T = TypeVar('T')
 
@@ -73,6 +76,25 @@ def copy_doc(original: Callable[..., Any]) -> Callable[[T], T]:
 
     return decorator
 
+def _check_for_hierarchy(member: discord.Member) -> bool:
+    guild = member.guild
+    me = guild.me
+    
+    if member.top_role >= me.top_role:
+        return False
+    if member == me:
+        return False
+    if guild.owner == member:
+        return False
+    
+    return True
+
+def _format_dt(dt: datetime.datetime) -> str:
+    try:
+        return discord.utils.format_dt(dt, style='F')
+    except OverflowError:
+        return 'Time is too far in the future.'
+
 
 class BaseCog(commands.Cog):
     """The base class for all cogs.
@@ -83,7 +105,19 @@ class BaseCog(commands.Cog):
         The bot that this cog is attached to.
     """
     emoji: Optional[discord.PartialEmoji] = None
+    brief: Optional[str] = None
     
-    def __init__(self, bot: FuryBot) -> None:
+    def __init_subclass__(cls: Type[BaseCog], **kwargs) -> None:
+        cls.emoji = kwargs.pop('emoji', None)
+        cls.brief = kwargs.pop('brief', None)
+        return super().__init_subclass__(**kwargs)
+    
+    def __init__(self, bot: FuryBot, *args: Any, **kwargs: Any) -> None:
         self.bot: FuryBot = bot
+        self.id: int = int(str(int(uuid.uuid4()))[:20])
         
+        next_in_mro = next(iter(self.__class__.__mro__))
+        if hasattr(next_in_mro, '__is_jishaku__') or isinstance(next_in_mro, self.__class__):
+            kwargs['bot'] = bot
+        
+        super().__init__(*args, **kwargs)
