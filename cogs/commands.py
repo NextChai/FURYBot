@@ -24,9 +24,11 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
+import googletrans
 from math import ceil
 from typing import (
-    TYPE_CHECKING,    
+    TYPE_CHECKING,
+    Optional,    
 )
 
 import discord
@@ -155,6 +157,46 @@ class Commands(BaseCog):
         Get the current total uptime of the bot.
         """
         return await ctx.reply(f'The bot has been online for {human_timedelta(self.bot.start_time)}', mention_author=False)
+    
+    @commands.command(name='translate', description='Translate a message from another language into english or vice versa.')
+    async def translate(self, ctx: Context, *, contents: Optional[str] = None) -> Optional[discord.Message]:
+        reference = ctx.message.reference
+        replier = ctx.message
+        if contents is None and reference is None:
+            raise commands.MissingRequiredArgument(self.translate.clean_params['contents'])
+        
+        if contents is None and reference:
+            resolved = reference.resolved
+            if resolved and isinstance(resolved, discord.Message):
+                contents = resolved.content
+                replier = resolved
+            
+            if not contents and reference.cached_message:
+                contents = reference.cached_message.content
+                replier = reference.cached_message
+            
+            if not contents and reference.message_id:
+                message = await ctx.channel.fetch_message(reference.message_id)
+                replier = message
+                contents = message.content
+        
+        if contents is None:
+            return await ctx.send('You did not supply a message to translate.')
+        
+        translated = await self.bot.translate(contents)
+        
+        # Inspired by:
+        # https://github.com/Rapptz/RoboDanny/blob/rewrite/cogs/funhouse.py#L90-L93
+        src = googletrans.LANGUAGES.get(translated.src, '(auto-detected)').title()
+        dest = googletrans.LANGUAGES.get(translated.dest, 'Unknown').title()
+        
+        embed = self.bot.Embed(
+            author=ctx.author,
+            title='Translated Message'
+        )
+        embed.add_field(name=f'From {src}', value=translated.origin, inline=False)
+        embed.add_field(name=f'To {dest}', value=translated.text, inline=False)
+        await replier.reply(embed=embed, mention_author=False)
         
         
 async def setup(bot):

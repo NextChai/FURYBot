@@ -701,7 +701,7 @@ class FuryBot(DiscordBot, TimerManager):
         """
         return await self.mystbin.post(content, syntax) # type: ignore # This is not of concern to us.
     
-    async def translate(self, text: str) -> str:
+    async def translate(self, text: str) -> googletrans.Translated:
         """|coro|
         
         Used to translate text from one language to another.
@@ -716,7 +716,7 @@ class FuryBot(DiscordBot, TimerManager):
         :class:`str`
             The translated text.
         """
-        return await self.wrap(self.translator.translate(text))
+        return await self.wrap(self.translator.translate, text)
         
     async def is_locked(
         self, 

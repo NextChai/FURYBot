@@ -124,20 +124,20 @@ class Safety(BaseCog):
     @_wrap_listener
     async def translator_profanity_checker(self, message: _KnownMessage) -> None:
         translated = await self.bot.translate(message.content)
-        if translated == message.content:
+        if translated.text == message.content:
             return
         
-        message.content = translated # Monkey patch the message
+        message.content = translated.text # Monkey patch the message
         return await self.profanity_checker(message)
     
     @commands.Cog.listener('on_message')
     @_wrap_listener
     async def translator_profanity_checker_on_edit(self, before: _KnownMessage, after: _KnownMessage) -> None:
         translated = await self.bot.translate(after.content)
-        if translated == after.content:
+        if translated.text == after.content:
             return
         
-        after.content = translated
+        after.content = translated.text
         return await self.profanity_checker(after)
         
     @commands.Cog.listener('on_message')
