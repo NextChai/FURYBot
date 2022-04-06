@@ -44,6 +44,8 @@ from jishaku.functools import AsyncSender
 from jishaku.repl import AsyncCodeExecutor, get_var_dict_from_ctx
 from jishaku.paginators import use_file_check, PaginatorInterface, WrappedPaginator
 
+from utils import BaseCog
+
 from .context import Context
 
 if TYPE_CHECKING:
@@ -52,9 +54,25 @@ if TYPE_CHECKING:
 T = TypeVar('T')
 
 
-class Jishaku(*STANDARD_FEATURES, *OPTIONAL_FEATURES):
+class Jishaku(
+    BaseCog,
+    *STANDARD_FEATURES,
+    *OPTIONAL_FEATURES,
+    emoji='\N{CONSTRUCTION WORKER}',
+    brief='Jishaku Frontend.'
+):
+    """
+    The jishaku frontend class that mixes all Features alongside BaseCog functionality.
+    
+    This adds utility commands to the bot that allow for the execution of code in 
+    discord, debugging, etc.
+    
+    Attributes
+    ----------
+    bot: :class:`FuryBot`
+        The bot instance.
+    """
     __is_jishaku__: bool = True
-    emoji: str = '\N{CONSTRUCTION WORKER}'
     
     async def jsk_python_result_handling(
         self, 
