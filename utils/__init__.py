@@ -106,6 +106,7 @@ class BaseCog(commands.Cog):
     """
     emoji: Optional[discord.PartialEmoji] = None
     brief: Optional[str] = None
+    id: int = int(str(int(uuid.uuid4()))[:20])
     
     def __init_subclass__(cls: Type[BaseCog], **kwargs) -> None:
         cls.emoji = kwargs.pop('emoji', None)
