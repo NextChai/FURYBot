@@ -197,7 +197,7 @@ class Commands(BaseCog):
         embed.add_field(name=f'From {src}', value=translated.origin, inline=False)
         embed.add_field(name=f'To {dest}', value=translated.text, inline=False)
         await replier.reply(embed=embed, mention_author=False)
-        
+    
         
 async def setup(bot):
     return await bot.add_cog(Commands(bot))
