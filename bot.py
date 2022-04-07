@@ -274,7 +274,7 @@ class DiscordBot(commands.Bot):
             help_command=commands.MinimalHelpCommand(),
             description='The Discord bot for the FLVS Fury server.',
             intents=discord.Intents.all(),
-            command_prefix={'fury.', 'f.'},
+            command_prefix=('fury.', 'f.'),
             strip_after_prefix=True,
             hartbeat_timeout=180,
             case_insensitive=True,
