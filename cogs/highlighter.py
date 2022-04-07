@@ -34,7 +34,7 @@ from typing import (
 import discord
 from discord.ext import commands
 
-from utils import BaseCog, constants
+from utils import BaseCog, constants, clamp
 from utils.context import Context
 from utils.paginator import BaseButtonPaginator
 
@@ -46,12 +46,6 @@ if TYPE_CHECKING:
 def to_lower(argument: str) -> str:
     return argument.lower()
 
-def clamp(argument: str) -> int:
-    if not argument.isdigit():
-        raise commands.BadArgument(f'{argument} is not a valid number.')
-        
-    return max(min(int(argument), 10), 1)
-    
     
 class HighlightPaginator(BaseButtonPaginator):
     def __init__(self, bot: FuryBot, *args, **kwargs) -> None:
@@ -204,7 +198,7 @@ class Highlighter(BaseCog):
             
             embed = self.bot.Embed(
                 title=f'"{phrase}" highlighted in #{channel_name}',
-                description=f'Highlighted by {message.author.mention}',
+                description=f'Highlighted by {message.author.mention} - [jump!]({message.jump_url})',
             )
             embed.set_author(name=message.guild.name, icon_url=message.guild.icon.url) # type: ignore
             

@@ -94,6 +94,13 @@ def _format_dt(dt: datetime.datetime) -> str:
         return discord.utils.format_dt(dt, style='F')
     except OverflowError:
         return 'Time is too far in the future.'
+    
+    
+def clamp(argument: str, *, max_number: int = 10, min_number: int = 1) -> int:
+    if not argument.isdigit():
+        raise commands.BadArgument(f'{argument} is not a valid number.')
+        
+    return max(min(int(argument), max_number), min_number)
 
 
 class BaseCog(commands.Cog):
