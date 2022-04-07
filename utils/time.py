@@ -143,6 +143,9 @@ class FutureTime(Time):
         
 class UserFriendlyTime(commands.Converter):
     """That way quotes aren't absolutely necessary."""
+    if TYPE_CHECKING:
+        arg: str
+    
     __slots__: Tuple[str, ...] = (
         'converter',
         'dt',
@@ -173,9 +176,8 @@ class UserFriendlyTime(commands.Converter):
         self.force_future: bool = force_future
 
     async def check_constraints(self, ctx: Context, now: datetime.datetime, remaining: str) -> UserFriendlyTime: 
-        if self.force_future:
-            if self.dt < now:
-                raise commands.BadArgument('This time is in the past.')
+        if self.force_future and self.dt < now:
+            raise commands.BadArgument('This time is in the past.')
 
         if not remaining:
             if self.default is None:
@@ -194,6 +196,7 @@ class UserFriendlyTime(commands.Converter):
         obj = cls.__new__(cls)
         obj.converter = self.converter
         obj.default = self.default
+        obj.force_future = self.force_future
         return obj
 
     async def convert(self, ctx: Context, argument: str) -> UserFriendlyTime:
