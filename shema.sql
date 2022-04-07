@@ -43,3 +43,10 @@ CREATE TABLE IF NOT EXISTS links (
     url TEXT,
     created_at TIMESTAMP DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS highlight (
+    id BIGSERIAL PRIMARY KEY,
+    member BIGINT,
+    phrase TEXT,
+    count INT
+)

@@ -91,6 +91,7 @@ initial_extensions = (
     'cogs.moderation',
     #'cogs.safety',
     'cogs.teams',
+    'cogs.highlighter',
 )
 
 def _yield_chunks(value: str):
@@ -518,6 +519,8 @@ class FuryBot(DiscordBot, TimerManager):
         self._have_data = asyncio.Event()
         self._current_timer = None
         
+        self.highlight_cache: Dict[int, List[Dict]] = {}
+        
     @staticmethod
     def chunker(iterable: Union[str, _Chunkable], /, *, size: int = 2000) -> Generator[Union[str, _Chunkable], None, None]:
         """
@@ -574,9 +577,24 @@ class FuryBot(DiscordBot, TimerManager):
         
         Called before the bot is ready to setup all extensions.
         """
+        await self.load_cache()
         self.loop.create_task(self.dispatch_timers())
         await super().setup_hook()
         
+    async def load_cache(self) -> None:
+        async with self.safe_connection() as connection:
+            data = await connection.fetch('SELECT * FROM highlight')
+        
+        if not data:
+            return
+        
+        for item in data:
+            try:
+                self.highlight_cache[item['member']].append(dict(item))
+            except:
+                self.highlight_cache[item['member']] = [dict(item)]
+        
+    
     async def wrap(self, method: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
         """|coro|
         

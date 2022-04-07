@@ -57,6 +57,7 @@ _LINK_REGEX: re.Pattern = re.compile(
 )
 
 
+
 class LinkChecker(URLExtract):
     def __init__(
         self, 
