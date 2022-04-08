@@ -74,12 +74,11 @@ class Profanity(BaseCog):
         if word in database_profanity: # type: ignore
             return await ctx.send(f'`{word}` is already in the profanity filter.')  
         
-        async with ctx.typing():
-            async with self.bot.safe_connection() as connection:
-                await connection.execute('INSERT INTO profanity (word) VALUES ($1)', word)
+        async with self.bot.safe_connection() as connection:
+            await connection.execute('INSERT INTO profanity (word) VALUES ($1)', word)
 
-            self.bot.profanity._profanity_regex = await self.bot.profanity._build_regex()
-            await ctx.send(f'`{word}` has been added to the profanity filter.')
+        self.bot.profanity._profanity_regex = await self.bot.profanity._build_regex()
+        await ctx.send(f'`{word}` has been added to the profanity filter.')
         
     @profanity.command(
         name='remove',
@@ -92,13 +91,12 @@ class Profanity(BaseCog):
         if word not in database_profanity: # type: ignore
             return await ctx.send(f'`{word}` is not in the profanity filter.') 
         
-        async with ctx.typing():
-        
-            async with self.bot.safe_connection() as connection:
-                await connection.execute('DELETE FROM profanity WHERE word = $1', word)
+        async with self.bot.safe_connection() as connection:
+            result = await connection.execute('DELETE FROM profanity WHERE word = $1', word)
+            print(result)
 
-            self.bot.profanity._profanity_regex = await self.bot.profanity._build_regex()
-            await ctx.send(f'`{word}` has been removed from the profanity filter.')
+        self.bot.profanity._profanity_regex = await self.bot.profanity._build_regex()
+        await ctx.send(f'`{word}` has been removed from the profanity filter.')
     
     @profanity.command(
         name='censor',
