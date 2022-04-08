@@ -34,6 +34,7 @@ import discord
 from discord.ext import commands
 
 from .context import Context
+from .errors import *
 
 if TYPE_CHECKING:
     import inspect
@@ -61,6 +62,8 @@ async def on_command_error(ctx: Context, error: commands.CommandError) -> Option
         return await ctx.send(f'Ope! You are missing the required parameter named `{required_param.name}`. Add it and try again. If you\'re stuck, try doing `{ctx.prefix}help {command.qualified_name}`.')
     if isinstance(error, commands.BadArgument):
         return await ctx.send(f'Ope! {str(error)}')
+    if isinstance(error, FuryException):
+        return await ctx.send(f'Ope! {error}')
 
     tracbeack_str = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
     log.warning('New error', exc_info=error)
