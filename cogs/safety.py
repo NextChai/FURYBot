@@ -87,6 +87,8 @@ class Safety(BaseCog):
             return False
         if should_ignore(message.author):
             return False
+        if not message.content:
+            return False
         
         return True
         
