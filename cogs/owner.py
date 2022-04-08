@@ -24,6 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import re
+import time
 from typing import (
     TYPE_CHECKING,
 )
@@ -56,10 +57,18 @@ class Owner(BaseCog):
         """
         message = await ctx.send('Starting...')
         paginator = AsyncCodePaginator(message=message, author=ctx.author, prefix='```py')
+        start = time.time()
         
         with ShellReader(f'git {argument}', loop=self.bot.loop) as reader:
             async for line in reader:
-                await paginator.add_line(line)
+                now = time.time()
+                update = False
+                
+                if now - start > 1:
+                    start = time.time()
+                    update = True
+                
+                await paginator.add_line(line, update_message=update)
         
         
 async def setup(bot: FuryBot) -> None:
