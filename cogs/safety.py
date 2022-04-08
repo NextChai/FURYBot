@@ -115,7 +115,7 @@ class Safety(BaseCog):
         message.content = translated.text # Monkey patch the message
         return await self.profanity_checker(message)
     
-    @commands.Cog.listener('on_message')
+    @commands.Cog.listener('on_message_edit')
     async def translator_profanity_checker_on_edit(self, before: _KnownMessage, after: _KnownMessage) -> None:
         if not self._check_listener(after):
             return
