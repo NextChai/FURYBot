@@ -329,7 +329,7 @@ class TimerManager:
         now = (now or discord.utils.utcnow()).astimezone(datetime.timezone.utc).replace(tzinfo=None)
 
         query = f"""INSERT INTO timers (event, extra, expires, created, precise, dispatched)
-                   VALUES ($1, $2::jsonb, $3, $4, $5)
+                   VALUES ($1, $2::jsonb, $3, $4, $5, $6)
                    RETURNING *;
                 """
         sanitized_args = (event, {'args': args, 'kwargs': kwargs}, when, now, precise, False if when else None)
