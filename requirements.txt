@@ -7,3 +7,4 @@ numpydoc
 fuzzywuzzy[speedup]
 asyncache 
 googletrans
+python-Levenshtein
