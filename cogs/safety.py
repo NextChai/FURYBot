@@ -62,7 +62,7 @@ class _KnownMessage(discord.Message):
     channel: Union[discord.TextChannel, discord.Thread]
 
 
-class Safety(BaseCog):
+class Safety(BaseCog,):
     """A cog used to keep the FLVS Fury Server safe.
         
     Attributes

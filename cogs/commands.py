@@ -106,7 +106,11 @@ class ReportView(discord.ui.View):
         self.add_item(JumpButton(channel_id))
         
 
-class Commands(BaseCog):
+class Commands(
+    BaseCog,
+    brief='Commands!',
+    emoji='\N{GAME DIE}'
+):
     """The base Commands cog for the bot.
     
     Any user in the server are allowed to use these commands.

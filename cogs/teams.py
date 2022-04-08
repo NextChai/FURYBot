@@ -445,6 +445,7 @@ class TeamSelect(discord.ui.Select):
         await interaction.response.send_message(f'Selected team: {self.values[0]}', ephemeral=True)
         self.parent.stop() 
 
+
 class SelectATeam(discord.ui.View):
     """A middle class used to implemet the select 
     menu for selecting a team.
@@ -517,8 +518,14 @@ class TeamPaginator(discord.ui.View):
         return self._initial
     
     
-class Teams(BaseCog):
-    """A cog to manage, create, and view teams within the FLVS Fury Discord server."""
+class Teams(
+    BaseCog,
+    brief='A cog to manage teams.',
+    emoji='\N{STEAM LOCOMOTIVE}'
+):
+    """
+    A cog to manage, create, and view teams within the FLVS Fury Discord server.
+    """
         
     async def cog_check(self, ctx: Context) -> bool:
         """|coro|

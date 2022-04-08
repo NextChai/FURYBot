@@ -60,21 +60,11 @@ class HighlightPaginator(BaseButtonPaginator):
         return embed
 
 
-class Highlighter(BaseCog):
-        
-    async def cog_check(self, ctx: Context) -> bool:
-        # A copy from /cogs/moderation/__init__.py#L64-74 - look into this later
-        if isinstance(ctx.author, discord.User):
-            raise commands.NoPrivateMessage('This command cannot be used in private messages.')
-        if not ctx.guild:
-            raise commands.NoPrivateMessage('This command cannot be used in private messages.')
-        
-        authorized = (constants.CAPTAIN_ROLE, constants.MOD_ROLE, constants.COACH_ROLE, constants.BYPASS_FURY)
-        result = any(r.id in authorized for r in ctx.author.roles)
-        if not result:
-            raise commands.MissingPermissions(['server_moderator'])
-        
-        return True
+class Highlighter(
+    BaseCog,
+    brief='The commands that allow you to highlight phrases in the chat.',
+    emoji='\N{BELLHOP BELL}'
+):
     
     @commands.command(
         name='highlights',
