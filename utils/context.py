@@ -21,6 +21,18 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
+"""
+Mozilla Public License Version 2
+================================
+
+Copyright (c) 2016-present Rapptz
+
+Full copyright can be found here: https://github.com/Rapptz/RoboDanny/blob/rewrite/LICENSE.txt
+
+Please note this only applies to the "tick" function.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -77,7 +89,7 @@ def tick(opt: Optional[bool], label: Optional[str] = None) -> str:
         return f'{emoji}: {label}'
     
     return emoji
-    
+
 
 class Confirmation(discord.ui.View):
     """Used to get confirmation from the user in a simple way.

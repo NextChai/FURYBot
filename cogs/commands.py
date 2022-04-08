@@ -22,6 +22,18 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 
+"""
+Mozilla Public License Version 2
+================================
+
+Copyright (c) 2016-present Rapptz
+
+Full copyright can be found here: https://github.com/Rapptz/RoboDanny/blob/rewrite/LICENSE.txt
+
+Please note this only applies to the "Commands.translate" function.
+"""
+
+
 from __future__ import annotations
 
 import googletrans
