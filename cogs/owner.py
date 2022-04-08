@@ -57,7 +57,7 @@ class Owner(BaseCog):
         message = await ctx.send('Starting...')
         paginator = AsyncCodePaginator(message=message, author=ctx.author, prefix='```py')
         
-        async with ShellReader(f'git {argument}', loop=self.bot.loop) as reader:
+        with ShellReader(f'git {argument}', loop=self.bot.loop) as reader:
             async for line in reader:
                 await paginator.add_line(line)
         
