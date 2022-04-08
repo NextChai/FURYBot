@@ -70,16 +70,16 @@ class Profanity(BaseCog):
         aliases=['a', 'addword']
     )
     async def profanity_add(self, ctx: Context, *, word: str = commands.parameter(converter=to_lower)) -> Optional[discord.Message]:
-        await self.bot.profanity.get_profane_words()
-        if word in self.bot.profanity._database_profanity: # type: ignore
+        database_profanity = self.bot.profanity._database_profanity or await self.bot.profanity._raw_profanity()
+        if word in database_profanity: # type: ignore
             return await ctx.send(f'`{word}` is already in the profanity filter.')  
         
-        async with self.bot.safe_connection() as connection:
-            await connection.execute('INSERT INTO profanity (word) VALUES ($1)', word)
+        async with ctx.typing():
+            async with self.bot.safe_connection() as connection:
+                await connection.execute('INSERT INTO profanity (word) VALUES ($1)', word)
 
-        self.bot.profanity._profanity.append(word) # type: ignore
-        self.bot.profanity._profanity_regex = None
-        await ctx.send(f'`{word}` has been added to the profanity filter.')
+            self.bot.profanity._profanity_regex = await self.bot.profanity._build_regex()
+            await ctx.send(f'`{word}` has been added to the profanity filter.')
         
     @profanity.command(
         name='remove',
@@ -88,16 +88,17 @@ class Profanity(BaseCog):
         aliases=['r', 'removeword']
     )
     async def profanity_remove(self, ctx: Context, *, word: str = commands.parameter(converter=to_lower)) -> Optional[discord.Message]:
-        await self.bot.profanity.get_profane_words()
-        if word not in self.bot.profanity._database_profanity: # type: ignore
+        database_profanity = self.bot.profanity._database_profanity or await self.bot.profanity._raw_profanity()
+        if word not in database_profanity: # type: ignore
             return await ctx.send(f'`{word}` is not in the profanity filter.') 
         
-        async with self.bot.safe_connection() as connection:
-            await connection.execute('DELETE FROM profanity WHERE word = $1', word)
+        async with ctx.typing():
+        
+            async with self.bot.safe_connection() as connection:
+                await connection.execute('DELETE FROM profanity WHERE word = $1', word)
 
-        self.bot.profanity._profanity.remove(word) # type: ignore
-        self.bot.profanity._profanity_regex = None
-        await ctx.send(f'`{word}` has been removed from the profanity filter.')
+            self.bot.profanity._profanity_regex = await self.bot.profanity._build_regex()
+            await ctx.send(f'`{word}` has been removed from the profanity filter.')
     
     @profanity.command(
         name='censor',

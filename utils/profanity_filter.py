@@ -32,7 +32,8 @@ from typing import (
     Awaitable,
     Callable, 
     ClassVar,
-    Dict, 
+    Dict,
+    Generic, 
     Iterable, 
     List, 
     Optional, 
@@ -40,26 +41,25 @@ from typing import (
     TypeVar,
     Any
 )
-from typing_extensions import ParamSpec
+from typing_extensions import ParamSpec, Concatenate
 
 if TYPE_CHECKING:
     from asyncpg import Connection
 
 __all__: Tuple[str, ...] = (
-    'PermeateProfanity',
-    'ProfanityChecker'
+    'ProfanityChecker',
 )
 
 T = TypeVar('T')
 P = ParamSpec('P')
 
 
-class PermeateProfanity:
-    """A helper class used to permeate a list of swear words into all possible combinations.
-    
-    This is mainly used so cheeky members in the server who use profanity can be caught easily.
+class ProfanityChecker(Generic[P, T]):
     """
-    mapping: ClassVar[Dict[str, List[str]]] = {
+    A class used to check if a string contains profanity.
+    """
+    
+    permeate_mapping: ClassVar[Dict[str, List[str]]] = {
         'a': ['@'],
         'i': ['!', 'l', '1'],
         'd': ['b'],
@@ -69,114 +69,90 @@ class PermeateProfanity:
         'y': ['i', 'ie']
     }  
     
-    def __init__(self, *, swears: Iterable[str]) -> None:
-        self._swears: List[str] = list(swears)
-
-    @property
-    def swears(self) -> List[str]:
-        """List[:class:`str`]: Returns the current list of swears."""
-        return self._swears
-    
-    async def permeate_swears(self) -> List[str]:
-        """|coro|
-        
-        Used to fill up all possible combinations of a swear word.
-        
-        For example, `soysauce` would turn into: 'soysauce', '$oysauce', '$0ysauce', '$0isauce', etc.
-        """
-        for swear in self._swears:
-            if swear.endswith('er'): 
-                self._swears.append(swear.replace('er', 'a')) 
-                
-            for index, char in enumerate(swear):
-                current = self.mapping.get(char.lower())
-                if not current:
-                    continue
-                
-                for switch in current:
-                    formatted = swear[0:index] + switch + swear[index+1:]
-                    self._swears.append(formatted) # type: ignore
-                break 
-            
-        return self._swears
-            
-            
-class ProfanityChecker:
-    """The base profanity filter for the bot.
-    
-    .. note::
-    
-        :meth:`ProfanityChecker.get_profane_words` is overwritten so a whitelist can be used.
-        
-    Attributes
-    ----------
-    clean_wordset: List[:class:`str`]
-        The clean wordset of the bot, aka the whitelisted words.
-    extra_profanity: List[:class:`str`]
-        The bad words of the bot, aka the words that will get flagged.
-    """
-    
-    invalid_regex = (
+    invalid_regex: ClassVar[Tuple[str, ...]] = (
         '.',
         '^',
         '$',
         '.'
     )
     
-    def __init__(self, *, wrap: Callable[..., Awaitable[Any]], safe_connection: Callable[[], AsyncContextManager[Connection]]) -> None:
-        self._profanity: Optional[List[str]] = None
-        self._censor_char = '*'
-        self.wrap: Callable[..., Awaitable[Any]] = wrap
+    def __init__(
+        self, 
+        *, 
+        wrap: Callable[Concatenate[Callable[P, T], P], Awaitable[T]], 
+        safe_connection: Callable[[], AsyncContextManager[Connection]]
+    ) -> None:
+        self.wrap: Callable[Concatenate[Callable[P, T], P], Awaitable[T]] = wrap
         self.safe_connection: Callable[[], AsyncContextManager[Connection]] = safe_connection
-        self._profanity_lock: asyncio.Lock = asyncio.Lock()
+        
         self._profanity_regex: Optional[re.Pattern] = None
         self._database_profanity: Optional[List[str]] = None
-        
-    async def _get_profanity(self) -> List[str]:
+    
+    def __call__(self, blocking: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Awaitable[T]:
+        return self.wrap(blocking, *args, **kwargs)
+    
+    async def _raw_profanity(self) -> List[str]:
         async with self.safe_connection() as connection:
             data = await connection.fetch('SELECT word FROM profanity')
         
-        return await PermeateProfanity(swears=[element['word'] for element in data]).permeate_swears()
+        self._database_profanity = profanity = [entry['word'] for entry in data]
+        return profanity
     
-    async def get_profane_words(self) -> List[str]:
+    async def _permeate(self, words: List[str], /) -> List[str]:
+        words = words.copy()
+        
+        for word in words:
+            if word.endswith('er'): 
+                words.append(word.replace('er', 'a')) 
+                
+            for index, char in enumerate(word):
+                current = self.permeate_mapping.get(char.lower())
+                if not current:
+                    continue
+                
+                for switch in current:
+                    formatted = word[0:index] + switch + word[index+1:]
+                    self._swears.append(formatted) # type: ignore
+                    
+                break 
+            
+        plural = [self(inflection.pluralize, word) for word in words] # type: ignore
+        words.extend(await asyncio.gather(*plural))
+        
+        for word in words:
+            for invalid in self.invalid_regex:
+                word = word.replace(invalid, r'\{0}'.format(invalid))
+        
+        words = list(set(words)) # Clean duplicates
+        words.sort(key=len)
+        words.reverse()
+        
+        return words
+    
+    async def _build_regex(self) -> re.Pattern:
+        words = await self._raw_profanity()
+        extended = await self._permeate(words)
+        return re.compile('|'.join(extended), flags=re.IGNORECASE)
+    
+    def _subber(self, match: re.Match) -> str:
+        return '*' * len(match.group(0))
+    
+    async def censor(self, text: str) -> str:
         """|coro|
         
-        A coroutine to get a complete list of profane word and return it, as 
-        well as setting some internal markers for later use.
+        A coroutine to censor profanity from a string.
+        
+        Parameters
+        ----------
+        text: :class:`str`
+            The string to censor.
         
         Returns
         -------
-        List[:class:`str`]
-            The list of profane words.
+        :class:`str`
+            The censored string.
         """
-        async with self._profanity_lock:
-            if self._profanity:
-                return self._profanity
-            
-            profanity = await self._get_profanity()
-            self._database_profanity = profanity
-
-            plural = [self.wrap(inflection.pluralize, word) for word in profanity]
-            profanity.extend(await asyncio.gather(*plural))
-            
-            profanity = list(set(profanity)) # Clean duplicates
-            profanity.sort(key=len)
-            profanity.reverse()
-            
-            for word in profanity:
-                for invalid in self.invalid_regex:
-                    word = word.replace(invalid, r'\{0}'.format(invalid))
-            
-            self._profanity = profanity
-            return profanity
-        
-    def _subber(self, match: re.Match) -> str:
-        return self._censor_char * len(match.group(0))
-    
-    async def censor(self, text: str) -> str:
-        """Returns input_text with any profane words censored."""
         if not self._profanity_regex:
-            profane = await self.get_profane_words()
-            self._profanity_regex = re.compile('|'.join(profane), flags=re.IGNORECASE)
+            self._profanity_regex = await self._build_regex()
         
-        return await self.wrap(self._profanity_regex.sub, self._subber, text)
+        return self._profanity_regex.sub(self._subber, text)
