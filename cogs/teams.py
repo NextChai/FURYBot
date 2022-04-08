@@ -733,8 +733,6 @@ class Teams(BaseCog):
         
         async with self.bot.safe_connection() as conn:
             await conn.execute('DELETE FROM teams WHERE id = $1', team.id)
-        
-        return await ctx.send(f'Team {team.name} has been deleted.')
     
     @team.command(name='sync', description='Channel permissions got messed up? Sync them using this command.')
     async def team_sync(self, ctx: Context, *, team: Optional[TeamConverter]) -> Optional[discord.Message]:
