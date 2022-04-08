@@ -140,12 +140,12 @@ class Mutes(BaseCog):
         )
         
         embed = self.bot.Embed(title='Muted', description=f'{member.mention} has been muted.')
-        embed.add_field(name='Reason', value=time.arg if time else 'No reason provided.')
-        embed.add_field(name='Expires', value=_format_dt(timer.expires) if timer.expires else "Does not expire.")
-        embed.add_field(name='Moderator', value=ctx.author.mention)
-        embed.add_field(name='Role(s) Affected', value=', '.join([f'<@&{r}>' for r in original_roles] or ['No roles.']))
-        embed.add_field(name='Channel(s) Affected', value=', '.join([f'<#{c}>' for c in channels] or ['No channels.']))
-        return await ctx.send(embed=embed, view=None, content=None, allowed_mentions=discord.AllowedMentions.none()) # type: ignore
+        embed.add_field(name='Reason', value=time.arg if time else 'No reason provided.', inline=False)
+        embed.add_field(name='Expires', value=_format_dt(timer.expires) if timer.expires else "Does not expire.", inline=False)
+        embed.add_field(name='Moderator', value=ctx.author.mention, inline=False)
+        embed.add_field(name='Role(s) Affected', value=', '.join([f'<@&{r}>' for r in original_roles] or ['No roles.']), inline=False)
+        embed.add_field(name='Channel(s) Affected', value=', '.join([f'<#{c}>' for c in channels] or ['No channels.']), inline=False)
+        return await ctx.send(embed=embed) 
                 
     @mute.command(name='remove', description='Remove a mute on a member.', aliases=['delete', 'unmute'])
     async def mute_remove(self, ctx: Context, member: discord.Member) -> discord.Message:
@@ -210,7 +210,7 @@ class Mutes(BaseCog):
         expires_fmt = f'Expires in {human_timedelta(expires)} ({_format_dt(expires)})' if (expires := temp.expires) else 'Does not expire.'
         embed.add_field(name='Expires', value=expires_fmt, inline=False)
         embed.add_field(name='Mute Reason', value=temp.kwargs.get('reason', 'None given.'), inline=False)
-        embed.add_field(name='Moderator', value=f'<@{moderator}>' if (moderator := temp.kwargs.get('moderator')) else 'No moderator given.')
+        embed.add_field(name='Moderator', value=f'<@{moderator}>' if (moderator := temp.kwargs.get('moderator')) else 'No moderator given.', inline=False)
         embed.add_field(
             name='Channel(s) Affected', 
             value=human_join([f'<#{id}>' for id in temp.kwargs['channels']] or ['No channels affected.'], final='and'), 
