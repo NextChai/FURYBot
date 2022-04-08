@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import logging
 from typing import (
-    TYPE_CHECKING,
+    List,
     Optional,
 )
 
@@ -33,12 +33,11 @@ import discord
 from discord.ext import commands
 
 from utils import BaseCog, _check_for_hierarchy, _format_dt
-from utils.context import Context
-from utils.time import UserFriendlyTime, human_timedelta
+from utils.context import Context, tick
+from utils.time import UserFriendlyTime, human_timedelta, human_join
 from utils.timer import Timer
+from utils.errors import MemberAlreadyLocked
 
-if TYPE_CHECKING:
-    from bot import FuryBot
 
 log = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ class Lockdowns(BaseCog):
     async def lockdown(
         self, 
         ctx: Context, 
-        member: discord.Member, 
+        members: List[discord.Member] = commands.parameter(converter=commands.Greedy[discord.Member]), 
         *,
         time: UserFriendlyTime(default='No reason given.') # type: ignore    
     ) -> Optional[discord.Message]:
@@ -60,9 +59,10 @@ class Lockdowns(BaseCog):
         
         Parameters
         ----------
-        member: discord.Member
-            The member to lockdown. Must be a member of the server. Mention them for this argument.
-        time: Optional[str]
+        members: List[:class:`discord.Member`]
+            The member to lockdown. You can mention one member or many, it's up to you.
+            For example `fury.lockdown @Timmy @Tommy 1h for being annoying`.
+        time: Optional[:class:`str`]
             The time and reason for the lockdown. If no time is provided, the member will not be removed
             from lockdown until the ``freedom`` command is used.
             
@@ -72,24 +72,52 @@ class Lockdowns(BaseCog):
         if ctx.invoked_subcommand:
             return
 
-        hierarchy_check = _check_for_hierarchy(member)
-        if not hierarchy_check:
-            return await ctx.send(f'I can not do this as {member.mention} is higher than or equal to me in role set.')
+        statuses = []
+        for member in members:
+            if not _check_for_hierarchy(member):
+                statuses.append(tick(False, f'{member.mention}: Hierarchy issue.'))
                 
-        result = await self.bot.lockdown(member, reason=time.arg, time=time.dt, moderator=ctx.author.id) 
-        if not result:
-            embed = self.bot.Embed(
-                title='Oh no!',
-                description='Something went wrong while trying to lockdown the member. You will need to lock them manually, or try again.',
-            )
-        else:
-            embed = self.bot.Embed(
-                title='Success!',
-                description=f'I have locked down {member.mention} for reason "{time.arg if time else "None specified"}".',
-            )
-            embed.add_field(name='Note:', value='They have been given the Lockdown Role, and all their previous roles have been removed. You can do `fury.unlock` to unlock them.')
-            
+            try:
+                timer = await self.bot.lockdown(member, reason=time.arg, time=time.dt, moderator=ctx.author.id) 
+            except MemberAlreadyLocked:
+                statuses.append(tick(False, f'{member.mention}: Already locked.'))
+            else:
+                if not timer:
+                    statuses.append(tick(None, label=f'{member.mention}: Something borked?'))
+                    continue
+                
+                statuses.append(tick(True, f'{member.mention}'))
+                
+        return await ctx.send(f'Locked:\n' + '\n'.join(statuses))
+        
+    @lockdown.command(name='info')
+    async def lockdown_info(self, ctx: Context, member: discord.Member) -> Optional[discord.Message]:
+        """|coro|
+        
+        Used to get information about a member's current lockdown.
+        
+        Parameters
+        ----------
+        member: :class:`discord.Member`
+            The member to get information about.
+        """
+        record = await self.bot.is_locked(member, return_record=True)
+        if not record:
+            return await ctx.send(f'{member.mention} is not locked.')
+        
+        timer = Timer(record=record)
+        
+        embed = self.bot.Embed(
+            title='Lockdown Info',
+            description=f'Member {member.mention} was locked {timer.human_delta(created=True)} ago ({timer.human_timestamp(created=True)})',
+        )
+        embed.add_field(name='Reason', value=timer.kwargs['reason'], inline=False)
+        embed.add_field(name='Expires', value=timer.human_timestamp(), inline=False)
+        embed.add_field(name='Role(s) Affected', value=human_join([f'<@&{id}' for id in timer.kwargs['roles']], final='and') or 'No Roles.')
+        embed.add_field(name='Channel(s) Affected', value=human_join([f'<#{id}' for id in timer.kwargs['channels']], final='and') or 'No Channels.')
+        embed.set_footer(text='You can do "fury.unlock" to unlock them.')
         return await ctx.send(embed=embed)
+        
     
     @lockdown.command(name='remove', description='Remove a lockdown from a member.')
     async def lockdown_remove(self, ctx: Context, member: discord.Member) -> None:
@@ -99,10 +127,9 @@ class Lockdowns(BaseCog):
         
         Parameters
         ----------
-        member: discord.Member
+        member: :class:`discord.Member`
             The member to remove the lockdown from.
         """
-        
         await self.freedom(ctx, member)
         
     @lockdown.command(name='history', description='Get the history of a member\'s lockdowns.')
@@ -113,7 +140,7 @@ class Lockdowns(BaseCog):
         
         Parameters
         ----------
-        member: discord.Member
+        member: :class:`discord.Member`
             The member to get the history of. Must be a member of the server. Mention them for this argument.
         """
         timers = await self.bot.fetch_timers('WHERE extra#>\'{kwargs, member}\' = $1 AND extra#>\'{kwargs, type}\' = $2', member.id, 'lockdowns')
@@ -171,7 +198,7 @@ class Lockdowns(BaseCog):
         
         Parameters
         ----------
-        member: discord.Member
+        member: :class:`discord.Member`
             The member to clear the history of. Must be a member of the server. Mention them for this argument.
         """
         
@@ -202,7 +229,7 @@ class Lockdowns(BaseCog):
         
         Parameters
         ----------
-        member: discord.Member
+        member: :class:`discord.Member`
             The member to get the history of. Must be a member of the server. Mention them for this argument.
         """
         return await self.lockdown_history(ctx, member)
@@ -215,7 +242,7 @@ class Lockdowns(BaseCog):
         
         Parameters
         ----------
-        member: discord.Member
+        member: :class:`discord.Member`
             The member to unlock. Must be a member of the server. Mention them for this argument.
         """
         
@@ -223,12 +250,19 @@ class Lockdowns(BaseCog):
         if not hierarchy_check:
             return await ctx.send(f'I can not do this as {member.mention} is higher than or equal to me in role set.')
         
-        await self.bot.freedom(member)
+        timer = await self.bot.freedom(member)
+        assert timer is not None
         
-        return await ctx.send(embed=self.bot.Embed(
-            title='Success!',
-            description=f'I have freed {member.mention} from lockdown.'
-        ))
+        embed = self.bot.Embed(
+            title='Member Unlocked',
+            description=f'{member.mention} has been unlocked from their lockdown.',
+        )
+        embed.add_field(name='Reason', value=timer.kwargs['reason'], inline=False)
+        embed.add_field(name='Expires', value=timer.human_timestamp(), inline=False)
+        embed.add_field(name='Role(s) Affected', value=human_join([f'<@&{id}' for id in timer.kwargs['roles']], final='and') or 'No Roles.')
+        embed.add_field(name='Channel(s) Affected', value=human_join([f'<#{id}' for id in timer.kwargs['channels']], final='and') or 'No Channels.')
+        
+        return await ctx.send(embed=embed)
         
     @commands.Cog.listener()
     async def on_lockdowns_timer_complete(self, timer: Timer) -> None:
@@ -272,7 +306,7 @@ class Lockdowns(BaseCog):
         except:
             pass
         
-        keep_roles.extend([discord.Object(id=r) for r in roles if r not in keep_roles_fmt])
+        keep_roles.extend([discord.Object(id=r) for r in roles if r not in keep_roles_fmt]) # type: ignore
         await member.edit(roles=keep_roles)
         
         embed = self.bot.Embed(
