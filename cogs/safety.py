@@ -456,8 +456,8 @@ class Safety(BaseCog):
             title='Oh no!',
             description="Links are not enabled in this server!"
         )
-        e.add_field(name="Why aren't links enabled?", value='Due to FLVS Fury being a School Discord, we limit links to keep the server as PG as possible!')
-        e.add_field(name='Invalid Links', value=', '.join(links))
+        e.add_field(name="Why aren't links enabled?", value='Due to FLVS Fury being a School Discord, we limit links to keep the server as PG as possible!', inline=False)
+        e.add_field(name='Invalid Links', value=', '.join(links), inline=False)
         await self.bot.send_to(message.author, embed=e)
         
         # I'm creating a new embed here because I wont want to handle removing fields 
