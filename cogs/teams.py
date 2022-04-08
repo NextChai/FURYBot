@@ -365,14 +365,7 @@ else:
                 WHERE (channels::jsonb->'text')::bigint = $1
                 OR (channels::jsonb->'voice')::bigint = $1
                 OR (channels::jsonb->'category')::bigint = $1
-                
-                -- Roster and Subs --
-                OR $1 = ANY(roster)
-                OR $1 = ANY(subs)
-                
-                -- Captain Role --
-                OR captain_role = $1
-                
+
                 -- Team ID --
                 OR id = $1
             """
