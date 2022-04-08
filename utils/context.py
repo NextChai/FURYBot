@@ -258,7 +258,7 @@ class Context(commands.Context, Generic[FuryT]):
             if message.content is None:
                 return check(message)
             
-            if ('stop', 'no', 'abort', 'close', 'cancel', 'end', 'quit') in message.content.lower().split():
+            if ('stop', 'no', 'abort', 'close', 'cancel', 'end', 'quit', 'none', 'n') in message.content.lower().split():
                 raise TypeError('Aborted')
             
             return check(message)

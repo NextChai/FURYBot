@@ -592,6 +592,67 @@ class Teams(BaseCog):
         embed = await team.embed()
         return await ctx.send(embed=embed)
     
+    @team.command(name='register', description='Register a new team from an existing one')
+    @commands.guild_only()
+    async def team_register(
+        self, 
+        ctx: Context,
+        name: str,
+        roster: List[discord.Member] = commands.parameter(converter=commands.Greedy[discord.Member]),
+        captain_role = commands.parameter(converter=discord.Role),
+        text_channel = commands.parameter(converter=discord.TextChannel),
+        voice_channel = commands.parameter(converter=discord.VoiceChannel),
+        category = commands.parameter(converter=discord.CategoryChannel),
+    ) -> Optional[discord.Message]:
+        assert ctx.guild is not None
+        
+        subs: List[discord.Member] = []
+        
+        @commands.command()
+        async def _dummy_g_p(ctx, param: commands.Greedy[discord.Member]): #  _dummy_g_p -> dummy greedy positional
+            return
+        
+        sub_obj = await ctx.prompt('Does this team have any subs?')
+        if sub_obj:
+            new_ctx = await self.bot.get_context(message=sub_obj, cls=type(ctx))
+            subs = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'])
+        
+        embed = self.bot.Embed(
+            title='To confirm..',
+            description='Please confirm this is all correct.',
+        )
+        embed.add_field(name='Team Name', value=name, inline=False)
+        embed.add_field(name='Roster', value=human_join([m.mention for m in roster], final='and') or 'None', inline=False)
+        embed.add_field(name='Subs', value=human_join([m.mention for m in subs], final='and') or 'None', inline=False)
+        embed.add_field(name='Captain Role', value=captain_role.mention)
+        embed.add_field(
+            name='Team Channels', 
+            value='\n'.join([
+                f'**Text Channel**: {text_channel.mention}',
+                f'**Voice Channel**: {voice_channel.mention}',
+                f'**Category**: {category.mention}',
+            ]),
+            inline=False
+        )
+        
+        confirmation = await ctx.get_confirmation(embed=embed)
+        if not confirmation:
+            return
+        
+        query = 'INSERT INTO teams (team_name, roster, subs, captain_role, channels) VALUES ($1, $2, $3, $4, $5) RETURNING *'
+        async with self.bot.safe_connection() as connection:
+            record = await connection.execute(
+                query,
+                name,
+                [r.id for r in roster],
+                [s.id for s in subs],
+                captain_role.id,
+                {'text': text_channel.id, 'voice': voice_channel.id, 'category': category.id}
+            )
+        
+        team = Team(guild=ctx.guild, record=record)
+        return await ctx.send(embed=team.embed())
+        
     @team.command(name='view', description='View a team and get some information on it.', aliases=['info'])
     async def team_view(self, ctx: Context, *, team: Optional[TeamConverter]) -> None:
         """|coro|
@@ -613,8 +674,6 @@ class Teams(BaseCog):
         Create a team!
         """
         # Let's make this user friendly... I mean, not everyone that makes the bot is going to use it.
-
-        channel = ctx.channel
         guild = ctx.guild
         if guild is None:
             raise commands.NoPrivateMessage('This command cannot be used in a private message.')
@@ -644,15 +703,8 @@ class Teams(BaseCog):
         new_ctx = await self.bot.get_context(message=member_list_obj, cls=type(ctx))
         roster = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'])
 
-        # We need a custom sub check here so the user can abort the process if they want to.
-        def _sub_check(message: discord.Message) -> bool:
-            if message.content.lower() in ('none', 'n', 'no', 'abort', 'stop', 'cancel'):
-                raise ValueError('Aborted.')
-            
-            return message.author == ctx.author and message.channel == channel
-        
         try:
-            sub_obj = await ctx.prompt('Fantastic! What subs do you want to add to the team? Say `none` if you don\'t want to add any subs.', check=_sub_check)
+            sub_obj = await ctx.prompt('Fantastic! What subs do you want to add to the team? Say `none` if you don\'t want to add any subs.')
         except ValueError:
             subs = []
         else:
