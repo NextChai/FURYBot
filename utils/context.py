@@ -33,8 +33,6 @@ Full copyright can be found here: https://github.com/Rapptz/RoboDanny/blob/rewri
 Please note this only applies to the "tick" function.
 """
 
-from __future__ import annotations
-
 import asyncio
 from typing import (
     Any,
