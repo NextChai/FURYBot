@@ -22,11 +22,11 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
-import asyncio
 
 import re
 import inflection
 import cachetools
+import asyncio
 from typing import (
     TYPE_CHECKING,
     AsyncContextManager,
@@ -144,12 +144,11 @@ class ProfanityChecker:
                 return self._profanity
             
             profanity = await self.get_profanity()
-           
-            try:
-                profanity.extend(inflection.pluralize(word) for word in profanity)
-            except:
-                # This can sometimes yell at us
-                pass
+
+            plural = [self.wrap(inflection.pluralize, word) for word in profanity]
+            profanity.extend(await asyncio.gather(*plural))
+            
+            profanity.extend(inflection.pluralize(word) for word in profanity)
                 
             profanity = list(set(profanity)) # Clean duplicates
             profanity.sort(key=len)
