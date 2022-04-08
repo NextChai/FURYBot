@@ -212,11 +212,12 @@ class AsyncCodePaginator(discord.ui.View, IncompletePaginator):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return interaction.user == self.author
 
-    async def add_line(self, line: str) -> None:
+    async def add_line(self, line: str, *, update_message: bool = True) -> None:
         super().add_line(line)
         self.current = len(self.incomplete_pages) - 1 if self.incomplete_pages else 0
         
-        await self.message.edit(content=self.current_page, view=self)
+        if update_message:
+            await self.message.edit(content=self.current_page, view=self)
     
     @discord.ui.button(emoji=discord.PartialEmoji(name='\N{BLACK LEFT-POINTING TRIANGLE}'), style=discord.ButtonStyle.primary)
     async def backward(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
