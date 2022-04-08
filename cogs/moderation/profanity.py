@@ -92,7 +92,7 @@ class Profanity(BaseCog):
             return await ctx.send(f'`{word}` is not in the profanity filter.') 
         
         async with self.bot.safe_connection() as connection:
-            result = await connection.execute('DELETE FROM profanity WHERE word = $1', word)
+            await connection.execute('DELETE FROM profanity WHERE word = $1', word)
 
         self.bot.profanity._profanity_regex = await self.bot.profanity._build_regex()
         await ctx.send(f'`{word}` has been removed from the profanity filter.')
