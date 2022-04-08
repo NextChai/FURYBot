@@ -577,7 +577,7 @@ class FuryBot(DiscordBot, TimerManager):
         
         Called before the bot is ready to setup all extensions.
         """
-        #await self.load_cache()
+        await self.load_cache()
         self.loop.create_task(self.dispatch_timers())
         await super().setup_hook()
         
