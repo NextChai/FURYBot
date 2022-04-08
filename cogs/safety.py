@@ -445,8 +445,10 @@ class Safety(BaseCog):
         if not links:
             return
         
-        if any(not await self.bot.is_valid_link(link) for link in links):
-            await message.delete()
+        for link in links:
+            if not await self.bot.is_valid_link(link):
+                await message.delete()
+                break
         else:
             return
         
