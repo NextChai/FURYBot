@@ -70,7 +70,7 @@ class Mutes(BaseCog):
     
     # Muting members
     @commands.group(name='mute', description='Mute members.')
-    async def mute(self, ctx: Context, member: discord.Member, *, time: UserFriendlyTime(default='...') = None) -> Optional[discord.Message]: # type: ignore
+    async def mute(self, ctx: Context, member: discord.Member, *, time: UserFriendlyTime(default='No reason specified.')) -> Optional[discord.Message]: # type: ignore
         """|coro|
         
         Used to mute a member from the server. This will limit them from speaking in any text channels
@@ -129,7 +129,7 @@ class Mutes(BaseCog):
             ))
     
         timer = await self.bot.create_timer(
-            time.dt if time else None,
+            time.dt,
             'mutes',
             precise=False,
             roles=original_roles,

@@ -865,7 +865,7 @@ class FuryBot(DiscordBot, TimerManager):
         member: discord.Member, 
         *, 
         reason: Optional[str] = None, 
-        time: Optional[datetime.datetime] = None,
+        time: datetime.datetime,
         **kwargs
     ) -> bool:
         """Adds a user to Lockdown.
@@ -876,6 +876,8 @@ class FuryBot(DiscordBot, TimerManager):
             The member to Lockdown.
         reason: Optional[:class:`str`]
             The reason for locking down the member.
+        time: :class:`datetime.datetime`
+            The time to lock the member down until.
         raise_for_exception: Optional[:class:`bool`]
             Whether or not to raise an exception if the member is already locked.
             
@@ -940,7 +942,7 @@ class FuryBot(DiscordBot, TimerManager):
             author=member
         )
         embed.add_field(name='Reason', value=f'Locked down for reason: {reason}')
-        embed.add_field(name='Expires', value=f'The lockdown expires in {human_timedelta(time) if time else "Never"}{" ({})".format(discord.utils.format_dt(time)) if time else ""}')
+        embed.add_field(name='Expires', value=f'The lockdown expires in {human_timedelta(time)}{" ({})".format(discord.utils.format_dt(time))}')
         
         await self.send_to(member, embed=embed)
         return True

@@ -298,7 +298,7 @@ class Safety(BaseCog):
         embed.add_field(name='Message Content', value=discord.utils.escape_mentions(message.content))
         
         await self.bot.send_to(message.author, embed=embed)
-        await self.bot.lockdown(member=message.author, reason='Mass mentioning roles.')
+        await self.bot.lockdown_for(60*24, member=message.author, reason='Mass mentioning roles.')
         
         # Now let's send to logging channel.
         embed = self.bot.Embed(
@@ -484,7 +484,7 @@ class Safety(BaseCog):
                 raise RuntimeError('Failed to get the Fury guild.')
             
             member = guild.get_member(after.id) or (await guild.fetch_member(after.id))
-            await self.bot.lockdown(member, reason='Bad display name.')
+            await self.bot.lockdown_for(60*24, member=member, reason='Bad display name')
 
     @tasks.loop(count=1)
     async def name_checker(self) -> None:
@@ -493,7 +493,7 @@ class Safety(BaseCog):
         
         async for member in guild.fetch_members(limit=None):
             if (censored := await self.bot.censor(member.display_name)) != member.display_name:
-                await self.bot.lockdown(member, reason='Bad display name.')
+                await self.bot.lockdown_for(60*24, member=member, reason='Bad display name')
                 
                 e = self.bot.Embed(
                     title='Lockdown Incoming!',
@@ -507,7 +507,7 @@ class Safety(BaseCog):
                 activity = discord.utils.find(lambda activity: isinstance(activity, discord.CustomActivity), member.activities)
                 if activity and activity.name:
                     if (censored := await self.bot.censor(activity.name)) != activity.name:
-                        await self.bot.lockdown(member, reason='Bad activity')
+                        await self.bot.lockdown_for(60*24, member=member, reason='Bad activity')
                         
                         e = self.bot.Embed(
                             title='Bad Status Found',

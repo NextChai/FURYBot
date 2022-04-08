@@ -293,7 +293,7 @@ class TimerManager:
         
     async def create_timer(
         self, 
-        when: Optional[datetime.datetime],
+        when: datetime.datetime,
         event: str = 'timer',
         *args: JSONType,
         now: Optional[datetime.datetime] = None,
@@ -323,16 +323,14 @@ class TimerManager:
         await self.wait_until_ready()
         
         # Remove timezone information since the database does not deal with it
-        if when:
-            when = when.astimezone(datetime.timezone.utc).replace(tzinfo=None)
-            
+        when = when.astimezone(datetime.timezone.utc).replace(tzinfo=None)
         now = (now or discord.utils.utcnow()).astimezone(datetime.timezone.utc).replace(tzinfo=None)
 
         query = f"""INSERT INTO timers (event, extra, expires, created, precise, dispatched)
                    VALUES ($1, $2::jsonb, $3, $4, $5, $6)
                    RETURNING *;
                 """
-        sanitized_args = (event, {'args': args, 'kwargs': kwargs}, when, now, precise, False if when else None)
+        sanitized_args = (event, {'args': args, 'kwargs': kwargs}, when, now, precise, False)
         
         async with self.safe_connection() as conn:
             row = await conn.fetchrow(query, *sanitized_args)

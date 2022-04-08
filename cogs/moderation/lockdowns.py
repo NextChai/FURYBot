@@ -51,7 +51,7 @@ class Lockdowns(BaseCog):
         ctx: Context, 
         member: discord.Member, 
         *,
-        time: UserFriendlyTime(default='...') = None # type: ignore    
+        time: UserFriendlyTime(default='No reason given.') # type: ignore    
     ) -> Optional[discord.Message]:
         """|coro|
         
@@ -76,11 +76,7 @@ class Lockdowns(BaseCog):
         if not hierarchy_check:
             return await ctx.send(f'I can not do this as {member.mention} is higher than or equal to me in role set.')
                 
-        if time is None:
-            result = await self.bot.lockdown(member, reason='None specified.', moderator=ctx.author.id) 
-        else:
-            result = await self.bot.lockdown(member, reason=time.arg, time=time.dt, moderator=ctx.author.id) 
-        
+        result = await self.bot.lockdown(member, reason=time.arg, time=time.dt, moderator=ctx.author.id) 
         if not result:
             embed = self.bot.Embed(
                 title='Oh no!',
