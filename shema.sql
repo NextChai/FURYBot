@@ -21,16 +21,6 @@ CREATE TABLE IF NOT EXISTS teams(
 );
 
 
-CREATE TABLE IF NOT EXISTS tracking (
-    id BIGSERIAL PRIMARY KEY,
-    member BIGINT,
-    team_id BIGINT,
-    game_sessions TIMESTAMP[][] DEFAULT ARRAY[], -- game_sessions and game_information should be in sync
-    game_information JSONB[],
-    notifications BOOLEAN DEFAULT FALSE
-);
-
-
 CREATE TABLE IF NOT EXISTS profanity(
     id BIGSERIAL PRIMARY KEY,
     word TEXT,
