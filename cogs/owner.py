@@ -119,13 +119,11 @@ class GitPull(discord.ui.View):
     
     @discord.ui.button(label='Reload All', style=discord.ButtonStyle.green)
     async def reload_all(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await interaction.response.defer()
-        
         statuses = []
         for extension in self.extensions:
             statuses.append(await self._reload_extension(extension))
         
-        await interaction.edit_original_message(content='Reloaded\n' + '\n'.join(statuses), view=None)
+        await interaction.response.edit_message(content='Reloaded\n' + '\n'.join(statuses), view=None)
     
 
 class Owner(BaseCog):
@@ -140,6 +138,9 @@ class Owner(BaseCog):
             path = path.replace('/', '.')
             
             extensions.append(path + filename)
+            
+        view = GitPull(extensions, ctx=ctx)
+        return await ctx.send(content='Extensions\n' + '\n'.join(f'- {extension}' for extension in extensions), view=view)
     
     @commands.command(name='git')
     async def git(self, ctx: Context, *, argument: str = 'pull') -> Optional[discord.Message]:
