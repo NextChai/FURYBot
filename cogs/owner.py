@@ -52,6 +52,16 @@ _GIT_PULL_REGEX: re.Pattern = re.compile(r'(?P<path>(?:[a-z]{1,}/){1,})(?P<filen
 
 
 class GitPullSelect(discord.ui.Select):
+    """
+    A select used by the owner to choose extensions to reload.
+    
+    Attributes
+    ----------
+    extensions: List[:class:`str`]
+        A list of extensions to choose from.
+    parent: :class:`GitPull`
+        The parent GitPull cog.
+    """
     def __init__(self, parent: GitPull, /, *, extensions: List[str]) -> None:
         self.extensions: List[str] = extensions
         self.parent: GitPull = parent
@@ -68,6 +78,15 @@ class GitPullSelect(discord.ui.Select):
         )
     
     async def callback(self, interaction: discord.Interaction) -> None:
+        """|coro|
+        
+        The callback for this select. When called, this will reload the selected extensions.
+        
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that was created by this select.
+        """
         statuses = []
         for value in self.values:
             statuses.append(await self.parent._reload_extension(value))
@@ -76,6 +95,19 @@ class GitPullSelect(discord.ui.Select):
 
 
 class GitPull(discord.ui.View):
+    """
+    A view to allow the owner to reload extensions after
+    pulling from github.
+    
+    Attributes
+    ----------
+    extensions: List[:class:`str`]
+        A list of extensions to choose from.
+    ctx: :class:`Context`
+        The invocation context of the command.
+    bot: :class:`FuryBot`
+        The bot instance.
+    """
     def __init__(
         self, 
         extensions: List[str], 
@@ -88,9 +120,27 @@ class GitPull(discord.ui.View):
         self.extensions: List[str] = extensions
         self.ctx: Context = ctx
         self.bot: FuryBot = ctx.bot
-        self.add_item(GitPullSelect(self, extensions=extensions))
+        
+        for extension_packet in self.bot.chunker(extensions, size=20): # type: ignore
+            extension_packet: List[str] 
+            
+            self.add_item(GitPullSelect(self, extensions=extension_packet))
     
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """|coro|
+        
+        A check called before the interaction is processed.
+        
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that is being processed.
+        
+        Returns
+        -------
+        :class:`bool`
+            Whether or not the interaction should be processed.
+        """
         result = interaction.user == self.ctx.author
         if not result:
             await interaction.response.send_message('Hey! You can\'t do that!')
@@ -121,6 +171,17 @@ class GitPull(discord.ui.View):
     
     @discord.ui.button(label='Reload All', style=discord.ButtonStyle.green)
     async def reload_all(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        """|coro|
+        
+        A button used to reload all extensions instead of using the select.
+        
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that was created by this button.
+        button: :class:`discord.ui.Button`
+            The button that was pressed.
+        """
         statuses = []
         for extension in self.extensions:
             statuses.append(await self._reload_extension(extension))
@@ -128,7 +189,18 @@ class GitPull(discord.ui.View):
         await interaction.response.edit_message(content='Reloaded\n' + '\n'.join(statuses), view=None)
     
 
-class Owner(BaseCog):
+class Owner(
+    BaseCog,
+    brief='The Owner commands.',
+    emoji='\N{BLACK SUN WITH RAYS}'
+):
+    """
+    The main owner cog. This cog contains commands 
+    that are only usable by the bot owner.
+    """
+    
+    async def cog_check(self, ctx: Context) -> bool:
+        return await self.bot.is_owner(ctx.author)
     
     async def git_pull_optimization(self, ctx: Context, buffer: str) -> Optional[discord.Message]:
         matches = _GIT_PULL_REGEX.findall(buffer)
