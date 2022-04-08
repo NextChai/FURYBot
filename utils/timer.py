@@ -328,11 +328,11 @@ class TimerManager:
             
         now = (now or discord.utils.utcnow()).astimezone(datetime.timezone.utc).replace(tzinfo=None)
 
-        query = f"""INSERT INTO timers (event, extra, expires, created, precise)
+        query = f"""INSERT INTO timers (event, extra, expires, created, precise, dispatched)
                    VALUES ($1, $2::jsonb, $3, $4, $5)
                    RETURNING *;
                 """
-        sanitized_args = (event, {'args': args, 'kwargs': kwargs}, when, now, precise)
+        sanitized_args = (event, {'args': args, 'kwargs': kwargs}, when, now, precise, False if when else None)
         
         async with self.safe_connection() as conn:
             row = await conn.fetchrow(query, *sanitized_args)
