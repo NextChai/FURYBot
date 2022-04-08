@@ -92,6 +92,7 @@ initial_extensions = (
     'cogs.safety',
     'cogs.teams',
     'cogs.highlighter',
+    'cogs.owner',
 )
 
 def _yield_chunks(value: str):
