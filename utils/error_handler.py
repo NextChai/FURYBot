@@ -48,6 +48,8 @@ async def on_command_error(ctx: Context, error: commands.CommandError) -> Option
     if not command:
         return
     
+    error = getattr(error, 'original', error)
+    
     if isinstance(error, (commands.CommandNotFound, )): # Ignored errors
         return
     if isinstance(error, commands.MemberNotFound):
