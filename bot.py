@@ -570,25 +570,7 @@ class FuryBot(DiscordBot, TimerManager):
         self._current_timer = None
         
         self.highlight_cache: Dict[int, List[Dict]] = {}
-        
-    def chunker(self, iterable: Union[str, _Chunkable], /, *, size: int = 2000) -> Generator[Union[str, _Chunkable], None, None]:
-        """
-        A generator used to chunk a string or iterable.
-        
-        Parameters
-        ----------
-        iterable: Union[:class:`str`, :class:`_Chunkable`]
-            The iterable to chunk.
-        size: :class:`int`
-            The size of each chunk.
-        
-        Yields
-        -------
-        Union[:class:`str`, :class:`_Chunkable`]
-            The chunked iterable.
-        """
-        yield from [iterable[i:i + size] for i in range(0, len(iterable), size)]
-        
+
     @discord.utils.cached_property
     def uptime_timestamp(self) -> str:
         """:class:`str`: The uptime of the bot in a human-readable Discord timestamp format.
@@ -643,7 +625,42 @@ class FuryBot(DiscordBot, TimerManager):
                 self.highlight_cache[item['member']].append(dict(item))
             except:
                 self.highlight_cache[item['member']] = [dict(item)]
+    
+    def chunker(self, iterable: Union[str, _Chunkable], /, *, size: int = 2000) -> Generator[Union[str, _Chunkable], None, None]:
+        """
+        A generator used to chunk a string or iterable.
         
+        Parameters
+        ----------
+        iterable: Union[:class:`str`, :class:`_Chunkable`]
+            The iterable to chunk.
+        size: :class:`int`
+            The size of each chunk.
+        
+        Yields
+        -------
+        Union[:class:`str`, :class:`_Chunkable`]
+            The chunked iterable.
+        """
+        yield from [iterable[i:i + size] for i in range(0, len(iterable), size)]
+        
+    def code_chunker(self, iterable: Union[str, _Chunkable], /) -> Generator[Union[str, _Chunkable], None, None]:
+        """
+        A generator used to chunk a string or iterable.
+        
+        Parameters
+        ----------
+        iterable: Union[:class:`str`, :class:`_Chunkable`]
+            The iterable to chunk.
+        size: :class:`int`
+            The size of each chunk.
+        
+        Yields
+        -------
+        Union[:class:`str`, :class:`_Chunkable`]
+            The chunked iterable.
+        """
+        yield from (f'```python\n{item}\n```' for item in self.chunker(iterable, size=1500))
     
     async def wrap(self, method: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
         """|coro|
