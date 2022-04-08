@@ -718,7 +718,7 @@ class FuryBot(DiscordBot, TimerManager):
         :class:`bool`
             Whether or not the text contains profanity.
         """
-        return await self.profanity.censor(text, fast=True) != text
+        return await self.profanity.censor(text) != text
     
     async def get_links(self, text: str) -> List[str]:
         """|coro|
