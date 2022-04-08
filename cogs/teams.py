@@ -651,7 +651,7 @@ class Teams(BaseCog):
             )
         
         team = Team(guild=ctx.guild, record=record)
-        return await ctx.send(embed=team.embed())
+        return await ctx.send(embed=await team.embed())
         
     @team.command(name='view', description='View a team and get some information on it.', aliases=['info'])
     async def team_view(self, ctx: Context, *, team: Optional[TeamConverter]) -> None:
