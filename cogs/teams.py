@@ -606,16 +606,19 @@ class Teams(BaseCog):
     ) -> Optional[discord.Message]:
         assert ctx.guild is not None
         
-        subs: List[discord.Member] = []
+        # Clean the roster for dups
+        roster = list(set(roster)) 
         
         @commands.command()
         async def _dummy_g_p(ctx, param: commands.Greedy[discord.Member]): #  _dummy_g_p -> dummy greedy positional
             return
         
+        subs: List[discord.Member] = []
         sub_obj = await ctx.prompt('Does this team have any subs?')
         if sub_obj:
             new_ctx = await self.bot.get_context(message=sub_obj, cls=type(ctx))
             subs = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'])
+            subs = list(set(subs)) # Clean dups
         
         embed = self.bot.Embed(
             title='To confirm..',
