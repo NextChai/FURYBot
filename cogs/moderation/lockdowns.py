@@ -118,7 +118,6 @@ class Lockdowns(BaseCog):
         embed.set_footer(text='You can do "fury.unlock" to unlock them.')
         return await ctx.send(embed=embed)
         
-    
     @lockdown.command(name='remove', description='Remove a lockdown from a member.')
     async def lockdown_remove(self, ctx: Context, member: discord.Member) -> None:
         """|coro|
