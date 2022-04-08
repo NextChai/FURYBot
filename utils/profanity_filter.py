@@ -179,4 +179,4 @@ class ProfanityChecker:
             profane = await self.get_profane_words()
             self._profanity_regex = re.compile('|'.join(profane), flags=re.IGNORECASE)
         
-        return self._profanity_regex.sub(self._subber, text)
+        return await self.wrap(self._profanity_regex.sub, self._subber, text)
