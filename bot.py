@@ -89,7 +89,7 @@ initial_extensions = (
     
     'cogs.commands',
     'cogs.moderation',
-    'cogs.safety',
+    #'cogs.safety',
     'cogs.teams',
     'cogs.highlighter',
 )
