@@ -87,6 +87,7 @@ class GitPull(discord.ui.View):
         self.ctx: Context = ctx
         self.bot: FuryBot = ctx.bot
         self.add_item(GitPullSelect(self, extensions=extensions))
+        super().__init__()
     
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         result = interaction.user == self.ctx.author
