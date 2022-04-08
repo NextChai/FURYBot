@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import aiohttp
 import logging
+import copy
 from typing import (
     TYPE_CHECKING,
     Optional,
@@ -111,22 +112,9 @@ class Safety(BaseCog):
         if translated.text == message.content:
             return
         
-        message.content = translated.text # Monkey patch the message
-        return await self.profanity_checker(message)
-    
-    @commands.Cog.listener('on_message_edit')
-    async def translator_profanity_checker_on_edit(self, before: _KnownMessage, after: _KnownMessage) -> None:
-        if not self._check_listener(after):
-            return
-        if before.content == after.content:
-            return
-        
-        translated = await self.bot.translate(after.content)
-        if translated.text == after.content:
-            return
-        
-        after.content = translated.text
-        return await self.profanity_checker(after)
+        new_message = copy.copy(message)
+        new_message.content = translated.text
+        return await self.profanity_checker(new_message)
         
     @commands.Cog.listener('on_message')
     async def message_logger(self, message: _KnownMessage) -> None:
@@ -387,9 +375,17 @@ class Safety(BaseCog):
         """
         if not self._check_listener(after):
             return
+        
         if before.content == after.content:
             return
         
+        translated = await self.bot.translate(after.content)
+        if translated != after.content:
+            new_after = copy.copy(after)
+            new_after.content = translated
+            
+            self.bot.loop.create_task(self.profanity_checker(new_after))
+                
         self.bot.loop.create_task(self.profanity_checker(after)) # type: ignore
         self.bot.loop.create_task(self.link_checker(after)) # type: ignore
                     
