@@ -592,7 +592,7 @@ class Teams(BaseCog):
         embed = await team.embed()
         return await ctx.send(embed=embed)
     
-    @team.command(name='register', description='Register a new team from an existing one')
+    @team.command(name='register', description='Register a new team from an existing one', hidden=True)
     @commands.guild_only()
     async def team_register(
         self, 
@@ -604,6 +604,25 @@ class Teams(BaseCog):
         voice_channel = commands.parameter(converter=discord.VoiceChannel),
         category = commands.parameter(converter=discord.CategoryChannel),
     ) -> Optional[discord.Message]:
+        """|coro|
+        
+        A private helper command to register a team that is not registered.
+        
+        Parmaters
+        ---------
+        name: :class:`str`
+            The name of the team.
+        roster: :class:`List[:class:`discord.Member`]`
+            The members on the team.
+        captain_role: :class:`discord.Role`
+            The captain role of the team.
+        text_channel: :class:`discord.TextChannel`
+            The text channel of the team.
+        voice_channel: :class:`discord.VoiceChannel`
+            The voice channel of the team.
+        category: :class:`discord.CategoryChannel`
+            The category channel of the team.
+        """
         assert ctx.guild is not None
         
         # Clean the roster for dups
