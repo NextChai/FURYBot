@@ -12,3 +12,4 @@ mystbin.py
 parsedatetime
 googletrans
 urlextract
+jishaku
