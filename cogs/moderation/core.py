@@ -85,10 +85,7 @@ class CoreModeration(BaseCog):
             counter[message.author] += 1
         
         fmt = '\n'.join(f'**{str(author)}**: {count}' for author, count in counter.most_common())
-        try:
-            await ctx.send(f'Deleted {counter.total()} messages.\n\n{fmt}', delete_after=5)
-        except:
-            pass
+        await ctx.send(f'Deleted {counter.total()} messages.\n\n{fmt}', delete_after=5)
     
     @commands.group(
         name='cleanup',
@@ -105,7 +102,10 @@ class CoreModeration(BaseCog):
             default=lambda ctx: ctx.channel, 
             converter=Optional[Union[discord.TextChannel, discord.Thread]]
         ),
-        member: discord.Member = commands.parameter(default=lambda ctx: ctx.guild.me, converter=Optional[discord.Member]),
+        member: discord.Member = commands.parameter(
+            default=lambda ctx: ctx.guild.me, 
+            converter=Optional[discord.Member]
+        ),
         count: int = ClampParameter, 
     ) -> None:
         """|coro|
@@ -123,6 +123,8 @@ class CoreModeration(BaseCog):
         """
         if ctx.invoked_subcommand:
             return
+        
+        print(channel, member, count)
         
         def predicate(message: discord.Message) -> bool:
             assert message.guild is not None
