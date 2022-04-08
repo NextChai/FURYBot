@@ -185,7 +185,6 @@ class Context(commands.Context, Generic[FuryT]):
         """
         view = Confirmation(author=self.author)
         kwargs['view'] = view
-        kwargs['allowed_mentions'] = discord.AllowedMentions.none()
         
         await self.send(*args, **kwargs)
         await view.wait()
