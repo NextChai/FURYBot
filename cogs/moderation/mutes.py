@@ -106,12 +106,10 @@ class Mutes(BaseCog):
         channels = []
         for channel in ctx.guild.text_channels:
             overwrites = channel.overwrites
-            if overwrites.get(member):
-                specific = discord.utils.find(lambda e: e[0] == 'send_messages' and e[1] == True, overwrites.items())
-                if specific:
-                    overwrites[member].update(send_messages=False)
-                    await channel.edit(overwrites=overwrites) # type: ignore
-                    channels.append(channel.id)
+            if (specific := overwrites.get(member)) and (specific.send_messages or specific.view_channel):
+                overwrites[member].update(send_messages=False, view_channel=False)
+                await channel.edit(overwrites=overwrites) # type: ignore
+                channels.append(channel.id)
         
         muted_role = ctx.guild.get_role(constants.MUTED_ROLE)
         if muted_role is None:
@@ -287,9 +285,12 @@ class Mutes(BaseCog):
                 continue
             
             overwrites = channel.overwrites
-            if overwrites.get(member):
-                overwrites[member].update(send_messages=True)
-                await channel.edit(overwrites=overwrites) # type: ignore
+            try:
+                overwrites[member].update(send_messages=True, view_channel=True)
+            except KeyError:
+                pass
+            
+            await channel.edit(overwrites=overwrites) # type: ignore
                 
         roles = timer.kwargs['roles']
         objs = [discord.Object(id=r) for r in roles]

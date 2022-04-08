@@ -294,7 +294,7 @@ class Lockdowns(BaseCog):
             
             overwrites = channel.overwrites
             if member in overwrites:
-                overwrites[member].update(view_channel=True)
+                overwrites[member].update(view_channel=True, send_messages=True)
                 
             await channel.edit(overwrites=overwrites) # type: ignore
         
