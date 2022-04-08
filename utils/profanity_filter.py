@@ -83,7 +83,7 @@ class ProfanityChecker(Generic[P, T]):
         async with self.safe_connection() as connection:
             data = await connection.fetch('SELECT word FROM profanity')
         
-        self._database_profanity = profanity = [entry['word'] for entry in data]
+        self._database_profanity = profanity = [entry['word'].lower() for entry in data]
         return profanity
     
     async def _permeate(self, words: List[str], /) -> List[str]:
@@ -110,6 +110,10 @@ class ProfanityChecker(Generic[P, T]):
         return re.compile('|'.join(extended), flags=re.IGNORECASE)
     
     def _subber(self, match: re.Match) -> str:
+        result = match.group(0)
+        if result.lower() not in self._database_profanity:
+            return result
+        
         return '*' * len(match.group(0))
     
     async def censor(self, text: str) -> str:
