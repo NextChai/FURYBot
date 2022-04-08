@@ -164,13 +164,12 @@ class ProfanityChecker:
         profane = await self.get_profane_words()
         
         def _wrapped(text: str, *, fast: bool = False) -> str:
-            text = text.lower()
             res = text
 
             for word in profane:
                 # Apply word boundaries to the bad word
                 regex_string = r'\b{0}\b'.format(word)
-                res = re.sub(regex_string, self._censor_char * len(word), res)
+                res = re.sub(regex_string, self._censor_char * len(word), res, flags=re.IGNORECASE)
                 
                 if res != text and fast:
                     return res
