@@ -826,12 +826,12 @@ class FuryBot(DiscordBot, TimerManager):
         -------
         :class:`bool`
         """
-        query = 'SELECT * FROM timers WHERE extra#>\'{kwargs, member}\' = $1 AND extra#>\'{kwargs, type}\' = $2 AND dispatched = $3 OR dispatched = $4'
+        query = 'SELECT * FROM timers WHERE extra#>\'{kwargs, member}\' = $1 AND extra#>\'{kwargs, type}\' = $2 AND dispatched = $3'
         if not connection:
             async with self.safe_connection() as conn:
-                data = await conn.fetchrow(query, member.id, 'lockdowns', False, None)
+                data = await conn.fetchrow(query, member.id, 'lockdowns', False,)
         else:
-            data = await connection.fetchrow(query, member.id, 'lockdowns', False, None)
+            data = await connection.fetchrow(query, member.id, 'lockdowns', False)
         
         if return_record: 
             return data
