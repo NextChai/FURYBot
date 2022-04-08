@@ -26,8 +26,6 @@ from __future__ import annotations
 import re
 import inflection
 import cachetools
-import asyncio
-import asyncache 
 from typing import (
     TYPE_CHECKING,
     AsyncContextManager,
@@ -130,10 +128,7 @@ class ProfanityChecker:
         self._profanity: Optional[List[str]] = None
         self._censor_char = '*'
         self.wrap: Callable[..., Awaitable[Any]] = wrap
-        self.profanity_cache = cachetools.Cache(maxsize=1024)
         self.safe_connection: Callable[[], AsyncContextManager[Connection]] = safe_connection
-        
-        asyncache.cached(cache=self.profanity_cache, lock=asyncio.Lock())(self.get_profane_words)
         
     async def get_profanity(self) -> List[str]:
         async with self.safe_connection() as connection:
@@ -142,30 +137,29 @@ class ProfanityChecker:
         return PermeateProfanity(swears=[element['word'] for element in data]).permeate_swears()
     
     async def get_profane_words(self) -> List[str]:
-        profane = []
-        
-        if not self._profanity:
-            self._profanity = await self.get_profanity()
-        
         if self._profanity:
-            profane.extend(self._profanity)
-            profane.extend(inflection.pluralize(word) for word in self._profanity)
-            
-        profane = list(set(profane)) # Clean duplicates
-        profane.sort(key=len)
-        profane.reverse()
+            return self._profanity
         
-        for word in profane:
+        profanity = await self.get_profanity()
+        profanity.extend(inflection.pluralize(word) for word in profanity)
+            
+        profanity = list(set(profanity)) # Clean duplicates
+        profanity.sort(key=len)
+        profanity.reverse()
+        
+        for word in profanity:
             for invalid in self.invalid_regex:
                 word = word.replace(invalid, r'\{0}'.format(invalid))
         
-        return profane
+        self._profanity = profanity
+        return profanity
     
     async def censor(self, text: str, *, fast: bool = False) -> str:
         """Returns input_text with any profane words censored."""
         profane = await self.get_profane_words()
         
         def _wrapped(text: str, *, fast: bool = False) -> str:
+            text = text.lower()
             res = text
 
             for word in profane:

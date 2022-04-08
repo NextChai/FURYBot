@@ -23,7 +23,6 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import cachetools
 from typing import (
     Optional,
 )
@@ -33,6 +32,10 @@ from discord.ext import commands
 
 from utils import BaseCog
 from utils.context import Context
+
+
+def to_lower(argument: str) -> str:
+    return argument.lower()
 
 
 class Profanity(BaseCog):
@@ -66,17 +69,15 @@ class Profanity(BaseCog):
         description='Add a word to the profanity filter',
         aliases=['a', 'addword']
     )
-    async def profanity_add(self, ctx: Context, *, word: str) -> Optional[discord.Message]:
+    async def profanity_add(self, ctx: Context, *, word: str = commands.parameter(converter=to_lower)) -> Optional[discord.Message]:
+        profanity = await self.bot.profanity.get_profane_words()
+        if word in profanity:
+            return await ctx.send(f'`{word}` is already in the profanity filter.')  
+        
         async with self.bot.safe_connection() as connection:
-            data = await connection.fetch('SELECT word FROM profanity')
-            profane_words = [entry['word'] for entry in data]
-
-            if word in profane_words:
-                return await ctx.send(f'`{word}` is already in the profanity filter.')  
-            
             await connection.execute('INSERT INTO profanity (word) VALUES ($1)', word)
 
-        self.bot.profanity.profanity_cache = cachetools.Cache(maxsize=1024)
+        self.bot.profanity._profanity.append(word) # type: ignore
         await ctx.send(f'`{word}` has been added to the profanity filter.')
         
     @profanity.command(
@@ -85,17 +86,15 @@ class Profanity(BaseCog):
         description='Remove a word from the profanity filter',
         aliases=['r', 'removeword']
     )
-    async def profanity_remove(self, ctx: Context, *, word: str) -> Optional[discord.Message]:
+    async def profanity_remove(self, ctx: Context, *, word: str = commands.parameter(converter=to_lower)) -> Optional[discord.Message]:
+        profanity = await self.bot.profanity.get_profane_words()
+        if word not in profanity:
+            return await ctx.send(f'`{word}` is not in the profanity filter.') 
+        
         async with self.bot.safe_connection() as connection:
-            data = await connection.fetch('SELECT word FROM profanity')
-            profane_words = [entry['word'] for entry in data]
-
-            if word not in profane_words:
-                return await ctx.send(f'`{word}` is not in the profanity filter.')
-            
             await connection.execute('DELETE FROM profanity WHERE word = $1', word)
 
-        self.bot.profanity.profanity_cache = cachetools.Cache(maxsize=1024)
+        self.bot.profanity._profanity.remove(word) # type: ignore
         await ctx.send(f'`{word}` has been removed from the profanity filter.')
     
     @profanity.command(

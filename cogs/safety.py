@@ -102,7 +102,6 @@ class Safety(BaseCog):
         
         return True
         
-        
     @commands.Cog.listener('on_message')
     async def translator_profanity_checker(self, message: _KnownMessage) -> None:
         if not self._check_listener(message):
