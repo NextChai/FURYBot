@@ -60,7 +60,8 @@ class ProfanityChecker(Generic[P, T]):
         '.',
         '^',
         '$',
-        '.'
+        '.',
+        '+'
     )
     
     def __init__(
