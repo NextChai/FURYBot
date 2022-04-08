@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+from __future__ import annotations
 
 """
 Mozilla Public License Version 2
@@ -32,9 +33,6 @@ Full copyright can be found here: https://github.com/Rapptz/RoboDanny/blob/rewri
 
 Please note this only applies to the "Commands.translate" function.
 """
-
-
-from __future__ import annotations
 
 import googletrans
 from math import ceil
