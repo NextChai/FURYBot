@@ -641,7 +641,7 @@ class Teams(BaseCog):
         
         query = 'INSERT INTO teams (team_name, roster, subs, captain_role, channels) VALUES ($1, $2, $3, $4, $5) RETURNING *'
         async with self.bot.safe_connection() as connection:
-            record = await connection.execute(
+            record = await connection.fetchrow(
                 query,
                 name,
                 [r.id for r in roster],
