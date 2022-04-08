@@ -8,3 +8,7 @@ fuzzywuzzy[speedup]
 asyncache 
 googletrans
 python-Levenshtein
+mystbin.py
+parsedatetime
+googletrans
+urlextract
