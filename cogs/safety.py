@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import aiohttp
 import logging
+import functools
 from typing import (
     TYPE_CHECKING,
     Awaitable,
@@ -56,6 +57,8 @@ log = logging.getLogger(__name__)
 
 
 def _wrap_listener(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[Optional[T]]]:
+    
+    @functools.wraps(func)
     async def wrapped(*args: P.args, **kwargs: P.kwargs) -> Optional[T]:
         message: discord.Message
         
