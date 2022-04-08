@@ -52,7 +52,6 @@ async def on_command_error(ctx: Context, error: commands.CommandError) -> Option
     if isinstance(error, commands.MemberNotFound):
         return await ctx.send(f'The member "{error.argument}" was not found.')
     if isinstance(error, commands.CheckFailure):
-        # Let's try and give the user some more info
         return await ctx.send('Ope! You can not run this command, you are not qualified to.')
     if isinstance(error, commands.TooManyArguments):
         total_args = len(command.clean_params)
@@ -63,8 +62,15 @@ async def on_command_error(ctx: Context, error: commands.CommandError) -> Option
     if isinstance(error, commands.BadArgument):
         return await ctx.send(f'Ope! {str(error)}')
 
-    # tracbeack_str = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
+    tracbeack_str = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
     log.warning('New error', exc_info=error)
+    
+    args = []
+    for item in ctx.bot.code_chunker(tracbeack_str):
+        args.append(item)
+        
+    await ctx.bot.send_many_to_logging_channel(args=args, kwargs=[])
+    
 
 async def setup(bot: FuryBot) -> None:
     bot.add_listener(on_command_error, 'on_command_error')
