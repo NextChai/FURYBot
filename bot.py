@@ -768,6 +768,9 @@ class FuryBot(DiscordBot, TimerManager):
         :class:`bool`
             Whether or not the link is valid.
         """
+        if any(prefix in link for prefix in self.command_prefix): # type: ignore
+            return True
+        
         return await self.links.is_valid_link(link)
     
     async def post_to_mystbin(self, content: str, syntax: str = 'python'):
