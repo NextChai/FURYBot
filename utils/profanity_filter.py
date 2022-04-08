@@ -53,6 +53,7 @@ __all__: Tuple[str, ...] = (
 T = TypeVar('T')
 P = ParamSpec('P')
 
+
 class PermeateProfanity:
     """A helper class used to permeate a list of swear words into all possible combinations.
     
