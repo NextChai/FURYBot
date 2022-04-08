@@ -148,8 +148,6 @@ class ProfanityChecker:
             plural = [self.wrap(inflection.pluralize, word) for word in profanity]
             profanity.extend(await asyncio.gather(*plural))
             
-            profanity.extend(inflection.pluralize(word) for word in profanity)
-                
             profanity = list(set(profanity)) # Clean duplicates
             profanity.sort(key=len)
             profanity.reverse()
