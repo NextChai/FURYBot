@@ -57,17 +57,7 @@ P = ParamSpec('P')
 class ProfanityChecker(Generic[P, T]):
     """
     A class used to check if a string contains profanity.
-    """
-    
-    permeate_mapping: ClassVar[Dict[str, List[str]]] = {
-        'a': ['@'],
-        'i': ['!', 'l', '1'],
-        'd': ['b'],
-        't': ['7'],
-        'o': ['0'],
-        's': ['$'],
-        'y': ['i', 'ie']
-    }  
+    """ 
     
     invalid_regex: ClassVar[Tuple[str, ...]] = (
         '.',
@@ -101,21 +91,8 @@ class ProfanityChecker(Generic[P, T]):
     async def _permeate(self, words: List[str], /) -> List[str]:
         words = words.copy()
         
-        for word in words:
-            if word.endswith('er'): 
-                words.append(word.replace('er', 'a')) 
+        words.extend(w.replace('er', 'a') for w in words if w.endswith('er'))
                 
-            for index, char in enumerate(word):
-                current = self.permeate_mapping.get(char.lower())
-                if not current:
-                    continue
-                
-                for switch in current:
-                    formatted = word[0:index] + switch + word[index+1:]
-                    words.append(formatted) # type: ignore
-                    
-                break 
-            
         plural = [self(inflection.pluralize, word) for word in words] # type: ignore
         words.extend(await asyncio.gather(*plural))
         
