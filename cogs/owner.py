@@ -70,7 +70,7 @@ class GitPullSelect(discord.ui.Select):
             options=[
                 discord.SelectOption(
                     label=extension,
-                    emoji=discord.PartialEmoji(name='\N{CLOCKWISE DOWNWARDS AND UPWARDS OPEN CIRCLE ARROWS}'),
+                    emoji='\N{CLOCKWISE DOWNWARDS AND UPWARDS OPEN CIRCLE ARROWS}',
                 )
                 for extension in extensions
             ],
