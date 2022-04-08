@@ -590,8 +590,7 @@ class FuryBot(DiscordBot, TimerManager):
         for i in range(0, len(iterable), size):
             yield iterable[i:i + size]
             
-    @staticmethod
-    def code_chunker(iterable: Union[str, _Chunkable], /) -> Generator[Union[str, _Chunkable], None, None]:
+    def code_chunker(self, iterable: Union[str, _Chunkable], /) -> Generator[Union[str, _Chunkable], None, None]:
         """
         A generator used to chunk a string or iterable in code blocks.
         
@@ -606,10 +605,9 @@ class FuryBot(DiscordBot, TimerManager):
             The chunked iterable.
         """
         code_fmt = '```py\n{}\n```'
-        code_fmt_legnth = len(code_fmt) - 2
         
-        for i in range(0, len(iterable), 2000 - code_fmt_legnth):
-            yield code_fmt.format(iterable[i:i + 2000 - code_fmt_legnth])
+        for item in self.chunker(iterable, size=1500):
+            yield code_fmt.format(item)
         
     @discord.utils.cached_property
     def uptime_timestamp(self) -> str:
