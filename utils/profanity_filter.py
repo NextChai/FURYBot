@@ -131,6 +131,8 @@ class ProfanityChecker:
         self.wrap: Callable[..., Awaitable[Any]] = wrap
         self.safe_connection: Callable[[], AsyncContextManager[Connection]] = safe_connection
         self._profanity_lock: asyncio.Lock = asyncio.Lock()
+        self._profanity_regex: Optional[re.Pattern] = None
+        self._database_profanity: Optional[List[str]] = None
         
     async def get_profanity(self) -> List[str]:
         async with self.safe_connection() as connection:
@@ -144,6 +146,7 @@ class ProfanityChecker:
                 return self._profanity
             
             profanity = await self.get_profanity()
+            self._database_profanity = profanity
 
             plural = [self.wrap(inflection.pluralize, word) for word in profanity]
             profanity.extend(await asyncio.gather(*plural))
@@ -158,22 +161,14 @@ class ProfanityChecker:
             
             self._profanity = profanity
             return profanity
+        
+    def _subber(self, match: re.Match) -> str:
+        return self._censor_char * len(match.group(0))
     
-    async def censor(self, text: str, *, fast: bool = False) -> str:
+    async def censor(self, text: str) -> str:
         """Returns input_text with any profane words censored."""
-        profane = await self.get_profane_words()
+        if not self._profanity_regex:
+            profane = await self.get_profane_words()
+            self._profanity_regex = re.compile('|'.join(profane), flags=re.IGNORECASE)
         
-        def _wrapped(text: str, *, fast: bool = False) -> str:
-            res = text
-
-            for word in profane:
-                # Apply word boundaries to the bad word
-                regex_string = r'\b{0}\b'.format(word)
-                res = re.sub(regex_string, self._censor_char * len(word), res, flags=re.IGNORECASE)
-                
-                if res != text and fast:
-                    return res
-
-            return res
-        
-        return await self.wrap(_wrapped, text=text, fast=fast)
+        return self._profanity_regex.sub(self._subber, text)

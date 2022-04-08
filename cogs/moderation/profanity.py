@@ -70,8 +70,8 @@ class Profanity(BaseCog):
         aliases=['a', 'addword']
     )
     async def profanity_add(self, ctx: Context, *, word: str = commands.parameter(converter=to_lower)) -> Optional[discord.Message]:
-        profanity = await self.bot.profanity.get_profane_words()
-        if word in profanity:
+        await self.bot.profanity.get_profane_words()
+        if word in self.bot.profanity._database_profanity: # type: ignore
             return await ctx.send(f'`{word}` is already in the profanity filter.')  
         
         async with self.bot.safe_connection() as connection:
@@ -87,8 +87,8 @@ class Profanity(BaseCog):
         aliases=['r', 'removeword']
     )
     async def profanity_remove(self, ctx: Context, *, word: str = commands.parameter(converter=to_lower)) -> Optional[discord.Message]:
-        profanity = await self.bot.profanity.get_profane_words()
-        if word not in profanity:
+        await self.bot.profanity.get_profane_words()
+        if word not in self.bot.profanity._database_profanity: # type: ignore
             return await ctx.send(f'`{word}` is not in the profanity filter.') 
         
         async with self.bot.safe_connection() as connection:
