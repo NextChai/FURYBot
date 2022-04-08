@@ -112,7 +112,7 @@ class ProfanityChecker(Generic[P, T]):
                 
                 for switch in current:
                     formatted = word[0:index] + switch + word[index+1:]
-                    self._swears.append(formatted) # type: ignore
+                    words.append(formatted) # type: ignore
                     
                 break 
             
