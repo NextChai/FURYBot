@@ -906,12 +906,13 @@ class FuryBot(DiscordBot, TimerManager):
         channels = []
         for channel in member.guild.channels: # Remove any special team creation. EX: rocket-league-1
             overwrites = channel.overwrites
-            if overwrites.get(member):
-                specific = discord.utils.find(lambda e: e[0] == 'view_channel' and e[1] == True, overwrites.items())
-                if specific:
-                    overwrites[member].update(view_channel=False) 
-                    await channel.edit(overwrites=overwrites) # type: ignore
-                    channels.append(channel.id)
+            if (specific := overwrites.get(member)) and (specific.view_channel or specific.send_messages):
+                
+                # NOTE: I dont like this, update it so it keeps 
+                # track of the correct permission.
+                specific.update(view_channel=False, send_messages=False)
+                await channel.edit(overwrites=overwrites) # type: ignore
+                channels.append(channel.id)
                     
         kwargs['channels'] = channels
         kwargs['roles'] = [r.id for r in member.roles if r.is_assignable()]
