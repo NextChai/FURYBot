@@ -87,11 +87,11 @@ initial_extensions = (
     'utils.help',
     'utils.jishaku',
     
-    'cogs.commands',
-    'cogs.moderation',
+    #'cogs.commands',
+    #'cogs.moderation',
     #'cogs.safety',
-    'cogs.teams',
-    'cogs.highlighter',
+    #'cogs.teams',
+    #'cogs.highlighter',
 )
 
 def _yield_chunks(value: str):
@@ -577,7 +577,7 @@ class FuryBot(DiscordBot, TimerManager):
         
         Called before the bot is ready to setup all extensions.
         """
-        await self.load_cache()
+        #await self.load_cache()
         self.loop.create_task(self.dispatch_timers())
         await super().setup_hook()
         
