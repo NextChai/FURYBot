@@ -395,6 +395,29 @@ class DiscordBot(commands.Bot):
         
         return webhook
     
+    async def _send_to_logging_webhook(self, *args, **kwargs) -> discord.WebhookMessage:
+        if args:
+            kwargs['content'] = args[0]
+
+        ping_staff = kwargs.pop('ping_staff', True)
+        
+        if ping_staff:
+            mentions = discord.AllowedMentions(roles=[discord.Object(id=constants.LOCKDOWN_NOTIFICATIONS_ROLE)])
+            
+            if (content := kwargs.get('content')):
+                content = f'<@&{constants.LOCKDOWN_NOTIFICATIONS_ROLE}>\n{content}'
+            else:
+                content = f'<@&{constants.LOCKDOWN_NOTIFICATIONS_ROLE}>'
+            
+            kwargs['content'] = content
+        else:
+            mentions = discord.AllowedMentions.none()
+        
+        kwargs['allowed_mentions'] = mentions
+        
+        webhook = await self.get_logging_webhook()
+        return await webhook.send(**kwargs)
+    
     async def send_to_logging_channel(self, *args, **kwargs) -> discord.WebhookMessage:
         """Send a message to the logging channel.
         
@@ -423,32 +446,58 @@ class DiscordBot(commands.Bot):
             The message that was sent.
         """
         await self.wait_until_ready()
-        if args:
-            kwargs['content'] = args[0]
-        
-        ping_staff = kwargs.pop('ping_staff', True)
-        
-        if ping_staff:
-            mentions = discord.AllowedMentions(roles=[discord.Object(id=constants.LOCKDOWN_NOTIFICATIONS_ROLE)])
-            
-            if (content := kwargs.get('content')):
-                content = f'<@&{constants.LOCKDOWN_NOTIFICATIONS_ROLE}>\n{content}'
-            else:
-                content = f'<@&{constants.LOCKDOWN_NOTIFICATIONS_ROLE}>'
-            
-            kwargs['content'] = content
-        else:
-            mentions = discord.AllowedMentions.none()
-        
-        kwargs['allowed_mentions'] = mentions
 
-        webhook = await self.get_logging_webhook()
-        return await webhook.send(
-            username=self.user.display_name, 
-            avatar_url=self.user.display_avatar.url,
-            **kwargs
-        )
+        async with self._webhook_lock:
+            return await self._send_to_logging_webhook(
+                username=self.user.display_name, 
+                avatar_url=self.user.display_avatar.url,
+                *args,
+                **kwargs
+            )
         
+    async def send_many_to_logging_channel(
+        self, 
+        args: List[Tuple[Any, ...]],
+        kwargs: List[Dict[Any, Any]],
+    ) -> List[discord.WebhookMessage]:
+        """|coro|
+        
+        Used to send many messages to the logging channel whilst ensuring
+        that the messages are sent in order.
+        
+        Parameters
+        ----------
+        args: List[Tuple[Any]]
+            A list of args to send along to the channel.
+        kwargs: List[Dict[Any, Any]]
+            A list of kwargs to send along to the channel. The index
+            of each arg item must match the index of the kwarg item.
+            
+        Returns
+        -------
+        List[:class:`discord.WebhookMessage`]
+            The list of messages that were sent.
+        """
+        await self.wait_until_ready()
+        
+        items = []
+        async with self._webhook_lock:
+            for index, arg in enumerate(args):
+                try:
+                    kwarg = kwargs[index]
+                except IndexError:
+                    kwarg = {}
+                
+                message = await self._send_to_logging_webhook(
+                    username=self.user.display_name, 
+                    avatar_url=self.user.display_avatar.url,
+                    *arg, 
+                    **kwarg
+                )
+                items.append(message)
+                
+        return items
+            
     async def on_ready(self):
         """|coro|
         
@@ -540,6 +589,27 @@ class FuryBot(DiscordBot, TimerManager):
         """
         for i in range(0, len(iterable), size):
             yield iterable[i:i + size]
+            
+    @staticmethod
+    def code_chunker(iterable: Union[str, _Chunkable], /) -> Generator[Union[str, _Chunkable], None, None]:
+        """
+        A generator used to chunk a string or iterable in code blocks.
+        
+        Parameters
+        ----------
+        iterable: Union[:class:`str`, :class:`_Chunkable`]
+            The iterable to chunk.
+        
+        Yields
+        -------
+        Union[:class:`str`, :class:`_Chunkable`]
+            The chunked iterable.
+        """
+        code_fmt = '```py\n{}\n```'
+        code_fmt_legnth = len(code_fmt) - 2
+        
+        for i in range(0, len(iterable), 2000 - code_fmt_legnth):
+            yield code_fmt.format(iterable[i:i + 2000 - code_fmt_legnth])
         
     @discord.utils.cached_property
     def uptime_timestamp(self) -> str:
