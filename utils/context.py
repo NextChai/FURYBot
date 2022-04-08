@@ -218,7 +218,7 @@ class Context(commands.Context, Generic[FuryT]):
         content: Optional[str] = None, 
         *, 
         timeout: float = 60.0, 
-        check: Optional[Callable[[discord.Message], Optional[bool]]] = None, 
+        check: Optional[Callable[[discord.Message], bool]] = None, 
         destination: Optional[discord.abc.MessageableChannel] = None,
         delete_after: bool = False,
         **kwargs: Dict[Any, Any]
@@ -254,11 +254,23 @@ class Context(commands.Context, Generic[FuryT]):
         if not check:
             check = lambda message: message.channel == self.channel and message.author == self.author
         
+        def wrapped_check(message: discord.Message) -> bool:
+            if message.content is None:
+                return check(message)
+            
+            if ('stop', 'no', 'abort', 'close', 'cancel', 'end', 'quit') in message.content.lower().split():
+                raise TypeError('Aborted')
+            
+            return check(message)
+        
         message = await (destination or self.channel).send(content, **kwargs)
         try:
-            response = await self.bot.wait_for('message', check=lambda m: m.author == self.author, timeout=timeout)
+            response = await self.bot.wait_for('message', check=wrapped_check, timeout=timeout)
         except asyncio.TimeoutError:
             await message.reply('Prompt timed out, you need to re-do this operation.')
+            return None
+        except TypeError:
+            await message.reply('Aborted.')
             return None
         
         if delete_after:
