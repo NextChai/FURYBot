@@ -803,7 +803,10 @@ class FuryBot(DiscordBot, TimerManager):
         :class:`str`
             The translated text.
         """
-        return await self.wrap(self.translator.translate, text)
+        try:
+            return await self.wrap(self.translator.translate, text)
+        except IndexError:
+            return text
         
     async def is_locked(
         self, 
