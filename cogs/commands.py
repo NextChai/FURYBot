@@ -138,9 +138,9 @@ class Commands(BaseCog):
         )
         embed.add_field(name='Message', value=message)
         
-        await self.bot.send_to_logging_channel('<@!146348630926819328>', embed=embed, view=ReportView(ctx.channel.id))  # 146348630926819328 -> Trevor F discord ID.
+        await self.bot.send_to_logging_channel('<@!146348630926819328>', embed=embed, view=ReportView(ctx.channel.id))
 
-        return await ctx.reply("I've reported this issue, you should get a response back from Trevor F. soon, thank you!", ephemeral=True)
+        return await ctx.reply("I've reported this issue, you should get a response back from <@146348630926819328> soon, thank you!", ephemeral=True)
     
     @app_commands.command(name='uptime', description='Get the current total uptime')
     async def app_command_uptime(self, interaction: discord.Interaction) -> None:
