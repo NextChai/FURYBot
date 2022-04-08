@@ -87,11 +87,11 @@ initial_extensions = (
     'utils.help',
     'utils.jishaku',
     
-    #'cogs.commands',
-    #'cogs.moderation',
+    'cogs.commands',
+    'cogs.moderation',
     #'cogs.safety',
-    #'cogs.teams',
-    #'cogs.highlighter',
+    'cogs.teams',
+    'cogs.highlighter',
 )
 
 def _yield_chunks(value: str):
