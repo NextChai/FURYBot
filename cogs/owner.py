@@ -151,6 +151,8 @@ class Owner(BaseCog):
         a view to the user to reload any extensions.
         """
         message = await ctx.send('Pulling...')
+        await ctx.trigger_typing()
+        
         paginator = AsyncCodePaginator(message=message, author=ctx.author, prefix='```py')
         buffer = ''
         
