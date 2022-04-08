@@ -800,13 +800,15 @@ class FuryBot(DiscordBot, TimerManager):
             
         Returns
         -------
-        :class:`str`
+        :class:`googletrans.Translated`
             The translated text.
         """
         try:
             return await self.wrap(self.translator.translate, text)
         except IndexError:
-            return text
+            return type('Translated', (object,), { # type: ignore
+                'text': text
+            })
         
     async def is_locked(
         self, 
