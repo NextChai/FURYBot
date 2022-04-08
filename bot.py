@@ -867,7 +867,7 @@ class FuryBot(DiscordBot, TimerManager):
         reason: Optional[str] = None, 
         time: datetime.datetime,
         **kwargs
-    ) -> bool:
+    ) -> Optional[Timer]:
         """Adds a user to Lockdown.
         
         Parameters
@@ -883,10 +883,9 @@ class FuryBot(DiscordBot, TimerManager):
             
         Returns
         -------
-        :class:`bool`
-            Tells you if the member's Lockdown role is new. 
-                - True = lockdown is new
-                - False = the user's lockdown has been extended for another reason.
+        Optional[:class:`Timer`]    
+            The timer created for the lockdown. If ``None`` is returned, 
+            locking this member failed.
                 
         Raises
         ------
@@ -899,7 +898,7 @@ class FuryBot(DiscordBot, TimerManager):
         
         if await self.is_locked(member):
             if not raise_for_exception:
-                return False
+                return None
             
             raise MemberAlreadyLocked(f'Member {member} is already locked.')
         
@@ -924,9 +923,9 @@ class FuryBot(DiscordBot, TimerManager):
         try:
             await member.edit(roles=roles, reason='Member is getting locked down.')
         except discord.Forbidden:
-            return False
+            return None
             
-        await self.create_timer(
+        timer = await self.create_timer(
             time,
             'lockdowns',
             precise=False,
@@ -945,7 +944,7 @@ class FuryBot(DiscordBot, TimerManager):
         embed.add_field(name='Expires', value=f'The lockdown expires in {human_timedelta(time)}{" ({})".format(discord.utils.format_dt(time))}')
         
         await self.send_to(member, embed=embed)
-        return True
+        return timer
     
     async def lockdown_for(
         self,
@@ -954,7 +953,7 @@ class FuryBot(DiscordBot, TimerManager):
         *,
         reason: Optional[str] = None,
         **kwargs
-    ) -> bool:
+    ) -> Optional[Timer]:
         """|coro|
         
         Used to lockdown a member for a specific amount of time.
@@ -972,10 +971,9 @@ class FuryBot(DiscordBot, TimerManager):
             
         Returns
         -------
-        :class:`bool`
-            Tells you if the member's Lockdown role is new. 
-                - True = lockdown is new
-                - False = the user's lockdown has been extended for another reason.
+        Optional[:class:`Timer`]    
+            The timer created for the lockdown. If ``None`` is returned, 
+            locking this member failed.
                 
         Raises
         ------
@@ -987,7 +985,7 @@ class FuryBot(DiscordBot, TimerManager):
         when = await UserFriendlyTime(converter=None, default='for lockdown').convert(context.DummyContext(), f'{seconds}s') # type: ignore
         return await self.lockdown(member, reason=reason, time=when.dt, **kwargs)
         
-    async def freedom(self, member: discord.Member, *, raise_for_exception: bool = True) -> bool:
+    async def freedom(self, member: discord.Member, *, raise_for_exception: bool = True) -> Optional[Timer]:
         """|coro|
         
         Called to prematurely remove the lockdown timer, this will override the existing timer.
@@ -1001,8 +999,9 @@ class FuryBot(DiscordBot, TimerManager):
             
         Returns
         -------
-        :class:`bool`
-            Whether or not the unlock was successful.
+        Optional[:class:`Timer`]
+            The timer that was removed. If ``None`` is returned,
+            there was no timer to remove.
             
         Raises
         ------
@@ -1015,7 +1014,7 @@ class FuryBot(DiscordBot, TimerManager):
         async with self.safe_connection() as conn:
             if not (data := await self.is_locked(member, return_record=True, connection=conn)):
                 if not raise_for_exception:
-                    return False
+                    return None
                 
                 raise MemberNotLocked(f'Member {member} is not locked.')
             
@@ -1025,4 +1024,4 @@ class FuryBot(DiscordBot, TimerManager):
         timer.member = member
         
         self.dispatch('lockdowns_timer_complete', timer)
-        return True
+        return timer
