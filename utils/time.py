@@ -1,6 +1,7 @@
 """
 The MIT License (MIT)
 
+Copyright (c) 2020-present Rapptz
 Copyright (c) 2020-present NextChai
 
 Permission is hereby granted, free of charge, to any person obtaining a
