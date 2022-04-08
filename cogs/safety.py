@@ -252,13 +252,11 @@ class Safety(BaseCog):
         # The user has mentioned a role in their message, let's manage cleanup.
         # Let's limit the channel to only moderators.
         channel = message.channel
-        if isinstance(channel, discord.Thread):
-            await channel.delete()
-        else:
-            overwrites = channel.overwrites
+        if hasattr(channel, 'overwrites'):
+            overwrites = channel.overwrites # type: ignore
             overwrites[channel.guild.default_role] = discord.PermissionOverwrite(send_messages=False)
             await channel.edit(overwrites=overwrites) # type: ignore
-        
+    
         # Now let's alert the channel affected
         embed = self.bot.Embed(
             title='Mass Ping Found!',
@@ -267,8 +265,11 @@ class Safety(BaseCog):
                         'meant time until we can resolve this issue.',
             author=message.author,
         )
-        embed.add_field(name='Actions Taken', value='This channel has been locked until further notice.'
-                                                'The member in question has been placed in lockdown.')
+        embed.add_field(
+            name='Actions Taken', 
+            value='This channel has been locked until further notice.'
+                'The member in question has been placed in lockdown.'
+        )
         await message.channel.send(embed=embed)
 
         # Now let's send it to the member
