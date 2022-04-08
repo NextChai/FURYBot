@@ -85,7 +85,7 @@ class CoreModeration(BaseCog):
             counter[message.author] += 1
         
         fmt = '\n'.join(f'**{str(author)}**: {count}' for author, count in counter.most_common())
-        await ctx.send(f'Deleted {counter.total()} messages.\n\n{fmt}', delete_after=5)
+        await ctx.send(f'Deleted {len(messages)} messages.\n\n{fmt}', delete_after=5)
     
     @commands.group(
         name='cleanup',
