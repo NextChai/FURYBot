@@ -87,7 +87,7 @@ class Safety(BaseCog):
         self.bot: FuryBot = bot
         self.session: aiohttp.ClientSession = aiohttp.ClientSession(loop=self.bot.loop)
         
-        self.name_checker.start()
+        #self.name_checker.start()
         
     def _check_listener(self, message: discord.Message) -> bool:
         if message.guild is None:
