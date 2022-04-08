@@ -588,8 +588,7 @@ class FuryBot(DiscordBot, TimerManager):
         Union[:class:`str`, :class:`_Chunkable`]
             The chunked iterable.
         """
-        for i in range(0, len(iterable), size):
-            yield iterable[i:i + size]
+        yield from [iterable[i:i + size] for i in range(0, len(iterable), size)]
             
     def code_chunker(self, iterable: Union[str, _Chunkable], /) -> Generator[Union[str, _Chunkable], None, None]:
         """
