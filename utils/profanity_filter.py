@@ -22,6 +22,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
+import asyncio
 
 import re
 import inflection
@@ -78,7 +79,7 @@ class PermeateProfanity:
         """List[:class:`str`]: Returns the current list of swears."""
         return self._swears
     
-    def permeate_swears(self) -> List[str]:
+    async def permeate_swears(self) -> List[str]:
         """|coro|
         
         Used to fill up all possible combinations of a swear word.
@@ -129,30 +130,37 @@ class ProfanityChecker:
         self._censor_char = '*'
         self.wrap: Callable[..., Awaitable[Any]] = wrap
         self.safe_connection: Callable[[], AsyncContextManager[Connection]] = safe_connection
+        self._profanity_lock: asyncio.Lock = asyncio.Lock()
         
     async def get_profanity(self) -> List[str]:
         async with self.safe_connection() as connection:
             data = await connection.fetch('SELECT word FROM profanity')
         
-        return PermeateProfanity(swears=[element['word'] for element in data]).permeate_swears()
+        return await PermeateProfanity(swears=[element['word'] for element in data]).permeate_swears()
     
     async def get_profane_words(self) -> List[str]:
-        if self._profanity:
-            return self._profanity
-        
-        profanity = await self.get_profanity()
-        profanity.extend(inflection.pluralize(word) for word in profanity)
+        async with self._profanity_lock:
+            if self._profanity:
+                return self._profanity
             
-        profanity = list(set(profanity)) # Clean duplicates
-        profanity.sort(key=len)
-        profanity.reverse()
-        
-        for word in profanity:
-            for invalid in self.invalid_regex:
-                word = word.replace(invalid, r'\{0}'.format(invalid))
-        
-        self._profanity = profanity
-        return profanity
+            profanity = await self.get_profanity()
+           
+            try:
+                profanity.extend(inflection.pluralize(word) for word in profanity)
+            except:
+                # This can sometimes yell at us
+                pass
+                
+            profanity = list(set(profanity)) # Clean duplicates
+            profanity.sort(key=len)
+            profanity.reverse()
+            
+            for word in profanity:
+                for invalid in self.invalid_regex:
+                    word = word.replace(invalid, r'\{0}'.format(invalid))
+            
+            self._profanity = profanity
+            return profanity
     
     async def censor(self, text: str, *, fast: bool = False) -> str:
         """Returns input_text with any profane words censored."""
