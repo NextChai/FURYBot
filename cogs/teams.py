@@ -990,7 +990,7 @@ class Teams(BaseCog):
             
         return await ctx.send(embed=embed)
     
-    @roster.command(name='promote', description='Switch a member from sub to the roster.', aliases=['roster'])
+    @sub.command(name='promote', description='Switch a member from sub to the roster.', aliases=['roster'])
     async def sub_promote(self, ctx: Context, member: discord.Member) -> Optional[discord.Message]:
         try:
             team = await TeamConverter().convert(ctx, str(ctx.channel.id)) # type: ignore
