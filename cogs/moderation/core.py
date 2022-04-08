@@ -124,8 +124,6 @@ class CoreModeration(BaseCog):
         if ctx.invoked_subcommand:
             return
         
-        print(channel, member, count)
-        
         def predicate(message: discord.Message) -> bool:
             assert message.guild is not None
             
