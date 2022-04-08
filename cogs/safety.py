@@ -80,7 +80,7 @@ def _wrap_listener(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[Opt
         )):
             return
         
-        return await func(*args, **kwargs)
+        return await func(cog, *args, **kwargs) # type: ignore 
     
     return wrapped
 
