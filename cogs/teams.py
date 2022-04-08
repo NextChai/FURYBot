@@ -1007,7 +1007,7 @@ class Teams(BaseCog):
         subs.remove(member)
         roster.append(member)
         await team.edit(roster=roster, subs=subs)
-        return await ctx.send(f'{member.mention} has been demoted to a sub.')
+        return await ctx.send(f'{member.mention} has been promoted to the roster.')
     
     @sub.command(name='switch', description='Switch a sub member from one team to another.', aliases=['move',])
     async def sub_switch(self, ctx: Context, member: discord.Member, *, new_team: TeamConverter) -> Optional[discord.Message]:
