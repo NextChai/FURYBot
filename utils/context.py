@@ -110,9 +110,31 @@ class Confirmation(discord.ui.View):
         self.value: bool = False
         self.author: Union[discord.Member, discord.User] = author
         
-    async def interaction_check(self, interaction):
-        return interaction.user == self.author
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """|coro|
+        
+        A coroutine that is called to check if the interaction is valid.
+        
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction to check.
+        
+        Returns
+        -------
+        :class:`bool`
+            Whether the interaction is valid.
+        """
+        result: bool = interaction.user == self.author
+        if not result:
+            await interaction.response.send_message('Hey! This isn\'t yours!', ephemeral=True)
+        
+        return result
     
+    def _cleanup(self) -> None:
+        for child in self.children:
+            child.disabled = True # type: ignore
+            
     @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         """|coro|
@@ -127,9 +149,12 @@ class Confirmation(discord.ui.View):
         button: :class:`discord.ui.Button`
             The button that was pressed.
         """
-        await interaction.response.send_message('Confirming', ephemeral=True)
-        self.value = True
+        self._cleanup()
         self.stop()
+        self.value = True
+        
+        await interaction.response.edit_message(view=self)
+        await interaction.followup.send('Confirming', ephemeral=True)
 
     @discord.ui.button(label='Cancel', style=discord.ButtonStyle.grey)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -145,9 +170,13 @@ class Confirmation(discord.ui.View):
         button: :class:`discord.ui.Button`
             The button that was pressed.
         """
-        await interaction.response.send_message('Cancelling', ephemeral=True)
-        self.value = False
+        self._cleanup()
         self.stop()
+        self.value = False
+        
+        await interaction.response.edit_message(view=self)
+        await interaction.followup.send('Cancelled', ephemeral=True)
+
 
 class DummyContext:
     """A dummy context used to convert human time without a context obj.
