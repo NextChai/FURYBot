@@ -78,6 +78,7 @@ class Profanity(BaseCog):
             await connection.execute('INSERT INTO profanity (word) VALUES ($1)', word)
 
         self.bot.profanity._profanity.append(word) # type: ignore
+        self.bot.profanity._profanity_regex = None
         await ctx.send(f'`{word}` has been added to the profanity filter.')
         
     @profanity.command(
@@ -95,6 +96,7 @@ class Profanity(BaseCog):
             await connection.execute('DELETE FROM profanity WHERE word = $1', word)
 
         self.bot.profanity._profanity.remove(word) # type: ignore
+        self.bot.profanity._profanity_regex = None
         await ctx.send(f'`{word}` has been removed from the profanity filter.')
     
     @profanity.command(

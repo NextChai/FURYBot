@@ -646,6 +646,7 @@ class FuryBot(DiscordBot, TimerManager):
         Called before the bot is ready to setup all extensions.
         """
         self._task = self.loop.create_task(self.dispatch_timers())
+        self.loop.create_task(self.censor('Hello')) # To load the profanity cache
         
         await self.load_cache()
         await super().setup_hook()
