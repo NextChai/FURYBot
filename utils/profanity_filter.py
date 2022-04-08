@@ -69,7 +69,7 @@ class PermeateProfanity:
         'y': ['i', 'ie']
     }  
     
-    def __init__(self, *, swears: Iterable[str]):
+    def __init__(self, *, swears: Iterable[str]) -> None:
         self._swears: List[str] = list(swears)
 
     @property
@@ -132,18 +132,28 @@ class ProfanityChecker:
         self._profanity_regex: Optional[re.Pattern] = None
         self._database_profanity: Optional[List[str]] = None
         
-    async def get_profanity(self) -> List[str]:
+    async def _get_profanity(self) -> List[str]:
         async with self.safe_connection() as connection:
             data = await connection.fetch('SELECT word FROM profanity')
         
         return await PermeateProfanity(swears=[element['word'] for element in data]).permeate_swears()
     
     async def get_profane_words(self) -> List[str]:
+        """|coro|
+        
+        A coroutine to get a complete list of profane word and return it, as 
+        well as setting some internal markers for later use.
+        
+        Returns
+        -------
+        List[:class:`str`]
+            The list of profane words.
+        """
         async with self._profanity_lock:
             if self._profanity:
                 return self._profanity
             
-            profanity = await self.get_profanity()
+            profanity = await self._get_profanity()
             self._database_profanity = profanity
 
             plural = [self.wrap(inflection.pluralize, word) for word in profanity]
