@@ -189,8 +189,9 @@ class Safety(BaseCog):
         # Let's limit the channel to only moderators.
         if isinstance(channel, discord.TextChannel):
             overwrites = channel.overwrites
-            overwrites[channel.guild.default_role] = discord.PermissionOverwrite(send_messages=False)
-            await channel.edit(overwrites=overwrites) # type: ignore
+            if (global_overwrite := overwrites.get(channel.guild.default_role)) and global_overwrite.view_channel:
+                global_overwrite.update(send_messages=False)
+                await channel.edit(overwrites=overwrites) # type: ignore
         
         # Alert those affected
         embed = self.bot.Embed(
