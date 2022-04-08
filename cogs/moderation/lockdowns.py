@@ -90,7 +90,7 @@ class Lockdowns(BaseCog):
                 
         return await ctx.send(f'Locked:\n' + '\n'.join(statuses))
         
-    @lockdown.command(name='info')
+    @lockdown.command(name='info', description='Get information about a member\'s lockdown.', aliases=['i', 'information', 'about', 'status'])
     async def lockdown_info(self, ctx: Context, member: discord.Member) -> Optional[discord.Message]:
         """|coro|
         
