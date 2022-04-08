@@ -26,17 +26,12 @@ from __future__ import annotations
 
 import aiohttp
 import logging
-import functools
 from typing import (
     TYPE_CHECKING,
-    Awaitable,
-    Callable,
     Optional,
-    Protocol,
     TypeVar,
     Union,
 )
-from typing_extensions import ParamSpec
 
 import discord
 from discord.ext import commands, tasks
@@ -51,38 +46,8 @@ __all__ = (
 )
 
 T = TypeVar('T')
-P = ParamSpec('P')
     
 log = logging.getLogger(__name__)
-
-
-def _wrap_listener(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[Optional[T]]]:
-    
-    @functools.wraps(func)
-    async def wrapped(*args: P.args, **kwargs: P.kwargs) -> Optional[T]:
-        message: discord.Message
-        
-        if len(args) == 2:
-            cog, message = args # type: ignore
-        elif len(args) == 3:
-            cog, before, message = args # type: ignore
-            if before.content == message.content: # type: ignore
-                return
-        else:
-            raise RuntimeError(f'Invalid number of arguments: {len(args)}')
-        
-        if any((
-            not message.guild,
-            should_ignore(message.author),
-            message.webhook_id,
-            message.author.bot,
-            isinstance(message.author, discord.User)
-        )):
-            return
-        
-        return await func(*args, **kwargs) # type: ignore 
-    
-    return wrapped
 
 
 class _KnownAuthor(discord.Member):
@@ -123,9 +88,26 @@ class Safety(BaseCog):
         
         self.name_checker.start()
         
+    def _check_listener(self, message: discord.Message) -> bool:
+        if message.guild is None:
+            return False
+        if message.webhook_id:
+            return False
+        if message.author.bot:
+            return False
+        if isinstance(message.author, discord.User):
+            return False
+        if should_ignore(message.author):
+            return False
+        
+        return True
+        
+        
     @commands.Cog.listener('on_message')
-    @_wrap_listener
     async def translator_profanity_checker(self, message: _KnownMessage) -> None:
+        if not self._check_listener(message):
+            return
+        
         translated = await self.bot.translate(message.content)
         if translated.text == message.content:
             return
@@ -134,8 +116,12 @@ class Safety(BaseCog):
         return await self.profanity_checker(message)
     
     @commands.Cog.listener('on_message')
-    @_wrap_listener
     async def translator_profanity_checker_on_edit(self, before: _KnownMessage, after: _KnownMessage) -> None:
+        if not self._check_listener(after):
+            return
+        if before.content == after.content:
+            return
+        
         translated = await self.bot.translate(after.content)
         if translated.text == after.content:
             return
@@ -144,7 +130,6 @@ class Safety(BaseCog):
         return await self.profanity_checker(after)
         
     @commands.Cog.listener('on_message')
-    @_wrap_listener
     async def message_logger(self, message: _KnownMessage) -> None:
         """|coro|
         
@@ -156,6 +141,9 @@ class Safety(BaseCog):
         message: :class:`discord.Message`
             The message that was sent.
         """
+        if not self._check_listener(message):
+            return
+        
         if message.channel.id == constants.MESSAGE_LOG_CHANNEL:
             return
         
@@ -187,7 +175,6 @@ class Safety(BaseCog):
                 pass
         
     @commands.Cog.listener('on_message')
-    @_wrap_listener
     async def role_mention_checker(self, message: _KnownMessage) -> None:
         """|coro|
         
@@ -199,6 +186,9 @@ class Safety(BaseCog):
         message: :class:`discord.Message`
             The message to check.
         """
+        if not self._check_listener(message):
+            return
+        
         if not message.role_mentions:
             return
 
@@ -246,7 +236,6 @@ class Safety(BaseCog):
         await self.bot.send_to_logging_channel(embed=embed, allowed_mentions=discord.AllowedMentions.none())
         
     @commands.Cog.listener('on_message')
-    @_wrap_listener
     async def mention_checker(self, message: _KnownMessage) -> None:
         """|coro|
         
@@ -258,6 +247,9 @@ class Safety(BaseCog):
         message: :class:`discord.Message`
             The message to check.
         """
+        if not self._check_listener(message):
+            return
+        
         if not message.mention_everyone:
             # The mention_everyone attr does not check if the @everyone 
             # or the @here text is in the message itself. Rather this boolean 
@@ -312,7 +304,6 @@ class Safety(BaseCog):
         await self.bot.send_to_logging_channel(embed=embed)
         
     @commands.Cog.listener('on_message')
-    @_wrap_listener
     async def file_checker(self, message: _KnownMessage):
         """|coro|
         
@@ -323,6 +314,8 @@ class Safety(BaseCog):
         message: :class:`discord.Message`
             The message to check.
         """
+        if not self._check_listener(message):
+            return
         
         if not message.attachments:
             return
@@ -353,7 +346,6 @@ class Safety(BaseCog):
         await self.bot.send_to_logging_channel(embed=embed, files=files)
         
     @commands.Cog.listener('on_message')
-    @_wrap_listener
     async def message_content_check(self, message: _KnownMessage):
         """Used to determine if a message's content legnth is too high.
         
@@ -364,6 +356,9 @@ class Safety(BaseCog):
         message: :class:`discord.Message`
             The message to check.
         """
+        if not self._check_listener(message):
+            return
+        
         if not len(message.clean_content) >= 700:
             return
         
@@ -377,7 +372,6 @@ class Safety(BaseCog):
         return await message.channel.send(embed=embed, content=message.author.mention)
         
     @commands.Cog.listener('on_message_edit')
-    @_wrap_listener
     async def on_message_edit(self, before: _KnownMessage, after: _KnownMessage) -> None:
         """Used to check if a member edited a message that now contains links / profanity.
         
@@ -392,11 +386,15 @@ class Safety(BaseCog):
         -------
         None
         """
+        if not self._check_listener(after):
+            return
+        if before.content == after.content:
+            return
+        
         self.bot.loop.create_task(self.profanity_checker(after)) # type: ignore
         self.bot.loop.create_task(self.link_checker(after)) # type: ignore
                     
     @commands.Cog.listener('on_message')
-    @_wrap_listener
     async def profanity_checker(self, message: _KnownMessage) -> None:
         """Used to check if a message contains profanity.
         
@@ -409,6 +407,9 @@ class Safety(BaseCog):
         -------
         None
         """
+        if not self._check_listener(message):
+            return
+        
         censored = await self.bot.censor(message.content)
         if censored.lower() == message.content.lower():
             return
@@ -432,7 +433,6 @@ class Safety(BaseCog):
         await self.bot.send_to_logging_channel(embed=embed)
         
     @commands.Cog.listener('on_message')
-    @_wrap_listener
     async def link_checker(self, message: _KnownMessage) -> None:
         """Used to check if a message contains links in non-valid gif channels.
         
@@ -441,6 +441,9 @@ class Safety(BaseCog):
         message: :class:`discord.Message`
             The message to check.
         """
+        if not self._check_listener(message):
+            return
+        
         links = await self.bot.get_links(message.content)
         if not links:
             return
