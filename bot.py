@@ -532,8 +532,8 @@ class DiscordBot(commands.Bot):
         trace_str = ''.join(traceback.format_exception(type, value, traceback_str))
         log.exception(f'Exception in {event_method}', exc_info=value)
         
-        for e in _yield_chunks(trace_str):
-            await self.send_to_logging_channel(e)
+        sending_args: List[Tuple[str, ...]] = [(item,) for item in _yield_chunks(trace_str)]
+        await self.send_many_to_logging_channel(args=sending_args, kwargs=[])
 
 
 class FuryBot(DiscordBot, TimerManager):
@@ -588,23 +588,6 @@ class FuryBot(DiscordBot, TimerManager):
             The chunked iterable.
         """
         yield from [iterable[i:i + size] for i in range(0, len(iterable), size)]
-            
-    def code_chunker(self, iterable: Union[str, _Chunkable], /) -> Generator[Union[str, _Chunkable], None, None]:
-        """
-        A generator used to chunk a string or iterable in code blocks.
-        
-        Parameters
-        ----------
-        iterable: Union[:class:`str`, :class:`_Chunkable`]
-            The iterable to chunk.
-        
-        Yields
-        -------
-        Union[:class:`str`, :class:`_Chunkable`]
-            The chunked iterable.
-        """
-        code_fmt = '```py\n{}\n```'
-        yield from [code_fmt.format(element) for element in self.chunker(iterable, size=1500)]
         
     @discord.utils.cached_property
     def uptime_timestamp(self) -> str:

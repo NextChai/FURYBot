@@ -70,10 +70,7 @@ async def on_command_error(ctx: Context, error: commands.CommandError) -> Option
     tracbeack_str = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
     log.warning('New error', exc_info=error)
     
-    args = []
-    for item in ctx.bot.code_chunker(tracbeack_str):
-        args.append(item)
-        
+    args = [(item,) for item in ctx.bot.code_chunker(tracbeack_str)]
     await ctx.bot.send_many_to_logging_channel(args=args, kwargs=[])
     
 
