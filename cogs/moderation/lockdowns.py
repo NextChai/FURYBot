@@ -259,8 +259,8 @@ class Lockdowns(BaseCog):
         )
         embed.add_field(name='Reason', value=timer.kwargs['reason'], inline=False)
         embed.add_field(name='Expires', value=timer.human_timestamp(), inline=False)
-        embed.add_field(name='Role(s) Affected', value=human_join([f'<@&{id}' for id in timer.kwargs['roles']], final='and') or 'No Roles.')
-        embed.add_field(name='Channel(s) Affected', value=human_join([f'<#{id}' for id in timer.kwargs['channels']], final='and') or 'No Channels.')
+        embed.add_field(name='Role(s) Affected', value=human_join([f'<@&{id}>' for id in timer.kwargs['roles']], final='and') or 'No Roles.')
+        embed.add_field(name='Channel(s) Affected', value=human_join([f'<#{id}>' for id in timer.kwargs['channels']], final='and') or 'No Channels.')
         
         return await ctx.send(embed=embed)
         
