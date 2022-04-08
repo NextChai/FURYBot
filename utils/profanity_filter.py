@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import re
 import inflection
-import cachetools
 import asyncio
 from typing import (
     TYPE_CHECKING,
@@ -53,8 +52,6 @@ __all__: Tuple[str, ...] = (
 
 T = TypeVar('T')
 P = ParamSpec('P')
-
-PROFANITY_CHACHE = cachetools.Cache(maxsize=1024)
 
 class PermeateProfanity:
     """A helper class used to permeate a list of swear words into all possible combinations.
