@@ -120,7 +120,7 @@ class Highlighter(
     async def highlight_add(
         self, 
         ctx: Context, 
-        count: int = commands.parameter(converter=clamp, default=5), 
+        count: int = commands.parameter(converter=Optional[clamp], default=5),  # type: ignore
         *, 
         phrase: str = commands.parameter(converter=to_lower)
     ) -> Optional[discord.Message]:
