@@ -34,7 +34,7 @@ from discord.ext import commands
 
 from utils import BaseCog, _check_for_hierarchy, _format_dt
 from utils.context import Context, tick
-from utils.time import UserFriendlyTime, human_timedelta, human_join
+from utils.time import UserFriendlyTime, human_timedelta, human_join, td_format
 from utils.timer import Timer
 from utils.errors import MemberAlreadyLocked
 
@@ -174,7 +174,7 @@ class Lockdowns(BaseCog):
                     first = timer.created_at
         
         if embed.description and time and first: # Type checker
-            embed.description += f'\n\nMember {member.mention} has spent {_format_dt(time)} in lockdown over the span of {human_timedelta(first, suffix="")}' 
+            embed.description += f'\n\nMember {member.mention} has spent {td_format(time)} in lockdown over the span of {human_timedelta(first, suffix="")}' 
         
         reasons = ['{0}: {1}'.format(index, timer.kwargs.get('reason') or 'No reason provided') for index, timer in enumerate(timers)]
         embed.add_field(name='Lockdown Reasons', value='\n'.join(reasons), inline=False)
