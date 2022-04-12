@@ -136,8 +136,6 @@ class Safety(BaseCog,):
                 except:
                     pass
         
-        embed = discord.Embed(description=message.content)
-        embed.add_field(name='Channel', value=message.channel.mention)
         async with self.bot._webhook_lock:
             try:     
                 await self.message_webhook.send(
@@ -145,7 +143,7 @@ class Safety(BaseCog,):
                     avatar_url=message.author.display_avatar.url,
                     allowed_mentions=discord.AllowedMentions.none(),
                     files=attachments,
-                    embed=embed
+                    content=message.content
                 )
             except discord.HTTPException:
                 pass
