@@ -26,6 +26,7 @@ from __future__ import annotations
 import re
 import inflection
 import asyncio
+import timeit
 from typing import (
     TYPE_CHECKING,
     AsyncContextManager,
@@ -134,4 +135,9 @@ class ProfanityChecker(Generic[P, T]):
         if not self._profanity_regex:
             self._profanity_regex = await self._build_regex()
         
-        return self._profanity_regex.sub(self._subber, text)
+        subbed = self._profanity_regex.sub(self._subber, text)
+        if any('*' in char and not '*'*len(char) == char for char in subbed.split()):
+            return text
+        
+        return subbed
+        
