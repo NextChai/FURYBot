@@ -34,7 +34,7 @@ from typing import (
 import discord
 from discord.ext import commands
 
-from utils import BaseCog, constants, clamp
+from utils import BaseCog, clamp
 from utils.context import Context
 from utils.paginator import BaseButtonPaginator
 
