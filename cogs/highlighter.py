@@ -24,7 +24,6 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import re
-import asyncio
 from typing import (
     TYPE_CHECKING,
     List,
