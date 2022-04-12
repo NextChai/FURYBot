@@ -30,15 +30,6 @@ from discord.ext import commands
 if TYPE_CHECKING:
     from .context import Context
 
-# Monkey patch mins and secs into the units
-units = pdt.pdtLocales['en_US'].units
-units['minutes'].append('mins')
-units['seconds'].append('secs')
-
-STT = TypeVar('STT', bound='ShortTime')
-HTT = TypeVar('HTT', bound='HumanTime')
-TT = TypeVar('TT', bound='Time')
-
 __all__: Tuple[str, ...] = (
     'ShortTime',
     'HumanTime',
@@ -49,6 +40,17 @@ __all__: Tuple[str, ...] = (
     'human_join',
     'human_timedelta',
 )
+
+STT = TypeVar('STT', bound='ShortTime')
+HTT = TypeVar('HTT', bound='HumanTime')
+TT = TypeVar('TT', bound='Time')
+
+# Monkey patch mins and secs into the units
+units = pdt.pdtLocales['en_US'].units
+units['minutes'].append('mins')
+units['seconds'].append('secs')
+
+
 
 class ShortTime:
     __slots__: Tuple[str, ...] = (
