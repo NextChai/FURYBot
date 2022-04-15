@@ -43,7 +43,7 @@ __all__: Tuple[str, ...] = (
     'OVERWATCH_ROLE',
     'FURY_GUILD',
     'NSFW_FILTER_CONSTANT',
-    'MUTED_ROLE'
+    'MUTED_ROLE',
 )
 
 # Channels

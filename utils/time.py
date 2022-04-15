@@ -13,17 +13,7 @@ import re
 import datetime
 from dateutil.relativedelta import relativedelta
 import parsedatetime as pdt
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    List,
-    Optional,
-    Tuple,
-    Type,
-    TypeVar,
-    Union
-)
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Tuple, Type, TypeVar, Union
 
 from discord.ext import commands
 
@@ -51,20 +41,20 @@ units['minutes'].append('mins')
 units['seconds'].append('secs')
 
 
-
 class ShortTime:
-    __slots__: Tuple[str, ...] = (
-        'dt',
-    )
-    
-    compiled = re.compile("""(?:(?P<years>[0-9])(?:years?|y))?             # e.g. 2y
+    __slots__: Tuple[str, ...] = ('dt',)
+
+    compiled = re.compile(
+        """(?:(?P<years>[0-9])(?:years?|y))?             # e.g. 2y
                              (?:(?P<months>[0-9]{1,2})(?:months?|mo))?     # e.g. 2months
                              (?:(?P<weeks>[0-9]{1,4})(?:weeks?|w))?        # e.g. 10w
                              (?:(?P<days>[0-9]{1,5})(?:days?|d))?          # e.g. 14d
                              (?:(?P<hours>[0-9]{1,5})(?:hours?|h))?        # e.g. 12h
                              (?:(?P<minutes>[0-9]{1,5})(?:minutes?|m))?    # e.g. 10m
                              (?:(?P<seconds>[0-9]{1,5})(?:seconds?|s))?    # e.g. 15s
-                          """, re.VERBOSE)
+                          """,
+        re.VERBOSE,
+    )
 
     def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None) -> None:
         match = self.compiled.fullmatch(argument)
@@ -82,11 +72,8 @@ class ShortTime:
 
 
 class HumanTime:
-    __slots__: Tuple[str, ...] = (
-        'dt',
-        '_past'
-    )
-    
+    __slots__: Tuple[str, ...] = ('dt', '_past')
+
     calendar = pdt.Calendar(version=pdt.VERSION_CONTEXT_STYLE)
 
     def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None) -> None:
@@ -106,11 +93,11 @@ class HumanTime:
     async def convert(cls: Type[HTT], ctx: Context, argument: str) -> HTT:
         now = ctx.message.created_at
         return cls(argument, now=now)
-    
-    
+
+
 class Time(HumanTime):
     __slots__: Tuple[str, ...] = ()
-    
+
     def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None) -> None:
         try:
             o = ShortTime(argument, now=now)
@@ -123,49 +110,48 @@ class Time(HumanTime):
 
 class FutureTime(Time):
     __slots__: Tuple[str, ...] = ()
-    
+
     def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None) -> None:
         super().__init__(argument, now=now)
 
         if self._past:
             raise commands.BadArgument('this time is in the past')
-        
-        
+
+
 class UserFriendlyTime(commands.Converter):
     """That way quotes aren't absolutely necessary."""
+
     if TYPE_CHECKING:
         arg: str
-    
+
     __slots__: Tuple[str, ...] = (
         'converter',
         'dt',
         'arg',
         'default',
     )
-    
+
     def __init__(
-        self, 
-        converter: Optional[Union[Callable[[Context, str], Any], Type[commands.Converter], commands.Converter]] = None, 
-        *, 
+        self,
+        converter: Optional[Union[Callable[[Context, str], Any], Type[commands.Converter], commands.Converter]] = None,
+        *,
         default: Optional[str] = None,
-        force_future: bool = True
+        force_future: bool = True,
     ) -> None:
         if isinstance(converter, type) and issubclass(converter, commands.Converter):
-            converter = converter() # type: ignore
+            converter = converter()  # type: ignore
 
         if converter is not None and not isinstance(converter, commands.Converter):
             raise TypeError('commands.Converter subclass necessary.')
 
-        self.converter: Optional[Union[
-            Callable[[Context, str], Any],
-            Type[commands.Converter], 
-            commands.Converter
-        ]] = converter
-        
+        self.converter: Optional[
+            Union[Callable[[Context, str], Any], Type[commands.Converter], commands.Converter]
+        ] = converter
+
         self.default: Optional[str] = default
         self.force_future: bool = force_future
 
-    async def check_constraints(self, ctx: Context, now: datetime.datetime, remaining: str) -> UserFriendlyTime: 
+    async def check_constraints(self, ctx: Context, now: datetime.datetime, remaining: str) -> UserFriendlyTime:
         if self.force_future and self.dt < now:
             raise commands.BadArgument('This time is in the past.')
 
@@ -175,10 +161,10 @@ class UserFriendlyTime(commands.Converter):
             remaining = self.default
 
         if self.converter is not None:
-            self.arg = await self.converter.convert(ctx, remaining) # type: ignore
+            self.arg = await self.converter.convert(ctx, remaining)  # type: ignore
         else:
             self.arg = remaining
-            
+
         return self
 
     def copy(self) -> UserFriendlyTime:
@@ -196,13 +182,13 @@ class UserFriendlyTime(commands.Converter):
         try:
             calendar = HumanTime.calendar
             regex = ShortTime.compiled
-            
+
             now = ctx.message.created_at
 
             match = regex.match(argument)
             if match is not None and match.group(0):
-                data = { k: int(v) for k, v in match.groupdict(default=0).items() }
-                remaining = argument[match.end():].strip()
+                data = {k: int(v) for k, v in match.groupdict(default=0).items()}
+                remaining = argument[match.end() :].strip()
                 result.dt = now + relativedelta(**data)
                 return await result.check_constraints(ctx, now, remaining)
 
@@ -232,9 +218,11 @@ class UserFriendlyTime(commands.Converter):
                 raise commands.BadArgument('Invalid time provided, try e.g. "tomorrow" or "3 days".')
 
             if begin not in (0, 1) and end != len(argument):
-                raise commands.BadArgument('Time is either in an inappropriate location, which ' \
-                                           'must be either at the end or beginning of your input, ' \
-                                           'or I just flat out did not understand what you meant. Sorry.')
+                raise commands.BadArgument(
+                    'Time is either in an inappropriate location, which '
+                    'must be either at the end or beginning of your input, '
+                    'or I just flat out did not understand what you meant. Sorry.'
+                )
 
             if not status.hasTime:
                 # replace it with the current time
@@ -244,7 +232,7 @@ class UserFriendlyTime(commands.Converter):
             if status.accuracy == pdt.pdtContext.ACU_HALFDAY:
                 dt = dt.replace(day=now.day + 1)
 
-            result.dt =  dt.replace(tzinfo=datetime.timezone.utc)
+            result.dt = dt.replace(tzinfo=datetime.timezone.utc)
 
             if begin in (0, 1):
                 if begin == 1:
@@ -255,30 +243,32 @@ class UserFriendlyTime(commands.Converter):
                     if not (end < len(argument) and argument[end] == '"'):
                         raise commands.BadArgument('If the time is quoted, you must unquote it.')
 
-                    remaining = argument[end + 1:].lstrip(' ,.!')
+                    remaining = argument[end + 1 :].lstrip(' ,.!')
                 else:
                     remaining = argument[end:].lstrip(' ,.!')
             elif len(argument) == end:
                 remaining = argument[:begin].strip()
 
-            return await result.check_constraints(ctx, now, remaining) # type: ignore
+            return await result.check_constraints(ctx, now, remaining)  # type: ignore
         except:
             import traceback
+
             traceback.print_exc()
             raise
-            
+
+
 class plural:
     def __init__(self, value: int) -> None:
         self.value: int = value
-        
+
     def __format__(self, format_spec: str) -> str:
         v = self.value
         singular, sep, plural = format_spec.partition('|')
         plural = plural or f'{singular}s'
-        
+
         if abs(v) != 1:
             return f'{v} {plural}'
-        
+
         return f'{v} {singular}'
 
 
@@ -297,12 +287,12 @@ def human_join(seq: List[str], delim=', ', final='or') -> str:
 
 
 def human_timedelta(
-    dt: datetime.datetime, 
-    *, 
-    source: Optional[datetime.datetime] = None, 
-    accuracy: int = 3, 
-    brief: bool = False, 
-    suffix: Union[bool, str] =True
+    dt: datetime.datetime,
+    *,
+    source: Optional[datetime.datetime] = None,
+    accuracy: int = 3,
+    brief: bool = False,
+    suffix: Union[bool, str] = True,
 ) -> str:
     now = source or datetime.datetime.now(datetime.timezone.utc)
     if dt.tzinfo is None:
@@ -370,23 +360,24 @@ def human_timedelta(
         else:
             return ' '.join(output) + suffix
 
+
 def td_format(td_object: datetime.timedelta) -> str:
     seconds = int(td_object.total_seconds())
     periods: List[Tuple[str, float]] = [
-        ('year', 60*60*24*365),
-        ('month', 60*60*24*30),
-        ('day', 60*60*24),
-        ('hour', 60*60),
+        ('year', 60 * 60 * 24 * 365),
+        ('month', 60 * 60 * 24 * 30),
+        ('day', 60 * 60 * 24),
+        ('hour', 60 * 60),
         ('minute', 60),
         ('second', 1),
-        ('millisecond', 1/1000),
-        ('microsecond', 1/1e+6)
+        ('millisecond', 1 / 1000),
+        ('microsecond', 1 / 1e6),
     ]
 
     strings: List[str] = []
     for period_name, period_seconds in periods:
         if seconds > period_seconds:
-            period_value , seconds = divmod(seconds, period_seconds)
+            period_value, seconds = divmod(seconds, period_seconds)
             has_s = 's' if period_value > 1 else ''
             strings.append("%s %s%s" % (period_value, period_name, has_s))
 

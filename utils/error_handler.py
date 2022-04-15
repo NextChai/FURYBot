@@ -38,19 +38,20 @@ from .errors import *
 
 if TYPE_CHECKING:
     import inspect
-    
+
     from bot import FuryBot
-    
+
 log = logging.getLogger(__name__)
-    
+
+
 async def on_command_error(ctx: Context, error: commands.CommandError) -> Optional[discord.Message]:
     command = ctx.command
     if not command:
         return
-    
+
     error = getattr(error, 'original', error)
-    
-    if isinstance(error, (commands.CommandNotFound, )): # Ignored errors
+
+    if isinstance(error, (commands.CommandNotFound,)):  # Ignored errors
         return
     if isinstance(error, commands.MemberNotFound):
         return await ctx.send(f'The member "{error.argument}" was not found.')
@@ -58,10 +59,14 @@ async def on_command_error(ctx: Context, error: commands.CommandError) -> Option
         return await ctx.send('Ope! You can not run this command, you are not qualified to.')
     if isinstance(error, commands.TooManyArguments):
         total_args = len(command.clean_params)
-        return await ctx.send(f'Ope! You passed too many parameters to this command. There should only be {total_args} parameters total.')
+        return await ctx.send(
+            f'Ope! You passed too many parameters to this command. There should only be {total_args} parameters total.'
+        )
     if isinstance(error, commands.MissingRequiredArgument):
         required_param: inspect.Parameter = error.param
-        return await ctx.send(f'Ope! You are missing the required parameter named `{required_param.name}`. Add it and try again. If you\'re stuck, try doing `{ctx.prefix}help {command.qualified_name}`.')
+        return await ctx.send(
+            f'Ope! You are missing the required parameter named `{required_param.name}`. Add it and try again. If you\'re stuck, try doing `{ctx.prefix}help {command.qualified_name}`.'
+        )
     if isinstance(error, commands.BadArgument):
         return await ctx.send(f'Ope! {str(error)}')
     if isinstance(error, FuryException):
@@ -69,13 +74,14 @@ async def on_command_error(ctx: Context, error: commands.CommandError) -> Option
 
     tracbeack_str = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
     log.warning('New error', exc_info=error)
-    
+
     args = [(item,) for item in ctx.bot.code_chunker(tracbeack_str)]
     await ctx.bot.send_many_to_logging_channel(args=args, kwargs=[])
-    
+
 
 async def setup(bot: FuryBot) -> None:
     bot.add_listener(on_command_error, 'on_command_error')
+
 
 async def teardown(bot: FuryBot) -> None:
     bot.remove_listener(on_command_error, 'on_command_error')

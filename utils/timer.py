@@ -12,16 +12,7 @@ import datetime
 import asyncio
 import asyncpg
 import logging
-from typing import (
-    Optional,
-    TYPE_CHECKING,
-    Tuple,
-    Union,
-    Dict,
-    Any,
-    List,
-    Callable
-)
+from typing import Optional, TYPE_CHECKING, Tuple, Union, Dict, Any, List, Callable
 
 import discord
 
@@ -30,7 +21,7 @@ from .errors import TimerNotFound
 
 if TYPE_CHECKING:
     from asyncpg import Record, Connection
-    
+
     from bot import DbContextManager
 
 log = logging.getLogger('FuryBot.utils.timer')
@@ -42,33 +33,30 @@ if TYPE_CHECKING:
     JSONType = Union[JSONValue, Dict[str, JSONValue], List[JSONValue]]
 
 
-__all__: Tuple[str, ...] = (
-    'Timer',
-    'TimerManager'
-)
+__all__: Tuple[str, ...] = ('Timer', 'TimerManager')
 
 
 class Timer:
     """Represents a Timer within the database.
-    
+
     .. container:: operations
 
         .. describe:: x == y
 
             Determines if the Timer is equal to another Timer.
-        
+
         .. describe:: x != y
 
             Determines if the Timer is not equal to another Timer.
-        
+
         .. describe:: hash(x)
 
             Returns the hash of the Timer.
-        
+
         .. describe:: repr(x)
 
             Returns the string representation of the Timer.
-    
+
     Attributes
     ----------
     args: List[Any]
@@ -85,17 +73,18 @@ class Timer:
     expires: :class:`datetime.datetime`
         The time the timer expires.
     """
+
     __slots__: Tuple[str, ...] = (
-        'args', 
-        'kwargs', 
+        'args',
+        'kwargs',
         'precise',
-        'event', 
-        'id', 
+        'event',
+        'id',
         'created_at',
-        'expires', 
+        'expires',
         '_cs_event_name',
         'member',
-        'dispatched'
+        'dispatched',
     )
 
     def __init__(self, *, record: Record):
@@ -105,7 +94,7 @@ class Timer:
         self.args = extra.get('args', [])
         self.kwargs = extra.get('kwargs', {})
         self.precise: bool = record['precise']
-        
+
         self.event = record['event']
         self.created_at = record['created']
         self.expires = record['expires']
@@ -114,24 +103,24 @@ class Timer:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Timer):
             return False
-        
+
         return self.id == other.id
-    
+
     def __ne__(self, _o: object) -> bool:
         return not self.__eq__(_o)
 
     def __hash__(self) -> int:
         return hash(self.id)
-    
+
     def __repr__(self) -> str:
         return f'<Timer created={self.created_at} expires={self.expires} event={self.event}>'
 
     def human_delta(self, created: bool = False):
         return time.human_timedelta(self.created_at if created else self.expires)
-    
+
     def human_timestamp(self, created: bool = False):
         return discord.utils.format_dt(self.created_at if created else self.expires)
-    
+
     @discord.utils.cached_slot_property('_cs_event_name')
     def event_name(self) -> str:
         """:class:`str`: Returns the timer's event name."""
@@ -140,15 +129,16 @@ class Timer:
 
 class TimerManager:
     """A class used to create and manage timers.
-    
+
     Please note this can be inherited in a cog to allow for easy
     timer management.
-    
+
     Attributes
     ----------
     bot: :class:`~.Scott`
         The bot instance.
     """
+
     if TYPE_CHECKING:
         pool: asyncpg.Pool
         _have_data: asyncio.Event
@@ -158,33 +148,26 @@ class TimerManager:
         dispatch: Callable[..., None]
         safe_connection: Callable[..., DbContextManager]
         wait_until_ready: Callable[..., asyncio.Future[None]]
-    
-    __slots__: Tuple[str, ...] = (
-        'name', 
-        'bot',
-        '_have_data', 
-        '_current_timer', 
-        '_task',
-        '_cs_display_emoji'
-    )
-    
+
+    __slots__: Tuple[str, ...] = ('name', 'bot', '_have_data', '_current_timer', '_task', '_cs_display_emoji')
+
     @discord.utils.cached_slot_property('_cs_display_emoji')
     def display_emoji(self) -> discord.PartialEmoji:
         """:class:`discord.PartialEmoji`: The emoji to display when a timer is dispatched."""
         return discord.PartialEmoji(name='\N{ALARM CLOCK}')
-            
+
     async def get_active_timer(self, *, connection: Optional[Connection] = None, days: int = 7) -> Optional[Timer]:
         """|coro|
-        
+
         Called to get the most current active timer in the database. This timer is expired and should be dispatched.
-        
+
         Parameters
         ----------
         connection: Optional[:class:`asyncpg.Connection`]
             The connection to use.
         days: :class:`int`
             The number of days to look back.
-            
+
         Returns
         -------
         Optional[:class:`Timer`]
@@ -195,17 +178,17 @@ class TimerManager:
 
         record = await con.fetchrow(query, datetime.timedelta(days=days), False)
         return Timer(record=record) if record else None
-    
-    async def wait_for_active_timers(self, *, days: int=  7) -> Optional[Timer]:
+
+    async def wait_for_active_timers(self, *, days: int = 7) -> Optional[Timer]:
         """|coro|
-        
+
         Waity for a timer that has expired. This will wait until a timer is expired and should be dispatched.
-        
+
         Parameters
         ----------
         days: :class:`int`
             The number of days to look back.
-            
+
         Returns
         -------
         :class:`Timer`
@@ -223,10 +206,10 @@ class TimerManager:
             self._current_timer = None
             await self._have_data.wait()
             return await self.get_active_timer(connection=con, days=days)
-        
+
     async def call_timer(self, timer: Timer) -> None:
         """Call an expired timer to dispatch it.
-        
+
         Parameters
         ----------
         timer: :class:`Timer`
@@ -239,17 +222,17 @@ class TimerManager:
             # We don't want to call a
             # timer that was deleted.
             return
-        
+
         if timer.precise:
             self.dispatch(timer.event_name, *timer.args, **timer.kwargs)
         else:
             self.dispatch(timer.event_name, timer)
-    
+
     async def dispatch_timers(self):
         """|coro|
-        
+
         The main dispatch loop. This will wait for a timer to expire and dispatch it.
-        Please note if you use this class, you need to cancel the task when you're done 
+        Please note if you use this class, you need to cancel the task when you're done
         with it.
         """
         try:
@@ -261,33 +244,33 @@ class TimerManager:
                 if not timer:
                     log.warning('Timer was supposted to be here, but isn\'t.. oh no.')
                     return
-                    
+
                 now = datetime.datetime.utcnow()
-                if timer.expires >= now: 
+                if timer.expires >= now:
                     to_sleep = (timer.expires - now).total_seconds()
                     await asyncio.sleep(to_sleep)
 
                 await self.call_timer(timer)
         except asyncio.CancelledError:
             raise
-        except (OSError, discord.ConnectionClosed, asyncpg.PostgresConnectionError): 
+        except (OSError, discord.ConnectionClosed, asyncpg.PostgresConnectionError):
             if self._task:
                 self._task.cancel()
                 self._task = self.loop.create_task(self.dispatch_timers())
-        
+
     async def create_timer(
-        self, 
+        self,
         when: datetime.datetime,
         event: str = 'timer',
         *args: JSONType,
         now: Optional[datetime.datetime] = None,
         precise: bool = True,
-        **kwargs: JSONType
+        **kwargs: JSONType,
     ) -> Timer:
         """|coro|
-        
+
         Used to create a timer in the database and dispatch it.
-        
+
         Parameters
         ----------
         when: :class:`datetime.datetime`
@@ -305,7 +288,7 @@ class TimerManager:
             in this dictionary must be JSON serializable.
         """
         await self.wait_until_ready()
-        
+
         # Remove timezone information since the database does not deal with it
         when = when.astimezone(datetime.timezone.utc).replace(tzinfo=None)
         now = (now or discord.utils.utcnow()).astimezone(datetime.timezone.utc).replace(tzinfo=None)
@@ -315,42 +298,42 @@ class TimerManager:
                    RETURNING *;
                 """
         sanitized_args = (event, {'args': args, 'kwargs': kwargs}, when, now, precise, False)
-        
+
         async with self.safe_connection() as conn:
             row = await conn.fetchrow(query, *sanitized_args)
-        
+
         if not when:
             return Timer(record=row)
-        
+
         # only set the data check if it can be waited on
-        delta = (when - now).total_seconds() # type: ignore # This is not none pyright doesn't like me shadowing.
+        delta = (when - now).total_seconds()  # type: ignore # This is not none pyright doesn't like me shadowing.
         if delta <= (86400 * 40):  # 40 days
             self._have_data.set()
 
         # check if this timer is earlier than our currently run timer
         if self._current_timer and when < self._current_timer.expires:
             # cancel the task and re-run it
-            self._task.cancel() # type: ignore
+            self._task.cancel()  # type: ignore
             self._task = self.loop.create_task(self.dispatch_timers())
-        
+
         timer = Timer(record=row)
         return timer
-    
+
     async def get_timer(self, id: int) -> Timer:
         """|coro|
-        
+
         Used to get a timer from it's ID.
-        
+
         Parameters
         ----------
         id: :class:`int`
             The ID of the timer to get.
-        
+
         Returns
         -------
         :class:`Timer`
             The timer that was fetched.
-            
+
         Raises
         ------
         TimerNotFound
@@ -358,22 +341,22 @@ class TimerManager:
         """
         async with self.safe_connection() as conn:
             data = await conn.fetchrow(f'SELECT * FROM timers WHERE id = $1', id)
-        
+
         if not data:
             raise TimerNotFound(id)
-        
+
         return Timer(record=data)
-    
+
     async def delete_timer(self, id: int) -> None:
         """|coro|
-        
+
         Delete a timer using it's ID.
-        
+
         Parameters
         ----------
         id: :class:`int`
             The ID of the timer to delete.
-            
+
         Raises
         ------
         TimerNotFound
@@ -382,22 +365,22 @@ class TimerManager:
         """
         async with self.safe_connection() as conn:
             data = await conn.fetchrow(f'SELECT * FROM timers WHERE id = $1', id)
-        
+
             if not data:
                 raise TimerNotFound(id)
-            
+
             await conn.execute(f'DELETE FROM timers WHERE id = $1', id)
-            
+
     async def fetch_timers(self, predicate: Optional[str] = None, *args) -> List[Timer]:
         """|coro|
-        
+
         Used to fetch all timers from the database.
-        
+
         Parameters
         ----------
         predicate: Optional[:class:`str`]
             A SQL predicate to filter the timers by.
-        
+
         Returns
         -------
         :class:`list`
@@ -405,6 +388,5 @@ class TimerManager:
         """
         async with self.safe_connection() as conn:
             data = await conn.fetch(f'SELECT * FROM timers {predicate or ""};'.strip(), *args)
-        
+
         return [Timer(record=row) for row in data]
-    

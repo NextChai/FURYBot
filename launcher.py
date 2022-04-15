@@ -42,11 +42,8 @@ os.environ['JISHAKU_RETAIN'] = 'true'
 
 logging.basicConfig(level=logging.INFO)
 
-__all__: Tuple[str, ...] = (
-    'RemoveNoise',
-    'setup_logging',
-    'run_bot'
-)
+__all__: Tuple[str, ...] = ('RemoveNoise', 'setup_logging', 'run_bot')
+
 
 class RemoveNoise(logging.Filter):
     def __init__(self):
@@ -56,7 +53,7 @@ class RemoveNoise(logging.Filter):
         if record.levelname == 'WARNING' and 'referencing an unknown' in record.msg:
             return False
         return True
-    
+
 
 @contextlib.contextmanager
 def setup_logging():
@@ -64,12 +61,12 @@ def setup_logging():
         logging.getLogger('discord').setLevel(logging.INFO)
         logging.getLogger('discord.http').setLevel(logging.WARNING)
         logging.getLogger('discord.state').addFilter(RemoveNoise())
-        
+
         log = logging.getLogger('chai')
         log.setLevel(logging.INFO)
-        
+
         ch = logging.StreamHandler()
-        
+
         dt_fmt = '%Y-%m-%d %H:%M:%S'
         fmt = logging.Formatter('[{asctime}] [{levelname:<7}] {name}: {message}', dt_fmt, style='{')
         ch.setFormatter(fmt)
@@ -77,7 +74,7 @@ def setup_logging():
     finally:
         return
 
-    
+
 async def run_bot():
     try:
         pool = await FuryBot.setup_pool()
@@ -85,7 +82,7 @@ async def run_bot():
         logging.warning('Could not setup PostgreSQL Pool, Exiting.')
         traceback.print_exc()
         raise
-    
+
     loop = asyncio.get_event_loop()
     with setup_logging() as logger:
         try:
@@ -95,6 +92,7 @@ async def run_bot():
                     await fury.start(TOKEN, reconnect=True)
         except Exception as e:
             logger.warning('An unknown exception has occurred', exc_info=e)
+
 
 if __name__ == '__main__':
     asyncio.run(run_bot())

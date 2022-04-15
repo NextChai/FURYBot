@@ -31,11 +31,11 @@ from typing import (
     TYPE_CHECKING,
     AsyncContextManager,
     Awaitable,
-    Callable, 
+    Callable,
     ClassVar,
-    Generic, 
-    List, 
-    Optional, 
+    Generic,
+    List,
+    Optional,
     Tuple,
     TypeVar,
 )
@@ -44,9 +44,7 @@ from typing_extensions import ParamSpec, Concatenate
 if TYPE_CHECKING:
     from asyncpg import Connection
 
-__all__: Tuple[str, ...] = (
-    'ProfanityChecker',
-)
+__all__: Tuple[str, ...] = ('ProfanityChecker',)
 
 T = TypeVar('T')
 P = ParamSpec('P')
@@ -55,78 +53,72 @@ P = ParamSpec('P')
 class ProfanityChecker(Generic[P, T]):
     """
     A class used to check if a string contains profanity.
-    """ 
-    
-    invalid_regex: ClassVar[Tuple[str, ...]] = (
-        '.',
-        '^',
-        '$',
-        '.',
-        '+'
-    )
-    
+    """
+
+    invalid_regex: ClassVar[Tuple[str, ...]] = ('.', '^', '$', '.', '+')
+
     def __init__(
-        self, 
-        *, 
-        wrap: Callable[Concatenate[Callable[P, T], P], Awaitable[T]], 
-        safe_connection: Callable[[], AsyncContextManager[Connection]]
+        self,
+        *,
+        wrap: Callable[Concatenate[Callable[P, T], P], Awaitable[T]],
+        safe_connection: Callable[[], AsyncContextManager[Connection]],
     ) -> None:
         self.wrap: Callable[Concatenate[Callable[P, T], P], Awaitable[T]] = wrap
         self.safe_connection: Callable[[], AsyncContextManager[Connection]] = safe_connection
-        
+
         self._profanity_regex: Optional[re.Pattern] = None
         self._database_profanity: Optional[List[str]] = None
-    
+
     def __call__(self, blocking: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Awaitable[T]:
         return self.wrap(blocking, *args, **kwargs)
-    
+
     async def _raw_profanity(self) -> List[str]:
         async with self.safe_connection() as connection:
             data = await connection.fetch('SELECT word FROM profanity')
-        
+
         self._database_profanity = profanity = [entry['word'].lower() for entry in data]
         return profanity
-    
+
     async def _permeate(self, words: List[str], /) -> List[str]:
         words = words.copy()
-        
+
         words.extend(w.replace('er', 'a') for w in words if w.endswith('er'))
-                
-        plural = [self(inflection.pluralize, word) for word in words] # type: ignore
+
+        plural = [self(inflection.pluralize, word) for word in words]  # type: ignore
         words.extend(await asyncio.gather(*plural))
-        
+
         for word in words:
             for invalid in self.invalid_regex:
                 word = word.replace(invalid, r'\{0}'.format(invalid))
-        
-        words = list(set(words)) # Clean duplicates
+
+        words = list(set(words))  # Clean duplicates
         words.sort(key=len)
         words.reverse()
-        
+
         return words
-    
+
     async def _build_regex(self) -> re.Pattern:
         words = await self._raw_profanity()
         extended = await self._permeate(words)
         return re.compile('|'.join(extended), flags=re.IGNORECASE)
-    
+
     def _subber(self, match: re.Match) -> str:
         result = match.group(0)
         if result.lower() not in self._database_profanity:
             return result
-        
+
         return '*' * len(match.group(0))
-    
+
     async def censor(self, text: str) -> str:
         """|coro|
-        
+
         A coroutine to censor profanity from a string.
-        
+
         Parameters
         ----------
         text: :class:`str`
             The string to censor.
-        
+
         Returns
         -------
         :class:`str`
@@ -134,10 +126,9 @@ class ProfanityChecker(Generic[P, T]):
         """
         if not self._profanity_regex:
             self._profanity_regex = await self._build_regex()
-        
+
         subbed = self._profanity_regex.sub(self._subber, text)
-        if any('*' in char and not '*'*len(char) == char for char in subbed.split()):
+        if any('*' in char and not '*' * len(char) == char for char in subbed.split()):
             return text
-        
+
         return subbed
-        

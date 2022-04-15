@@ -33,13 +33,7 @@ from typing import (
 import discord
 from discord.ext import commands
 
-from utils.constants import (
-    CAPTAIN_ROLE, 
-    MOD_ROLE,
-    BYPASS_FURY,
-    COACH_ROLE, 
-    GAME_CONSULTANT_ROLE
-)
+from utils.constants import CAPTAIN_ROLE, MOD_ROLE, BYPASS_FURY, COACH_ROLE, GAME_CONSULTANT_ROLE
 
 if TYPE_CHECKING:
     from .context import Context
@@ -51,54 +45,63 @@ __all__ = (
     'should_ignore',
 )
 
+
 def is_captain() -> Callable[[Context], Context]:
     """Used to determine if a member is a captain."""
+
     async def predicate(ctx: Context) -> bool:
         if not isinstance(ctx.author, discord.Member):
             return False
-        
+
         return CAPTAIN_ROLE in (r.id for r in ctx.author.roles)
-    
+
     return commands.check(predicate)
+
 
 def is_mod() -> Callable[[Context], Context]:
     """Determenes if a member is a mod."""
+
     async def predicate(ctx: Context):
         if not isinstance(ctx.author, discord.Member):
             return False
-        
+
         return MOD_ROLE in (r.id for r in ctx.author.roles)
-    
+
     return commands.check(predicate)
+
 
 def is_coach() -> Callable[[Context], Context]:
     """Used to determine if a member is a coach."""
+
     async def predicate(ctx: Context):
         if not isinstance(ctx.author, discord.Member):
             return False
-        
+
         return COACH_ROLE in (r.id for r in ctx.author.roles)
-    
+
     return commands.check(predicate)
+
 
 def is_game_consultant() -> Callable[[Context], Context]:
     """Used to dertermine if a member is a game consultant."""
+
     async def predicate(ctx: Context):
         if not isinstance(ctx.author, discord.Member):
             return False
-        
+
         return GAME_CONSULTANT_ROLE in (r.id for r in ctx.author.roles)
-    
+
     return commands.check(predicate)
-        
+
+
 def should_ignore(member: Union[discord.Member, discord.User]) -> bool:
     """Determines if Fury Bot should ignore this member when checking for profanity or links.
-    
+
     Parameters
     ----------
     member: :class:`discord.Member`
         The member to check.
-    
+
     Returns
     -------
     :class:`bool`
@@ -106,6 +109,6 @@ def should_ignore(member: Union[discord.Member, discord.User]) -> bool:
     """
     if not isinstance(member, discord.Member):
         return False
-    
+
     roles = [r.id for r in member.roles]
     return BYPASS_FURY in roles or member.bot

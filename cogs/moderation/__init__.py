@@ -44,35 +44,30 @@ if TYPE_CHECKING:
 
 
 class Moderation(
-    CoreModeration,
-    Lockdowns,
-    Mutes,
-    Profanity,
-    Link,
-    brief='Moderation based commands.',
-    emoji='\N{HAMMER AND PICK}'
+    CoreModeration, Lockdowns, Mutes, Profanity, Link, brief='Moderation based commands.', emoji='\N{HAMMER AND PICK}'
 ):
     """
     The main Moderation cog. Contains all moderation based commands.
     These commands can only be used by authorized members. If you are not authorized,
     you will be kicked from the server... jokes! :D
     """
+
     def __init__(self, bot: FuryBot) -> None:
         self.bot: FuryBot = bot
-    
+
     async def cog_check(self, ctx: Context) -> bool:
         if isinstance(ctx.author, discord.User):
             raise commands.NoPrivateMessage('This command cannot be used in private messages.')
         if not ctx.guild:
             raise commands.NoPrivateMessage('This command cannot be used in private messages.')
-        
+
         authorized = (constants.CAPTAIN_ROLE, constants.MOD_ROLE, constants.COACH_ROLE, constants.BYPASS_FURY)
         result = any(r.id in authorized for r in ctx.author.roles)
         if not result:
             raise commands.MissingPermissions(['server_moderator'])
-        
+
         return True
-    
-    
+
+
 async def setup(bot: FuryBot) -> None:
     return await bot.add_cog(Moderation(bot))

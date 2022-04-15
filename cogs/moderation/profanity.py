@@ -39,71 +39,73 @@ def to_lower(argument: str) -> str:
 
 
 class Profanity(BaseCog):
-    
     @commands.command(
         name='censor',
         brief='Censor a word or phrase.',
         description='Use fury bot to censor a word or phrase.',
-        aliases=['censorword', 'censortext', 'censortexts', 'censorphrase', 'censorphrases']
+        aliases=['censorword', 'censortext', 'censortexts', 'censorphrase', 'censorphrases'],
     )
     async def censor(self, ctx: Context, *, phrase: str) -> None:
         return await self.profanity_censor(ctx, sentence=phrase)
-    
+
     @commands.group(
-        name='profanity', 
+        name='profanity',
         brief='Manage the profanity filter',
         description='Manage the profanity filter',
         aliases=['p', 'profanityfilter'],
-        invoke_without_command=True
+        invoke_without_command=True,
     )
     async def profanity(self, ctx: Context, *, sentence: str) -> None:
         if ctx.invoked_subcommand:
             return
-        
+
         censored = await self.bot.censor(sentence)
         await ctx.send(f'`{censored}`')
-        
+
     @profanity.command(
-        name='add', 
+        name='add',
         brief='Add a word to the profanity filter',
         description='Add a word to the profanity filter',
-        aliases=['a', 'addword']
+        aliases=['a', 'addword'],
     )
-    async def profanity_add(self, ctx: Context, *, word: str = commands.parameter(converter=to_lower)) -> Optional[discord.Message]:
+    async def profanity_add(
+        self, ctx: Context, *, word: str = commands.parameter(converter=to_lower)
+    ) -> Optional[discord.Message]:
         database_profanity = self.bot.profanity._database_profanity or await self.bot.profanity._raw_profanity()
-        if word in database_profanity: # type: ignore
-            return await ctx.send(f'`{word}` is already in the profanity filter.')  
-        
+        if word in database_profanity:  # type: ignore
+            return await ctx.send(f'`{word}` is already in the profanity filter.')
+
         async with self.bot.safe_connection() as connection:
             await connection.execute('INSERT INTO profanity (word) VALUES ($1)', word)
 
         self.bot.profanity._profanity_regex = await self.bot.profanity._build_regex()
         await ctx.send(f'`{word}` has been added to the profanity filter.')
-        
+
     @profanity.command(
         name='remove',
         brief='Remove a word from the profanity filter',
         description='Remove a word from the profanity filter',
-        aliases=['r', 'removeword']
+        aliases=['r', 'removeword'],
     )
-    async def profanity_remove(self, ctx: Context, *, word: str = commands.parameter(converter=to_lower)) -> Optional[discord.Message]:
+    async def profanity_remove(
+        self, ctx: Context, *, word: str = commands.parameter(converter=to_lower)
+    ) -> Optional[discord.Message]:
         database_profanity = self.bot.profanity._database_profanity or await self.bot.profanity._raw_profanity()
-        if word not in database_profanity: # type: ignore
-            return await ctx.send(f'`{word}` is not in the profanity filter.') 
-        
+        if word not in database_profanity:  # type: ignore
+            return await ctx.send(f'`{word}` is not in the profanity filter.')
+
         async with self.bot.safe_connection() as connection:
             await connection.execute('DELETE FROM profanity WHERE word = $1', word)
 
         self.bot.profanity._profanity_regex = await self.bot.profanity._build_regex()
         await ctx.send(f'`{word}` has been removed from the profanity filter.')
-    
+
     @profanity.command(
         name='censor',
         brief='Censor a sentence',
         description='Censor a sentence to see if it contains profanity',
-        aliases=['c']
+        aliases=['c'],
     )
     async def profanity_censor(self, ctx: Context, *, sentence: str) -> None:
         censored = await self.bot.censor(sentence)
         await ctx.send(f'{sentence} -> `{censored}`')
-    

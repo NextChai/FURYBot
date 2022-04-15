@@ -57,35 +57,34 @@ _LINK_REGEX: re.Pattern = re.compile(
 )
 
 
-
 class LinkChecker(URLExtract):
     def __init__(
-        self, 
-        *args, 
+        self,
+        *args,
         wrap: Callable[..., Awaitable[Any]],
         safe_connection: Callable[..., AsyncContextManager[Connection]],
-        **kwargs
+        **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.wrap: Callable[..., Awaitable[Any]] = wrap
         self.safe_connection: Callable[..., AsyncContextManager[Connection]] = safe_connection
-        
+
         self._allowed_links: Optional[List[str]] = None
-        
+
     async def get_links(self, text: str) -> List[Any]:
         return await self.wrap(self.find_urls, text=text)
 
     async def contains_links(self, text: str) -> bool:
         return await self.get_links(text) != []
-    
+
     async def fetch_allowed_links(self) -> List[str]:
         async with self.safe_connection() as connection:
             data = await connection.fetch('SELECT url FROM links')
-            
+
         return [element['url'] for element in data]
-        
+
     async def is_valid_link(self, link: str) -> bool:
         if not self._allowed_links:
             self._allowed_links = await self.fetch_allowed_links()
-            
+
         return link in self._allowed_links

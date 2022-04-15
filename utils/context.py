@@ -35,17 +35,7 @@ Please note this only applies to the "tick" function.
 """
 
 import asyncio
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Optional, 
-    Tuple, 
-    Union,
-    TYPE_CHECKING,
-    Generic,
-    TypeVar
-)
+from typing import Any, Callable, Dict, Optional, Tuple, Union, TYPE_CHECKING, Generic, TypeVar
 
 import discord
 from discord.ext import commands
@@ -64,14 +54,14 @@ FuryT = TypeVar('FuryT', bound='FuryBot')
 
 def tick(opt: Optional[bool], label: Optional[str] = None) -> str:
     """Used to tick a message based on the operation.
-    
+
     Parameters
     ----------
     opt: Optional[:class:`bool`]
         The operation to tick.
     label: Optional[:class:`str`]
         A label for the tick, if any.
-        
+
     Returns
     -------
     :class:`str`
@@ -83,16 +73,16 @@ def tick(opt: Optional[bool], label: Optional[str] = None) -> str:
         None: '❔',
     }
     emoji = lookup.get(opt, '❌')
-    
+
     if label is not None:
         return f'{emoji}: {label}'
-    
+
     return emoji
 
 
 class Confirmation(discord.ui.View):
     """Used to get confirmation from the user in a simple way.
-    
+
     Attributes
     ----------
     value: :class:`bool`
@@ -100,26 +90,24 @@ class Confirmation(discord.ui.View):
     author: Union[:class:`discord.Member`, :class:`discord.User`]
         The user who is confirming the operation.
     """
-    __slots__: Tuple[str, ...] = (
-        'value',
-        'author'
-    )
-    
+
+    __slots__: Tuple[str, ...] = ('value', 'author')
+
     def __init__(self, author: Union[discord.Member, discord.User]):
         super().__init__()
         self.value: bool = False
         self.author: Union[discord.Member, discord.User] = author
-        
+
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """|coro|
-        
+
         A coroutine that is called to check if the interaction is valid.
-        
+
         Parameters
         ----------
         interaction: :class:`discord.Interaction`
             The interaction to check.
-        
+
         Returns
         -------
         :class:`bool`
@@ -128,20 +116,20 @@ class Confirmation(discord.ui.View):
         result: bool = interaction.user == self.author
         if not result:
             await interaction.response.send_message('Hey! This isn\'t yours!', ephemeral=True)
-        
+
         return result
-    
+
     def _cleanup(self) -> None:
         for child in self.children:
-            child.disabled = True # type: ignore
-            
+            child.disabled = True  # type: ignore
+
     @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         """|coro|
-        
+
         The callback for the confirm button. When pressed, will set the internal
         marker to True and stop the view.
-        
+
         Parameters
         ----------
         interaction: :class:`discord.Interaction`
@@ -152,17 +140,17 @@ class Confirmation(discord.ui.View):
         self._cleanup()
         self.stop()
         self.value = True
-        
+
         await interaction.response.edit_message(view=self)
         await interaction.followup.send('Confirming', ephemeral=True)
 
     @discord.ui.button(label='Cancel', style=discord.ButtonStyle.grey)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         """|coro|
-        
+
         The callback for the confirm button. When pressed, will set the internal
         marker to False and stop the view.
-        
+
         Parameters
         ----------
         interaction: :class:`discord.Interaction`
@@ -173,89 +161,87 @@ class Confirmation(discord.ui.View):
         self._cleanup()
         self.stop()
         self.value = False
-        
+
         await interaction.response.edit_message(view=self)
         await interaction.followup.send('Cancelled', ephemeral=True)
 
 
 class DummyContext:
     """A dummy context used to convert human time without a context obj.
-    
+
     Attributes
     ----------
     created_at: :class:`datetime.datetime`
         When the context was created.
     """
-    __slots__: Tuple[str, ...] = (
-        'message',
-    )
-    
+
+    __slots__: Tuple[str, ...] = ('message',)
+
     def __init__(self) -> None:
-        self.message = type('DummyContext', (object,), {
-            'created_at': discord.utils.utcnow()
-        })
-    
+        self.message = type('DummyContext', (object,), {'created_at': discord.utils.utcnow()})
+
     def __repr__(self) -> str:
         return '<DummyContext created_at={0.created_at}>'.format(self)
-        
-        
+
+
 class Context(commands.Context, Generic[FuryT]):
     """The overridden Context class. Used to provide some simple
     functionality to the bot, which can home in handy for commands.
     """
+
     __slots__: Tuple[str, ...] = ()
-    
+
     if TYPE_CHECKING:
         bot: FuryT
-    
+
     async def get_confirmation(self, *args, **kwargs) -> bool:
         """Get confirmation fromt he user.
-        
+
         Parameters
         ----------
         args: List[Any]
             The args to pass onto the send function.
         kwargs: Dict[str, Any]
             The kwargs to pass onto the send function.
-        
+
         Returns
         -------
         :class:`bool`
-            True if confirmation was "Confirm" and false if confirmation was "Cancel". 
+            True if confirmation was "Confirm" and false if confirmation was "Cancel".
         """
         view = Confirmation(author=self.author)
         kwargs['view'] = view
-        
+
         await self.send(*args, **kwargs)
         await view.wait()
-        
+
         return view.value
-        
+
     @discord.utils.copy_doc(tick)
     def tick(self, opt: Optional[bool], label: Optional[str] = None) -> str:
         return tick(opt, label)
-    
+
     @discord.utils.copy_doc(commands.Context.send)
     async def send(self, *args, **kwargs) -> discord.Message:
         if not kwargs.get('allowed_mentions', None):
             kwargs['allowed_mentions'] = discord.AllowedMentions.none()
-            
+
         return await super().send(*args, **kwargs)
-    
+
     async def prompt(
-        self, 
-        content: Optional[str] = None, 
-        *, 
-        timeout: float = 60.0, 
-        check: Optional[Callable[[discord.Message], bool]] = None, 
+        self,
+        content: Optional[str] = None,
+        *,
+        timeout: float = 60.0,
+        check: Optional[Callable[[discord.Message], bool]] = None,
         destination: Optional[discord.abc.MessageableChannel] = None,
         delete_after: bool = False,
-        **kwargs: Dict[Any, Any]
+        **kwargs: Dict[Any, Any],
     ) -> Optional[discord.Message]:
         """|coro|
-        
+
         Prompt the user with a question and get wait for a response.
-        
+
         Parameters
         ----------
         content: :class:`str`
@@ -274,7 +260,7 @@ class Context(commands.Context, Generic[FuryT]):
             Defaults to ``False``.
         kwargs: Dict[str, Any]
             A dict of keyword arguments to pass to :meth:`Context.send`.
-            
+
         Returns
         -------
         Optional[:class:`discord.Message`]
@@ -282,16 +268,16 @@ class Context(commands.Context, Generic[FuryT]):
         """
         if not check:
             check = lambda message: message.channel == self.channel and message.author == self.author
-        
+
         def wrapped_check(message: discord.Message) -> bool:
             if message.content is None:
                 return check(message)
-            
+
             if ('stop', 'no', 'abort', 'close', 'cancel', 'end', 'quit', 'none', 'n') in message.content.lower().split():
                 raise TypeError('Aborted')
-            
+
             return check(message)
-        
+
         message = await (destination or self.channel).send(content, **kwargs)
         try:
             response = await self.bot.wait_for('message', check=wrapped_check, timeout=timeout)
@@ -301,9 +287,8 @@ class Context(commands.Context, Generic[FuryT]):
         except TypeError:
             await message.reply('Aborted.')
             return None
-        
+
         if delete_after:
             await message.delete()
-        
+
         return response
-    
