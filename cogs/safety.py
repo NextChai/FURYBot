@@ -103,7 +103,7 @@ class Safety(
         assert webhook_logging_channel is not None and isinstance(webhook_logging_channel, discord.TextChannel)
         
         webhooks = await webhook_logging_channel.webhooks()
-        webhook = discord.utils.get(webhooks, id=self.bot.message_webhook_url)
+        webhook = discord.utils.get(webhooks, url=self.bot.message_webhook_url)
         if webhook is None:
             raise RuntimeError(f'Could not find webhook with id {self.bot.message_webhook_url}')
 
