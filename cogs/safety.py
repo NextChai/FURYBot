@@ -120,7 +120,17 @@ class Safety(
         message: :class:`discord.Message`
             The message that was sent.
         """
-        if not self._check_listener(message):
+        
+        # This is done manually to ensure that every message is logged, I dont want to ignore members.
+        if message.guild is None:
+            return
+        if message.webhook_id:
+            return
+        if message.author.bot:
+            return
+        if isinstance(message.author, discord.User):
+            return
+        if not message.content:
             return
 
         if message.channel.id == constants.MESSAGE_LOG_CHANNEL:
@@ -168,7 +178,7 @@ class Safety(
                 
     @commands.Cog.listener('on_message_edit')
     async def message_logger_on_edit(self, before: discord.Message, after: discord.Message) -> None:
-        if not after.content or not after.guild:
+        if not after.content or not after.guild or after.webhook_id:
             return
             
         old_webhook_id = self._message_logging_cache.get(before.id)
