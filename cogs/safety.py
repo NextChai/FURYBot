@@ -166,6 +166,7 @@ class Safety(
                 except Exception:
                     pass
                 else:
+                    kwargs.pop('allowed_mentions', None) # We cant use allowed mentions when replying to a message.
                     webhook_message = await original_message.reply(**kwargs, wait=True) # wait=True here for type checker to view ovewrwrites correctly.
                     self._message_logging_cache[message.id] = webhook_message.id 
                     return
