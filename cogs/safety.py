@@ -160,16 +160,15 @@ class Safety(
                 content=message.content,
             )
             
-            if (ref := message.reference) and (ref_m_id := ref.message_id) and ref_m_id in self._message_logging_cache:
-                try:
-                    original_message = await self.message_webhook.fetch_message(ref_m_id)
-                except Exception:
-                    pass
-                else:
-                    kwargs['allowed_mentions'] = None # type: ignore
-                    webhook_message = await original_message.reply(**kwargs, wait=True) # wait=True here for type checker to view ovewrwrites correctly.
-                    self._message_logging_cache[message.id] = webhook_message.id 
-                    return
+            # if (ref := message.reference) and (ref_m_id := ref.message_id) and ref_m_id in self._message_logging_cache:
+            #     try:
+            #         original_message = await self.message_webhook.fetch_message(ref_m_id)
+            #     except Exception:
+            #         pass
+            #     else:
+            #         webhook_message = await original_message.reply(**kwargs, wait=True) # wait=True here for type checker to view ovewrwrites correctly.
+            #         self._message_logging_cache[message.id] = webhook_message.id 
+            #         return
                 
             try:
                 webhook_message = await self.message_webhook.send(**kwargs, wait=True) # wait=True here for type checker to view ovewrwrites correctly.
@@ -177,22 +176,22 @@ class Safety(
             except discord.HTTPException:
                 pass
                 
-    @commands.Cog.listener('on_message_edit')
-    async def message_logger_on_edit(self, before: discord.Message, after: discord.Message) -> None:
-        if not after.content or not after.guild or after.webhook_id:
-            return
-            
-        old_webhook_id = self._message_logging_cache.get(before.id)
-        if not old_webhook_id:
-            return
-        
-        try:
-            old_webhook_message = await self.message_webhook.fetch_message(old_webhook_id)
-        except (discord.NotFound, discord.HTTPException):
-            return 
-        
-        edited_fmt = '`Message has been edited:`\n\n'
-        await old_webhook_message.reply(content=edited_fmt + after.content[:2000 - len(edited_fmt)], allowed_mentions=None) # remove allowed mentions when replying
+    #@commands.Cog.listener('on_message_edit')
+    #async def message_logger_on_edit(self, before: discord.Message, after: discord.Message) -> None:
+    #    if not after.content or not after.guild or after.webhook_id:
+    #        return
+    #        
+    #    old_webhook_id = self._message_logging_cache.get(before.id)
+    #    if not old_webhook_id:
+    #        return
+    #    
+    #    try:
+    #        old_webhook_message = await self.message_webhook.fetch_message(old_webhook_id)
+    #    except (discord.NotFound, discord.HTTPException):
+    #        return 
+    #    
+    #    edited_fmt = '`Message has been edited:`\n\n'
+    #    await old_webhook_message.reply(content=edited_fmt + after.content[:2000 - len(edited_fmt)]) # remove allowed mentions when replying
             
     @commands.Cog.listener('on_message')
     async def role_mention_checker(self, message: _KnownMessage) -> None:
