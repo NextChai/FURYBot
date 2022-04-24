@@ -94,7 +94,21 @@ class Safety(
             return False
 
         return True
+    
+    async def _load_webhook(self) -> None:
+        # View more about why this happened here in the DPY server:
+        # https://discord.com/channels/336642139381301249/603069307286454290/967901380113236008
+        
+        webhook_logging_channel = self.bot.get_channel(constants.MESSAGE_LOG_CHANNEL)
+        assert webhook_logging_channel is not None and isinstance(webhook_logging_channel, discord.TextChannel)
+        
+        webhooks = await webhook_logging_channel.webhooks()
+        webhook = discord.utils.get(webhooks, id=self.bot.message_webhook_url)
+        if webhook is None:
+            raise RuntimeError(f'Could not find webhook with id {self.bot.message_webhook_url}')
 
+        self.message_webhook = webhook
+        
     @commands.Cog.listener('on_message')
     async def translator_profanity_checker(self, message: _KnownMessage) -> None:
         if not self._check_listener(message):
@@ -136,12 +150,8 @@ class Safety(
         if message.channel.id == constants.MESSAGE_LOG_CHANNEL:
             return
 
-        # Make the type checker happy here:
         if not hasattr(self.bot, 'message_webhook'):
-            partial = discord.Webhook.from_url(
-                self.bot.message_webhook_url, session=self.session, bot_token=self.bot.http.token
-            )
-            self.message_webhook = await partial.fetch()
+            await self._load_webhook()
 
         attachments = []
         if message.attachments:
@@ -160,15 +170,15 @@ class Safety(
                 content=message.content,
             )
             
-            # if (ref := message.reference) and (ref_m_id := ref.message_id) and ref_m_id in self._message_logging_cache:
-            #     try:
-            #         original_message = await self.message_webhook.fetch_message(ref_m_id)
-            #     except Exception:
-            #         pass
-            #     else:
-            #         webhook_message = await original_message.reply(**kwargs, wait=True) # wait=True here for type checker to view ovewrwrites correctly.
-            #         self._message_logging_cache[message.id] = webhook_message.id 
-            #         return
+            if (ref := message.reference) and (ref_m_id := ref.message_id) and ref_m_id in self._message_logging_cache:
+                try:
+                    original_message = await self.message_webhook.fetch_message(ref_m_id)
+                except Exception:
+                    pass
+                else:
+                    webhook_message = await original_message.reply(**kwargs, wait=True) # wait=True here for type checker to view ovewrwrites correctly.
+                    self._message_logging_cache[message.id] = webhook_message.id 
+                    return
                 
             try:
                 webhook_message = await self.message_webhook.send(**kwargs, wait=True) # wait=True here for type checker to view ovewrwrites correctly.
@@ -176,22 +186,25 @@ class Safety(
             except discord.HTTPException:
                 pass
                 
-    #@commands.Cog.listener('on_message_edit')
-    #async def message_logger_on_edit(self, before: discord.Message, after: discord.Message) -> None:
-    #    if not after.content or not after.guild or after.webhook_id:
-    #        return
-    #        
-    #    old_webhook_id = self._message_logging_cache.get(before.id)
-    #    if not old_webhook_id:
-    #        return
-    #    
-    #    try:
-    #        old_webhook_message = await self.message_webhook.fetch_message(old_webhook_id)
-    #    except (discord.NotFound, discord.HTTPException):
-    #        return 
-    #    
-    #    edited_fmt = '`Message has been edited:`\n\n'
-    #    await old_webhook_message.reply(content=edited_fmt + after.content[:2000 - len(edited_fmt)]) # remove allowed mentions when replying
+    @commands.Cog.listener('on_message_edit')
+    async def message_logger_on_edit(self, before: discord.Message, after: discord.Message) -> None:
+        if not after.content or not after.guild or after.webhook_id:
+            return
+        
+        if not hasattr(self.bot, 'message_webhook'):
+            await self._load_webhook()
+            
+        old_webhook_id = self._message_logging_cache.get(before.id)
+        if not old_webhook_id:
+            return
+        
+        try:
+            old_webhook_message = await self.message_webhook.fetch_message(old_webhook_id)
+        except (discord.NotFound, discord.HTTPException):
+            return 
+        
+        edited_fmt = '`Message has been edited:`\n\n'
+        await old_webhook_message.reply(content=edited_fmt + after.content[:2000 - len(edited_fmt)]) # remove allowed mentions when replying
             
     @commands.Cog.listener('on_message')
     async def role_mention_checker(self, message: _KnownMessage) -> None:
