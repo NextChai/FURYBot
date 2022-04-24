@@ -204,7 +204,11 @@ class Safety(
             return 
         
         edited_fmt = '`Message has been edited:`\n\n'
-        await old_webhook_message.reply(content=edited_fmt + after.content[:2000 - len(edited_fmt)]) # remove allowed mentions when replying
+        await old_webhook_message.reply(
+            username=after.author.display_name,
+            avatar_url=after.author.display_avatar.url,
+            content=edited_fmt + after.content[:2000 - len(edited_fmt)]
+        )
             
     @commands.Cog.listener('on_message')
     async def role_mention_checker(self, message: _KnownMessage) -> None:
