@@ -170,7 +170,7 @@ class Safety(
                 else:
                     message_fmt = f'Message replied by {message.author}\n\n'
                     webhook_message = await original_message.reply(
-                        content=message_fmt + message.content[: 2000 - len(message_fmt)], wait=True
+                        content=message_fmt + message.content[: 2000 - len(message_fmt)]
                     )  # wait=True here for type checker to view ovewrwrites correctly.
                     self._message_logging_cache[message.id] = webhook_message.id
                     return
