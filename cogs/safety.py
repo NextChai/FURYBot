@@ -168,7 +168,7 @@ class Safety(
                 except Exception:
                     pass
                 else:
-                    message_fmt = f'Message replied by {message.author}\n\n'
+                    message_fmt = f'Message replied by {message.author.mention}\n\n'
                     webhook_message = await original_message.reply(
                         content=message_fmt + message.content[: 2000 - len(message_fmt)]
                     )  # wait=True here for type checker to view ovewrwrites correctly.
