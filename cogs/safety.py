@@ -166,7 +166,7 @@ class Safety(
                 except Exception:
                     pass
                 else:
-                    kwargs.pop('allowed_mentions', None) # We cant use allowed mentions when replying to a message.
+                    kwargs['allowed_mentions'] = None # type: ignore
                     webhook_message = await original_message.reply(**kwargs, wait=True) # wait=True here for type checker to view ovewrwrites correctly.
                     self._message_logging_cache[message.id] = webhook_message.id 
                     return
@@ -192,8 +192,8 @@ class Safety(
             return 
         
         edited_fmt = '`Message has been edited:`\n\n'
-        await old_webhook_message.reply(content=edited_fmt + after.content[:2000 - len(edited_fmt)])
-        
+        await old_webhook_message.reply(content=edited_fmt + after.content[:2000 - len(edited_fmt)], allowed_mentions=None) # remove allowed mentions when replying
+            
     @commands.Cog.listener('on_message')
     async def role_mention_checker(self, message: _KnownMessage) -> None:
         """|coro|
