@@ -172,7 +172,7 @@ class Safety(
             
             if (ref := message.reference) and (ref_m_id := ref.message_id) and ref_m_id in self._message_logging_cache:
                 try:
-                    original_message = await self.message_webhook.fetch_message(ref_m_id)
+                    original_message = await self.message_webhook.fetch_message(self._message_logging_cache[ref_m_id])
                 except Exception:
                     pass
                 else:
