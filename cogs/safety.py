@@ -162,26 +162,28 @@ class Safety(
                     pass
                 
         async with self.bot._webhook_lock:
-            kwargs = dict(
-                username=message.author.display_name,
-                avatar_url=message.author.display_avatar.url,
-                allowed_mentions=discord.AllowedMentions.none(),
-                files=attachments,
-                content=message.content,
-            )
-            
             if (ref := message.reference) and (ref_m_id := ref.message_id) and ref_m_id in self._message_logging_cache:
                 try:
                     original_message = await self.message_webhook.fetch_message(self._message_logging_cache[ref_m_id])
                 except Exception:
                     pass
                 else:
-                    webhook_message = await original_message.reply(**kwargs, wait=True) # wait=True here for type checker to view ovewrwrites correctly.
+                    message_fmt = f'Message replied by {message.author}\n\n'
+                    webhook_message = await original_message.reply(
+                        content=message_fmt + message.content[:2000 - len(message_fmt)],
+                        wait=True
+                    ) # wait=True here for type checker to view ovewrwrites correctly.
                     self._message_logging_cache[message.id] = webhook_message.id 
                     return
                 
             try:
-                webhook_message = await self.message_webhook.send(**kwargs, wait=True) # wait=True here for type checker to view ovewrwrites correctly.
+                webhook_message = await self.message_webhook.send(
+                    username=message.author.display_name,
+                    avatar_url=message.author.display_avatar.url,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                    files=attachments,
+                    content=message.content,wait=True
+                ) # wait=True here for type checker to view ovewrwrites correctly.
                 self._message_logging_cache[message.id] = webhook_message.id 
             except discord.HTTPException:
                 pass
