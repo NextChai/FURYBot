@@ -203,7 +203,7 @@ class Safety(
         except (discord.NotFound, discord.HTTPException):
             return 
         
-        edited_fmt = f'`Message has been edited by {after.author.mention}:`\n\n'
+        edited_fmt = f'Message has been edited by {after.author.mention}:\n\n'
         await old_webhook_message.reply(
             content=edited_fmt + after.content[:2000 - len(edited_fmt)]
         )
