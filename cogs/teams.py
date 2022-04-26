@@ -1279,7 +1279,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
 
         embed = self.bot.Embed(
             title='Deactivating team now...',
-            description=f'The team `{record["name"]}` is being deactivated.',
+            description=f'The team `{team.name}` is being deactivated.',
         )
         await team.text_channel.send(embed=embed)
         await asyncio.sleep(5)
