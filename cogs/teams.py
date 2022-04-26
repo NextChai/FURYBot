@@ -23,8 +23,10 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import asyncio
+import datetime
 from collections import deque
-from typing import TYPE_CHECKING, Literal, Mapping, TypedDict, List, Tuple, Any, Type, Union, Optional, Dict
+from typing import TYPE_CHECKING, Literal, Mapping, TypedDict, List, Tuple, Any, Type, Union, Optional, Dict, overload
 
 import discord
 from discord.ext import commands
@@ -306,116 +308,130 @@ class Team:
         async with client.safe_connection() as conn:
             await conn.execute(sql_query, *args)
 
+    async def delete(self) -> None:
+        bot: FuryBot = self.guild._state._get_client()  # type: ignore
+        async with bot.safe_connection() as connection:
+            await connection.execute('delete from teams where id = $1', self.id)
 
-if TYPE_CHECKING:
-    TeamConverter = Team
-else:
+        channels = [self.text_channel, self.voice_channel, self.category_channel]
+        for channel in channels:
+            try:
+                await channel.delete()
+            except (discord.Forbidden, discord.NotFound):
+                continue
 
-    class TeamConverter(commands.IDConverter[Team]):
-        """Converts a team from a given argument to a :class:`Team` object.
 
-        Attributes
+class TeamConverter(commands.IDConverter[Team]):
+    """Converts a team from a given argument to a :class:`Team` object.
+
+    Attributes
+    ----------
+    multiple: :class:`bool`
+        Whether or not to convert as many teams as possible, or just one.
+    """
+
+    multiple: bool = False
+
+    def __init__(self, *, multiple: bool = False) -> None:
+        self.multiple: bool = multiple
+
+    @overload
+    async def convert(self, ctx: Context[FuryBot], argument: str) -> Team:
+        ...
+
+    @overload
+    async def convert(self, ctx: Context[FuryBot], argument: str) -> List[Team]:
+        ...
+
+    async def convert(self, ctx: Context[FuryBot], argument: str) -> Union[Team, List[Team]]:
+        """|coro|
+
+        Does the actual team conversion from a given argument.
+
+        Parameters
         ----------
-        multiple: :class:`bool`
-            Whether or not to convert as many teams as possible, or just one.
+        ctx: :class:`Context[FuryBot]`
+            The context of the command.
+        argument: :class:`str`
+            The argument to convert.
+
+        Returns
+        -------
+        :class:`Team`
+
+        Raises
+        ------
+        commands.NoPrivateMessage
+            The command was used in a private message.
+        commands.BadArgument
+            The argument could not be converted to a valid team.
+        """
+        bot = ctx.bot
+        guild = ctx.guild
+        if guild is None:
+            raise commands.NoPrivateMessage('This command can not be used in private messages.')
+
+        query = """
+            SELECT * FROM teams
+
+            WHERE (channels::jsonb->'text')::bigint = $1
+            OR (channels::jsonb->'voice')::bigint = $1
+            OR (channels::jsonb->'category')::bigint = $1
+
+            -- Team ID --
+            OR id = $1
         """
 
-        multiple: bool = False
+        async with bot.safe_connection() as connection:
 
-        def __init__(self, *, multiple: bool = False) -> None:
-            self.multiple: bool = multiple
-
-        async def convert(self, ctx: Context[FuryBot], argument: str) -> Union[Team, List[Team]]:
-            """|coro|
-
-            Does the actual team conversion from a given argument.
-
-            Parameters
-            ----------
-            ctx: :class:`Context[FuryBot]`
-                The context of the command.
-            argument: :class:`str`
-                The argument to convert.
-
-            Returns
-            -------
-            :class:`Team`
-
-            Raises
-            ------
-            commands.NoPrivateMessage
-                The command was used in a private message.
-            commands.BadArgument
-                The argument could not be converted to a valid team.
-            """
-            bot = ctx.bot
-            guild = ctx.guild
-            if guild is None:
-                raise commands.NoPrivateMessage('This command can not be used in private messages.')
-
-            query = """
-                SELECT * FROM teams
-
-                WHERE (channels::jsonb->'text')::bigint = $1
-                OR (channels::jsonb->'voice')::bigint = $1
-                OR (channels::jsonb->'category')::bigint = $1
-
-                -- Team ID --
-                OR id = $1
-            """
-
-            async with bot.safe_connection() as connection:
+            # Let's see if we can save some time
+            match = self._get_id_match(argument)
+            if argument.isdigit() or match:
+                if match:
+                    argument = match.groups()[0]
 
                 # Let's see if we can save some time
-                match = self._get_id_match(argument)
-                if argument.isdigit() or match:
-                    if match:
-                        argument = match.groups()[0]
+                record = await connection.fetch(query, int(argument))
+                if record:
+                    return (
+                        Team(record=record[0], guild=guild)
+                        if not self.multiple
+                        else [Team(record=r, guild=guild) for r in record]
+                    )
 
-                    # Let's see if we can save some time
-                    record = await connection.fetch(query, int(argument))
-                    if record:
-                        return (
-                            Team(record=record[0], guild=guild)
-                            if not self.multiple
-                            else [Team(record=r, guild=guild) for r in record]
-                        )
+            converters: Tuple[Type[commands.Converter], ...] = (
+                commands.MemberConverter,
+                commands.RoleConverter,
+                commands.TextChannelConverter,
+                commands.VoiceChannelConverter,
+                commands.CategoryChannelConverter,
+            )
 
-                converters: Tuple[Type[commands.Converter], ...] = (
-                    commands.MemberConverter,
-                    commands.RoleConverter,
-                    commands.TextChannelConverter,
-                    commands.VoiceChannelConverter,
-                    commands.CategoryChannelConverter,
-                )
+            for converter in converters:
+                try:
+                    converted = await converter().convert(ctx, argument)
+                    break
+                except commands.BadArgument:
+                    pass
+            else:
+                # Break did not get called, let's check for team name
+                record = await connection.fetch('SELECT * FROM teams WHERE LOWER(team_name) = $1', str(argument).lower())
+                if record:
+                    return (
+                        Team(record=record[0], guild=guild)
+                        if not self.multiple
+                        else [Team(record=r, guild=guild) for r in record]
+                    )
 
-                for converter in converters:
-                    try:
-                        converted = await converter().convert(ctx, argument)
-                        break
-                    except commands.BadArgument:
-                        pass
-                else:
-                    # Break did not get called, let's check for team name
-                    record = await connection.fetch('SELECT * FROM teams WHERE LOWER(team_name) = $1', str(argument).lower())
-                    if record:
-                        return (
-                            Team(record=record[0], guild=guild)
-                            if not self.multiple
-                            else [Team(record=r, guild=guild) for r in record]
-                        )
+                raise commands.BadArgument('I could not find the team you requested.')
 
-                    raise commands.BadArgument('I could not find the team you requested.')
+            record = await connection.fetch(query, converted.id)
+            if not record:
+                raise commands.BadArgument('I could not find the team you requested.')
 
-                record = await connection.fetch(query, converted.id)
-                if not record:
-                    raise commands.BadArgument('I could not find the team you requested.')
-
-                return (
-                    Team(record=record[0], guild=guild)
-                    if not self.multiple
-                    else [Team(record=r, guild=guild) for r in record]
-                )
+            return (
+                Team(record=record[0], guild=guild) if not self.multiple else [Team(record=r, guild=guild) for r in record]
+            )
 
 
 class TeamSelect(discord.ui.Select):
@@ -579,7 +595,9 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
         await ctx.send(embed=view.initial, view=view)
 
     @commands.group(name='team', description='View and create teams.', invoke_without_command=True)
-    async def team(self, ctx: Context, *, team: Optional[TeamConverter]) -> Optional[discord.Message]:
+    async def team(
+        self, ctx: Context, *, team: Optional[Team] = commands.parameter(converter=Optional[TeamConverter])
+    ) -> Optional[discord.Message]:
         """|coro|
 
         View a specific FLVS Fury team. If no team is specified, the current channel that the command
@@ -597,12 +615,48 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             return
 
         if not team:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
             if not team:
                 return
 
         embed = await team.embed()
         return await ctx.send(embed=embed)
+
+    @team.command(
+        name='deactivate', brief='Deactivate a team.', description='Deactivate a team because of the season ending.'
+    )
+    @commands.guild_only()
+    async def team_deactivate(
+        self,
+        ctx: Context,
+    ) -> Optional[discord.Message]:
+        """|coro|
+        
+        A command called to deactivate a team because of the season ending.
+        """
+        try:
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
+        except Exception:
+            return await ctx.send('You did not use this command in a team channel.')
+
+        subs = await team.subs()
+        roster = await team.roster()
+        member_fmt = human_join([m.mention for m in roster + subs], final='and')
+
+        now = discord.utils.utcnow().astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        await self.bot.create_timer(
+            now + datetime.timedelta(hours=1),
+            event='team_deactivate',
+            team_id=team.id,
+            guild_id=ctx.guild.id,
+        )
+
+        embed = self.bot.Embed(
+            title='Team Deactivated',
+            description=f'The season has ended! Congrats to {member_fmt} for playing the best you can in the season!',
+        )
+        embed.add_field(name='Team Channels Deactivating', value=f'All of this teams channels will be deleted in 1 hour.')
+        await team.text_channel.send(embed=embed, allowed_mentions=discord.AllowedMentions(users=subs + roster))
 
     @team.command(name='register', description='Register a new team from an existing one', hidden=True)
     @commands.guild_only()
@@ -798,7 +852,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
         return await ctx.send(embed=embed)
 
     @team.command(name='delete', aliases=['remove', 'del', 'rm'], description='Delete a team.')
-    async def team_delete(self, ctx: Context, *, team: TeamConverter = None) -> Optional[discord.Message]:  # type: ignore
+    async def team_delete(self, ctx: Context, *, team: Optional[Team] = commands.parameter(converter=Optional[TeamConverter])) -> Optional[discord.Message]:  # type: ignore
         """|coro|
 
         Delete a team and all of its channels.
@@ -810,7 +864,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             will be found from the channel the command is invoked in.
         """
         if not team:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
             if not team:
                 return
 
@@ -827,7 +881,9 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             await conn.execute('DELETE FROM teams WHERE id = $1', team.id)
 
     @team.command(name='sync', description='Channel permissions got messed up? Sync them using this command.')
-    async def team_sync(self, ctx: Context, *, team: Optional[TeamConverter]) -> Optional[discord.Message]:
+    async def team_sync(
+        self, ctx: Context, *, team: Optional[Team] = commands.parameter(converter=Optional[TeamConverter])
+    ) -> Optional[discord.Message]:
         """|coro|
 
         A command used to sync the permissions of the team's channels. This is best to be used
@@ -840,7 +896,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             will be found from the channel the command is invoked in.
         """
         if not team:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
             if not team:
                 return
 
@@ -852,7 +908,9 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
         return await ctx.send('Permissions were synced successfully.')
 
     @commands.group(name='roster', description='Manage and add members to a team\'s roster', invoke_without_command=True)
-    async def roster(self, ctx: Context, *, team: Optional[TeamConverter]) -> Optional[discord.Message]:
+    async def roster(
+        self, ctx: Context, *, team: Optional[Team] = commands.parameter(converter=Optional[TeamConverter])
+    ) -> Optional[discord.Message]:
         """|coro|
 
         View the current roster of a team.
@@ -867,7 +925,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             return
 
         if not team:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
             if not team:
                 return
 
@@ -881,7 +939,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
     @roster.command(name='demote', description='Switch a member from roster to sub.', aliases=['sub', 'substitute'])
     async def roster_demote(self, ctx: Context, member: discord.Member) -> Optional[discord.Message]:
         try:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
         except:
             return await ctx.send('This command was not used in a team\'s channel.')
 
@@ -904,7 +962,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
         ],
     )
     async def roster_switch(
-        self, ctx: Context, member: discord.Member, *, new_team: TeamConverter
+        self, ctx: Context, member: discord.Member, *, new_team: Team = commands.parameter(converter=TeamConverter)
     ) -> Optional[discord.Message]:
         """|coro|
 
@@ -918,7 +976,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             The team the member should be switched to.
         """
         try:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
         except:
             return await ctx.send('This command was not used in a team\'s channel.')
 
@@ -936,7 +994,9 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
         return await ctx.send(f'I have moved {member.mention} from `{team.name}` to `{new_team.name}`.')
 
     @roster.command(name='sync', description='Sync the team\'s roster with the server.')
-    async def roster_sync(self, ctx: Context, *, team: Optional[TeamConverter]) -> Optional[discord.Message]:
+    async def roster_sync(
+        self, ctx: Context, *, team: Optional[Team] = commands.parameter(converter=Optional[TeamConverter])
+    ) -> Optional[discord.Message]:
         """|coro|
 
         Sync the team's roster with the server.
@@ -948,7 +1008,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             will be found from the channel the command is invoked in.
         """
         if not team:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
             if not team:
                 return
 
@@ -956,7 +1016,11 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
 
     @roster.command(name='add', description='Add a member to a team\'s roster.')
     async def roster_add(
-        self, ctx: Context, member: discord.Member, *, team: Optional[TeamConverter]
+        self,
+        ctx: Context,
+        member: discord.Member,
+        *,
+        team: Optional[Team] = commands.parameter(converter=Optional[TeamConverter]),
     ) -> Optional[discord.Message]:
         """|coro|
 
@@ -971,7 +1035,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             will be found from the channel the command is invoked in.
         """
         if not team:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
             if not team:
                 return
 
@@ -985,7 +1049,11 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
 
     @roster.command(name='remove', description='Remove a member from a team\'s roster.')
     async def roster_remove(
-        self, ctx: Context, member: discord.Member, *, team: Optional[TeamConverter]
+        self,
+        ctx: Context,
+        member: discord.Member,
+        *,
+        team: Optional[Team] = commands.parameter(converter=Optional[TeamConverter]),
     ) -> Optional[discord.Message]:
         """|coro|
 
@@ -1000,7 +1068,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             will be found from the channel the command is invoked in.
         """
         if not team:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
             if not team:
                 return
 
@@ -1015,7 +1083,9 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
     @commands.group(
         name='sub', description='Manage and add subs to the team.', aliases=['subs'], invoke_without_command=True
     )
-    async def sub(self, ctx: Context, *, team: Optional[TeamConverter]) -> Optional[discord.Message]:
+    async def sub(
+        self, ctx: Context, *, team: Optional[Team] = commands.parameter(converter=Optional[TeamConverter])
+    ) -> Optional[discord.Message]:
         """|coro|
 
         View the current subs on a team.
@@ -1030,7 +1100,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             return
 
         if not team:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
             if not team:
                 return
 
@@ -1044,7 +1114,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
     @sub.command(name='promote', description='Switch a member from sub to the roster.', aliases=['roster'])
     async def sub_promote(self, ctx: Context, member: discord.Member) -> Optional[discord.Message]:
         try:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
         except:
             return await ctx.send('This command was not used in a team\'s channel.')
 
@@ -1081,7 +1151,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             The team the member should be switched to.
         """
         try:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
         except:
             return await ctx.send('This command was not used in a team\'s channel.')
 
@@ -1099,7 +1169,9 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
         return await ctx.send(f'I have moved {member.mention} from `{team.name}` to `{new_team.name}`.')
 
     @sub.command(name='sync', description='Sync the team\'s roster with the server.')
-    async def sub_sync(self, ctx: Context, *, team: Optional[TeamConverter]) -> Optional[discord.Message]:
+    async def sub_sync(
+        self, ctx: Context, *, team: Optional[Team] = commands.parameter(converter=Optional[TeamConverter])
+    ) -> Optional[discord.Message]:
         """|coro|
 
         Sync the team's sub members with the server.
@@ -1111,7 +1183,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             will be found from the channel the command is invoked in.
         """
         if not team:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
             if not team:
                 return
 
@@ -1119,7 +1191,11 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
 
     @sub.command(name='add', description='Add a member to the subs list.')
     async def sub_add(
-        self, ctx: Context, member: discord.Member, *, team: Optional[TeamConverter]
+        self,
+        ctx: Context,
+        member: discord.Member,
+        *,
+        team: Optional[Team] = commands.parameter(converter=Optional[TeamConverter]),
     ) -> Optional[discord.Message]:
         """|coro|
 
@@ -1134,7 +1210,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             will be found from the channel the command is invoked in.
         """
         if not team:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
             if not team:
                 return
 
@@ -1148,7 +1224,11 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
 
     @sub.command(name='remove', description='Remove a member from the subs list.')
     async def sub_remove(
-        self, ctx: Context, member: discord.Member, *, team: Optional[TeamConverter]
+        self,
+        ctx: Context,
+        member: discord.Member,
+        *,
+        team: Optional[Team] = commands.parameter(converter=Optional[TeamConverter]),
     ) -> Optional[discord.Message]:
         """|coro|
 
@@ -1163,7 +1243,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             will be found from the channel the command is invoked in.
         """
         if not team:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team = await TeamConverter().convert(ctx, str(ctx.channel.id))
             if not team:
                 return
 
@@ -1174,6 +1254,36 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
         subs.remove(member)
         await team.edit(subs=subs)
         return await ctx.send(f'I have removed {member.mention} from the subs list.')
+
+    @commands.Cog.listener()
+    async def on_team_deactivate_timers_complete(self, *, team_id: int, guild_id: int) -> None:
+        """|coro|
+        
+        A coroutine called when a team is set to be deactivated.
+        
+        Parameters
+        ----------
+        team_id: :class:`int`
+            The team's ID.
+        guild_id: :class:`int`
+            The ID of the guild the team is in.
+        """
+        guild = self.bot.get_guild(guild_id)
+        if guild is None:
+            return
+
+        async with self.bot.safe_connection() as connection:
+            record = await connection.fetchrow('SELECT * FROM teams WHERE id = $1', team_id)
+
+        team = Team(record=record, guild=guild)
+
+        embed = self.bot.Embed(
+            title='Deactivating team now...',
+            description=f'The team `{record["name"]}` is being deactivated.',
+        )
+        await team.text_channel.send(embed=embed)
+        await asyncio.sleep(5)
+        await team.delete()
 
 
 async def setup(bot: FuryBot) -> None:
