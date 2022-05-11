@@ -41,7 +41,7 @@ import discord
 from discord.ext import commands
 
 if TYPE_CHECKING:
-    from bot import FuryBot
+    from bot import DiscordBot
 
 __all__ = (
     'Confirmation',
@@ -49,7 +49,7 @@ __all__ = (
     'tick',
 )
 
-FuryT = TypeVar('FuryT', bound='FuryBot')
+FuryT = TypeVar('FuryT', bound='DiscordBot')
 
 
 def tick(opt: Optional[bool], label: Optional[str] = None) -> str:
@@ -184,7 +184,7 @@ class DummyContext:
         return '<DummyContext created_at={0.created_at}>'.format(self)
 
 
-class Context(commands.Context, Generic[FuryT]):
+class Context(commands.Context[FuryT]):
     """The overridden Context class. Used to provide some simple
     functionality to the bot, which can home in handy for commands.
     """
