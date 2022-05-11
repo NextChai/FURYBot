@@ -40,3 +40,10 @@ CREATE TABLE IF NOT EXISTS highlight (
     phrase TEXT,
     count INT
 )
+
+CREATE TABLE IF NOT EXISTS counting (
+    user BIGINT,
+    number INT,
+    message_id BIGINT,
+    created_at TIMESTAMP,
+)
