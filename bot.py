@@ -32,11 +32,13 @@ import functools
 import datetime
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Awaitable,
     List,
     Dict,
+    Literal,
     Optional,
     Protocol,
     Union,
@@ -48,13 +50,14 @@ from typing import (
     Callable,
     Any,
     Generator,
+    overload,
 )
-from typing_extensions import ParamSpec
+from typing_extensions import ParamSpec, Self
 
 import aiohttp
 import mystbin
 import asyncpg
-import googletrans
+import googletrans # type: ignore # Stub file not found
 
 import discord
 from discord.ext import commands
@@ -71,6 +74,7 @@ from config import postgresql as uri, logging_webhook, message_webhook
 T = TypeVar('T')
 P = ParamSpec('P')
 FuryT = TypeVar('FuryT', bound='FuryBot')
+BotT = TypeVar('BotT', bound='Union[FuryBot, DiscordBot]')
 
 __all__ = (
     'DiscordBot',
@@ -102,7 +106,7 @@ def _yield_chunks(value: str):
         yield f'```py\n{value[i:i + const]}\n```'
 
 
-@discord.utils.copy_doc(discord.Embed)
+@discord.utils.copy_doc(discord.Embed) # type: ignore
 def Embed(
     *,
     title: str = MISSING,
@@ -177,11 +181,11 @@ class _Chunkable(Protocol):
     def __len__(self) -> int:
         ...
 
-    def __getitem__(self, __k) -> Any:
+    def __getitem__(self, __k: Any) -> Any:
         ...
 
 
-class DbContextManager(Generic[FuryT]):
+class DbContextManager(Generic[BotT]):
     """A simple context manager used to manage database connections.
 
     Please note this was created instead of using `contextlib.asynccontextmanager` because
@@ -197,26 +201,26 @@ class DbContextManager(Generic[FuryT]):
 
     __slots__: Tuple[str, ...] = ('bot', 'timeout', '_pool', '_conn', '_tr')
 
-    def __init__(self, bot: FuryT, *, timeout: float = 10.0) -> None:
-        self.bot: FuryT = bot
+    def __init__(self, bot: BotT, *, timeout: float = 10.0) -> None:
+        self.bot: BotT = bot
         self.timeout: float = timeout
-        self._pool: asyncpg.Pool = bot.pool
-        self._conn: Optional[asyncpg.Connection] = None
-        self._tr: Optional[asyncpg.Transaction] = None
+        self._pool: asyncpg.Pool[asyncpg.Record] = bot.pool
+        self._conn: Optional[asyncpg.Connection[asyncpg.Record]] = None
+        self._tr: Optional[Any] = None # note: look into fixing this later
 
-    async def acquire(self) -> asyncpg.Connection:
+    async def acquire(self) -> Coroutine[Any, Any, asyncpg.Connection[asyncpg.Record]]:
         return await self.__aenter__()
 
     async def release(self) -> None:
         return await self.__aexit__(None, None, None)
 
-    async def __aenter__(self) -> asyncpg.Connection:
-        self._conn = conn = await self._pool.acquire(timeout=self.timeout)
+    async def __aenter__(self) -> Any:
+        self._conn = conn = await self._pool.acquire(timeout=self.timeout) # type: ignore
         self._tr = conn.transaction()
         await self._tr.start()
         return conn
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type: Optional[Type[Exception]], exc: Optional[Exception], tb: Optional[TracebackType]):
         if exc and self._tr:
             await self._tr.rollback()
 
@@ -224,7 +228,7 @@ class DbContextManager(Generic[FuryT]):
             await self._tr.commit()
 
         if self._conn:
-            await self._pool.release(self._conn)
+            await self._pool.release(self._conn) # type: ignore
 
 
 class DiscordBot(commands.Bot):
@@ -259,10 +263,10 @@ class DiscordBot(commands.Bot):
         # This is mainly to ignore NoneType errors.
         # This won't be used unless the bot is ready and this
         # is not None.
-        user: discord.ClientUser
+        user: discord.ClientUser # type: ignore
 
-    def __init__(self, pool: asyncpg.Pool, session: aiohttp.ClientSession, *args, **kwargs):
-        self.pool: asyncpg.Pool = pool
+    def __init__(self, pool: asyncpg.Pool[asyncpg.Record], session: aiohttp.ClientSession, *args: Any, **kwargs: Any):
+        self.pool: asyncpg.Pool[asyncpg.Record] = pool
         self.session: aiohttp.ClientSession = session
 
         super().__init__(
@@ -290,7 +294,7 @@ class DiscordBot(commands.Bot):
         self._webhook_lock: asyncio.Lock = asyncio.Lock()
 
     @classmethod
-    async def setup_pool(cls) -> asyncpg.Pool:
+    async def setup_pool(cls) -> asyncpg.Pool[asyncpg.Record]:
         """:meth: `asyncpg.create_pool` with some extra functionality.
 
         Parameters
@@ -301,33 +305,36 @@ class DiscordBot(commands.Bot):
             Extra keyword arguments to pass to :meth:`asyncpg.create_pool`.
         """
 
-        def _encode_jsonb(value):
-            return discord.utils._to_json(value)
+        def _encode_jsonb(value: Any) -> str:
+            return discord.utils._to_json(value) # type: ignore
 
-        def _decode_jsonb(value):
-            return discord.utils._from_json(value)
+        def _decode_jsonb(value: Any) -> Any:
+            return discord.utils._from_json(value) # type: ignore
 
-        async def init(con):
+        async def init(con: asyncpg.Connection[asyncpg.Record]):
             await con.set_type_codec(
                 'jsonb', schema='pg_catalog', encoder=_encode_jsonb, decoder=_decode_jsonb, format='text'
             )
 
         pool = await asyncpg.create_pool(uri, init=init)
+        if pool is None:
+            raise RuntimeError('Failed to create pool!')
+            
         return pool
 
     @_wrap_extension
-    @discord.utils.copy_doc(commands.Bot.load_extension)
-    def load_extension(self, name: str, *, package: Optional[str] = None) -> Coroutine[Any, Any, None]:
+    @discord.utils.copy_doc(commands.Bot.load_extension) # type: ignore
+    def load_extension(self, name: str, *, package: Optional[str] = None) -> Coroutine[Any, Any, None]: # type: ignore
         return super().load_extension(name, package=package)
 
     @_wrap_extension
-    @discord.utils.copy_doc(commands.Bot.unload_extension)
-    def unload_extension(self, name: str, *, package: Optional[str] = None) -> Coroutine[Any, Any, None]:
+    @discord.utils.copy_doc(commands.Bot.unload_extension) # type: ignore
+    def unload_extension(self, name: str, *, package: Optional[str] = None) -> Coroutine[Any, Any, None]: # type: ignore
         return super().unload_extension(name, package=package)
 
     @_wrap_extension
-    @discord.utils.copy_doc(commands.Bot.reload_extension)
-    def reload_extension(self, name: str, *, package: Optional[str] = None) -> Coroutine[Any, Any, None]:
+    @discord.utils.copy_doc(commands.Bot.reload_extension) # type: ignore
+    def reload_extension(self, name: str, *, package: Optional[str] = None) -> Coroutine[Any, Any, None]: # type: ignore
         return super().reload_extension(name, package=package)
 
     async def load_extensions(self, /, *, force_task: bool = True) -> List[Optional[asyncio.Task[None]]]:
@@ -351,7 +358,7 @@ class DiscordBot(commands.Bot):
         """
         await self.load_extensions()
 
-    def safe_connection(self, timeout: float = 10) -> DbContextManager:
+    def safe_connection(self, timeout: float = 10) -> DbContextManager[Self]:
         """|coro|
 
         Generates a safe connection used to make database calls.
@@ -363,7 +370,7 @@ class DiscordBot(commands.Bot):
         """
         return DbContextManager(self, timeout=timeout)  # type: ignore
 
-    async def get_context(self, message: discord.Message, *, cls: Type[context.Context] = context.Context) -> Any:
+    async def get_context(self, message: discord.Message, *, cls: Type[context.Context[Self]] = context.Context) -> Any: # type: ignore
         """|coro|
 
         Used to get context of a :class:`discord.Message`.
@@ -393,7 +400,7 @@ class DiscordBot(commands.Bot):
 
         return webhook
 
-    async def _send_to_logging_webhook(self, *args, **kwargs) -> discord.WebhookMessage:
+    async def _send_to_logging_webhook(self, *args: Any, **kwargs: Any) -> discord.WebhookMessage:
         if args:
             kwargs['content'] = args[0]
 
@@ -416,7 +423,7 @@ class DiscordBot(commands.Bot):
         webhook = await self.get_logging_webhook()
         return await webhook.send(**kwargs)
 
-    async def send_to_logging_channel(self, *args, **kwargs) -> discord.WebhookMessage:
+    async def send_to_logging_channel(self, *args: Any, **kwargs: Any) -> discord.WebhookMessage:
         """Send a message to the logging channel.
 
         This is the only non-native dpy related coro. This is so the on_error can get placed here and not
@@ -475,7 +482,7 @@ class DiscordBot(commands.Bot):
         """
         await self.wait_until_ready()
 
-        items = []
+        items: List[discord.WebhookMessage] = []
         async with self._webhook_lock:
             for index, arg in enumerate(args):
                 try:
@@ -529,7 +536,7 @@ class DiscordBot(commands.Bot):
         await self.send_many_to_logging_channel(args=sending_args, kwargs=[])
 
 
-class FuryBot(DiscordBot, TimerManager):
+class FuryBot(DiscordBot, TimerManager): # type: ignore
     """
     The main implementation of Fury Bot. This combines
     both the Discord Bot and the Timer Manager into one, and adds
@@ -550,20 +557,20 @@ class FuryBot(DiscordBot, TimerManager):
         The time the bot started, in utc.
     """
 
-    def __init__(self, *, pool: asyncpg.Pool, session: aiohttp.ClientSession, loop: asyncio.AbstractEventLoop) -> None:
+    def __init__(self, *, pool: asyncpg.Pool[asyncpg.Record], session: aiohttp.ClientSession, loop: asyncio.AbstractEventLoop) -> None:
         super().__init__(pool=pool, session=session, loop=loop)
-        self.profanity = ProfanityChecker(wrap=self.wrap, safe_connection=self.safe_connection)
-        self.links: LinkChecker = LinkChecker(wrap=self.wrap, safe_connection=self.safe_connection, extract_email=True)
+        self.profanity = ProfanityChecker(wrap=self.wrap, safe_connection=self.safe_connection) # type: ignore
+        self.links: LinkChecker = LinkChecker(wrap=self.wrap, safe_connection=self.safe_connection, extract_email=True) # type: ignore
 
         self.executor = ThreadPoolExecutor(max_workers=15)
         self.mystbin: mystbin.Client = mystbin.Client(session=self.session)  # type: ignore
         self.start_time: datetime.datetime = datetime.datetime.utcnow()
-        self.translator = googletrans.Translator()
+        self.translator = googletrans.Translator() # type: ignore
 
         self._have_data = asyncio.Event()
         self._current_timer = None
 
-        self.highlight_cache: Dict[int, List[Dict]] = {}
+        self.highlight_cache: Dict[int, List[Dict[str, Any]]] = {}
 
     @discord.utils.cached_property
     def uptime_timestamp(self) -> str:
@@ -695,7 +702,7 @@ class FuryBot(DiscordBot, TimerManager):
         :class:`str`
             The censored text.
         """
-        return await self.profanity.censor(text)
+        return await self.profanity.censor(text) # type: ignore
 
     async def contains_profanity(self, text: str) -> bool:
         """|coro|
@@ -712,7 +719,7 @@ class FuryBot(DiscordBot, TimerManager):
         :class:`bool`
             Whether or not the text contains profanity.
         """
-        return await self.profanity.censor(text) != text
+        return await self.profanity.censor(text) != text # type: ignore
 
     async def get_links(self, text: str) -> List[str]:
         """|coro|
@@ -769,7 +776,7 @@ class FuryBot(DiscordBot, TimerManager):
 
         return await self.links.is_valid_link(link)
 
-    async def post_to_mystbin(self, content: str, syntax: str = 'python'):
+    async def post_to_mystbin(self, content: str, syntax: str = 'python') -> mystbin.Paste: # type: ignore # module is incorrect
         """Post content to Mystbin and get the response back.
 
         Parameters
@@ -785,7 +792,7 @@ class FuryBot(DiscordBot, TimerManager):
         """
         return await self.mystbin.post(content, syntax)  # type: ignore # This is not of concern to us.
 
-    async def translate(self, text: str) -> googletrans.Translated:
+    async def translate(self, text: str) -> googletrans.Translated: # type: ignore # The module is built incorrectly
         """|coro|
 
         Used to translate text from one language to another.
@@ -801,17 +808,37 @@ class FuryBot(DiscordBot, TimerManager):
             The translated text.
         """
         try:
-            return await self.wrap(self.translator.translate, text)
+            return await self.wrap(self.translator.translate, text) # type: ignore
         except IndexError:
             return type('Translated', (object,), {'text': text})  # type: ignore
+
+    @overload
+    async def is_locked(
+        self,
+        member: Union[discord.Member, discord.User],
+        *,
+        return_record: Literal[True] = True,
+        connection: Optional[asyncpg.Connection[asyncpg.Record]] = None
+    ) -> asyncpg.Record:
+        ...
+    
+    @overload
+    async def is_locked(
+        self,
+        member: Union[discord.Member, discord.User],
+        *,
+        return_record: Literal[False] = False,
+        connection: Optional[asyncpg.Connection[asyncpg.Record]] = None
+    ) -> bool:
+        ...
 
     async def is_locked(
         self,
         member: Union[discord.Member, discord.User],
         *,
         return_record: bool = False,
-        connection: Optional[asyncpg.Connection] = None,
-    ) -> bool:
+        connection: Optional[asyncpg.Connection[asyncpg.Record]] = None,
+    ) -> Union[asyncpg.Record, bool]:
         """Determine if a member is locked.
 
         Parameters
@@ -844,7 +871,7 @@ class FuryBot(DiscordBot, TimerManager):
 
         return False if not data else True
 
-    async def send_to(self, member: discord.abc.Messageable, *args, **kwargs) -> Optional[discord.Message]:
+    async def send_to(self, member: discord.abc.Messageable, *args: Any, **kwargs: Any) -> Optional[discord.Message]:
         """Neatly sends a message to a member. Any exceptions thrown will be quietly handled.
 
         Parameters
@@ -867,7 +894,7 @@ class FuryBot(DiscordBot, TimerManager):
             return None
 
     async def lockdown(
-        self, member: discord.Member, *, reason: Optional[str] = None, time: datetime.datetime, **kwargs
+        self, member: discord.Member, *, reason: Optional[str] = None, time: datetime.datetime, **kwargs: Any
     ) -> Optional[Timer]:
         """Adds a user to Lockdown.
 
@@ -903,7 +930,7 @@ class FuryBot(DiscordBot, TimerManager):
 
             raise MemberAlreadyLocked(f'Member {member} is already locked.')
 
-        channels = []
+        channels: List[int] = []
         for channel in member.guild.channels:  # Remove any special team creation. EX: rocket-league-1
             overwrites = channel.overwrites
             if (specific := overwrites.get(member)) and (specific.view_channel or specific.send_messages):
@@ -945,7 +972,7 @@ class FuryBot(DiscordBot, TimerManager):
         return timer
 
     async def lockdown_for(
-        self, seconds: int, member: discord.Member, *, reason: Optional[str] = None, **kwargs
+        self, seconds: int, member: discord.Member, *, reason: Optional[str] = None, **kwargs: Any
     ) -> Optional[Timer]:
         """|coro|
 
