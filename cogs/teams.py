@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from collections import deque
 from typing import TYPE_CHECKING, Literal, Mapping, TypedDict, List, Tuple, Any, Type, Union, Optional, Dict
+from typing_extensions import Self
 
 import discord
 from discord.ext import commands
@@ -137,7 +138,7 @@ class Team:
     async def overwrites(self) -> Mapping[Union[discord.Role, discord.Member], discord.PermissionOverwrite]:
         """Mapping[Union[:class:`discord.Role`, :class:`discord.Member`], :class:`discord.PermissionOverwrite`]:
         A mapping of members and roles to their respective permission overwrites."""
-        overwrites = {}
+        overwrites: Dict[Union[discord.Role, discord.Member], discord.PermissionOverwrite] = {}
         for member in await self.roster():
             overwrites[member] = discord.PermissionOverwrite(view_channel=True)
         for member in await self.subs():
@@ -280,7 +281,7 @@ class Team:
         await self.voice_channel.edit(sync_permissions=True)
 
         query_maker: List[str] = []
-        args = []
+        args: List[Union[str, int, datetime.datetime, Dict[Any, Any]]] = []
         for key, value in query:
             query_maker.append(f'{key}')
             args.append(value)
@@ -297,8 +298,8 @@ class Team:
         args.append(discord.utils.utcnow().replace(tzinfo=None))
         args.append(self.id)
 
-        for index, query in enumerate(query_maker):  # type: ignore
-            query_maker[index] = query + f' = ${index+1}'  # type: ignore
+        for index, entry in enumerate(query_maker):  
+            query_maker[index] = entry + f' = ${index+1}' 
 
         sql_query = 'update teams set ' + ', '.join(query_maker) + ' where id = $' + str(len(query_maker) + 1)
 
@@ -325,14 +326,14 @@ else:
         def __init__(self, *, multiple: bool = False) -> None:
             self.multiple: bool = multiple
 
-        async def convert(self, ctx: Context[FuryBot], argument: str) -> Union[Team, List[Team]]:
+        async def convert(self, ctx: Context, argument: str) -> Union[Team, List[Team]]:
             """|coro|
 
             Does the actual team conversion from a given argument.
 
             Parameters
             ----------
-            ctx: :class:`Context[FuryBot]`
+            ctx: :class:`Context`
                 The context of the command.
             argument: :class:`str`
                 The argument to convert.
@@ -418,7 +419,7 @@ else:
                 )
 
 
-class TeamSelect(discord.ui.Select):
+class TeamSelect(discord.ui.Select['SelectATeam']):
     """A select menu used to allow a user to select a specific team. This is
     so if there's a team name conflict, it can be sorted easily.
 
@@ -488,7 +489,7 @@ class TeamPaginator(discord.ui.View):
         super().__init__(timeout=90)
 
     @discord.ui.button(emoji='\N{LEFTWARDS BLACK ARROW}')
-    async def previous_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def previous_embed(self, interaction: discord.Interaction, button: discord.ui.Button[Self]):
         """|coro|
 
         Called to go back a page.
@@ -505,7 +506,7 @@ class TeamPaginator(discord.ui.View):
         await interaction.response.edit_message(embed=embed)
 
     @discord.ui.button(emoji='\N{BLACK RIGHTWARDS ARROW}')
-    async def next_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def next_embed(self, interaction: discord.Interaction, button: discord.ui.Button[Self]):
         """|coro|
 
         Called to go forward a page.
@@ -532,7 +533,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
     A cog to manage, create, and view teams within the FLVS Fury Discord server.
     """
 
-    async def cog_check(self, ctx: Context) -> bool:
+    async def cog_check(self, ctx: Context) -> bool: # type: ignore
         """|coro|
 
         A check called before each command invoke to ensure the user
@@ -611,10 +612,11 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
         ctx: Context,
         name: str,
         roster: List[discord.Member] = commands.parameter(converter=commands.Greedy[discord.Member]),
-        captain_role=commands.parameter(converter=discord.Role),
-        text_channel=commands.parameter(converter=discord.TextChannel),
-        voice_channel=commands.parameter(converter=discord.VoiceChannel),
-        category=commands.parameter(converter=discord.CategoryChannel),
+        
+        captain_role: discord.Role = Any,
+        text_channel: discord.TextChannel = Any,
+        voice_channel: discord.VoiceChannel = Any,
+        category: discord.CategoryChannel = Any,
     ) -> Optional[discord.Message]:
         """|coro|
 
@@ -641,14 +643,14 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
         roster = list(set(roster))
 
         @commands.command()
-        async def _dummy_g_p(ctx, param: commands.Greedy[discord.Member]):  #  _dummy_g_p -> dummy greedy positional
+        async def _dummy_g_p(ctx: Any, param: commands.Greedy[discord.Member]):  #  _dummy_g_p -> dummy greedy positional
             return
 
         subs: List[discord.Member] = []
         sub_obj = await ctx.prompt('Does this team have any subs?')
         if sub_obj:
             new_ctx = await self.bot.get_context(message=sub_obj, cls=type(ctx))
-            subs = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'])
+            subs = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'], commands.core._AttachmentIterator(data=[])) # type: ignore
             subs = list(set(subs))  # Clean dups
 
         embed = self.bot.Embed(
@@ -737,11 +739,11 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
         # In order to get commands.Greedy to transform,
         # we need a dummy command to work on, this is that command.
         @commands.command()
-        async def _dummy_g_p(ctx, param: commands.Greedy[discord.Member]):  #  _dummy_g_p -> dummy greedy positional
+        async def _dummy_g_p(ctx: Any, param: commands.Greedy[discord.Member]):  #  _dummy_g_p -> dummy greedy positional
             return
 
         new_ctx = await self.bot.get_context(message=member_list_obj, cls=type(ctx))
-        roster = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'])
+        roster = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'], commands.core._AttachmentIterator(data=[])) # type: ignore
 
         try:
             sub_obj = await ctx.prompt(
@@ -754,7 +756,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
                 return
 
             new_ctx = await self.bot.get_context(message=sub_obj, cls=type(ctx))
-            subs = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'])
+            subs: List[discord.Member] = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'], commands.core._AttachmentIterator(data=[])) # type: ignore
 
         captain_role_obj = await ctx.prompt('Great! Please enter the name or mention the captain role for this team.')
         if not captain_role_obj:
@@ -762,7 +764,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
 
         captain_role = await commands.RoleConverter().convert(ctx, captain_role_obj.content)
 
-        await ctx.trigger_typing()
+        await ctx.typing()
 
         # Let's create the team now
         team_tc_fmt = team_name.replace(' ', '-').lower()  # text channel
@@ -818,7 +820,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
         if not result:
             return
 
-        await ctx.trigger_typing()
+        await ctx.typing()
 
         for channel in (team.text_channel, team.voice_channel, team.category_channel):
             await channel.delete(reason='Team deleted')
@@ -881,7 +883,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
     @roster.command(name='demote', description='Switch a member from roster to sub.', aliases=['sub', 'substitute'])
     async def roster_demote(self, ctx: Context, member: discord.Member) -> Optional[discord.Message]:
         try:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team: Team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
         except:
             return await ctx.send('This command was not used in a team\'s channel.')
 
@@ -918,7 +920,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             The team the member should be switched to.
         """
         try:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team: Team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
         except:
             return await ctx.send('This command was not used in a team\'s channel.')
 
@@ -1044,7 +1046,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
     @sub.command(name='promote', description='Switch a member from sub to the roster.', aliases=['roster'])
     async def sub_promote(self, ctx: Context, member: discord.Member) -> Optional[discord.Message]:
         try:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team: Team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
         except:
             return await ctx.send('This command was not used in a team\'s channel.')
 
@@ -1081,7 +1083,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             The team the member should be switched to.
         """
         try:
-            team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
+            team: Team = await TeamConverter().convert(ctx, str(ctx.channel.id))  # type: ignore
         except:
             return await ctx.send('This command was not used in a team\'s channel.')
 
