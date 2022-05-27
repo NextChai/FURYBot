@@ -33,11 +33,12 @@ from typing import (
     Optional,
     List,
 )
+from typing_extensions import Self
 
 import discord
 from discord.ext import commands
 
-from jishaku.shell import ShellReader
+from jishaku.shell import ShellReader # type: ignore
 
 from utils import BaseCog
 from utils.context import Context, tick
@@ -48,10 +49,10 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-_GIT_PULL_REGEX: re.Pattern = re.compile(r'(?P<path>(?:[a-z]{1,}/){1,})(?P<filename>[a-z]{1,}).py')
+_GIT_PULL_REGEX: re.Pattern[str] = re.compile(r'(?P<path>(?:[a-z]{1,}/){1,})(?P<filename>[a-z]{1,}).py')
 
 
-class GitPullSelect(discord.ui.Select):
+class GitPullSelect(discord.ui.Select['GitPull']):
     """
     A select used by the owner to choose extensions to reload.
 
@@ -88,9 +89,9 @@ class GitPullSelect(discord.ui.Select):
         interaction: :class:`discord.Interaction`
             The interaction that was created by this select.
         """
-        statuses = []
+        statuses: List[str] = []
         for value in self.values:
-            statuses.append(await self.parent._reload_extension(value))
+            statuses.append(await self.parent._reload_extension(value)) # type: ignore
 
         await interaction.edit_original_message(content='Reloaded\n' + '\n'.join(statuses), view=None)
 
@@ -166,7 +167,7 @@ class GitPull(discord.ui.View):
             return tick(True, extension)
 
     @discord.ui.button(label='Reload All', style=discord.ButtonStyle.green)
-    async def reload_all(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def reload_all(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """|coro|
 
         A button used to reload all extensions instead of using the select.
@@ -178,7 +179,7 @@ class GitPull(discord.ui.View):
         button: :class:`discord.ui.Button`
             The button that was pressed.
         """
-        statuses = []
+        statuses: List[str] = []
         for extension in self.extensions:
             statuses.append(await self._reload_extension(extension))
 
@@ -191,7 +192,7 @@ class Owner(BaseCog, brief='The Owner commands.', emoji='\N{BLACK SUN WITH RAYS}
     that are only usable by the bot owner.
     """
 
-    async def cog_check(self, ctx: Context) -> bool:
+    async def cog_check(self, ctx: Context) -> bool: # type: ignore
         return await self.bot.is_owner(ctx.author)
 
     async def git_pull_optimization(self, ctx: Context, buffer: str) -> Optional[discord.Message]:
@@ -199,7 +200,7 @@ class Owner(BaseCog, brief='The Owner commands.', emoji='\N{BLACK SUN WITH RAYS}
         if not matches:
             return await ctx.send(f'No matches inside the `buffer` were found.')
 
-        extensions = []
+        extensions: List[str] = []
         for path, filename in matches:
             path = path.replace('/', '.')
 
@@ -217,13 +218,13 @@ class Owner(BaseCog, brief='The Owner commands.', emoji='\N{BLACK SUN WITH RAYS}
         a view to the user to reload any extensions.
         """
         message = await ctx.send('Pulling...')
-        await ctx.trigger_typing()
+        await ctx.typing()
 
         paginator = AsyncCodePaginator(message=message, author=ctx.author, prefix='```py')
         buffer = ''
 
-        with ShellReader(f'git {argument}', loop=self.bot.loop) as reader:
-            async for line in reader:
+        with ShellReader(f'git {argument}', loop=self.bot.loop) as reader: # type: ignore
+            async for line in reader: # type: ignore
                 buffer += f'{line}\n'
 
         await paginator.add_line(buffer)
