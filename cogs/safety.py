@@ -33,6 +33,7 @@ from typing import (
     Optional,
     TypeVar,
     Union,
+    List
 )
 
 import discord
@@ -72,7 +73,7 @@ class Safety(
         The bot that owns this cog.
     """
 
-    def __init__(self, bot):
+    def __init__(self, bot: FuryBot) -> None:
         self.bot: FuryBot = bot
         self.session: aiohttp.ClientSession = aiohttp.ClientSession(loop=self.bot.loop)
         self._message_logging_cache: cachetools.TTLCache[int, int] = cachetools.TTLCache(maxsize=1000, ttl=60 * 3)
@@ -114,12 +115,12 @@ class Safety(
         if not self._check_listener(message):
             return
 
-        translated = await self.bot.translate(message.content)
-        if translated.text == message.content:
+        translated: Any = await self.bot.translate(message.content) # type: ignore
+        if translated.text == message.content: # type: ignore
             return
 
         new_message = copy.copy(message)
-        new_message.content = translated.text
+        new_message.content = translated.text # type: ignore
         return await self.profanity_checker(new_message)
 
     @commands.Cog.listener('on_message')
@@ -153,7 +154,7 @@ class Safety(
         if not hasattr(self.bot, 'message_webhook'):
             await self._load_webhook()
 
-        attachments = []
+        attachments: List[discord.File] = []
         if message.attachments:
             for att in message.attachments:
                 try:
@@ -161,7 +162,7 @@ class Safety(
                 except:
                     pass
 
-        async with self.bot._webhook_lock:
+        async with self.bot._webhook_lock: # type: ignore
             if (ref := message.reference) and (ref_m_id := ref.message_id) and ref_m_id in self._message_logging_cache:
                 try:
                     original_message = await self.message_webhook.fetch_message(self._message_logging_cache[ref_m_id])
@@ -356,7 +357,7 @@ class Safety(
             return
 
         await message.delete()
-        files = []
+        files: List[discord.File] = []
         for a in message.attachments:
             try:
                 file = await a.to_file(use_cached=True)
@@ -427,7 +428,7 @@ class Safety(
         if before.content == after.content:
             return
 
-        translated = await self.bot.translate(after.content)
+        translated = await self.bot.translate(after.content) # type: ignore
         if translated != after.content:
             new_after = copy.copy(after)
             new_after.content = translated
@@ -579,5 +580,5 @@ class Safety(
         log.info('Name checker started.')
 
 
-async def setup(bot):
+async def setup(bot: FuryBot) -> None:
     return await bot.add_cog(Safety(bot))
