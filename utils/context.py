@@ -35,13 +35,14 @@ Please note this only applies to the "tick" function.
 """
 
 import asyncio
-from typing import Any, Callable, Dict, Optional, Tuple, Union, TYPE_CHECKING, Generic, TypeVar
+from typing import Any, Callable, Dict, Optional, Tuple, Union, TYPE_CHECKING, TypeVar
+from typing_extensions import Self
 
 import discord
 from discord.ext import commands
 
 if TYPE_CHECKING:
-    from bot import DiscordBot
+    from bot import DiscordBot, FuryBot
 
 __all__ = (
     'Confirmation',
@@ -124,7 +125,7 @@ class Confirmation(discord.ui.View):
             child.disabled = True  # type: ignore
 
     @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green)
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """|coro|
 
         The callback for the confirm button. When pressed, will set the internal
@@ -145,7 +146,7 @@ class Confirmation(discord.ui.View):
         await interaction.followup.send('Confirming', ephemeral=True)
 
     @discord.ui.button(label='Cancel', style=discord.ButtonStyle.grey)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button[Self]):
         """|coro|
 
         The callback for the confirm button. When pressed, will set the internal
@@ -184,7 +185,7 @@ class DummyContext:
         return '<DummyContext created_at={0.created_at}>'.format(self)
 
 
-class Context(commands.Context[FuryT]):
+class Context(commands.Context['FuryBot']):
     """The overridden Context class. Used to provide some simple
     functionality to the bot, which can home in handy for commands.
     """
@@ -192,9 +193,9 @@ class Context(commands.Context[FuryT]):
     __slots__: Tuple[str, ...] = ()
 
     if TYPE_CHECKING:
-        bot: FuryT
+        bot: FuryBot
 
-    async def get_confirmation(self, *args, **kwargs) -> bool:
+    async def get_confirmation(self, *args: Any, **kwargs: Any) -> bool:
         """Get confirmation fromt he user.
 
         Parameters
@@ -217,12 +218,10 @@ class Context(commands.Context[FuryT]):
 
         return view.value
 
-    @discord.utils.copy_doc(tick)
     def tick(self, opt: Optional[bool], label: Optional[str] = None) -> str:
         return tick(opt, label)
 
-    @discord.utils.copy_doc(commands.Context.send)
-    async def send(self, *args, **kwargs) -> discord.Message:
+    async def send(self, *args: Any, **kwargs: Any) -> discord.Message: # type: ignore
         if not kwargs.get('allowed_mentions', None):
             kwargs['allowed_mentions'] = discord.AllowedMentions.none()
 

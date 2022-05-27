@@ -652,7 +652,7 @@ class FuryHelp(commands.HelpCommand):
     """
 
     if TYPE_CHECKING:
-        context: Context[FuryBot]
+        context: Context
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs, verify_checks=True)
