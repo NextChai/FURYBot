@@ -28,6 +28,7 @@ from typing import (
     TYPE_CHECKING,
     List,
     Optional,
+    Any
 )
 
 import discord
@@ -48,7 +49,7 @@ def to_lower(argument: str) -> str:
 
 
 class HighlightPaginator(BaseButtonPaginator):
-    def __init__(self, bot: FuryBot, *args, **kwargs) -> None:
+    def __init__(self, bot: FuryBot, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.bot: FuryBot = bot
 
