@@ -34,27 +34,71 @@ Full copyright can be found here: https://github.com/Rapptz/RoboDanny/blob/rewri
 Please note this only applies to the "Commands.translate" function.
 """
 
+import re
+import itertools
 import googletrans # type: ignore
 from math import ceil
 from typing import (
     TYPE_CHECKING,
+    Any,
     Optional,
+    List,
+    NamedTuple
 )
 
 import discord
 from discord.ext import commands
 from discord import app_commands
 
+from jishaku.codeblocks import Codeblock, codeblock_converter # type: ignore
+
 from utils import human_timedelta, BaseCog
 from utils.context import Context
+from utils.paginator import Paginator, PaginatorView
 
 if TYPE_CHECKING:
     from bot import FuryBot
+    pyston: Any
+    
+else:
+    import pyston 
 
 __all__ = (
     'ReportView',
     'Commands',
 )
+
+CODEBLOCK_REGEX: re.Pattern[str] = re.compile(r'`{3}(?P<lang>[a-zA-z]*)\n?(?P<code>[^`]*)\n?`{3}', flags=re.IGNORECASE)
+
+PYTHON_OPTIMIZATION: str = """
+import asyncio
+
+async def main():
+    {}
+
+try:
+    asyncio.run(main())
+except Exception as e:
+    import traceback
+    traceback.print_exc()
+"""
+
+
+class Codeblock(NamedTuple):
+    lang: str
+    code: str
+
+
+def codeblock_converter(argument: str) -> Codeblock:
+    match = CODEBLOCK_REGEX.match(argument)
+    if not match:
+        raise commands.BadArgument('Invalid codeblock')
+
+    lang, code = match.groups()
+    if not lang or not code:
+        raise commands.BadArgument('Invalid codeblock')
+
+    return Codeblock(lang, code)
 
 
 class JumpButton(discord.ui.Button['ReportView']):
@@ -113,6 +157,40 @@ class Commands(BaseCog, brief='Commands!', emoji='\N{GAME DIE}'):
 
     Any user in the server are allowed to use these commands.
     """
+    pyston_client: Any = pyston.PystonClient()  # type: ignore
+    pyston_allowed_languages: List[str] = []
+    
+    @commands.command(
+        name='eval',
+        brief='Evalate code',
+        description='Evalate code in python.',
+        aliases=['evaluate', 'ev'],
+    )
+    async def evaluate(
+        self, ctx: Context, *, codeblock: Codeblock = commands.parameter(converter=codeblock_converter) # type: ignore
+    ) -> discord.Message:
+        # Let's handle internal cache first
+        if not self.pyston_allowed_languages:
+            runtimes = await self.pyston_client.runtimes()
+            self.pyston_allowed_languages = list(itertools.chain(*([r.language, *r.aliases] for r in runtimes)))
+
+        if codeblock.lang.lower() not in self.pyston_allowed_languages:
+            return await ctx.send(f'Language `{codeblock.lang}` is not supported.')
+
+        if codeblock.lang in {'py', 'python'}:
+            codeblock = Codeblock(codeblock.lang, PYTHON_OPTIMIZATION.format(codeblock.code))
+
+        async with ctx.typing():
+            result = await self.pyston_client.execute(codeblock.lang, [pyston.File(codeblock.code)])  # type: ignore
+
+        paginator = Paginator(prefix=f'Code lang `{codeblock.lang}` returned:\n```{codeblock.lang}')
+        paginator.add_line(result.run_stage.output)
+
+        view = None
+        if len(paginator.pages) > 1:
+            view = PaginatorView(paginator, author=ctx.author)
+
+        return await ctx.send(paginator.pages[0], view=view)
 
     @commands.command(name='ping', description='Pong!')
     async def _ping(self, ctx: Context) -> discord.Message:
