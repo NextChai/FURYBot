@@ -34,7 +34,7 @@ Full copyright can be found here: https://github.com/Rapptz/RoboDanny/blob/rewri
 Please note this only applies to the "Commands.translate" function.
 """
 
-import googletrans
+import googletrans # type: ignore
 from math import ceil
 from typing import (
     TYPE_CHECKING,
@@ -57,7 +57,7 @@ __all__ = (
 )
 
 
-class JumpButton(discord.ui.Button):
+class JumpButton(discord.ui.Button['ReportView']):
     """Used to handle the interaciton given when the "Jump!" button is pressed
     in the ReportView.
 
@@ -69,7 +69,7 @@ class JumpButton(discord.ui.Button):
 
     __all__ = ('channel_id',)
 
-    def __init__(self, channel_id):
+    def __init__(self, channel_id: int) -> None:
         self.channel_id = channel_id
         super().__init__(style=discord.ButtonStyle.green, label='Jump!')
 
@@ -103,7 +103,7 @@ class ReportView(discord.ui.View):
 
     __slots__ = ()
 
-    def __init__(self, channel_id):
+    def __init__(self, channel_id: int) -> None:
         super().__init__(timeout=3600)
         self.add_item(JumpButton(channel_id))
 
@@ -198,18 +198,18 @@ class Commands(BaseCog, brief='Commands!', emoji='\N{GAME DIE}'):
         if contents is None:
             return await ctx.send('You did not supply a message to translate.')
 
-        translated = await self.bot.translate(contents)
+        translated = await self.bot.translate(contents) # type: ignore
 
         # Inspired by:
         # https://github.com/Rapptz/RoboDanny/blob/rewrite/cogs/funhouse.py#L90-L93
-        src = googletrans.LANGUAGES.get(translated.src, '(auto-detected)').title()
-        dest = googletrans.LANGUAGES.get(translated.dest, 'Unknown').title()
+        src = googletrans.LANGUAGES.get(translated.src, '(auto-detected)').title() # type: ignore
+        dest = googletrans.LANGUAGES.get(translated.dest, 'Unknown').title() # type: ignore
 
         embed = self.bot.Embed(author=ctx.author, title='Translated Message')
-        embed.add_field(name=f'From {src}', value=translated.origin, inline=False)
-        embed.add_field(name=f'To {dest}', value=translated.text, inline=False)
+        embed.add_field(name=f'From {src}', value=translated.origin, inline=False) # type: ignore
+        embed.add_field(name=f'To {dest}', value=translated.text, inline=False) # type: ignore
         await replier.reply(embed=embed, mention_author=False)
 
 
-async def setup(bot):
+async def setup(bot: FuryBot) -> None:
     return await bot.add_cog(Commands(bot))
