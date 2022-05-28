@@ -1,170 +1,125 @@
 """
-The MIT License (MIT)
+MIT License
 
-Copyright (c) 2020-present NextChai
+Copyright (c) 2021 NextChai
 
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 """
 from __future__ import annotations
+import asyncio
 
+from dataclasses import dataclass
 from typing import (
-    Any,
-    Coroutine,
+    Optional,
     List,
-    Tuple,
     Union,
-    Generator,
+    Any,
+    Generic,
+    TypeVar,
     TYPE_CHECKING,
+    Type,
 )
+from typing_extensions import Self
 
 import discord
 from discord.ext import commands
 
+from jishaku.paginators import WrappedPaginator  # type: ignore
+
 if TYPE_CHECKING:
+    from discord.interactions import InteractionChannel
+
     from .context import Context
 
+    WrappedPaginator = commands.Paginator
+else:
+    from jishaku.paginators import WrappedPaginator  # type: ignore
 
-class BaseButtonPaginator(discord.ui.View):
-    """
-    The Base Button Paginator class. Will handle all page switching without
-    you having to do anything.
+T = TypeVar('T')
 
-    Attributes
-    ----------
-    entries: List[Any]
-        A list of entries to get spread across pages.
-    per_page: :class:`int`
-        The number of entries that get passed onto one page.
-    pages: List[List[Any]]
-        A list of pages which contain all entries for that page.
-    """
 
-    if TYPE_CHECKING:
-        ctx: Context
+@dataclass(repr=True, init=True)
+class ContextProxy:
+    author: Union[discord.Member, discord.User]
+    guild: Optional[discord.Guild]
+    channel: Optional[InteractionChannel]
+    message: Optional[discord.Message] = None
 
-    def __init__(self, *, entries: List[Any], per_page: int = 6) -> None:
-        super().__init__(timeout=180)
-        self.entries = entries
-        self.per_page = per_page
 
-        self._min_page = 1
-        self._current_page = 1
-        self.pages = list(self._format_pages(entries, per_page))
-        self._max_page = len(self.pages)
+class PaginatorView(discord.ui.View):
+    def __init__(
+        self,
+        paginator: commands.Paginator,
+        *,
+        timeout: Optional[float] = 180.0,
+        author: Optional[Union[discord.Member, discord.User]] = None,
+    ) -> None:
+        self.paginator: commands.Paginator = paginator
+        self.current: int = 0
+        self.author: Optional[Union[discord.Member, discord.User]] = author
 
-    @property
-    def max_page(self) -> int:
-        """:class:`int`: The max page count for this paginator."""
-        return self._max_page
+        super().__init__(timeout=timeout)
 
-    @property
-    def min_page(self) -> int:
-        """:class:`int`: The min page count for this paginator."""
-        return self._min_page
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:  # type: ignore
+        if not self.author:
+            return True
 
-    @property
-    def current_page(self) -> int:
-        """:class:`int`: The current page the user is on."""
-        return self._current_page
+        if self.author == interaction.user:
+            return True
 
-    @property
-    def total_pages(self) -> int:
-        """:class:`int`: Returns the total amount of pages."""
-        return len(self.pages)
+        await interaction.response.send_message('Hey! You can\'t do that!', ephemeral=True)
+        return False
 
-    async def format_page(self, entries: List[Any]) -> discord.Embed:
-        """|coro|
+    @discord.ui.button(emoji=discord.PartialEmoji(name='\N{BLACK LEFT-POINTING TRIANGLE}'))
+    async def backward(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        self.current -= 1
+        try:
+            page = self.paginator.pages[self.current]
+        except IndexError:
+            return await interaction.response.send_message('That\'s the last page!', ephemeral=True)
 
-        Used to make the embed that the user sees.
+        return await interaction.response.edit_message(content=page)
 
-        Parameters
-        ----------
-        entries: List[Any]
-            A list of entries for the current page.
+    @discord.ui.button(emoji=discord.PartialEmoji(name='\N{BLACK RIGHT-POINTING TRIANGLE}'))
+    async def forward(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        self.current += 1
+        try:
+            page = self.paginator.pages[self.current]
+        except IndexError:
+            return await interaction.response.send_message('That\'s the last page!', ephemeral=True)
 
-        Returns
-        -------
-        :class:`discord.Embed`
-            The embed for this page.
-        """
-        raise NotImplementedError('Subclass did not overwrite format_page coro.')
+        return await interaction.response.edit_message(content=page)
 
-    def _format_pages(self, entries, per_page) -> Generator[List[Any], None, None]:
-        for i in range(0, len(entries), per_page):
-            yield entries[i : i + per_page]
-
-    def _get_entries(self, *, up: bool = True, increment: bool = True) -> List[Any]:
-        if increment:
-            if up:
-                self._current_page += 1
-                if self._current_page > self._max_page:
-                    self._current_page = self._min_page
-            else:
-                self._current_page -= 1
-                if self._current_page < self._min_page:
-                    self._current_page = self.max_page
-
-        return self.pages[self._current_page - 1]
-
-    @discord.ui.button(emoji='\U000025c0', style=discord.ButtonStyle.blurple)
-    async def on_arrow_backward(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        entries = self._get_entries(up=False)
-        embed = await self.format_page(entries=entries)
-        return await interaction.response.edit_message(embed=embed)
-
-    @discord.ui.button(emoji='\U000025b6', style=discord.ButtonStyle.blurple)
-    async def on_arrow_forward(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        entries = self._get_entries(up=True)
-        embed = await self.format_page(entries=entries)
-        return await interaction.response.edit_message(embed=embed)
-
-    @discord.ui.button(emoji='\U000023f9', style=discord.ButtonStyle.blurple)
-    async def on_stop(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        self.clear_items()
+    @discord.ui.button(emoji=discord.PartialEmoji(name='\N{CROSS MARK}'))
+    async def stopper(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        await interaction.response.edit_message(view=None)
+        await asyncio.sleep(2)
+        await interaction.delete_original_message()
         self.stop()
-        return await interaction.response.edit_message(view=self)
-
-    @classmethod
-    async def start(cls, context: Context, *, entries: List[Any], per_page: int = 6):
-        """|coro|
-
-        Used to start the paginator.
-
-        Parameters
-        ----------
-        context: :class:`Context`
-            The context to send to. This could also be discord.abc.Messageable as `ctx.send` is the only method
-            used.
-        entries: List[Any]
-            A list of entries to pass onto the paginator.
-        per_page: :class:`int`
-            A number of how many entries you want per page.
-        """
-        new = cls(entries=entries, per_page=per_page)
-        new.ctx = context
-
-        entries = new._get_entries(increment=False)
-        embed = await new.format_page(entries=entries)
-        await context.send(embed=embed, view=new)
 
 
-class IncompletePaginator(commands.Paginator):
+# For imports im commands
+class Paginator(WrappedPaginator):
+    pass
+
+
+class IncompletePaginator(Paginator):
     def partially_close_page(self) -> str:
         current = self._current_page.copy()
         if self.suffix is not None:
@@ -183,71 +138,163 @@ class IncompletePaginator(commands.Paginator):
         return self._pages
 
 
-class AsyncCodePaginator(discord.ui.View, IncompletePaginator):
-    __slots__: Tuple[str, ...] = (
-        'message',
-        'current',
-    )
+class BaseButtonPaginator(Generic[T], discord.ui.View):
+    """
+    The Base Button Paginator class. Will handle all page switching without
+    you having to do anything.
 
-    def __init__(
-        self, message: discord.Message, author: Union[discord.Member, discord.User], timeout: float = 180.0, *args, **kwargs
-    ) -> None:
-        super().__init__(timeout=timeout)
-        IncompletePaginator.__init__(self, *args, **kwargs)
+    Attributes
+    ----------
+    entries: List[T]
+        A list of entries to get spread across pages.
+    per_page: :class:`int`
+        The number of entries that get passed onto one page.
+    pages: List[List[Any]]
+        A list of pages which contain all entries for that page.
+    clamp_pages: :class:`bool`
+        Whether or not to clamp the pages to the min and max.
+    """
 
-        self.author: Union[discord.Member, discord.User] = author
-        self.message: discord.Message = message
-        self.current: int = 0
+    if TYPE_CHECKING:
+        ctx: Context
 
-    def __repr__(self) -> str:
-        return '<AsyncCodePaginator interaction={0.interaction} current={0.current}>'.format(self)
+    def __init__(self, *, entries: List[T], per_page: int = 6, clamp_pages: bool = True, **kwargs: Any) -> None:
+        super().__init__(timeout=180)
+        self.entries: List[T] = entries
+        self.per_page: int = per_page
+        self.clamp_pages: bool = clamp_pages
+        self._orig_kwargs: Any = kwargs
 
-    def __await__(self):
-        return self.add_line.__await__()
-
-    def __call__(self, line: str) -> Coroutine[Any, Any, None]:
-        return self.add_line(line)
+        self._current_page = 0
+        self.pages = [entries[i : i + per_page] for i in range(0, len(entries), per_page)]
 
     @property
-    def current_page(self) -> str:
-        return self.incomplete_pages[self.current]
+    def max_page(self) -> int:
+        """:class:`int`: The max page count for this paginator."""
+        return len(self.pages)
+
+    @property
+    def min_page(self) -> int:
+        """:class:`int`: The min page count for this paginator."""
+        return 1
+
+    @property
+    def current_page(self) -> int:
+        """:class:`int`: The current page the user is on."""
+        return self._current_page + 1
+
+    @property
+    def total_pages(self) -> int:
+        """:class:`int`: Returns the total amount of pages."""
+        return len(self.pages)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        return interaction.user == self.author
+        result = interaction.user == self.ctx.author
+        if not result:
+            await interaction.response.send_message('Hey! This isn\'t yours!', ephemeral=True)
 
-    async def add_line(self, line: str, *, update_message: bool = True) -> None:
-        super().add_line(line)
-        self.current = len(self.incomplete_pages) - 1 if self.incomplete_pages else 0
+        return result
 
-        if update_message:
-            await self.message.edit(content=self.current_page, view=self)
+    async def format_page(self, entries: List[T], /) -> discord.Embed:
+        """|coro|
 
-    @discord.ui.button(
-        emoji=discord.PartialEmoji(name='\N{BLACK LEFT-POINTING TRIANGLE}'), style=discord.ButtonStyle.primary
-    )
-    async def backward(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        if self.current > 0:
-            self.current -= 1
-        else:
-            self.current = len(self.incomplete_pages) - 1
+        Used to make the embed that the user sees.
 
-        return await interaction.response.edit_message(content=self.current_page, view=self)
+        Parameters
+        ----------
+        entries: List[Any]
+            A list of entries for the current page.
 
-    @discord.ui.button(
-        emoji=discord.PartialEmoji(name='\N{BLACK RIGHT-POINTING TRIANGLE}'), style=discord.ButtonStyle.primary
-    )
-    async def forward(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        if self.current < len(self.incomplete_pages) - 1:
-            self.current += 1
-        else:
-            self.current = 0
+        Returns
+        -------
+        :class:`discord.Embed`
+            The embed for this page.
+        """
+        raise NotImplementedError('Subclass did not overwrite format_page coro.')
 
-        return await interaction.response.edit_message(content=self.current_page, view=self)
+    def _switch_page(self, count: int, /) -> List[T]:
+        self._current_page += count
 
-    @discord.ui.button(label='Stop Pagination', style=discord.ButtonStyle.danger)
-    async def stop_pagination(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if self.clamp_pages:
+            if count < 0:  # Going down
+                if self._current_page < 0:
+                    self._current_page = self.max_page - 1
+            elif count > 0:  # Going up
+                if self._current_page > self.max_page - 1:  # - 1 for indexing
+                    self._current_page = 0
+
+        return self.pages[self._current_page]
+
+    @discord.ui.button(emoji='\U000025c0', style=discord.ButtonStyle.blurple)
+    async def on_arrow_backward(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        entries = self._switch_page(-1)
+        embed = await self.format_page(entries)
+        return await interaction.response.edit_message(embed=embed)
+
+    @discord.ui.button(emoji='\U000025b6', style=discord.ButtonStyle.blurple)
+    async def on_arrow_forward(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        entries = self._switch_page(1)
+        embed = await self.format_page(entries)
+        return await interaction.response.edit_message(embed=embed)
+
+    @discord.ui.button(emoji='\U000023f9', style=discord.ButtonStyle.blurple)
+    async def on_stop(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         for child in self.children:
             child.disabled = True  # type: ignore
 
         self.stop()
-        await interaction.response.edit_message(view=self)
+
+        return await interaction.response.edit_message(view=self)
+
+    @classmethod
+    async def start(
+        cls: Type[BaseButtonPaginator[T]],
+        context: Context,
+        *,
+        entries: List[T],
+        per_page: int = 6,
+        clamp_pages: bool = True,
+    ) -> BaseButtonPaginator[T]:
+        """|coro|
+
+        Used to start the paginator.
+
+        Parameters
+        ----------
+        context: :class:`commands.Context`
+            The context to send to. This could also be discord.abc.Messageable as `ctx.send` is the only method
+            used.
+        entries: List[T]
+            A list of entries to pass onto the paginator.
+        per_page: :class:`int`
+            A number of how many entries you want per page.
+
+        Returns
+        -------
+        :class:`BaseButtonPaginator`[T]
+            The paginator that was started.
+        """
+        new = cls(entries=entries, per_page=per_page, clamp_pages=clamp_pages)
+        new.ctx = context
+
+        embed = await new.format_page(new.pages[0])
+        await context.send(embed=embed, view=new)
+        return new
+
+    @classmethod
+    async def start_from_interaction(
+        cls: Type[BaseButtonPaginator[T]], interaction: discord.Interaction, ephemeral: bool = True, **kwargs: Any
+    ) -> BaseButtonPaginator[T]:
+        proxy = ContextProxy(
+            author=kwargs.get('author') or interaction.user,
+            guild=interaction.guild,
+            channel=interaction.channel,
+            message=None,
+        )
+
+        new = cls(**kwargs)
+        new.ctx = proxy()  # type: ignore
+
+        embed = await new.format_page(new.pages[0])
+        await interaction.response.send_message(embed=embed, view=new, ephemeral=ephemeral)
+        return new
