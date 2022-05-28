@@ -14,3 +14,4 @@ googletrans==4.0.0-rc1
 urlextract
 jishaku
 git+https://github.com/bryanforbes/asyncpg-stubs
+aiopyston
