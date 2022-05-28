@@ -73,11 +73,11 @@ CODEBLOCK_REGEX: re.Pattern[str] = re.compile(r'`{3}(?P<lang>[a-zA-z]*)\n?(?P<co
 PYTHON_OPTIMIZATION: str = """
 import asyncio
 
-async def main():
+async def _wrapped_execution_function():
     {}
 
 try:
-    asyncio.run(main())
+    asyncio.run(_wrapped_execution_function())
 except Exception as e:
     import traceback
     traceback.print_exc()
