@@ -85,13 +85,15 @@ async def run_bot():
 
     loop = asyncio.get_event_loop()
     with setup_logging() as logger:
-        try:
-            async with aiohttp.ClientSession() as session:
-                fury = FuryBot(pool=pool, session=session, loop=loop)
-                async with fury:
-                    await fury.start(TOKEN, reconnect=True)
-        except Exception as e:
-            logger.warning('An unknown exception has occurred', exc_info=e)
+        async with pool:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    fury = FuryBot(pool=pool, session=session, loop=loop)
+                    async with fury:
+                        await fury.start(TOKEN, reconnect=True)
+            except Exception as e:
+                logger.warning('An unknown exception has occurred', exc_info=e)
+            
 
 
 if __name__ == '__main__':
