@@ -298,8 +298,8 @@ class Team:
         args.append(discord.utils.utcnow().replace(tzinfo=None))
         args.append(self.id)
 
-        for index, entry in enumerate(query_maker):  
-            query_maker[index] = entry + f' = ${index+1}' 
+        for index, entry in enumerate(query_maker):
+            query_maker[index] = entry + f' = ${index+1}'
 
         sql_query = 'update teams set ' + ', '.join(query_maker) + ' where id = $' + str(len(query_maker) + 1)
 
@@ -533,7 +533,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
     A cog to manage, create, and view teams within the FLVS Fury Discord server.
     """
 
-    async def cog_check(self, ctx: Context) -> bool: # type: ignore
+    async def cog_check(self, ctx: Context) -> bool:  # type: ignore
         """|coro|
 
         A check called before each command invoke to ensure the user
@@ -612,7 +612,6 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
         ctx: Context,
         name: str,
         roster: List[discord.Member] = commands.parameter(converter=commands.Greedy[discord.Member]),
-        
         captain_role: discord.Role = Any,
         text_channel: discord.TextChannel = Any,
         voice_channel: discord.VoiceChannel = Any,
@@ -650,7 +649,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
         sub_obj = await ctx.prompt('Does this team have any subs?')
         if sub_obj:
             new_ctx = await self.bot.get_context(message=sub_obj, cls=type(ctx))
-            subs = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'], commands.core._AttachmentIterator(data=[])) # type: ignore
+            subs = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'], commands.core._AttachmentIterator(data=[]))  # type: ignore
             subs = list(set(subs))  # Clean dups
 
         embed = self.bot.Embed(
@@ -743,7 +742,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
             return
 
         new_ctx = await self.bot.get_context(message=member_list_obj, cls=type(ctx))
-        roster = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'], commands.core._AttachmentIterator(data=[])) # type: ignore
+        roster = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'], commands.core._AttachmentIterator(data=[]))  # type: ignore
 
         try:
             sub_obj = await ctx.prompt(
@@ -756,7 +755,7 @@ class Teams(BaseCog, brief='A cog to manage teams.', emoji='\N{STEAM LOCOMOTIVE}
                 return
 
             new_ctx = await self.bot.get_context(message=sub_obj, cls=type(ctx))
-            subs: List[discord.Member] = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'], commands.core._AttachmentIterator(data=[])) # type: ignore
+            subs: List[discord.Member] = await _dummy_g_p.transform(new_ctx, _dummy_g_p.clean_params['param'], commands.core._AttachmentIterator(data=[]))  # type: ignore
 
         captain_role_obj = await ctx.prompt('Great! Please enter the name or mention the captain role for this team.')
         if not captain_role_obj:

@@ -36,21 +36,15 @@ Please note this only applies to the "Commands.translate" function.
 
 import re
 import itertools
-import googletrans # type: ignore
+import googletrans  # type: ignore
 from math import ceil
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Optional,
-    List,
-    NamedTuple
-)
+from typing import TYPE_CHECKING, Any, Optional, List, NamedTuple
 
 import discord
 from discord.ext import commands
 from discord import app_commands
 
-from jishaku.codeblocks import Codeblock, codeblock_converter # type: ignore
+from jishaku.codeblocks import Codeblock, codeblock_converter  # type: ignore
 
 from utils import human_timedelta, BaseCog
 from utils.context import Context
@@ -58,10 +52,11 @@ from utils.paginator import Paginator, PaginatorView
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
     pyston: Any
-    
+
 else:
-    import pyston 
+    import pyston
 
 __all__ = (
     'ReportView',
@@ -157,9 +152,10 @@ class Commands(BaseCog, brief='Commands!', emoji='\N{GAME DIE}'):
 
     Any user in the server are allowed to use these commands.
     """
+
     pyston_client: Any = pyston.PystonClient()  # type: ignore
     pyston_allowed_languages: List[str] = []
-    
+
     @commands.command(
         name='eval',
         brief='Evalate code',
@@ -167,7 +163,7 @@ class Commands(BaseCog, brief='Commands!', emoji='\N{GAME DIE}'):
         aliases=['evaluate', 'ev'],
     )
     async def evaluate(
-        self, ctx: Context, *, codeblock: Codeblock = commands.parameter(converter=codeblock_converter) # type: ignore
+        self, ctx: Context, *, codeblock: Codeblock = commands.parameter(converter=codeblock_converter)  # type: ignore
     ) -> discord.Message:
         # Let's handle internal cache first
         if not self.pyston_allowed_languages:
@@ -276,16 +272,16 @@ class Commands(BaseCog, brief='Commands!', emoji='\N{GAME DIE}'):
         if contents is None:
             return await ctx.send('You did not supply a message to translate.')
 
-        translated = await self.bot.translate(contents) # type: ignore
+        translated = await self.bot.translate(contents)  # type: ignore
 
         # Inspired by:
         # https://github.com/Rapptz/RoboDanny/blob/rewrite/cogs/funhouse.py#L90-L93
-        src = googletrans.LANGUAGES.get(translated.src, '(auto-detected)').title() # type: ignore
-        dest = googletrans.LANGUAGES.get(translated.dest, 'Unknown').title() # type: ignore
+        src = googletrans.LANGUAGES.get(translated.src, '(auto-detected)').title()  # type: ignore
+        dest = googletrans.LANGUAGES.get(translated.dest, 'Unknown').title()  # type: ignore
 
         embed = self.bot.Embed(author=ctx.author, title='Translated Message')
-        embed.add_field(name=f'From {src}', value=translated.origin, inline=False) # type: ignore
-        embed.add_field(name=f'To {dest}', value=translated.text, inline=False) # type: ignore
+        embed.add_field(name=f'From {src}', value=translated.origin, inline=False)  # type: ignore
+        embed.add_field(name=f'To {dest}', value=translated.text, inline=False)  # type: ignore
         await replier.reply(embed=embed, mention_author=False)
 
 

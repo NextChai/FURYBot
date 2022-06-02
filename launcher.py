@@ -93,7 +93,6 @@ async def run_bot():
                         await fury.start(TOKEN, reconnect=True)
             except Exception as e:
                 logger.warning('An unknown exception has occurred', exc_info=e)
-            
 
 
 if __name__ == '__main__':

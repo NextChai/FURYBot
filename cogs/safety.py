@@ -28,13 +28,7 @@ import aiohttp
 import logging
 import copy
 import cachetools
-from typing import (
-    TYPE_CHECKING,
-    Optional,
-    TypeVar,
-    Union,
-    List
-)
+from typing import TYPE_CHECKING, Optional, TypeVar, Union, List
 
 import discord
 from discord.ext import commands, tasks
@@ -115,12 +109,12 @@ class Safety(
         if not self._check_listener(message):
             return
 
-        translated: Any = await self.bot.translate(message.content) # type: ignore
-        if translated.text == message.content: # type: ignore
+        translated: Any = await self.bot.translate(message.content)  # type: ignore
+        if translated.text == message.content:  # type: ignore
             return
 
         new_message = copy.copy(message)
-        new_message.content = translated.text # type: ignore
+        new_message.content = translated.text  # type: ignore
         return await self.profanity_checker(new_message)
 
     @commands.Cog.listener('on_message')
@@ -162,7 +156,7 @@ class Safety(
                 except:
                     pass
 
-        async with self.bot._webhook_lock: # type: ignore
+        async with self.bot._webhook_lock:  # type: ignore
             if (ref := message.reference) and (ref_m_id := ref.message_id) and ref_m_id in self._message_logging_cache:
                 try:
                     original_message = await self.message_webhook.fetch_message(self._message_logging_cache[ref_m_id])
@@ -428,7 +422,7 @@ class Safety(
         if before.content == after.content:
             return
 
-        translated = await self.bot.translate(after.content) # type: ignore
+        translated = await self.bot.translate(after.content)  # type: ignore
         if translated != after.content:
             new_after = copy.copy(after)
             new_after.content = translated

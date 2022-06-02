@@ -221,7 +221,7 @@ class Context(commands.Context['FuryBot']):
     def tick(self, opt: Optional[bool], label: Optional[str] = None) -> str:
         return tick(opt, label)
 
-    async def send(self, *args: Any, **kwargs: Any) -> discord.Message: # type: ignore
+    async def send(self, *args: Any, **kwargs: Any) -> discord.Message:  # type: ignore
         if not kwargs.get('allowed_mentions', None):
             kwargs['allowed_mentions'] = discord.AllowedMentions.none()
 
