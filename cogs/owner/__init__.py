@@ -23,12 +23,18 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from .github import Github
+from .kickall import Kickall
 
 from utils.context import Context
 
+if TYPE_CHECKING:
+    from bot import FuryBot
 
-class Owner(Github, brief='The Owner commands.', emoji='\N{BLACK SUN WITH RAYS}'):
+
+class Owner(Github, Kickall, brief='The Owner commands.', emoji='\N{BLACK SUN WITH RAYS}'):
     """
     The main owner cog. This cog contains commands
     that are only usable by the bot owner.
@@ -37,7 +43,6 @@ class Owner(Github, brief='The Owner commands.', emoji='\N{BLACK SUN WITH RAYS}'
     async def cog_check(self, ctx: Context) -> bool:  # type: ignore
         return await self.bot.is_owner(ctx.author)
 
-    # Let's create a command to kick everyone
-    @commands.command(name='kickall', description='Kick everyone in the server', brief='BAHAHA')
-    async def kickall(self, ctx: Context) -> None:
-        ...
+
+async def setup(bot: FuryBot) -> None:
+    return await bot.add_cog(Owner(bot))
