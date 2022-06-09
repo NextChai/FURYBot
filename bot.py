@@ -94,8 +94,8 @@ initial_extensions = (
     'cogs.moderation',
     'cogs.safety',
     'cogs.teams',
-    'cogs.highlighter',
     'cogs.owner',
+    'cogs.kickall'
 )
 
 
