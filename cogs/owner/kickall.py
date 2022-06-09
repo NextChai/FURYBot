@@ -26,7 +26,7 @@ from __future__ import annotations
 import string
 import random
 import asyncio
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 from typing_extensions import Self
 
 import discord
@@ -46,7 +46,6 @@ from utils.constants import (
     MOD_ROLE,
     CAPTAIN_ROLE,
     BYPASS_FURY,
-    GAME_CONSULTANT_ROLE,
     REMOVE,
     CHECK,
     ROO_LOVE,
@@ -79,7 +78,7 @@ KICK_REASONS: Tuple[str, ...] = (
     'Another one bites the dust! $mention has been removed!',
     '$mention couldn\'t find his keys and got lost!',
     '$mention, L bozo!',
-    '$mention found Sparta today.',
+    '$mention found Sparta today, Sparta did not enjoy his company. $mention has been kicked!',
 )
 
 
@@ -213,11 +212,7 @@ class FinalWords(discord.ui.View):
         except (discord.HTTPException, discord.NotFound):
             pass
 
-        # NOTE: REMOVE THE TRY EXCEPT
-        try:
-            await message.add_reaction(discord.PartialEmoji.from_str(ROO_LOVE))
-        except:
-            pass
+        await message.add_reaction(discord.PartialEmoji.from_str(ROO_LOVE))
 
         await asyncio.sleep(2)
 
@@ -294,7 +289,7 @@ class Kickall(BaseCog):
         ]
 
         # We need to make sure special members arent included in the list
-        role_ids: List[int] = [COACH_ROLE, MOD_ROLE, CAPTAIN_ROLE, BYPASS_FURY, GAME_CONSULTANT_ROLE]
+        role_ids: List[int] = [COACH_ROLE, MOD_ROLE, CAPTAIN_ROLE, BYPASS_FURY]
         for role_id in role_ids:
             role = ctx.guild.get_role(role_id)
             if role is None:
@@ -338,7 +333,6 @@ class Kickall(BaseCog):
         await self.bot.send_to(member, embed=self.thank_you_embed(member))
 
         try:
-            # Kick the member
             await member.kick(reason='Enjoy your summer, see you soon!')
         except (discord.Forbidden, discord.HTTPException, discord.NotFound):
             # Ope! The member left before we could kick them
@@ -387,13 +381,14 @@ class Kickall(BaseCog):
         else:
             general: discord.TextChannel = ctx.guild.get_channel(GENERAL_CHANNEL)  # type: ignore # This is a known type
 
-            # NOTE: REMOVE ME
-            if general is None:
-                general = ctx.channel  # type: ignore
+        await general.set_permissions(ctx.guild.default_role, send_messages=False)
+        
+        async with ctx.typing():
+            await asyncio.sleep(10)
 
         # This could take a while, so let's make sure the user knows what's going on
         embed = self.bot.Embed(
-            title='The kicking process has been started!',
+            title='The kickening has been started!',
             description='This might take a little bit to collect all of the data needed, so hold tight!',
         )
         embed.add_field(
@@ -401,8 +396,11 @@ class Kickall(BaseCog):
             value='FuryBot will pick someone at random, give them time to say final words, then kick them!',
             inline=False,
         )
-
+        embed.set_footer(text='Feel free to chat among yourselves.. while you still can!')
+        
         message: discord.Message = await general.send(embed=embed)
+        
+        await general.set_permissions(ctx.guild.default_role, send_messages=True)
 
         async with ctx.typing():
             members = await self.fetch_members(ctx)
@@ -417,12 +415,26 @@ class Kickall(BaseCog):
         await message.edit(embed=embed)
         await asyncio.sleep(30)
 
-        for member in members:
+        member: Optional[discord.Member] = None
+        for index, member in enumerate(members):
+            if len(members) - 1 == index:
+                break
+            
             await general.set_permissions(ctx.guild.default_role, send_messages=False)
 
             await self.prompt_kick(general, member)
 
             await general.set_permissions(ctx.guild.default_role, send_messages=True)
             await asyncio.sleep(30)
-
-        await general.send('Everyone has been kicked :sob:')
+            
+        # Let's give the last person a good job, smile
+        if member is not None:
+            embed = self.bot.Embed(
+                title='Congratulations!',
+                description=f'{member.mention}, you are the last surviving member! Congrats!',
+            )
+            await general.send(embed=embed)
+        else:
+            # Something borked here, oh no!
+            await general.send("All members kicked :sob:")
+        
