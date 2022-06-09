@@ -95,7 +95,6 @@ initial_extensions = (
     'cogs.safety',
     'cogs.teams',
     'cogs.owner',
-    'cogs.kickall'
 )
 
 
