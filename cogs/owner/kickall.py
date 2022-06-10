@@ -86,9 +86,9 @@ class FinalWords(discord.ui.View):
     """A view that allows the user to enter in any final words, if any.
     We'll use :meth:`wait` in the command callback to wait for the user to
     send something, and then we'll KICK THEM.
-    
+
     This class inherits :class:`~discord.ui.View` and has a timeout of 20 seconds.
-    
+
     Paramters
     ---------
     bot: :class:`FuryBot`
@@ -97,7 +97,7 @@ class FinalWords(discord.ui.View):
         The channel used to send messges to, this is the #general channel.
     member: :class:`discord.Member`
         The member to request information from.
-        
+
     Attributes
     ----------
     bot: :class:`FuryBot`
@@ -109,7 +109,7 @@ class FinalWords(discord.ui.View):
     button_pressed: :class:`bool`
         Whether or not the user pressed a button. We'll use this in the :meth:`on_timeout` function.
     """
-    
+
     if TYPE_CHECKING:
         message: discord.Message
 
@@ -128,7 +128,7 @@ class FinalWords(discord.ui.View):
 
     async def on_timeout(self) -> None:
         """|coro|
-        
+
         A method called when the view times out. If the user didn't press a button,
         then we'll make the channel known, but if they do then delete the message.
         """
@@ -146,14 +146,14 @@ class FinalWords(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """|coro|
-        
+
         A method to check if the user that pressed the button is the same as the member that is supposed to be kicked.
-        
+
         Parameters
         ----------
         interaction: :class:`discord.Interaction`
             The interaction that was created from the button press.
-        
+
         Returns
         -------
         :class:`bool`
@@ -170,10 +170,10 @@ class FinalWords(discord.ui.View):
     )
     async def yes(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """|coro|
-        
+
         Called when the "yes" button has been pressed by the member that is supposed to be kicked. This
         callback will allow the user to send their final words to the channel.
-        
+
         Parmaeters
         ----------
         interaction: :class:`discord.Interaction`
@@ -221,10 +221,10 @@ class FinalWords(discord.ui.View):
     )
     async def no(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """|coro|
-        
+
         Called when the "no" button has been pressed by the member that is supposed to be kicked. This
         callback will alert the channel that the user chose to not have final words.
-        
+
         Parmaeters
         ----------
         interaction: :class:`discord.Interaction`
@@ -245,15 +245,15 @@ class Kickall(BaseCog):
     def fifty_fifty() -> bool:
         """:class:`bool`: A random ``True`` or ``False`` based upon a coin flip."""
         return random.random() >= 0.5
-    
+
     def thank_you_embed(self, member: discord.Member) -> discord.Embed:
         """A method used to return a simple thank you embed sent to the user that was kicked.
-        
+
         Parameters
-        ----------  
+        ----------
         member: :class:`discord.Member`
             The member that was kicked.
-        
+
         Returns
         -------
         :class:`discord.Embed`
@@ -264,24 +264,24 @@ class Kickall(BaseCog):
             description=f'From all of us at the **Fury** team, thank you for joining in our season of **Fury**! Through this season we have been able to grow our community and we hope to see you in the next one! {FURY}',
             author=member,
         )
-    
+
     async def fetch_members(self, ctx: Context) -> List[discord.Member]:
         """|coro|
-        
+
         Fetch all members within the guild and remove the ones that should not be kicked.
-        
+
         Parameters
         ----------
         ctx: :class:`Context`
             The context of the command.
-        
+
         Returns
         -------
         List[:class:`discord.Member`]
             A list of all members within the guild that should be kicked.
         """
         assert ctx.guild is not None
-        
+
         members: List[discord.Member] = [
             member
             async for member in ctx.guild.fetch_members(limit=None)
@@ -302,13 +302,13 @@ class Kickall(BaseCog):
 
         random.shuffle(members)
         return members
-    
+
     async def prompt_kick(self, general: discord.TextChannel, member: discord.Member) -> None:
         """|coro|
-        
+
         A method used to prompt the user that they're going to be kicked. This will alert the user it's their turn,
         allow them to say some final words, send them a nice message, then kick them.
-        
+
         Parameters
         ----------
         general: :class:`discord.TextChannel`
@@ -325,7 +325,7 @@ class Kickall(BaseCog):
         # Create our view and send our message to the general channel
         final_words = FinalWords(self.bot, general, member)
         final_words.message = await general.send(embed=embed, view=final_words, allowed_mentions=ALLOWED_MENTIONS)
-        
+
         # Wait for the view to be done.
         await final_words.wait()
 
@@ -360,7 +360,7 @@ class Kickall(BaseCog):
     @commands.guild_only()
     async def kickall(self, ctx: Context) -> None:
         """|coro|
-        
+
         Used to kick every unauthorized member from the FLVS Fury Discord server. This will
         go through every member, give them some time to say goodbyes, and then remove them.
         """
@@ -382,7 +382,7 @@ class Kickall(BaseCog):
             general: discord.TextChannel = ctx.guild.get_channel(GENERAL_CHANNEL)  # type: ignore # This is a known type
 
         await general.set_permissions(ctx.guild.default_role, send_messages=False)
-        
+
         async with ctx.typing():
             await asyncio.sleep(10)
 
@@ -397,9 +397,9 @@ class Kickall(BaseCog):
             inline=False,
         )
         embed.set_footer(text='Feel free to chat among yourselves.. while you still can!')
-        
+
         message: discord.Message = await general.send(embed=embed)
-        
+
         await general.set_permissions(ctx.guild.default_role, send_messages=True)
 
         async with ctx.typing():
@@ -419,14 +419,14 @@ class Kickall(BaseCog):
         for index, member in enumerate(members):
             if len(members) - 1 == index:
                 break
-            
+
             await general.set_permissions(ctx.guild.default_role, send_messages=False)
 
             await self.prompt_kick(general, member)
 
             await general.set_permissions(ctx.guild.default_role, send_messages=True)
             await asyncio.sleep(30)
-            
+
         # Let's give the last person a good job, smile
         if member is not None:
             embed = self.bot.Embed(
@@ -437,4 +437,3 @@ class Kickall(BaseCog):
         else:
             # Something borked here, oh no!
             await general.send("All members kicked :sob:")
-        
