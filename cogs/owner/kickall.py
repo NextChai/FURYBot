@@ -181,6 +181,7 @@ class FinalWords(discord.ui.View):
         button: :class:`discord.ui.Button`
             The button that was pressed.
         """
+        self.timeout = 60
         self.button_pressed = True
         self.disable_children()
 
