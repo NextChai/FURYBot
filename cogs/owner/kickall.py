@@ -259,11 +259,14 @@ class Kickall(BaseCog):
         :class:`discord.Embed`
             The embed that will be sent to the user.
         """
-        return self.bot.Embed(
+        embed = self.bot.Embed(
             title='Thank you!',
             description=f'From all of us at the **Fury** team, thank you for joining in our season of **Fury**! Through this season we have been able to grow our community and we hope to see you in the next one! {FURY}',
             author=member,
         )
+        embed.add_field(name='I need to get in contact with Coach Lambart?', value='His dm\'s are open! Feel free to message <@757663899532132418> anytime.')
+        
+        return embed
 
     async def fetch_members(self, ctx: Context) -> List[discord.Member]:
         """|coro|
