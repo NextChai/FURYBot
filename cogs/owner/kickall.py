@@ -212,7 +212,10 @@ class FinalWords(discord.ui.View):
         except (discord.HTTPException, discord.NotFound):
             pass
 
-        await message.add_reaction(discord.PartialEmoji.from_str(ROO_LOVE))
+        try:
+            await message.add_reaction(discord.PartialEmoji.from_str(ROO_LOVE))
+        except:
+            pass
 
         await asyncio.sleep(2)
 
@@ -285,10 +288,12 @@ class Kickall(BaseCog):
         """
         assert ctx.guild is not None
 
+        clean_members = [815658973993631755, 99582023080886272, 503635529989095424, 331106212881891328, 774853956106846238, 289186713849430016, 660344998172164096]
+
         members: List[discord.Member] = [
             member
             async for member in ctx.guild.fetch_members(limit=None)
-            if not member.bot and member.top_role < ctx.guild.me.top_role
+            if not member.bot and member.top_role < ctx.guild.me.top_role and member.id not in clean_members
         ]
 
         # We need to make sure special members arent included in the list
