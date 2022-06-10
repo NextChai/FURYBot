@@ -406,8 +406,8 @@ class Kickall(BaseCog):
         )
         embed.set_footer(text='Feel free to chat among yourselves.. while you still can!')
 
-        message: discord.Message = await general.send(embed=embed)
-
+        message: discord.Message = await general.send(embed=embed, content=ctx.guild.default_role.mention, allowed_mentions=discord.AllowedMentions.all())
+    
         await general.set_permissions(ctx.guild.default_role, send_messages=True)
 
         async with ctx.typing():
