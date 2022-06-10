@@ -87,7 +87,7 @@ class FinalWords(discord.ui.View):
     We'll use :meth:`wait` in the command callback to wait for the user to
     send something, and then we'll KICK THEM.
 
-    This class inherits :class:`~discord.ui.View` and has a timeout of 20 seconds.
+    This class inherits :class:`~discord.ui.View` and has a timeout of 10 seconds.
 
     Paramters
     ---------
@@ -118,7 +118,7 @@ class FinalWords(discord.ui.View):
         self.channel: discord.TextChannel = channel
         self.member: discord.Member = member
         self.button_pressed: bool = False
-        super().__init__(timeout=20)
+        super().__init__(timeout=10)
 
     def disable_children(self) -> None:
         """A method to disable all the children of the view."""
@@ -327,7 +327,7 @@ class Kickall(BaseCog):
         # Alert the user that it's their turn
         embed = self.bot.Embed(
             title=f'{member.display_name}, it\'s time!',
-            description=f'{member.mention}, do you have any final words? You have **20** seconds to press **Yes** or **No**.',
+            description=f'{member.mention}, do you have any final words? You have **10** seconds to press **Yes** or **No**.',
         )
 
         # Create our view and send our message to the general channel
