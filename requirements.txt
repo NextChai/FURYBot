@@ -1,17 +1,4 @@
 aiohttp[speedup]
 orjson
 git+https://github.com/Rapptz/discord.py
-profanityfilter
-asyncpg
-numpydoc
-fuzzywuzzy[speedup]
-asyncache 
-googletrans
-python-Levenshtein
-mystbin.py
-parsedatetime
-googletrans==4.0.0-rc1
-urlextract
-jishaku
 git+https://github.com/bryanforbes/asyncpg-stubs
-aiopyston
