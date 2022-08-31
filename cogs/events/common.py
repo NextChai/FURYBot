@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import discord
 
+
 def valid_message(message: discord.Message) -> bool:
     if not message.guild:
         return False

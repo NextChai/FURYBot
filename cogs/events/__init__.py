@@ -9,8 +9,10 @@ from discord.ext import commands
 
 from cogs.infractions import InfractionType
 from utils import assertion
+
 from .link import Link
 from .profanity import Profanity
+
 
 class EventListener(Link, Profanity):
     def check_valid_operation(self, data: Dict[Any, Any], message: discord.Message) -> bool:

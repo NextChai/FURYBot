@@ -34,6 +34,7 @@ from utils.bases.cog import BaseCog
 if TYPE_CHECKING:
     from bot import FuryBot
 
+
 class InfractionType(enum.Enum):
     profanity = 'Profanity'
     links = 'Links'
@@ -54,21 +55,21 @@ class Infractions(BaseCog):
         default_permissions=discord.Permissions(moderate_members=True),
         guild_only=True,
     )
-    
+
     infraction_moderator_role = app_commands.Group(
         name='moderator_role',
         description='Manage infraction moderator roles.',
         default_permissions=discord.Permissions(moderate_members=True),
         guild_only=True,
     )
-    
+
     infraction_allowed_links = app_commands.Group(
         name='allowed_links',
         description='Add and remove allowed links.',
         default_permissions=discord.Permissions(moderate_members=True),
         guild_only=True,
     )
-    
+
     infraction_ignored_channels = app_commands.Group(
         name='ignored_channels',
         description='Manage ignored channels for the infraction manager.',
@@ -146,7 +147,7 @@ class Infractions(BaseCog):
     @app_commands.describe(member='The member to add as a moderator.')
     async def infraction_moderator_add(self, interaction: discord.Interaction, member: discord.Member) -> None:
         assert interaction.guild
-        
+
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
@@ -160,16 +161,16 @@ class Infractions(BaseCog):
                 END $$
                 """,
                 interaction.guild.id,
-                member.id
+                member.id,
             )
-            
+
         return await interaction.response.send_message(f'I\'ve added {member.mention} as a moderator.', ephemeral=True)
-    
+
     @infraction_moderator.command(name='remove', description='Remove a moderator to your list of moderators.')
     @app_commands.describe(member='The member to remove as a moderator.')
     async def infraction_moderator_remove(self, interaction: discord.Interaction, member: discord.Member) -> None:
         assert interaction.guild
-        
+
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
@@ -181,16 +182,16 @@ class Infractions(BaseCog):
                 END $$
                 """,
                 interaction.guild.id,
-                member.id
+                member.id,
             )
-            
+
         return await interaction.response.send_message(f'I\'ve removed {member.mention} as a moderator.', ephemeral=True)
-    
+
     @infraction_moderator_role.command(name='add', description='Add a moderator role to your list of moderators.')
     @app_commands.describe(role='The role to add as a moderator role.')
     async def infraction_moderator_role_add(self, interaction: discord.Interaction, role: discord.Role) -> None:
         assert interaction.guild
-        
+
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
@@ -204,16 +205,16 @@ class Infractions(BaseCog):
                 END $$
                 """,
                 interaction.guild.id,
-                role.id
+                role.id,
             )
-            
+
         return await interaction.response.send_message(f'I\'ve added {role.mention} as a moderator role.', ephemeral=True)
-    
+
     @infraction_moderator_role.command(name='remove', description='Remove a moderator role to your list of moderators.')
     @app_commands.describe(member='The role to remove as a moderator role.')
     async def infraction_moderator_role_remove(self, interaction: discord.Interaction, role: discord.Role) -> None:
         assert interaction.guild
-        
+
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
@@ -225,16 +226,16 @@ class Infractions(BaseCog):
                 END $$
                 """,
                 interaction.guild.id,
-                role.id
+                role.id,
             )
-            
+
         return await interaction.response.send_message(f'I\'ve removed {role.mention} as a moderator role.', ephemeral=True)
 
     @infraction_ignored_channels.command(name='add', description='Add an ignored channel to the infraction manager.')
     @app_commands.describe(channel='The channel to add.')
     async def infraction_channels_add(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
         assert interaction.guild
-        
+
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
@@ -248,16 +249,18 @@ class Infractions(BaseCog):
                 END $$
                 """,
                 interaction.guild.id,
-                channel.id
+                channel.id,
             )
-            
-        return await interaction.response.send_message(f'I\'ve added {channel.mention} as an ignored channel.', ephemeral=True)
-    
+
+        return await interaction.response.send_message(
+            f'I\'ve added {channel.mention} as an ignored channel.', ephemeral=True
+        )
+
     @infraction_ignored_channels.command(name='remove', description='Remove an ignored channel to the infraction manager.')
     @app_commands.describe(channel='The channel to remove.')
     async def infraction_channels_remove(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
         assert interaction.guild
-        
+
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
@@ -269,19 +272,23 @@ class Infractions(BaseCog):
                 END $$
                 """,
                 interaction.guild.id,
-                channel.id
+                channel.id,
             )
-            
-        return await interaction.response.send_message(f'I\'ve removed {channel.mention} as an ignored channel.', ephemeral=True)
-    
+
+        return await interaction.response.send_message(
+            f'I\'ve removed {channel.mention} as an ignored channel.', ephemeral=True
+        )
+
     @infraction_allowed_links.command(name='add', description='Add an allowed link to the link filter.')
     @app_commands.describe(link='The link to add.')
     async def infraction_allowed_links_add(self, interaction: discord.Interaction, link: str) -> None:
         assert interaction.guild
-        
+
         if not await self.bot.link_filter.get_links(link):
-            return await interaction.response.send_message('I couldn\'t find any links in the `link` parameter you sent...', ephemeral=True)
-        
+            return await interaction.response.send_message(
+                'I couldn\'t find any links in the `link` parameter you sent...', ephemeral=True
+            )
+
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
@@ -295,19 +302,21 @@ class Infractions(BaseCog):
                 END $$
                 """,
                 interaction.guild.id,
-                link
+                link,
             )
-            
+
         return await interaction.response.send_message(f'I\'ve added `{link}` as an allowed link.', ephemeral=True)
-        
+
     @infraction_allowed_links.command(name='remove', description='Remove an allowed link to the link filter.')
     @app_commands.describe(link='The link to remove.')
     async def infraction_allowed_links_remove(self, interaction: discord.Interaction, link: str) -> None:
         assert interaction.guild
-        
+
         if not await self.bot.link_filter.get_links(link):
-            return await interaction.response.send_message('I couldn\'t find any links in the `link` parameter you sent...', ephemeral=True)
-        
+            return await interaction.response.send_message(
+                'I couldn\'t find any links in the `link` parameter you sent...', ephemeral=True
+            )
+
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
@@ -319,10 +328,11 @@ class Infractions(BaseCog):
                 END $$
                 """,
                 interaction.guild.id,
-                link
+                link,
             )
-            
+
         return await interaction.response.send_message(f'I\'ve removed `{link}` as an allowed link.', ephemeral=True)
-    
+
+
 async def setup(bot: FuryBot) -> None:
     await bot.add_cog(Infractions(bot))

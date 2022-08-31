@@ -23,10 +23,10 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import time
 import asyncio
 import functools
 import logging
+import time
 from concurrent import futures
 from typing import (
     TYPE_CHECKING,
@@ -47,7 +47,7 @@ from typing import (
 import asyncpg
 import discord
 from discord.ext import commands
-from typing_extensions import Self, Concatenate
+from typing_extensions import Concatenate, Self
 
 from utils import assertion
 from utils.link import LinkFilter
@@ -66,9 +66,8 @@ DecoFunc: TypeAlias = Callable[Concatenate['FuryBot', P], Coroutine[T, Any, Any]
 
 _log = logging.getLogger(__name__)
 
-initial_extensions: Tuple[str, ...] = (
-    'jishaku',
-)
+initial_extensions: Tuple[str, ...] = ('jishaku',)
+
 
 def wrap_extension(coro: DecoFunc[P, T]) -> DecoFunc[P, T]:
     """A method to wrap an extension coroutine in the Bot class. This will handle all
@@ -172,7 +171,7 @@ class FuryBot(commands.Bot):
 
         self.profanity_filter: ProfantiyFilter = ProfantiyFilter(self)
         self.link_filter: LinkFilter = LinkFilter(self)
-        
+
         super().__init__(
             command_prefix='fury.',
             help_command=None,
