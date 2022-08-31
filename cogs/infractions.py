@@ -94,7 +94,7 @@ class Infractions(BaseCog):
                 DO $$
                 BEGIN
                     IF EXISTS(SELECT * FROM infractions.settings WHERE guild_id = $1) THEN
-                        UPDATE infractions.settings SET notification_channel_id = $2
+                        UPDATE infractions.settings SET notification_channel_id = $2 WHERE guild_id = $1
                     ELSE
                         INSERT INTO infractions.settings(guild_id, notification_channel_id) VALUES($1, $2)
                     END IF;
