@@ -59,8 +59,8 @@ if TYPE_CHECKING:
 
 T = TypeVar('T')
 P = ParamSpec('P')
-PoolType: TypeAlias = asyncpg.Pool[asyncpg.Record]
-ConnectionType: TypeAlias = asyncpg.Connection[asyncpg.Record]
+PoolType: TypeAlias = 'asyncpg.Pool[asyncpg.Record]'
+ConnectionType: TypeAlias = 'asyncpg.Connection[asyncpg.Record]'
 
 _log = logging.getLogger(__name__)
 
