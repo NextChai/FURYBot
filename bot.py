@@ -49,6 +49,8 @@ from discord.ext import commands
 from typing_extensions import Self
 
 from utils import assertion
+from utils.link import LinkFilter
+from utils.profanity import ProfantiyFilter
 
 if TYPE_CHECKING:
     import datetime
@@ -132,6 +134,9 @@ class FuryBot(commands.Bot):
         self.session: aiohttp.ClientSession = session
         self.pool: PoolType = pool
         self.thread_pool: futures.ThreadPoolExecutor = futures.ThreadPoolExecutor(max_workers=20)
+
+        self.profanity_filter: ProfantiyFilter = ProfantiyFilter(self)
+        self.link_filter: LinkFilter = LinkFilter(self)
 
     @classmethod
     async def setup_pool(cls: Type[Self], *, uri: str, **kwargs: Any) -> PoolType:

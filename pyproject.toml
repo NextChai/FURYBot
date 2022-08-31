@@ -13,7 +13,8 @@ reportPrivateUsage = "none"
 exclude = [
     "**/__pycache__",
     '.github',
-    'typings'
+    'typings',
+    'schema.sql'
 ]
 
 [tool.isort]
