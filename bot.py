@@ -50,6 +50,7 @@ from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
 from utils import assertion
+from utils.error_handler import ErrorHandler
 from utils.link import LinkFilter
 from utils.profanity import ProfantiyFilter
 
@@ -66,7 +67,7 @@ DecoFunc: TypeAlias = Callable[Concatenate['FuryBot', P], Coroutine[T, Any, Any]
 
 _log = logging.getLogger(__name__)
 
-initial_extensions: Tuple[str, ...] = ('jishaku', 'cogs.events.infractions', 'cogs.infractions')
+initial_extensions: Tuple[str, ...] = ('jishaku', 'cogs.events.infractions', 'cogs.infractions', 'utils.error_handler')
 
 
 def wrap_extension(coro: DecoFunc[P, T]) -> DecoFunc[P, T]:
@@ -162,6 +163,7 @@ class FuryBot(commands.Bot):
 
     if TYPE_CHECKING:
         user: discord.ClientUser  # This isn't accessed before the client has been logged in so it's OK to overwrite it.
+        error_handler: ErrorHandler
 
     def __init__(self, *, loop: asyncio.AbstractEventLoop, session: aiohttp.ClientSession, pool: PoolType) -> None:
         self.loop: asyncio.AbstractEventLoop = loop
