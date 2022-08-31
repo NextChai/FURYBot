@@ -217,7 +217,8 @@ class FuryBot(commands.Bot):
 
     # Hooks
     async def setup_hook(self) -> None:
-        return await super().setup_hook()
+        for extension in initial_extensions:
+            await self.load_extension(extension)
 
     # Events
     async def on_ready(self) -> None:
