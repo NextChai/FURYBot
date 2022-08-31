@@ -64,7 +64,9 @@ ConnectionType: TypeAlias = 'asyncpg.Connection[asyncpg.Record]'
 
 _log = logging.getLogger(__name__)
 
-initial_extensions: Tuple[str, ...] = ()
+initial_extensions: Tuple[str, ...] = (
+    'jishaku',
+)
 
 
 class DbContextManager:
