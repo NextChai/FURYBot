@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import textwrap
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import discord
 from discord.ext import commands
@@ -13,8 +13,11 @@ from utils import assertion
 from .link import Link
 from .profanity import Profanity
 
+if TYPE_CHECKING:
+    from bot import FuryBot
 
-class EventListener(Link, Profanity):
+
+class InfractionListener(Link, Profanity):
     def check_valid_operation(self, data: Dict[Any, Any], message: discord.Message) -> bool:
         assert isinstance(message.author, discord.Member)
 
@@ -129,3 +132,7 @@ class EventListener(Link, Profanity):
             inline=False,
         )
         await channel.send(embed=embed)
+
+
+async def setup(bot: FuryBot) -> None:
+    await bot.add_cog(InfractionListener(bot))
