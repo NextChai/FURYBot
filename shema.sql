@@ -16,6 +16,6 @@ CREATE TABLE IF NOT EXISTS infractions.settings (
     notification_channel_id BIGINT,
     moderators BIGINT[] DEFAULT ARRAY[]::BIGINT[],
     moderator_role_ids BIGINT[] DEFAULT ARRAY[]::BIGINT[],
-    valid_links TEXT[] DEFAULT ARRAY::TEXT[],
+    valid_links TEXT[] DEFAULT ARRAY[]::TEXT[],
     ignored_channel_ids BIGINT[] DEFAULT ARRAY[]::BIGINT[]
 )
