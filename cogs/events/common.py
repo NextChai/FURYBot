@@ -24,35 +24,13 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import discord
-from discord.ext import commands
 
-from utils.bases.cog import BaseCog
+def valid_message(message: discord.Message) -> bool:
+    if not message.guild:
+        return False
+    if not isinstance(message.author, discord.Member):
+        return False
+    if not message.content:
+        return False
 
-from .common import valid_message
-
-
-class Link(BaseCog):
-    @commands.Cog.listener('on_message')
-    async def link_check(self, message: discord.Message) -> None:
-        if not valid_message(message):
-            return
-
-        links = await self.bot.link_filter.get_links(message.content)
-        if not links:
-            return
-
-        self.bot.dispatch('links_found', message, links)
-
-    @commands.Cog.listener('on_message_edit')
-    async def link_check_on_edit(self, before: discord.Message, after: discord.Message) -> None:
-        if before.content == after.content:
-            return
-
-        if not valid_message(after):
-            return
-
-        links = await self.bot.link_filter.get_links(after.content)
-        if not links:
-            return
-
-        self.bot.dispatch('links_found', after, links)
+    return True

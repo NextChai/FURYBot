@@ -9,21 +9,10 @@ from discord.ext import commands
 
 from cogs.infractions import InfractionType
 from utils import assertion
-from utils.bases.cog import BaseCog
+from .link import Link
+from .profanity import Profanity
 
-
-def valid_message(message: discord.Message) -> bool:
-    if not message.guild:
-        return False
-    if not isinstance(message.author, discord.Member):
-        return False
-    if not message.content:
-        return False
-
-    return True
-
-
-class EventListener(BaseCog):
+class EventListener(Link, Profanity):
     def check_valid_operation(self, data: Dict[Any, Any], message: discord.Message) -> bool:
         assert isinstance(message.author, discord.Member)
 

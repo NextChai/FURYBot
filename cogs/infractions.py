@@ -24,12 +24,15 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import enum
+from typing import TYPE_CHECKING
 
 import discord
 from discord import app_commands
 
 from utils.bases.cog import BaseCog
 
+if TYPE_CHECKING:
+    from bot import FuryBot
 
 class InfractionType(enum.Enum):
     profanity = 'Profanity'
@@ -320,3 +323,6 @@ class Infractions(BaseCog):
             )
             
         return await interaction.response.send_message(f'I\'ve removed `{link}` as an allowed link.', ephemeral=True)
+    
+async def setup(bot: FuryBot) -> None:
+    await bot.add_cog(Infractions(bot))

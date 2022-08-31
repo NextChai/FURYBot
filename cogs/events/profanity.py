@@ -28,7 +28,7 @@ from discord.ext import commands
 
 from utils.bases.cog import BaseCog
 
-from . import valid_message
+from .common import valid_message
 
 
 class Profanity(BaseCog):
