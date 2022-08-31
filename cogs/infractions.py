@@ -54,6 +54,7 @@ class Infractions(BaseCog):
         description='Manage infraction moderators.',
         default_permissions=discord.Permissions(moderate_members=True),
         guild_only=True,
+        parent=infraction,
     )
 
     infraction_moderator_role = app_commands.Group(
@@ -61,6 +62,7 @@ class Infractions(BaseCog):
         description='Manage infraction moderator roles.',
         default_permissions=discord.Permissions(moderate_members=True),
         guild_only=True,
+        parent=infraction,
     )
 
     infraction_allowed_links = app_commands.Group(
@@ -68,6 +70,7 @@ class Infractions(BaseCog):
         description='Add and remove allowed links.',
         default_permissions=discord.Permissions(moderate_members=True),
         guild_only=True,
+        parent=infraction,
     )
 
     infraction_ignored_channels = app_commands.Group(
@@ -75,6 +78,7 @@ class Infractions(BaseCog):
         description='Manage ignored channels for the infraction manager.',
         default_permissions=discord.Permissions(moderate_members=True),
         guild_only=True,
+        parent=infraction,
     )
 
     @infraction.command(name='notification_channel', description='Change the notification channel for infractions.')
