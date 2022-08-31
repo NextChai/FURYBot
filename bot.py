@@ -137,6 +137,15 @@ class FuryBot(commands.Bot):
 
         self.profanity_filter: ProfantiyFilter = ProfantiyFilter(self)
         self.link_filter: LinkFilter = LinkFilter(self)
+        
+        super().__init__(
+            command_prefix='fury.',
+            help_command=None,
+            description='A helpful moderation tool',
+            intents=discord.Intents.all(),
+            strip_after_prefix=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
 
     @classmethod
     async def setup_pool(cls: Type[Self], *, uri: str, **kwargs: Any) -> PoolType:
