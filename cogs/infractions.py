@@ -105,6 +105,9 @@ class Infractions(BaseCog):
 
     @infraction.command(name='time', description='Change the mute time for an infraction.')
     @app_commands.guild_only()
+    @app_commands.describe(
+        time='The total time to mute when an infraction occurrs.'
+    )
     @app_commands.choices(
         time=[
             app_commands.Choice(name='1 minute', value=60),
@@ -211,7 +214,7 @@ class Infractions(BaseCog):
         return await interaction.response.send_message(f'I\'ve added {role.mention} as a moderator role.', ephemeral=True)
 
     @infraction_moderator_role.command(name='remove', description='Remove a moderator role to your list of moderators.')
-    @app_commands.describe(member='The role to remove as a moderator role.')
+    @app_commands.describe(role='The role to remove as a moderator role.')
     async def infraction_moderator_role_remove(self, interaction: discord.Interaction, role: discord.Role) -> None:
         assert interaction.guild
 
