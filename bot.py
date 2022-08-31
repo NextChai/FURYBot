@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import time
 import asyncio
 import functools
 import logging
@@ -46,7 +47,7 @@ from typing import (
 import asyncpg
 import discord
 from discord.ext import commands
-from typing_extensions import Self
+from typing_extensions import Self, Concatenate
 
 from utils import assertion
 from utils.link import LinkFilter
@@ -61,12 +62,44 @@ T = TypeVar('T')
 P = ParamSpec('P')
 PoolType: TypeAlias = 'asyncpg.Pool[asyncpg.Record]'
 ConnectionType: TypeAlias = 'asyncpg.Connection[asyncpg.Record]'
+DecoFunc: TypeAlias = Callable[Concatenate['FuryBot', P], Coroutine[T, Any, Any]]
 
 _log = logging.getLogger(__name__)
 
 initial_extensions: Tuple[str, ...] = (
     'jishaku',
 )
+
+def wrap_extension(coro: DecoFunc[P, T]) -> DecoFunc[P, T]:
+    """A method to wrap an extension coroutine in the Bot class. This will handle all
+    logging and error handling.
+
+    Parameters
+    ----------
+    coro: DecoFunc[P, T]
+        The coroutine to wrap.
+
+    Returns
+    -------
+    DecoFunc[P, T]
+        A wrapped function that logs and handles errors.
+    """
+
+    async def wrapped(self: FuryBot, *args: P.args, **kwargs: P.kwargs) -> T:
+        ext_name, *_ = args
+
+        start = time.time()
+        try:
+            result = await coro(self, *args, **kwargs)
+        except commands.ExtensionFailed as exc:
+            raise exc.original from exc
+        except Exception as exc:
+            raise exc from None
+
+        _log.info(f'Loaded the "{ext_name}" extension in {time.time() - start:.2f} seconds')
+        return result
+
+    return wrapped
 
 
 class DbContextManager:
@@ -284,3 +317,15 @@ class FuryBot(commands.Bot):
             The future that will be resolved when the function is done.
         """
         return self.loop.run_in_executor(self.thread_pool, functools.partial(func, *args, **kwargs))
+
+    @wrap_extension
+    async def load_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
+        return await super().load_extension(name, package=package)
+
+    @wrap_extension
+    async def reload_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
+        return await super().reload_extension(name, package=package)
+
+    @wrap_extension
+    async def unload_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
+        return await super().unload_extension(name, package=package)
