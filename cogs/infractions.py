@@ -98,6 +98,7 @@ class Infractions(BaseCog):
                     ELSE
                         INSERT INTO infractions.settings(guild_id, notification_channel_id) VALUES($1, $2)
                     END IF;
+                END $$
                 """,
                 interaction.guild.id,
                 channel.id,
