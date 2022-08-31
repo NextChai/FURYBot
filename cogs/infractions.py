@@ -65,16 +65,16 @@ class Infractions(BaseCog):
         parent=infraction,
     )
 
-    infraction_allowed_links = app_commands.Group(
-        name='allowed_links',
+    infraction_allowed_link = app_commands.Group(
+        name='allowed_link',
         description='Add and remove allowed links.',
         default_permissions=discord.Permissions(moderate_members=True),
         guild_only=True,
         parent=infraction,
     )
 
-    infraction_ignored_channels = app_commands.Group(
-        name='ignored_channels',
+    infraction_ignored_channel = app_commands.Group(
+        name='ignored_channel',
         description='Manage ignored channels for the infraction manager.',
         default_permissions=discord.Permissions(moderate_members=True),
         guild_only=True,
@@ -238,9 +238,9 @@ class Infractions(BaseCog):
 
         return await interaction.response.send_message(f'I\'ve removed {role.mention} as a moderator role.', ephemeral=True)
 
-    @infraction_ignored_channels.command(name='add', description='Add an ignored channel to the infraction manager.')
+    @infraction_ignored_channel.command(name='add', description='Add an ignored channel to the infraction manager.')
     @app_commands.describe(channel='The channel to add.')
-    async def infraction_channels_add(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
+    async def infraction_ignored_channel_add(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -263,9 +263,9 @@ class Infractions(BaseCog):
             f'I\'ve added {channel.mention} as an ignored channel.', ephemeral=True
         )
 
-    @infraction_ignored_channels.command(name='remove', description='Remove an ignored channel to the infraction manager.')
+    @infraction_ignored_channel.command(name='remove', description='Remove an ignored channel to the infraction manager.')
     @app_commands.describe(channel='The channel to remove.')
-    async def infraction_channels_remove(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
+    async def infraction_ignored_channel_remove(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -286,9 +286,9 @@ class Infractions(BaseCog):
             f'I\'ve removed {channel.mention} as an ignored channel.', ephemeral=True
         )
 
-    @infraction_allowed_links.command(name='add', description='Add an allowed link to the link filter.')
+    @infraction_allowed_link.command(name='add', description='Add an allowed link to the link filter.')
     @app_commands.describe(link='The link to add.')
-    async def infraction_allowed_links_add(self, interaction: discord.Interaction, link: str) -> None:
+    async def infraction_allowed_link_add(self, interaction: discord.Interaction, link: str) -> None:
         assert interaction.guild
 
         if not await self.bot.link_filter.get_links(link):
@@ -314,9 +314,9 @@ class Infractions(BaseCog):
 
         return await interaction.response.send_message(f'I\'ve added `{link}` as an allowed link.', ephemeral=True)
 
-    @infraction_allowed_links.command(name='remove', description='Remove an allowed link to the link filter.')
+    @infraction_allowed_link.command(name='remove', description='Remove an allowed link to the link filter.')
     @app_commands.describe(link='The link to remove.')
-    async def infraction_allowed_links_remove(self, interaction: discord.Interaction, link: str) -> None:
+    async def infraction_allowed_link_remove(self, interaction: discord.Interaction, link: str) -> None:
         assert interaction.guild
 
         if not await self.bot.link_filter.get_links(link):
