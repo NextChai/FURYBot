@@ -82,7 +82,7 @@ class InfractionListener(Link, Profanity):
                 type.value,
             )
 
-        _log.debug('Data from invalidate infraction is: %s', dict(data) if data else 'Nothing')
+        _log.debug('Data from invalidate infraction is: %s', data)
 
         if not data:
             return
