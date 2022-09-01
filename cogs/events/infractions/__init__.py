@@ -46,6 +46,11 @@ _log = logging.getLogger(__name__)
 class InfractionListener(Link, Profanity):
     def check_valid_operation(self, data: Dict[Any, Any], message: discord.Message) -> bool:
         assert isinstance(message.author, discord.Member)
+        
+        if message.author.bot:
+            return False
+        if message.webhook_id:
+            return False
 
         if message.author.id in data['moderators']:
             _log.debug('Author is moderator.')
