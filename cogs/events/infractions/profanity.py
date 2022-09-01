@@ -37,8 +37,8 @@ class Profanity(BaseCog):
         if not valid_message(message):
             return
 
-        censored = await self.bot.profanity_filter.censor(message.content)
-        if censored == message.content:
+        censored = await self.bot.profanity_filter.censor(message.content.lower())
+        if censored.lower() == message.content.lower():
             return
 
         self.bot.dispatch('profanity_found', message, censored)
@@ -51,8 +51,8 @@ class Profanity(BaseCog):
         if not valid_message(after):
             return
 
-        censored = await self.bot.profanity_filter.censor(after.content)
-        if censored == after.content:
+        censored = await self.bot.profanity_filter.censor(after.content.lower())
+        if censored.lower() == after.content.lower():
             return
 
         self.bot.dispatch('profanity_found', after, censored)
