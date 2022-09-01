@@ -303,15 +303,19 @@ class Infractions(BaseCog):
 
     @app_commands.command(name='censor', description='Censor a message to check if it\'s profanity.')
     @app_commands.default_permissions(manage_messages=True)
+    @app_commands.describe(phrase='The phrase to check for profanity.')
     async def censor(self, interaction: discord.Interaction, phrase: str) -> None:
         censored = await self.bot.profanity_filter.censor(phrase)
         return await interaction.response.send_message(discord.utils.escape_markdown(censored), ephemeral=True)
 
     @app_commands.command(name='get_links', description='Get the links from a given text.')
     @app_commands.default_permissions(manage_messages=True)
+    @app_commands.describe(phrase='The phrase to check for links.')
     async def get_links(self, interaction: discord.Interaction, phrase: str) -> None:
         links = await self.bot.link_filter.get_links(phrase)
-        return await interaction.response.send_message('\n'.join(f'- <{link}>' for link in links))
+        return await interaction.response.send_message(
+            '**Links found**:\n\n' + '\n'.join(f'- <{link}>' for link in links or ['No links found.']), ephemeral=True
+        )
 
 
 async def setup(bot: FuryBot) -> None:
