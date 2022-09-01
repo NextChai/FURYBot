@@ -6,9 +6,9 @@ CREATE TABLE IF NOT EXISTS profane_words (
 CREATE SCHEMA infractions;
 
 CREATE TABLE IF NOT EXISTS infractions.time (
-    guild_id BIGINT UNIQUE,
+    guild_id BIGINT,
     type TEXT,
-    time INT -- In seconds,
+    time BIGINT -- In seconds,
 )
 
 CREATE TABLE IF NOT EXISTS infractions.settings (
