@@ -301,6 +301,12 @@ class Infractions(BaseCog):
 
         return await interaction.response.send_message(f'I\'ve removed `{link}` as an allowed link.', ephemeral=True)
 
+    @app_commands.command(name='censor', description='Censor a message to check if it\'s profanity.')
+    @app_commands.default_permissions(manage_messages=True)
+    async def censor(self, interaction: discord.Interaction, phrase: str) -> None:
+        censored = await self.bot.profanity_filter.censor(phrase)
+        return await interaction.response.send_message(censored, ephemeral=True)
+        
 
 async def setup(bot: FuryBot) -> None:
     await bot.add_cog(Infractions(bot))
