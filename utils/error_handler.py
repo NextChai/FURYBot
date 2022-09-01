@@ -128,7 +128,7 @@ class ExceptionManager:
             fmt['command'] = command.qualified_name
             display = f'in command "{command.qualified_name}"'
         else:
-            display = f'in no command (in DisBot)'
+            display = f'in no command (in FuryBot)'
 
         embed = discord.Embed(title=f'An error has occured in {display}', timestamp=packet['time'])
         embed.add_field(
