@@ -125,21 +125,24 @@ class Infractions(BaseCog):
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
-            await connection.execute(
-                """
-                DO $$
-                BEGIN
-                    IF EXISTS(SELECT * FROM infractions.time WHERE guild_id = $1 AND type = $2) THEN
-                        UPDATE infractions.time SET time = $3 WHERE guild_id = $1 AND type = $2
-                    ELSE   
-                        INSERT INTO infractions.time(guild_id, type, time) VALUES($1, $2, $3)
-                    END IF;
-                END $$
-                """,
-                interaction.guild.id,
-                type.value,
-                time,
+            # NOTE: A singular query here gets mad because of how asyncpg handles parameters.
+            data = await connection.fetchrow(
+                'SELECT * FROM infractions.time WHERE guild_id = $1 AND type = $2', interaction.guild.id, type.value
             )
+            if data:
+                await connection.execute(
+                    'UPDATE infractions.time SET time = $3 WHERE guild_id = $1 AND type = $2',
+                    interaction.guild.id,
+                    type.value,
+                    time,
+                )
+            else:
+                await connection.execute(
+                    'INSERT INTO infractions.time(guild_id, type, time) VALUES($1, $2, $3)',
+                    interaction.guild.id,
+                    type.value,
+                    time,
+                )
 
         return await interaction.response.send_message(
             f'I\'ve updated the total mute time for the {type.name.title()} infraction.', ephemeral=True
