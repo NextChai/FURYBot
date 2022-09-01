@@ -170,7 +170,7 @@ class InfractionListener(Link, Profanity):
         embed.add_field(name='Original Content', value=message.content)
         embed.add_field(
             name='Action Taken',
-            value=f'I\'ve muted them until {discord.utils.format_dt(discord.utils.utcnow() + mute_delta, "R")}',
+            value=f'I\'ve muted them for {discord.utils.format_dt(discord.utils.utcnow() + mute_delta, "R")}',
             inline=False,
         )
         await channel.send(embed=embed)
