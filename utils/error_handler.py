@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 import traceback
-from typing import TYPE_CHECKING, Tuple, Optional, Any, Awaitable, Callable, Dict, Generator, List, Union
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 import discord
 from discord import app_commands
@@ -379,6 +379,7 @@ class ErrorHandler:
 
 async def setup(bot: FuryBot) -> None:
     bot.error_handler = ErrorHandler(bot)
+
 
 async def teardown(bot: FuryBot) -> None:
     if bot.error_handler:  # simply to make type checker happy

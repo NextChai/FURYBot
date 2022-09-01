@@ -106,9 +106,7 @@ class Infractions(BaseCog):
 
     @infraction.command(name='time', description='Change the mute time for an infraction.')
     @app_commands.guild_only()
-    @app_commands.describe(
-        time='The total time to mute when an infraction occurrs.'
-    )
+    @app_commands.describe(time='The total time to mute when an infraction occurrs.')
     @app_commands.choices(
         time=[
             app_commands.Choice(name='1 minute', value=60),
@@ -197,7 +195,7 @@ class Infractions(BaseCog):
                 """,
                 interaction.guild.id,
                 role.id,
-            )   
+            )
 
         return await interaction.response.send_message(f'I\'ve added {role.mention} as a moderator role.', ephemeral=True)
 
@@ -240,7 +238,9 @@ class Infractions(BaseCog):
 
     @infraction_ignored_channel.command(name='remove', description='Remove an ignored channel to the infraction manager.')
     @app_commands.describe(channel='The channel to remove.')
-    async def infraction_ignored_channel_remove(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
+    async def infraction_ignored_channel_remove(
+        self, interaction: discord.Interaction, channel: discord.TextChannel
+    ) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -306,7 +306,7 @@ class Infractions(BaseCog):
     async def censor(self, interaction: discord.Interaction, phrase: str) -> None:
         censored = await self.bot.profanity_filter.censor(phrase)
         return await interaction.response.send_message(censored, ephemeral=True)
-        
+
 
 async def setup(bot: FuryBot) -> None:
     await bot.add_cog(Infractions(bot))
