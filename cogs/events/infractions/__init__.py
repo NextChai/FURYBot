@@ -53,16 +53,13 @@ class InfractionListener(Link, Profanity):
             return False
 
         if message.author.id in data['moderators']:
-            _log.debug('Author is moderator.')
             return False
 
         author_roles = [r.id for r in message.author.roles]
         if any(role_id in author_roles for role_id in data['moderator_role_ids']):
-            _log.debug('Author has moderator role.')
             return False
 
         if message.channel.id in data['ignored_channel_ids']:
-            _log.debug('Channel is an ignored channel.')
             return False
 
         return True
@@ -85,13 +82,10 @@ class InfractionListener(Link, Profanity):
                 type.value,
             )
 
-        _log.debug('Data from invalidate infraction is: %s', data)
-
         if not data:
             return
 
         validation = self.check_valid_operation(dict(data), message)
-        _log.debug('Validation', validation)
         if not validation:
             return
 
@@ -120,7 +114,6 @@ class InfractionListener(Link, Profanity):
         await message.delete()
 
         channel = assertion(message.guild.get_channel(data['notification_channel_id']), Optional[discord.TextChannel])
-        _log.debug('Found notification channel %s', channel)
         if not channel:
             return
 
