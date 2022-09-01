@@ -159,7 +159,7 @@ class Infractions(BaseCog):
                 INSERT INTO infractions.settings(guild_id, moderators) VALUES($1, ARRAY[ $2 ]::BIGINT[])
                 ON CONFLICT (guild_id)
                 DO UPDATE
-                    SET moderators = array_cat(moderators, EXCLUDED.moderators)
+                    SET moderators = array_append((SELECT moderators FROM infractions.settings WHERE guild_id = $1), $2)
                 """,
                 interaction.guild.id,
                 member.id,
@@ -191,10 +191,10 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                INSERT INTO infractions.settings(guild_id, moderator_role_ids) VALUES($1, '{$2}'::bigint[])
+                INSERT INTO infractions.settings(guild_id, moderator_role_ids) VALUES($1, ARRAY[ $2 ]::BIGINT[])
                 ON CONFLICT (guild_id)
                 DO UPDATE
-                    SET moderator_role_ids = array_cat(moderator_role_ids, EXCLUDED.moderator_role_ids)
+                    SET moderator_role_ids = array_append((SELECT moderator_role_ids FROM infractions.settings WHERE guild_id = $1), $2)
                 """,
                 interaction.guild.id,
                 role.id,
@@ -226,10 +226,10 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                INSERT INTO infractions.settings(guild_id, ignored_channel_ids) VALUES($1, '{$2}'::bigint[])
+                INSERT INTO infractions.settings(guild_id, ignored_channel_ids) VALUES($1, ARRAY[ $2 ]::BIGINT[])
                 ON CONFLICT (guild_id)
                 DO UPDATE
-                    SET ignored_channel_ids = array_cat(ignored_channel_ids, EXCLUDED.ignored_channel_ids)
+                    SET ignored_channel_ids = array_append((SELECT ignored_channel_ids FROM infractions.settings WHERE guild_id = $1), $2)
                 """,
                 interaction.guild.id,
                 channel.id,
@@ -272,10 +272,10 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                INSERT INTO infractions.settings(guild_id, valid_links) VALUES($1, '{$2}'::bigint[])
+                INSERT INTO infractions.settings(guild_id, valid_links) VALUES($1, ARRAY[ $2 ]::BIGINT[])
                 ON CONFLICT (guild_id)
                 DO UPDATE
-                    SET valid_links = array_cat(valid_links, EXCLUDED.valid_links)
+                    SET valid_links = array_append((SELECT valid_links FROM infractions.settings WHERE guild_id = $1), $2)
                 """,
                 interaction.guild.id,
                 link,
