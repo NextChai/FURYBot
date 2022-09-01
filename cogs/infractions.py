@@ -91,14 +91,10 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                DO $$
-                BEGIN
-                    IF EXISTS(SELECT * FROM infractions.settings WHERE guild_id = $1) THEN
-                        UPDATE infractions.settings SET notification_channel_id = $2 WHERE guild_id = $1
-                    ELSE
-                        INSERT INTO infractions.settings(guild_id, notification_channel_id) VALUES($1, $2)
-                    END IF;
-                END $$
+                INSERT INTO infractions.settings(guild_id, notification_channel_id) VALUES($1, $2)
+                ON CONFLICT (guild_id)
+                DO UPDATE
+                    SET notification_channel_id = EXCLUDED.notification_channel_id
                 """,
                 interaction.guild.id,
                 channel.id,
@@ -133,14 +129,10 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                DO $$
-                BEGIN
-                    IF EXISTS(SELECT * FROM infractions.time WHERE guild_id = $1 AND type = $2) THEN
-                        UPDATE infractions.time SET time = $3 WHERE guild_id = $1 AND type = $2
-                    ELSE
-                        INSERT INTO infractions.time(guild_id, type, time) VALUES($1, $2, $3)
-                    END IF;
-                END $$
+                INSERT INTO infractions.settings(guild_id, type, time) VALUES($1, $2, $3)
+                ON CONFLICT (guild_id)
+                DO UPDATE
+                    SET time = EXCLUDED.time AND type = EXCLUDED.type
                 """,
                 interaction.guild.id,
                 type.value,
@@ -159,14 +151,10 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                DO $$
-                BEGIN
-                    IF EXISTS(SELECT moderators FROM infractions.settings WHERE guild_id = $1) THEN
-                        UPDATE infractions.settings SET moderators = array_append(moderators, $2) WHERE guild_id = $1
-                    ELSE
-                        INSERT INTO infractions.settings(guild_id, moderators) VALUES($1, '{$2}'::bigint[])
-                    END IF;
-                END $$
+                INSERT INTO infractions.settings(guild_id, moderators) VALUES($1, '{$2}'::bigint[])
+                ON CONFLICT (guild_id)
+                DO UPDATE
+                    SET moderators = array_cat(moderators, EXCLUDED.moderators)
                 """,
                 interaction.guild.id,
                 member.id,
@@ -182,12 +170,7 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                DO $$
-                BEGIN
-                    IF EXISTS(SELECT moderators FROM infractions.settings WHERE guild_id = $1) THEN
-                        UPDATE infractions.settings SET moderators = array_remove(moderators, $2) WHERE guild_id = $1
-                    END IF;
-                END $$
+                UPDATE infractions.settings SET moderators = array_remove(moderators, $2) WHERE guild_id = $1
                 """,
                 interaction.guild.id,
                 member.id,
@@ -203,14 +186,10 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                DO $$
-                BEGIN
-                    IF EXISTS(SELECT moderator_role_ids FROM infractions.settings WHERE guild_id = $1) THEN
-                        UPDATE infractions.settings SET moderator_role_ids = array_append(moderator_role_ids, $2) WHERE guild_id = $1
-                    ELSE
-                        INSERT INTO infractions.settings(guild_id, moderator_role_ids) VALUES($1, '{$2}'::bigint[])
-                    END IF;
-                END $$
+                INSERT INTO infractions.settings(guild_id, moderator_role_ids) VALUES($1, '{$2}'::bigint[])
+                ON CONFLICT (guild_id)
+                DO UPDATE
+                    SET moderator_role_ids = array_cat(moderator_role_ids, EXCLUDED.moderator_role_ids)
                 """,
                 interaction.guild.id,
                 role.id,
@@ -226,12 +205,7 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                DO $$
-                BEGIN
-                    IF EXISTS(SELECT moderator_role_ids FROM infractions.settings WHERE guild_id = $1) THEN
-                        UPDATE infractions.settings SET moderator_role_ids = array_remove(moderator_role_ids, $2) WHERE guild_id = $1
-                    END IF;
-                END $$
+                UPDATE infractions.settings SET moderator_role_ids = array_remove(moderator_role_ids, $2) WHERE guild_id = $1
                 """,
                 interaction.guild.id,
                 role.id,
@@ -247,14 +221,10 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                DO $$
-                BEGIN
-                    IF EXISTS(SELECT ignored_channel_ids FROM infractions.settings WHERE guild_id = $1) THEN
-                        UPDATE infractions.settings SET ignored_channel_ids = array_append(ignored_channel_ids, $2) WHERE guild_id = $1
-                    ELSE
-                        INSERT INTO infractions.settings(guild_id, ignored_channel_ids) VALUES($1, '{$2}'::bigint[])
-                    END IF;
-                END $$
+                INSERT INTO infractions.settings(guild_id, ignored_channel_ids) VALUES($1, '{$2}'::bigint[])
+                ON CONFLICT (guild_id)
+                DO UPDATE
+                    SET ignored_channel_ids = array_cat(ignored_channel_ids, EXCLUDED.ignored_channel_ids)
                 """,
                 interaction.guild.id,
                 channel.id,
@@ -272,12 +242,7 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                DO $$
-                BEGIN
-                    IF EXISTS(SELECT ignored_channel_ids FROM infractions.settings WHERE guild_id = $1) THEN
-                        UPDATE infractions.settings SET ignored_channel_ids = array_remove(ignored_channel_ids, $2) WHERE guild_id = $1
-                    END IF;
-                END $$
+                UPDATE infractions.settings SET ignored_channel_ids = array_remove(ignored_channel_ids, $2) WHERE guild_id = $1
                 """,
                 interaction.guild.id,
                 channel.id,
@@ -300,14 +265,10 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                DO $$
-                BEGIN
-                    IF EXISTS(SELECT valid_links FROM infractions.settings WHERE guild_id = $1) THEN
-                        UPDATE infractions.settings SET valid_links = array_append(valid_links, $2) WHERE guild_id = $1
-                    ELSE
-                        INSERT INTO infractions.settings(guild_id, valid_links) VALUES($1, '{$2}'::bigint[])
-                    END IF;
-                END $$
+                INSERT INTO infractions.settings(guild_id, valid_links) VALUES($1, '{$2}'::bigint[])
+                ON CONFLICT (guild_id)
+                DO UPDATE
+                    SET valid_links = array_cat(valid_links, EXCLUDED.valid_links)
                 """,
                 interaction.guild.id,
                 link,
@@ -328,12 +289,7 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                DO $$
-                BEGIN
-                    IF EXISTS(SELECT valid_links FROM infractions.settings WHERE guild_id = $1) THEN
-                        UPDATE infractions.settings SET valid_links = array_remove(valid_links, $2) WHERE guild_id = $1
-                    END IF;
-                END $$
+                UPDATE infractions.settings SET valid_links = array_remove(valid_links, $2) WHERE guild_id = $1
                 """,
                 interaction.guild.id,
                 link,
