@@ -59,6 +59,13 @@ class Owner(BaseCog):
             data = await connection.execute("INSERT INTO profane_words(word) VALUES ($1) ON CONFLICT (word) DO NOTHING", word)
         
         return await ctx.send(data)
+    
+    @profanity.command(name='reload', description='Reload the word filter.')
+    async def profanity_reload(self, ctx: Context) -> None:
+        self.bot.profanity_filter.clear()
+        await ctx.message.add_reaction('👍')
+        
+        
 
 async def setup(bot: FuryBot):
     await bot.add_cog(Owner(bot))
