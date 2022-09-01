@@ -147,7 +147,7 @@ class InfractionListener(Link, Profanity):
             description=f'{message.author.mention} has sent profanity in {message.channel.mention}.',  # pyright: ignore # NOTE: Come back
             author=message.author,
         )
-        embed.add_field(name='Censored', value=censored)
+        embed.add_field(name='Censored', value=discord.utils.escape_markdown(censored))
         embed.add_field(name='Original Content', value=message.content)
         embed.add_field(
             name='Action Taken',

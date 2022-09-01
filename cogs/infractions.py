@@ -305,7 +305,7 @@ class Infractions(BaseCog):
     @app_commands.default_permissions(manage_messages=True)
     async def censor(self, interaction: discord.Interaction, phrase: str) -> None:
         censored = await self.bot.profanity_filter.censor(phrase)
-        return await interaction.response.send_message(censored, ephemeral=True)
+        return await interaction.response.send_message(discord.utils.escape_markdown(censored), ephemeral=True)
 
 
 async def setup(bot: FuryBot) -> None:
