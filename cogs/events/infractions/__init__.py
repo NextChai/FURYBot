@@ -42,6 +42,7 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
+
 class InfractionListener(Link, Profanity):
     def check_valid_operation(self, data: Dict[Any, Any], message: discord.Message) -> bool:
         assert isinstance(message.author, discord.Member)
@@ -66,7 +67,8 @@ class InfractionListener(Link, Profanity):
 
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
-                """
+                textwrap.dedent(
+                    """
                 SELECT 
                 *
                 FROM 
@@ -74,11 +76,12 @@ class InfractionListener(Link, Profanity):
                 JOIN
                 (SELECT * FROM infractions.time WHERE guild_id = $1 AND type = $2) AS t2
                 ON t1.guild_id = t2.guild_id
-                """,
+                """
+                ),
                 message.guild.id,
                 type.value,
             )
-        
+
         _log.debug('Data from invalidate infraction is: %s', dict(data) if data else 'Nothing')
 
         if not data:
@@ -110,7 +113,7 @@ class InfractionListener(Link, Profanity):
             await message.author.timeout(mute_delta)
         except discord.Forbidden:
             pass
-        
+
         await message.delete()
 
         channel = assertion(message.guild.get_channel(data['notification_channel_id']), Optional[discord.TextChannel])
@@ -148,7 +151,7 @@ class InfractionListener(Link, Profanity):
             await message.author.timeout(mute_delta)
         except discord.Forbidden:
             pass
-        
+
         await message.delete()
 
         channel = assertion(message.guild.get_channel(data['notification_channel_id']), Optional[discord.TextChannel])
