@@ -156,7 +156,7 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                INSERT INTO infractions.settings(guild_id, moderators) VALUES($1, '{$2}'::bigint[])
+                INSERT INTO infractions.settings(guild_id, moderators) VALUES($1, ARRAY[ $2 ]::BIGINT[])
                 ON CONFLICT (guild_id)
                 DO UPDATE
                     SET moderators = array_cat(moderators, EXCLUDED.moderators)
