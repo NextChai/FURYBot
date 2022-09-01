@@ -71,7 +71,7 @@ class InfractionListener(Link, Profanity):
                 *
                 FROM 
                 (SELECT * FROM infractions.settings WHERE guild_id = $1) AS t1
-                INNER JOIN
+                JOIN
                 (SELECT * FROM infractions.time WHERE guild_id = $1 AND type = $2) AS t2
                 ON t1.guild_id = t2.guild_id
                 """,
