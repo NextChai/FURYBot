@@ -67,7 +67,13 @@ DecoFunc: TypeAlias = Callable[Concatenate['FuryBot', P], Coroutine[T, Any, Any]
 
 _log = logging.getLogger(__name__)
 
-initial_extensions: Tuple[str, ...] = ('jishaku', 'cogs.events.infractions', 'cogs.infractions', 'utils.error_handler')
+initial_extensions: Tuple[str, ...] = (
+    'jishaku', 
+    'cogs.events.infractions', 
+    'cogs.infractions', 
+    'utils.error_handler',
+    'cogs.owner',
+    )
 
 
 def wrap_extension(coro: DecoFunc[P, T]) -> DecoFunc[P, T]:
