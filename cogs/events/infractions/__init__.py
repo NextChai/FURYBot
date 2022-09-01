@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import logging
 import datetime
 import textwrap
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
@@ -39,19 +40,23 @@ from .profanity import Profanity
 if TYPE_CHECKING:
     from bot import FuryBot
 
+_log = logging.getLogger(__name__)
 
 class InfractionListener(Link, Profanity):
     def check_valid_operation(self, data: Dict[Any, Any], message: discord.Message) -> bool:
         assert isinstance(message.author, discord.Member)
 
         if message.author.id in data['moderators']:
+            _log.debug('Author is moderator.')
             return False
 
         author_roles = [r.id for r in message.author.roles]
         if any(role_id in author_roles for role_id in data['moderator_role_ids']):
+            _log.debug('Author has moderator role.')
             return False
 
         if message.channel.id in data['ignored_channel_ids']:
+            _log.debug('Channel is an ignored channel.')
             return False
 
         return True
@@ -73,11 +78,14 @@ class InfractionListener(Link, Profanity):
                 message.guild.id,
                 type.value,
             )
+        
+        _log.debug('Data from invalidate infraction is: %s', dict(data) if data else 'Nothing')
 
         if not data:
             return
 
         validation = self.check_valid_operation(dict(data), message)
+        _log.debug('Validation', validation)
         if not validation:
             return
 
@@ -102,8 +110,11 @@ class InfractionListener(Link, Profanity):
             await message.author.timeout(mute_delta)
         except discord.Forbidden:
             pass
+        
+        await message.delete()
 
         channel = assertion(message.guild.get_channel(data['notification_channel_id']), Optional[discord.TextChannel])
+        _log.debug('Found notification channel %s', channel)
         if not channel:
             return
 
@@ -137,6 +148,8 @@ class InfractionListener(Link, Profanity):
             await message.author.timeout(mute_delta)
         except discord.Forbidden:
             pass
+        
+        await message.delete()
 
         channel = assertion(message.guild.get_channel(data['notification_channel_id']), Optional[discord.TextChannel])
         if not channel:
