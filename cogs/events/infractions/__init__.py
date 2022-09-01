@@ -67,8 +67,7 @@ class InfractionListener(Link, Profanity):
 
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
-                textwrap.dedent(
-                    """
+                """
                 SELECT 
                 *
                 FROM 
@@ -76,8 +75,7 @@ class InfractionListener(Link, Profanity):
                 JOIN
                 (SELECT * FROM infractions.time WHERE guild_id = $1 AND type = $2) AS t2
                 ON t1.guild_id = t2.guild_id
-                """
-                ),
+                """,
                 message.guild.id,
                 type.value,
             )
@@ -96,7 +94,7 @@ class InfractionListener(Link, Profanity):
 
     @commands.Cog.listener('on_links_found')
     async def on_links_found(self, message: discord.Message, links: List[str]) -> None:
-        data = await self.validate_infraction(message, InfractionType.profanity)
+        data = await self.validate_infraction(message, InfractionType.links)
         if not data:
             return
 
@@ -132,7 +130,7 @@ class InfractionListener(Link, Profanity):
 
     @commands.Cog.listener('on_profanity_found')
     async def on_profanity_found(self, message: discord.Message, censored: str) -> None:
-        data = await self.validate_infraction(message, InfractionType.links)
+        data = await self.validate_infraction(message, InfractionType.profanity)
         if not data:
             return
 
