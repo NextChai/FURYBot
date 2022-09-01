@@ -34,8 +34,8 @@ from utils.context import Context
 if TYPE_CHECKING:
     from bot import FuryBot
 
-class Owner(BaseCog):
 
+class Owner(BaseCog):
     async def cog_check(self, ctx: Context) -> bool:
         return await self.bot.is_owner(ctx.author)
 
@@ -43,29 +43,30 @@ class Owner(BaseCog):
     async def profanity(self, ctx: Context) -> Optional[discord.Message]:
         if ctx.invoked_subcommand:
             return
-        
+
         return await ctx.send('No subcommand sent.')
-    
+
     @profanity.command(name='remove', description='Remove a profane word.')
     async def profanity_remove(self, ctx: Context, *, word: str) -> discord.Message:
         async with self.bot.safe_connection() as connection:
             data = await connection.execute('DELETE FROM profane_words WHERE word = $1', word)
-        
+
         return await ctx.send(data)
 
     @profanity.command(name='add', description='Add a profane word.')
     async def profanity_add(self, ctx: Context, *, word: str) -> discord.Message:
         async with self.bot.safe_connection() as connection:
-            data = await connection.execute("INSERT INTO profane_words(word) VALUES ($1) ON CONFLICT (word) DO NOTHING", word)
-        
+            data = await connection.execute(
+                "INSERT INTO profane_words(word) VALUES ($1) ON CONFLICT (word) DO NOTHING", word
+            )
+
         return await ctx.send(data)
-    
+
     @profanity.command(name='reload', description='Reload the word filter.')
     async def profanity_reload(self, ctx: Context) -> None:
         self.bot.profanity_filter.clear()
         await ctx.message.add_reaction('👍')
-        
-        
+
 
 async def setup(bot: FuryBot):
     await bot.add_cog(Owner(bot))

@@ -307,6 +307,12 @@ class Infractions(BaseCog):
         censored = await self.bot.profanity_filter.censor(phrase)
         return await interaction.response.send_message(discord.utils.escape_markdown(censored), ephemeral=True)
 
+    @app_commands.command(name='get_links', description='Get the links from a given text.')
+    @app_commands.default_permissions(manage_messages=True)
+    async def get_links(self, interaction: discord.Interaction, phrase: str) -> None:
+        links = await self.bot.link_filter.get_links(phrase)
+        return await interaction.response.send_message('\n'.join(f'- <{link}>' for link in links))
+
 
 async def setup(bot: FuryBot) -> None:
     await bot.add_cog(Infractions(bot))

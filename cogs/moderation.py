@@ -33,6 +33,7 @@ from utils.bases.cog import BaseCog
 if TYPE_CHECKING:
     from bot import FuryBot
 
+
 class Moderation(BaseCog):
 
     ...

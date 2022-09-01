@@ -77,7 +77,7 @@ class ProfantiyFilter:
     def __init__(self, bot: FuryBot) -> None:
         self.bot: FuryBot = bot
         self.clear()
-        
+
     def clear(self) -> None:
         self.profanity_mapping: Dict[str, ProfanityWord] = {}
         self.profanity_hashing: cachetools.LRUCache[int, str] = cachetools.LRUCache(maxsize=5000)
