@@ -271,3 +271,5 @@ class Teams(BaseCog):
         return await interaction.response.send_message(f'Promoted {member.mention} on the `{team["name"]}` team.', ephemeral=True)
     
     
+async def setup(bot: FuryBot) -> None:
+    return await bot.add_cog(Teams(bot))
