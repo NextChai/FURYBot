@@ -19,3 +19,18 @@ CREATE TABLE IF NOT EXISTS infractions.settings (
     valid_links TEXT[] DEFAULT ARRAY[]::TEXT[],
     ignored_channel_ids BIGINT[] DEFAULT ARRAY[]::BIGINT[]
 )
+
+CREATE SCHEMA teams;
+
+CREATE TABLE IF NOT EXISTS teams.settings (
+    id SERIAL PRIMARY KEY,
+    category_id BIGINT,
+    channels BIGINT[] DEFAULT ARRAY[]::BIGINT,
+    name TEXT UNIQUE,
+)
+
+CREATE TABLE IF NOT EXISTS teams.members (
+    team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE 
+    member_id BIGINT,
+    is_sub BOOLEAN DEFAULT FALSE,
+)
