@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS teams.settings (
     id SERIAL PRIMARY KEY,
     category_id BIGINT,
     channels BIGINT[] DEFAULT ARRAY[]::BIGINT[],
-    name TEXT UNIQUE
+    name TEXT UNIQUE,
+    captain_roles BIGINT[] DEFAULT ARRAY[]::BIGINT[]
 )
 
 CREATE TABLE IF NOT EXISTS teams.members (
