@@ -73,7 +73,7 @@ initial_extensions: Tuple[str, ...] = (
     'cogs.infractions',
     'utils.error_handler',
     'cogs.owner',
-    'cogs.events.tracking'
+    'cogs.events.tracking',
 )
 
 
@@ -188,7 +188,7 @@ class FuryBot(commands.Bot):
             intents=discord.Intents.all(),
             strip_after_prefix=True,
             allowed_mentions=discord.AllowedMentions.none(),
-            max_messages=5000
+            max_messages=5000,
         )
 
     @classmethod

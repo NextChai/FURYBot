@@ -23,8 +23,8 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import logging
 import datetime
+import logging
 import textwrap
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -46,7 +46,7 @@ _log = logging.getLogger(__name__)
 class InfractionListener(Link, Profanity):
     def check_valid_operation(self, data: Dict[Any, Any], message: discord.Message) -> bool:
         assert isinstance(message.author, discord.Member)
-        
+
         if message.author.bot:
             return False
         if message.webhook_id:
