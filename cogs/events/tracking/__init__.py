@@ -131,7 +131,15 @@ class MessageTracker(BaseCog):
 
         embed = self.bot.Embed(title='Message has been deleted.', description=webhook_message.content)
         embeds = [embed]
-        embeds.extend(webhook_message.embeds)
+
+        if message.attachments:
+            embed.add_field(
+                name='Attachments', value='\n'.join([f'- {att.url}' for att in message.attachments])
+            )
+            
+        if message.embeds:
+            embed.add_field(name='Embeds', value=f'Contined {len(message.embeds)} embed(s), I\'ve attached them.')
+            embeds.extend(webhook_message.embeds)
 
         await webhook_message.reply(embeds=embeds)
         self.message_webhook_cache.pop(message.id)
