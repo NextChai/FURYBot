@@ -83,13 +83,10 @@ class Teams(BaseCog):
     team_captains = app_commands.Group(name='captains', description='Manage team captainis.', parent=team)
 
     async def _sync_channels(self, guild: discord.Guild, channel_ids: List[int]) -> None:
-        futures: List[Coroutine[Any, Any, Any]] = []
         for channel_id in channel_ids:
             channel = assertion(guild.get_channel(channel_id), Optional[Union[discord.TextChannel, discord.VoiceChannel]])
             if channel:
-                futures.append(channel.edit(sync_permissions=True))
-
-        await asyncio.gather(*futures)
+                await channel.edit(sync_permissions=True)
 
     @team.command(name='create', description='Create a team.')
     @app_commands.describe(name='The name of the team.')
