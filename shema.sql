@@ -25,7 +25,7 @@ CREATE SCHEMA teams;
 CREATE TABLE IF NOT EXISTS teams.settings (
     id SERIAL PRIMARY KEY,
     category_id BIGINT,
-    channels BIGINT[] DEFAULT ARRAY[]::BIGINT,
+    channels BIGINT[] DEFAULT ARRAY[]::BIGINT[],
     name TEXT UNIQUE
 )
 
