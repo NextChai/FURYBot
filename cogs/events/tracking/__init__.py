@@ -44,7 +44,9 @@ class MessageTracker(BaseCog):
         self.message_cache: cachetools.Cache[int, discord.Message] = cachetools.Cache(maxsize=5000)
 
         self.message_webhook: Optional[discord.Webhook] = None
-        self.message_webhook_cache: cachetools.Cache[int, Union[discord.WebhookMessage, discord.Message]] = cachetools.Cache(maxsize=5000)
+        self.message_webhook_cache: cachetools.Cache[int, Union[discord.WebhookMessage, discord.Message]] = cachetools.Cache(
+            maxsize=5000
+        )
 
     async def fetch_webhook(self) -> discord.Webhook:
         match = re.search(
@@ -61,11 +63,16 @@ class MessageTracker(BaseCog):
             return
         if message.webhook_id:
             return
+        if message.type not in (discord.MessageType.default, discord.MessageType.reply):
+            return
 
         self.message_cache[message.id] = message
 
         if not self.message_webhook:
             self.message_webhook = await self.fetch_webhook()
+
+        if message.channel.id == self.message_webhook.channel_id:
+            return
 
         files: List[discord.File] = []
         if message.attachments:
@@ -90,35 +97,41 @@ class MessageTracker(BaseCog):
 
     @commands.Cog.listener('on_message_edit')
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
-        if all((
-            before.content == after.content,
-            before.embeds == after.embeds,
-        )):
+        if all(
+            (
+                before.content == after.content,
+                before.embeds == after.embeds,
+            )
+        ):
             return
-        
+
         # See if we can find from the webhook cache
         webhook_message = self.message_webhook_cache.get(after.id, None)
         if webhook_message is None:
             return
 
+        embed = self.bot.Embed(title='Edited Message', author=after.author, description=after.content)
+
+        embeds = [embed]
+        embeds.extend(after.embeds)
+
         new_message = await webhook_message.reply(
-            content=after.content,
-            embeds=after.embeds,
+            embeds=embeds,
             allowed_mentions=discord.AllowedMentions.none(),
         )
         self.message_webhook_cache[after.id] = new_message
 
     @commands.Cog.listener('on_message_delete')
-    async def on_raw_message_delete(self, message: discord.Message) -> None:
+    async def on_message_delete(self, message: discord.Message) -> None:
         webhook_message = self.message_webhook_cache.get(message.id)
         if not webhook_message:
             return
 
-        await webhook_message.reply(
-            content=f'`[Message has been deleted {discord.utils.format_dt(discord.utils.utcnow(), "R")}]`',
-            username=message.author.display_name,
-            avatar_url=message.author.display_avatar.url,
-        )
+        embed = self.bot.Embed(title='Message has been deleted.', description=webhook_message.content)
+        embeds = [embed]
+        embeds.extend(webhook_message.embeds)
+
+        await webhook_message.reply(embeds=embeds)
         self.message_webhook_cache.pop(message.id)
 
     @commands.command(name='snipe', description='Snipe a deleted message.')
