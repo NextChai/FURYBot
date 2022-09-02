@@ -129,8 +129,24 @@ class Teams(BaseCog):
     @team.command(name='delete', description='Delete a team.')
     @app_commands.describe(team='The team to delete.')
     async def team_delete(self, interaction: discord.Interaction, team: TEAM_TRANSFORM) -> None:
+        assert interaction.guild
+
         async with self.bot.safe_connection() as connection:
             await connection.execute('DELETE FROM teams.settings WHERE id = $1', team['id'])
+
+        futures: List[Coroutine[Any, Any, Any]] = []
+        for channel_id in team['channels']:
+            channel = assertion(
+                interaction.guild.get_channel(channel_id), Optional[Union[discord.TextChannel, discord.VoiceChannel]]
+            )
+            if channel:
+                futures.append(channel.delete(reason='Team deleted.'))
+
+        category = assertion(interaction.guild.get_channel(team['category_id']), Optional[discord.CategoryChannel])
+        if category:
+            futures.append(category.delete(reason='Team deleted.'))
+
+        await asyncio.gather(*futures)
 
         self.bot.team_cache.pop(team['id'], None)
         return await interaction.response.send_message(f'Team {team["name"]} has been deleted.', ephemeral=True)
