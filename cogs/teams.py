@@ -184,9 +184,16 @@ class Teams(BaseCog):
                 subs_fmt.append(f'- {mention_fmt}')
             else:
                 members_fmt.append(f'- {mention_fmt}')
+                
+        captains_fmt: List[str] = []
+        for entry in team['captain_roles']:
+            role = interaction.guild.get_role(entry)
+            if role:
+                captains_fmt.append(f'- {role.mention}')
 
         embed.add_field(name='Members', value='\n'.join(members_fmt or ['No members on this team.']), inline=False)
         embed.add_field(name='Subs', value='\n'.join(subs_fmt or ['No subs on this team.']), inline=False)
+        embed.add_field(name='Captains', value='\n'.join(captains_fmt or ['No captains on this team.']))
         return await interaction.response.send_message(embed=embed)
 
     @team_members.command(name='add', description='Add a team member.')
