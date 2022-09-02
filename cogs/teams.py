@@ -23,8 +23,9 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import asyncio
 import difflib
-from typing import TYPE_CHECKING, Any, List, Optional, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Coroutine, List, Optional, TypeAlias, Union
 
 import asyncpg
 import discord
@@ -43,16 +44,20 @@ class TeamTransformer(app_commands.Transformer):
     ) -> List[app_commands.Choice[Union[int, float, str]]]:
         # Show available teams
         bot: FuryBot = interaction.client  # type: ignore
-        
+
         team_mapping = {team['name']: team for team in bot.team_cache.values()}
         if not team_mapping:
             return []
-        
+
         if not value:
-            return [app_commands.Choice(name=team['name'], value=str(team['id'])) for team in list(bot.team_cache.values())[:20]]
-        
-        similar: List[str] = await bot.wrap(difflib.get_close_matches, str(value), team_mapping.keys(), n=20) # type: ignore
-        return [app_commands.Choice(name=team_mapping[entry]['name'], value=str(team_mapping[entry]['id'])) for entry in similar]
+            return [
+                app_commands.Choice(name=team['name'], value=str(team['id'])) for team in list(bot.team_cache.values())[:20]
+            ]
+
+        similar: List[str] = await bot.wrap(difflib.get_close_matches, str(value), team_mapping.keys(), n=20)  # type: ignore
+        return [
+            app_commands.Choice(name=team_mapping[entry]['name'], value=str(team_mapping[entry]['id'])) for entry in similar
+        ]
 
     async def transform(self, interaction: discord.Interaction, value: Any, /) -> asyncpg.Record:
         if not value.isdigit():
@@ -76,6 +81,15 @@ class Teams(BaseCog):
     team_members = app_commands.Group(name='members', description='Manage team members.', parent=team)
     team_subs = app_commands.Group(name='subs', description='Manage team subs.', parent=team)
     team_captains = app_commands.Group(name='captains', description='Manage team captainis.', parent=team)
+
+    async def _sync_channels(self, guild: discord.Guild, channel_ids: List[int]) -> None:
+        futures: List[Coroutine[Any, Any, Any]] = []
+        for channel_id in channel_ids:
+            channel = assertion(guild.get_channel(channel_id), Optional[Union[discord.TextChannel, discord.VoiceChannel]])
+            if channel:
+                futures.append(channel.edit(sync_permissions=True))
+
+        await asyncio.gather(*futures)
 
     @team.command(name='create', description='Create a team.')
     @app_commands.describe(name='The name of the team.')
@@ -130,9 +144,7 @@ class Teams(BaseCog):
             team_roster_data = await connection.fetch('SELECT * FROM teams.members WHERE team_id = $1', team['id'])
 
         embed = self.bot.Embed(
-            title=team['name'],
-            description=f'Below displays some inforamtion about {team["name"]}.',
-            author=interaction.user
+            title=team['name'], description=f'Below displays some inforamtion about {team["name"]}.', author=interaction.user
         )
 
         category = interaction.guild.get_channel(team['category_id'])
@@ -172,19 +184,17 @@ class Teams(BaseCog):
         await interaction.response.defer(ephemeral=True)
 
         async with self.bot.safe_connection() as connection:
+            member = await connection.fetchval('SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id)
+            if member:
+                return await interaction.response.send_message('This member is already on the team.', ephemeral=True)
+            
             await connection.execute('INSERT INTO teams.members(team_id, member_id) VALUES($1, $2)', team['id'], member.id)
 
         category = assertion(interaction.guild.get_channel(team['category_id']), Optional[discord.CategoryChannel])
         if category:
             await category.set_permissions(member, view_channel=True, reason='Requested to add member to team.')
 
-        for channel_id in team['channels']:
-            channel = assertion(
-                interaction.guild.get_channel(channel_id), Optional[Union[discord.TextChannel, discord.VoiceChannel]]
-            )
-            if channel:
-                await channel.edit(sync_permissions=True)
-
+        await self._sync_channels(interaction.guild, team['channels'])
         await interaction.edit_original_response(content=f'Added {member.mention} to the {team["name"]} team.')
 
     @team_members.command(name='remove', description='Remove a team member.')
@@ -197,6 +207,10 @@ class Teams(BaseCog):
         await interaction.response.defer(ephemeral=True)
 
         async with self.bot.safe_connection() as connection:
+            member = await connection.fetchval('SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id)
+            if not member:
+                return await interaction.response.send_message('This member is not on the team.', ephemeral=True)
+            
             await connection.execute(
                 'DELETE FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id
             )
@@ -207,21 +221,19 @@ class Teams(BaseCog):
             overwrites.pop(member, None)
             await category.edit(overwrites=overwrites)
 
-        for channel_id in team['channels']:
-            channel = assertion(
-                interaction.guild.get_channel(channel_id), Optional[Union[discord.TextChannel, discord.VoiceChannel]]
-            )
-            if channel:
-                await channel.edit(sync_permissions=True)
-
+        await self._sync_channels(interaction.guild, team['channels'])
         await interaction.edit_original_response(content=f'Removed {member.mention} from the {team["name"]} team.')
 
     @team_members.command(name='demote', description='Demote a team member to a sub.')
-    @app_commands.describe(member='The member to demote.')
+    @app_commands.describe(team='The team to demote the member on.', member='The member to demote.')
     async def team_members_demote(
         self, interaction: discord.Interaction, team: TEAM_TRANSFORM, member: discord.Member
     ) -> None:
         async with self.bot.safe_connection() as connection:
+            member = await connection.fetchval('SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id)
+            if not member:
+                return await interaction.response.send_message('This member is not on the team.', ephemeral=True)
+            
             await connection.execute(
                 'UPDATE teams.members SET is_sub = True WHERE member_id = $1 AND team_id = $2', member.id, team['id']
             )
@@ -238,6 +250,10 @@ class Teams(BaseCog):
         await interaction.response.defer(ephemeral=True)
 
         async with self.bot.safe_connection() as connection:
+            member = await connection.fetchval('SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id)
+            if member:
+                return await interaction.response.send_message('This member is already on the team.', ephemeral=True)
+            
             await connection.execute(
                 'INSERT INTO teams.members(team_id, member_id, is_sub) VALUES($1, $2, True)', team['id'], member.id
             )
@@ -246,13 +262,7 @@ class Teams(BaseCog):
         if category:
             await category.set_permissions(member, view_channel=True, reason='Requested to add member to team.')
 
-        for channel_id in team['channels']:
-            channel = assertion(
-                interaction.guild.get_channel(channel_id), Optional[Union[discord.TextChannel, discord.VoiceChannel]]
-            )
-            if channel:
-                await channel.edit(sync_permissions=True)
-
+        await self._sync_channels(interaction.guild, team['channels'])
         await interaction.edit_original_response(content=f'Added {member.mention} to {team["name"]}\'s sub roster.')
 
     @team_subs.command(name='remove', description='Remove a sub from a team.')
@@ -263,6 +273,10 @@ class Teams(BaseCog):
         await interaction.response.defer(ephemeral=True)
 
         async with self.bot.safe_connection() as connection:
+            member = await connection.fetchval('SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id)
+            if not member:
+                return await interaction.response.send_message('This member is not on the team.', ephemeral=True)
+
             await connection.execute(
                 'DELETE FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id
             )
@@ -273,21 +287,19 @@ class Teams(BaseCog):
             overwrites.pop(member, None)
             await category.edit(overwrites=overwrites)
 
-        for channel_id in team['channels']:
-            channel = assertion(
-                interaction.guild.get_channel(channel_id), Optional[Union[discord.TextChannel, discord.VoiceChannel]]
-            )
-            if channel:
-                await channel.edit(sync_permissions=True)
-
+        await self._sync_channels(interaction.guild, team['channels'])
         await interaction.edit_original_response(content=f'Removed {member.mention} from {team["name"]}\'s sub roster.')
 
     @team_subs.command(name='promote', description='Promote a team\'s sub to be apart of the main roster.')
-    @app_commands.describe(member='The member to promote.')
+    @app_commands.describe(member='The member to promote.', team='The team to promote the member on.')
     async def team_subs_promote(
         self, interaction: discord.Interaction, team: TEAM_TRANSFORM, member: discord.Member
     ) -> None:
         async with self.bot.safe_connection() as connection:
+            member = await connection.fetchval('SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id)
+            if not member:
+                return await interaction.response.send_message('This member is not on the team.', ephemeral=True)
+            
             await connection.execute(
                 'UPDATE teams.members SET is_sub = False WHERE member_id = $1 AND team_id = $2', member.id, team['id']
             )
@@ -295,23 +307,55 @@ class Teams(BaseCog):
         return await interaction.response.send_message(
             f'Promoted {member.mention} on the {team["name"]} team.', ephemeral=True
         )
-    
-    @team_captains.command(name='add', description='Add a team captain role.')
-    @app_commands.describe(role='The role to add.')
-    async def team_captains_add(self, interaction: discord.Interaction, team: TEAM_TRANSFORM, role: discord.Role) -> None:
-        async with self.bot.safe_connection() as connection:
-            await connection.execute('UPDATE teams.settings SET captain_roles = array_append(captain_roles, $1) WHERE id = $2', role.id, team['id'])
 
-        return await interaction.response.send_message(
-            f'Added {role.mention} to the {team["name"]} team.', ephemeral=True
-        )
-    
-    @team_captains.command(name='remove', description='Remove a team captain role.')
-    @app_commands.describe(role='The role to remove.')
-    async def team_captains_remove(self, interaction: discord.Interaction, team: TEAM_TRANSFORM, role: discord.Role) -> None:
+    @team_captains.command(name='add', description='Add a team captain role.')
+    @app_commands.describe(role='The role to add.', team='The team to add the captain role to.')
+    async def team_captains_add(self, interaction: discord.Interaction, team: TEAM_TRANSFORM, role: discord.Role) -> None:
+        assert interaction.guild
+
+        if role.id in team['captain_roles']:
+            return await interaction.response.send_message('This role is already a captain.', ephemeral=True)
+
         async with self.bot.safe_connection() as connection:
-            await connection.execute('UPDATE teams.settings SET captain_roles = array_remove(captain_roles, $1) WHERE id = $2', role.id, team['id'])
-            
+            await connection.execute(
+                'UPDATE teams.settings SET captain_roles = array_append(captain_roles, $1) WHERE id = $2',
+                role.id,
+                team['id'],
+            )
+
+        team['captain_roles'].append(role.id)
+
+        category = assertion(interaction.guild.get_channel(team['category_id']), Optional[discord.CategoryChannel])
+        if category:
+            await category.set_permissions(role, view_channel=True, reason='Adding new captain.')
+
+        await self._sync_channels(interaction.guild, team['channels'])
+        return await interaction.response.send_message(f'Added {role.mention} to the {team["name"]} team.', ephemeral=True)
+
+    @team_captains.command(name='remove', description='Remove a team captain role.')
+    @app_commands.describe(role='The role to remove.', team='The team to remove the captain role from.')
+    async def team_captains_remove(self, interaction: discord.Interaction, team: TEAM_TRANSFORM, role: discord.Role) -> None:
+        assert interaction.guild
+
+        if role.id not in team['captain_roles']:
+            return await interaction.response.send_message('This role is not a captain role on this team.', ephemeral=True)
+
+        async with self.bot.safe_connection() as connection:
+            await connection.execute(
+                'UPDATE teams.settings SET captain_roles = array_remove(captain_roles, $1) WHERE id = $2',
+                role.id,
+                team['id'],
+            )
+
+        team['captain_roles'].remove(role.id)
+
+        category = assertion(interaction.guild.get_channel(team['category_id']), Optional[discord.CategoryChannel])
+        if category:
+            overwrites = category.overwrites
+            overwrites.pop(role, None)
+            await category.edit(overwrites=overwrites, reason='Removing captain.')
+
+        await self._sync_channels(interaction.guild, team['channels'])
         return await interaction.response.send_message(
             f'Removed {role.mention} from the {team["name"]} team.', ephemeral=True
         )
