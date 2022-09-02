@@ -136,3 +136,7 @@ class MessageTracker(BaseCog):
         embed.add_field(name='Attachments', value='\n'.join([f'- {att.url}' for att in message.attachments] or ['No attachments.']))
         embed.add_field(name='Embeds', value=bool(message.embeds) or 'Message contained no embeds.')
         return await sender(embed=embed)
+    
+    
+async def setup(bot: FuryBot) -> None:
+    await bot.add_cog(MessageTracker(bot))
