@@ -187,6 +187,7 @@ class FuryBot(commands.Bot):
             intents=discord.Intents.all(),
             strip_after_prefix=True,
             allowed_mentions=discord.AllowedMentions.none(),
+            max_messages=5000
         )
 
     @classmethod
