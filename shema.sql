@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS teams.settings (
 )
 
 CREATE TABLE IF NOT EXISTS teams.members (
-    team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE 
+    team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     member_id BIGINT,
     is_sub BOOLEAN DEFAULT FALSE
 )
