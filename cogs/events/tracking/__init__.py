@@ -157,11 +157,17 @@ class MessageTracker(BaseCog):
         embed = self.bot.Embed(
             author=message.author, title='Sniped Message', description=message.content, timestamp=message.created_at
         )
-        embed.add_field(
-            name='Attachments', value='\n'.join([f'- {att.url}' for att in message.attachments] or ['No attachments.'])
-        )
-        embed.add_field(name='Embeds', value=bool(message.embeds) or 'Message contained no embeds.')
-        return await sender(embed=embed)
+        if message.attachments:
+            embed.add_field(
+                name='Attachments', value='\n'.join([f'- {att.url}' for att in message.attachments])
+            )
+        
+        embeds = [embed]
+        if message.embeds:
+            embed.add_field(name='Embeds', value=f'Contined {len(message.embeds)} embed(s), I\'ve attached them.')
+            embeds.extend(message.embeds)
+            
+        return await sender(embeds=embeds)
 
 
 async def setup(bot: FuryBot) -> None:
