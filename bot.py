@@ -181,9 +181,9 @@ class FuryBot(commands.Bot):
 
         self.profanity_filter: ProfantiyFilter = ProfantiyFilter(self)
         self.link_filter: LinkFilter = LinkFilter(self)
-        
+
         self.team_cache: Dict[int, asyncpg.Record] = {}
-        
+
         super().__init__(
             command_prefix='fury.',
             help_command=None,
@@ -264,7 +264,7 @@ class FuryBot(commands.Bot):
     async def setup_hook(self) -> None:
         for extension in initial_extensions:
             await self.load_extension(extension)
-            
+
         async with self.safe_connection() as connection:
             data = await connection.fetch('SELECT * FROM teams.settings')
             self.team_cache = {entry['id']: entry for entry in data}

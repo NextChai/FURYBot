@@ -133,10 +133,8 @@ class MessageTracker(BaseCog):
         embeds = [embed]
 
         if message.attachments:
-            embed.add_field(
-                name='Attachments', value='\n'.join([f'- {att.url}' for att in message.attachments])
-            )
-            
+            embed.add_field(name='Attachments', value='\n'.join([f'- {att.url}' for att in message.attachments]))
+
         if message.embeds:
             embed.add_field(name='Embeds', value=f'Contined {len(message.embeds)} embed(s), I\'ve attached them.')
             embeds.extend(webhook_message.embeds)
@@ -166,15 +164,13 @@ class MessageTracker(BaseCog):
             author=message.author, title='Sniped Message', description=message.content, timestamp=message.created_at
         )
         if message.attachments:
-            embed.add_field(
-                name='Attachments', value='\n'.join([f'- {att.url}' for att in message.attachments])
-            )
-        
+            embed.add_field(name='Attachments', value='\n'.join([f'- {att.url}' for att in message.attachments]))
+
         embeds = [embed]
         if message.embeds:
             embed.add_field(name='Embeds', value=f'Contined {len(message.embeds)} embed(s), I\'ve attached them.')
             embeds.extend(message.embeds)
-            
+
         return await sender(embeds=embeds)
 
 
