@@ -65,6 +65,8 @@ class MessageTracker(BaseCog):
             return
         if message.type not in (discord.MessageType.default, discord.MessageType.reply):
             return
+        if message.author.bot:
+            return
 
         self.message_cache[message.id] = message
 
