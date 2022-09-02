@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import difflib
 from typing import TYPE_CHECKING, Any, List, Optional, TypeAlias, Union
 
 import asyncpg
@@ -42,8 +43,16 @@ class TeamTransformer(app_commands.Transformer):
     ) -> List[app_commands.Choice[Union[int, float, str]]]:
         # Show available teams
         bot: FuryBot = interaction.client  # type: ignore
-
-        return [app_commands.Choice(name=team['name'], value=str(team['id'])) for team in bot.team_cache.values()]
+        
+        team_mapping = {team['name']: team for team in bot.team_cache.values()}
+        if not team_mapping:
+            return []
+        
+        if not value:
+            return [app_commands.Choice(name=team['name'], value=str(team['id'])) for team in list(bot.team_cache.values())[:20]]
+        
+        similar: List[str] = await bot.wrap(difflib.get_close_matches, str(value), team_mapping.keys(), n=20) # type: ignore
+        return [app_commands.Choice(name=team_mapping[entry]['name'], value=str(team_mapping[entry]['id'])) for entry in similar]
 
     async def transform(self, interaction: discord.Interaction, value: Any, /) -> asyncpg.Record:
         if not value.isdigit():
@@ -66,6 +75,7 @@ class Teams(BaseCog):
     )
     team_members = app_commands.Group(name='members', description='Manage team members.', parent=team)
     team_subs = app_commands.Group(name='subs', description='Manage team subs.', parent=team)
+    team_captains = app_commands.Group(name='captains', description='Manage team captainis.', parent=team)
 
     @team.command(name='create', description='Create a team.')
     @app_commands.describe(name='The name of the team.')
@@ -109,10 +119,11 @@ class Teams(BaseCog):
             await connection.execute('DELETE FROM teams.settings WHERE id = $1', team['id'])
 
         self.bot.team_cache.pop(team['id'], None)
-        return await interaction.response.send_message(f'Team `{team["name"]}` has been deleted.', ephemeral=True)
+        return await interaction.response.send_message(f'Team {team["name"]} has been deleted.', ephemeral=True)
 
-    @team.command(name='view', description='View stats about a specific team.')
-    async def team_view(self, interaction: discord.Interaction, team: TEAM_TRANSFORM) -> None:
+    @team.command(name='info', description='View stats about a specific team.')
+    @app_commands.describe(team='The team to get information on.')
+    async def team_info(self, interaction: discord.Interaction, team: TEAM_TRANSFORM) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -120,10 +131,12 @@ class Teams(BaseCog):
 
         embed = self.bot.Embed(
             title=team['name'],
+            description=f'Below displays some inforamtion about {team["name"]}.',
+            author=interaction.user
         )
 
         category = interaction.guild.get_channel(team['category_id'])
-        embed.add_field(name='Category', value=category and category.name or "Category Deleted.")
+        embed.add_field(name='Category', value=category and category.name or "Category Deleted.", inline=False)
 
         channel_fmt: List[str] = []
         for channel_id in team['channels']:
@@ -135,7 +148,7 @@ class Teams(BaseCog):
             else:
                 channel_fmt.append(f'- Channel `{channel_id}` deleted.')
 
-        embed.add_field(name='Channels', value='\n'.join(channel_fmt))
+        embed.add_field(name='Channels', value='\n'.join(channel_fmt), inline=False)
 
         members_fmt: List[str] = []
         subs_fmt: List[str] = []
@@ -147,12 +160,8 @@ class Teams(BaseCog):
             else:
                 members_fmt.append(f'- {mention_fmt}')
 
-        if members_fmt:
-            embed.add_field(name='Members', value='\n'.join(members_fmt))
-
-        if subs_fmt:
-            embed.add_field(name='Subs', value='\n'.join(subs_fmt))
-
+        embed.add_field(name='Members', value='\n'.join(members_fmt or ['No members on this team.']), inline=False)
+        embed.add_field(name='Subs', value='\n'.join(subs_fmt or ['No subs on this team.']), inline=False)
         return await interaction.response.send_message(embed=embed)
 
     @team_members.command(name='add', description='Add a team member.')
@@ -208,6 +217,7 @@ class Teams(BaseCog):
         await interaction.edit_original_response(content=f'Removed {member.mention} from the {team["name"]} team.')
 
     @team_members.command(name='demote', description='Demote a team member to a sub.')
+    @app_commands.describe(member='The member to demote.')
     async def team_members_demote(
         self, interaction: discord.Interaction, team: TEAM_TRANSFORM, member: discord.Member
     ) -> None:
@@ -217,7 +227,7 @@ class Teams(BaseCog):
             )
 
         return await interaction.response.send_message(
-            f'Demoted {member.mention} on the `{team["name"]}` team.', ephemeral=True
+            f'Demoted {member.mention} on the {team["name"]} team.', ephemeral=True
         )
 
     @team_subs.command(name='add', description='Add a member to the subs list.')
@@ -273,6 +283,7 @@ class Teams(BaseCog):
         await interaction.edit_original_response(content=f'Removed {member.mention} from {team["name"]}\'s sub roster.')
 
     @team_subs.command(name='promote', description='Promote a team\'s sub to be apart of the main roster.')
+    @app_commands.describe(member='The member to promote.')
     async def team_subs_promote(
         self, interaction: discord.Interaction, team: TEAM_TRANSFORM, member: discord.Member
     ) -> None:
@@ -282,7 +293,27 @@ class Teams(BaseCog):
             )
 
         return await interaction.response.send_message(
-            f'Promoted {member.mention} on the `{team["name"]}` team.', ephemeral=True
+            f'Promoted {member.mention} on the {team["name"]} team.', ephemeral=True
+        )
+    
+    @team_captains.command(name='add', description='Add a team captain role.')
+    @app_commands.describe(role='The role to add.')
+    async def team_captains_add(self, interaction: discord.Interaction, team: TEAM_TRANSFORM, role: discord.Role) -> None:
+        async with self.bot.safe_connection() as connection:
+            await connection.execute('UPDATE teams.settings SET captain_roles = array_append(captain_roles, $1) WHERE id = $2', role.id, team['id'])
+
+        return await interaction.response.send_message(
+            f'Added {role.mention} to the {team["name"]} team.', ephemeral=True
+        )
+    
+    @team_captains.command(name='remove', description='Remove a team captain role.')
+    @app_commands.describe(role='The role to remove.')
+    async def team_captains_remove(self, interaction: discord.Interaction, team: TEAM_TRANSFORM, role: discord.Role) -> None:
+        async with self.bot.safe_connection() as connection:
+            await connection.execute('UPDATE teams.settings SET captain_roles = array_remove(captain_roles, $1) WHERE id = $2', role.id, team['id'])
+            
+        return await interaction.response.send_message(
+            f'Removed {role.mention} from the {team["name"]} team.', ephemeral=True
         )
 
 
