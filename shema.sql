@@ -26,11 +26,11 @@ CREATE TABLE IF NOT EXISTS teams.settings (
     id SERIAL PRIMARY KEY,
     category_id BIGINT,
     channels BIGINT[] DEFAULT ARRAY[]::BIGINT,
-    name TEXT UNIQUE,
+    name TEXT UNIQUE
 )
 
 CREATE TABLE IF NOT EXISTS teams.members (
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE 
     member_id BIGINT,
-    is_sub BOOLEAN DEFAULT FALSE,
+    is_sub BOOLEAN DEFAULT FALSE
 )
