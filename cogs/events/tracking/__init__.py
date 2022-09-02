@@ -129,7 +129,7 @@ class MessageTracker(BaseCog):
         if not webhook_message:
             return
 
-        embed = self.bot.Embed(title='Message has been deleted.', description=webhook_message.content)
+        embed = self.bot.Embed(title='Message has been deleted.', description=webhook_message.content, author=message.author)
         embeds = [embed]
 
         if message.attachments:
