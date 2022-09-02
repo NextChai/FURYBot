@@ -85,7 +85,7 @@ class MessageTracker(BaseCog):
         )
         self.message_webhook_cache[message.id] = webhook_message
 
-    @commands.Cog.listener('on_raw_message_edit')
+    @commands.Cog.listener('on_message_edit')
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
         # See if we can find from the webhook cache
         webhook_message = self.message_webhook_cache.get(after.id, None)
