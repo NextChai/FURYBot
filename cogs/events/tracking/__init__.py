@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Union
 
 import cachetools
 import discord
@@ -44,7 +44,16 @@ class MessageTracker(BaseCog):
         self.message_cache: cachetools.Cache[int, discord.Message] = cachetools.Cache(maxsize=5000)
 
         self.message_webhook: Optional[discord.Webhook] = None
-        self.message_webhook_cache: cachetools.Cache[int, discord.WebhookMessage] = cachetools.Cache(maxsize=5000)
+        self.message_webhook_cache: cachetools.Cache[int, Union[discord.WebhookMessage, discord.Message]] = cachetools.Cache(maxsize=5000)
+
+    async def fetch_webhook(self) -> discord.Webhook:
+        match = re.search(
+            r'discord(?:app)?.com/api/webhooks/(?P<id>[0-9]{17,20})/(?P<token>[A-Za-z0-9\.\-\_]{60,68})',
+            os.environ['MESSAGE_WEBHOOK_URL'],
+        )
+        assert match
+
+        return await self.bot.fetch_webhook(int(match['id']))
 
     @commands.Cog.listener('on_message')
     async def on_message(self, message: discord.Message) -> None:
@@ -56,13 +65,7 @@ class MessageTracker(BaseCog):
         self.message_cache[message.id] = message
 
         if not self.message_webhook:
-            match = re.search(
-                r'discord(?:app)?.com/api/webhooks/(?P<id>[0-9]{17,20})/(?P<token>[A-Za-z0-9\.\-\_]{60,68})',
-                os.environ['MESSAGE_WEBHOOK_URL'],
-            )
-            assert match
-
-            self.message_webhook = await self.bot.fetch_webhook(int(match['id']))
+            self.message_webhook = await self.fetch_webhook()
 
         files: List[discord.File] = []
         if message.attachments:
@@ -87,20 +90,23 @@ class MessageTracker(BaseCog):
 
     @commands.Cog.listener('on_message_edit')
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
+        if all((
+            before.content == after.content,
+            before.embeds == after.embeds,
+        )):
+            return
+        
         # See if we can find from the webhook cache
         webhook_message = self.message_webhook_cache.get(after.id, None)
         if webhook_message is None:
             return
 
-        await webhook_message.reply(
+        new_message = await webhook_message.reply(
             content=after.content,
-            username=after.author.display_name,
-            avatar_url=after.author.display_avatar.url,
             embeds=after.embeds,
             allowed_mentions=discord.AllowedMentions.none(),
-            wait=True,
         )
-        self.message_webhook_cache[after.id] = webhook_message
+        self.message_webhook_cache[after.id] = new_message
 
     @commands.Cog.listener('on_message_delete')
     async def on_raw_message_delete(self, message: discord.Message) -> None:
