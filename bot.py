@@ -70,6 +70,7 @@ _log = logging.getLogger(__name__)
 initial_extensions: Tuple[str, ...] = (
     'jishaku',
     'cogs.events.infractions',
+    'cogs.events.notifier',
     'cogs.infractions',
     'utils.error_handler',
     'cogs.owner',
