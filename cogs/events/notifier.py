@@ -83,7 +83,7 @@ class Notifier(BaseCog):
         except (discord.Forbidden, discord.HTTPException):
             pass
 
-    async def _fetch_and_send_members(self, guild: discord.Guild) -> List[discord.Member]:
+    async def _fetch_and_send_members(self, guild: discord.Guild, moderators: List[int]) -> List[discord.Member]:
         embed = self.bot.Embed(
             title='Oh no!',
             description=f'Your DM\'s are not turned off in the {guild.name} server. Please '
@@ -97,6 +97,9 @@ class Notifier(BaseCog):
 
         members: List[discord.Member] = []
         async for member in guild.fetch_members(limit=None):
+            if member.id in moderators:
+                continue
+            
             try:
                 await member.send(embed=embed)
             except discord.HTTPException:
@@ -107,19 +110,28 @@ class Notifier(BaseCog):
         return members
 
     async def _wrap_guild_member_sending(self, guild: discord.Guild):
-        members = await self._fetch_and_send_members(guild)
+        async with self.bot.safe_connection() as connection:
+            data = await connection.fetchrow(
+                'SELECT notification_channel_id, moderators, moderator_role_ids FROM infractions.settigs WHERE guild_id = $1', guild.id
+            )
+        
+        assert data is not None
+        
+        moderators: List[int] = data['moderators'] or []
+        if data['moderator_role_ids']:
+            for role_id in data['moderator_role_ids']:
+                role = guild.get_role(role_id)
+                if role:
+                    moderators.extend([m.id for m in role.members])    
+        
+        members = await self._fetch_and_send_members(guild, moderators)
         if not members:
             return
 
-        async with self.bot.safe_connection() as connection:
-            channel_id = await connection.fetchval(
-                'SELECT notification_channel_id FROM infractions.settigs WHERE guild_id = $1', guild.id
-            )
-
-        if not channel_id:
+        if not data['notification_channel_id']:
             return
 
-        channel = assertion(guild.get_channel(channel_id), Optional[discord.TextChannel])
+        channel = assertion(guild.get_channel(data['notification_channel_id']), Optional[discord.TextChannel])
         if not channel:
             return
 
