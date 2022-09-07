@@ -77,16 +77,16 @@ class Notifier(BaseCog):
         embed.set_image(
             url='https://cdn.discordapp.com/attachments/881935961972436992/1017087615641587722/2022-09-07_10-52-33_online-video-cutter.com.gif'
         )
-        
+
         second_embed = self.bot.Embed(
             title='Add the Coaches!',
             description='In addition to turning of your DMs, you also must add all of the Coaches '
-                'and Lead Captains on Discord so they can Direct Message you if needed.'
+            'and Lead Captains on Discord so they can Direct Message you if needed.',
         )
         second_embed.add_field(
-            name='How do I add the Coaches?', 
+            name='How do I add the Coaches?',
             value='In the Discord server on the right side, right click on '
-                'each Coach and Lead Captain, and select "Add Friend".'
+            'each Coach and Lead Captain, and select "Add Friend".',
         )
 
         try:
@@ -112,7 +112,7 @@ class Notifier(BaseCog):
                 continue
             if member.bot:
                 continue
-            
+
             try:
                 await member.send(embed=embed)
             except discord.HTTPException:
@@ -125,18 +125,19 @@ class Notifier(BaseCog):
     async def _wrap_guild_member_sending(self, guild: discord.Guild):
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
-                'SELECT notification_channel_id, moderators, moderator_role_ids FROM infractions.settings WHERE guild_id = $1', guild.id
+                'SELECT notification_channel_id, moderators, moderator_role_ids FROM infractions.settings WHERE guild_id = $1',
+                guild.id,
             )
-        
+
         assert data is not None
-        
+
         moderators: List[int] = data['moderators'] or []
         if data['moderator_role_ids']:
             for role_id in data['moderator_role_ids']:
                 role = guild.get_role(role_id)
                 if role:
-                    moderators.extend([m.id for m in role.members])    
-        
+                    moderators.extend([m.id for m in role.members])
+
         members = await self._fetch_and_send_members(guild, moderators)
         if not members:
             return
