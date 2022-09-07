@@ -99,6 +99,8 @@ class Notifier(BaseCog):
         async for member in guild.fetch_members(limit=None):
             if member.id in moderators:
                 continue
+            if member.bot:
+                continue
             
             try:
                 await member.send(embed=embed)
