@@ -49,7 +49,7 @@ class Notifier(BaseCog):
             description='Welcome to the FLVS Fury Discord server! My name is Fury Bot, the '
             'main moderation tool for the server. Let\'s walk through some important things you '
             'need to know.',
-            author=member,
+            author=member.guild.me,
         )
         embed.add_field(
             name='Rules',
@@ -77,9 +77,20 @@ class Notifier(BaseCog):
         embed.set_image(
             url='https://cdn.discordapp.com/attachments/881935961972436992/1017087615641587722/2022-09-07_10-52-33_online-video-cutter.com.gif'
         )
+        
+        second_embed = self.bot.Embed(
+            title='Add the Coaches!',
+            description='In addition to turning of your DMs, you also must add all of the Coaches '
+                'and Lead Captains on Discord so they can Direct Message you if needed.'
+        )
+        second_embed.add_field(
+            name='How do I add the Coaches?', 
+            value='In the Discord server on the right side, right click on '
+                'each Coach and Lead Captain, and select "Add Friend".'
+        )
 
         try:
-            await member.send(embed=embed)
+            await member.send(embeds=[embed, second_embed])
         except (discord.Forbidden, discord.HTTPException):
             pass
 
