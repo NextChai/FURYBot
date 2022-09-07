@@ -68,10 +68,10 @@ class Notifier(BaseCog):
         )
         embed.add_field(
             name='Private DMS',
-            value='It\'s important you turn your DMs from peers in the FLVS Fury server off. The gif '
-            'below demonstrates this. This is required, failure to do turn off your DM\'s will result '
-            'in one of the Coaches reaching out to you (you may need to click '
-            'on the gif to load properly).',
+            value='It\'s important you turn your DMs from peers in the FLVS Fury server off. [This gif '
+            'will show you how](https://cdn.discordapp.com/attachments/881935961972436992/1017087615641587722/'
+            '2022-09-07_10-52-33_online-video-cutter.com.gif). This is required, failure to do turn off your DM\'s will result '
+            'in one of the Coaches reaching out to you.',
             inline=False,
         )
         embed.add_field(
@@ -81,10 +81,7 @@ class Notifier(BaseCog):
             'server on the right side, right click on each Coach and Lead Captain, and select "Add Friend".',
             inline=False,
         )
-        embed.set_image(
-            url='https://cdn.discordapp.com/attachments/881935961972436992/1017087615641587722/2022-09-07_10-52-33_online-video-cutter.com.gif'
-        )
-
+        
         try:
             await member.send(embed=embed)
         except (discord.Forbidden, discord.HTTPException):
