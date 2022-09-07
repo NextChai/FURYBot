@@ -70,8 +70,8 @@ class Notifier(BaseCog):
             name='Private DMS',
             value='It\'s important you turn your DMs from peers in the FLVS Fury server off. The gif '
             'below demonstrates this. This is required, failure to do turn off your DM\'s will result '
-            'in one of the Coaches reaching out to you. (gif below for how to do this, you may need to click) '
-            'on it to load properly).',
+            'in one of the Coaches reaching out to you (you may need to click '
+            'on the gif to load properly).',
             inline=False,
         )
         embed.set_image(
