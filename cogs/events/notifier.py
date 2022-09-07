@@ -74,23 +74,19 @@ class Notifier(BaseCog):
             'on the gif to load properly).',
             inline=False,
         )
+        embed.add_field(
+            name='Add the Coaches!',
+            value='In addition to turning of your DMs, you also must add all of the Coaches '
+            'and Lead Captains on Discord so they can Direct Message you if needed. In the Discord '
+            'server on the right side, right click on each Coach and Lead Captain, and select "Add Friend".',
+            inline=False,
+        )
         embed.set_image(
             url='https://cdn.discordapp.com/attachments/881935961972436992/1017087615641587722/2022-09-07_10-52-33_online-video-cutter.com.gif'
         )
 
-        second_embed = self.bot.Embed(
-            title='Add the Coaches!',
-            description='In addition to turning of your DMs, you also must add all of the Coaches '
-            'and Lead Captains on Discord so they can Direct Message you if needed.',
-        )
-        second_embed.add_field(
-            name='How do I add the Coaches?',
-            value='In the Discord server on the right side, right click on '
-            'each Coach and Lead Captain, and select "Add Friend".',
-        )
-
         try:
-            await member.send(embeds=[embed, second_embed])
+            await member.send(embed=embed)
         except (discord.Forbidden, discord.HTTPException):
             pass
 
