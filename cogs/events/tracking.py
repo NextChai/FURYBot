@@ -85,6 +85,9 @@ class MessageTracker(BaseCog):
                     continue
 
                 files.append(file)
+        
+        if not files and not message.embeds and not message.content:
+            return
 
         webhook_message = await self.message_webhook.send(
             content=message.content,
