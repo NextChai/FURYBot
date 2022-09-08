@@ -81,7 +81,7 @@ class Notifier(BaseCog):
             'server on the right side, right click on each Coach and Lead Captain, and select "Add Friend".',
             inline=False,
         )
-        
+
         try:
             await member.send(embed=embed)
         except (discord.Forbidden, discord.HTTPException):
