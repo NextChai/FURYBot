@@ -38,6 +38,7 @@ if TYPE_CHECKING:
 
 class InfractionType(enum.Enum):
     links = 'Links'
+    profanity = 'Profanity'
 
 
 class Infractions(BaseCog):
@@ -133,6 +134,31 @@ class Infractions(BaseCog):
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
+            # Edit singular profanity check
+            if type is InfractionType.profanity:
+                rule_id = await connection.fetchval(
+                    'SELECT automod_rule_id FROM infractions.profaniy WHERE guild_id = $1', interaction.guild.id
+                )
+                if not rule_id:
+                    return await interaction.response.send_message('You have no profanity filter.', ephemeral=True)
+
+                try:
+                    rule = await interaction.guild.fetch_automod_rule(rule_id)
+                except discord.NotFound:
+                    return await interaction.response.send_message(
+                        'A mod deleted the profanity filter automod rule. I could not edit it.', ephemeral=True
+                    )
+
+                if not rule.actions:
+                    return await interaction.response.send_message(
+                        'A moderator has edited this automod rule. I can not do anything to it now.', ephemeral=True
+                    )
+
+                action = rule.actions[0]
+                action.duration = datetime.timedelta(seconds=time)
+                await rule.edit(actions=[action])
+                return await interaction.response.send_message('I\'ve updated the time.')
+
             # NOTE: A singular query here gets mad because of how asyncpg handles parameters.
             data = await connection.fetchrow(
                 'SELECT * FROM infractions.time WHERE guild_id = $1 AND type = $2', interaction.guild.id, type.value
