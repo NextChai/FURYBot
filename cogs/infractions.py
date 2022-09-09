@@ -315,6 +315,7 @@ class Infractions(BaseCog):
                 link,
             )
 
+        self.bot.link_filter._allowed_links.pop(interaction.guild.id, None)
         return await interaction.response.send_message(f'I\'ve added `{link}` as an allowed link.', ephemeral=True)
 
     @infraction_allowed_link.command(name='remove', description='Remove an allowed link to the link filter.')
@@ -336,6 +337,7 @@ class Infractions(BaseCog):
                 link,
             )
 
+        self.bot.link_filter._allowed_links.pop(interaction.guild.id, None)
         return await interaction.response.send_message(f'I\'ve removed `{link}` as an allowed link.', ephemeral=True)
 
     @infraction_profanity.command(name='add', description='Add a profane word to the profanity filter.')
