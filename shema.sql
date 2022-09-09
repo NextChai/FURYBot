@@ -20,6 +20,11 @@ CREATE TABLE IF NOT EXISTS infractions.settings (
     ignored_channel_ids BIGINT[] DEFAULT ARRAY[]::BIGINT[]
 )
 
+CREATE TABLE IF NOT EXISTS infractions.profanity (
+    guild_id BIGINT UNIQUE,
+    automod_rule_id BIGINT
+)
+
 CREATE SCHEMA teams;
 
 CREATE TABLE IF NOT EXISTS teams.settings (
