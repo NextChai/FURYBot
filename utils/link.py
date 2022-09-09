@@ -19,33 +19,49 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import re
-from typing import TYPE_CHECKING, List
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+)
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
-_LINK_REGEX: re.Pattern[str] = re.compile(
-    r'\b('
-    r'(?:https?://)?'
-    r'(?:(?:www\.)?(?:[\da-z\.-]+)\.(?:[a-z]{2,6})'
-    r'|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)'
-    r'|(?:(?:[0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|'
-    r'(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|'
-    r'(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|'
-    r'[0-9a-fA-F]{1,4}:(?:(?::[0-9a-fA-F]{1,4}){1,6})|:(?:(?::[0-9a-fA-F]{1,4}){1,7}|:)|'
-    r'fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(?:ffff(?::0{1,4}){0,1}:){0,1}(?:(?:25[0-5]|'
-    r'(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])|'
-    r'(?:[0-9a-fA-F]{1,4}:){1,4}:(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(?:25[0-5]|'
-    r'(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])))'
-    r'(?::[0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])'
-    r'?(?:/[\w\.-]*)*/?)\b'
-)
+    class URLExtract:
+        if TYPE_CHECKING:
+
+            def find_urls(self, text: str, /) -> List[str]:
+                ...
+
+else:
+    from urlextract import URLExtract
 
 
-class LinkFilter:
-    def __init__(self, bot: FuryBot):
+class LinkFilter(URLExtract):
+    def __init__(self, bot: FuryBot, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
         self.bot: FuryBot = bot
+        self._allowed_links: Dict[int, List[str]] = {}
 
-    async def get_links(self, phrase: str) -> List[str]:
-        return await self.bot.wrap(_LINK_REGEX.findall, phrase)
+    async def get_links(self, text: str, /, *, guild_id: int) -> List[str]:
+        if not self._allowed_links.get(guild_id):
+            self._allowed_links[guild_id] = await self.fetch_allowed_links(guild_id)
+
+        links = await self.bot.wrap(self.find_urls, text=text)
+
+        for link in links:
+            if link in self._allowed_links[guild_id]:
+                links.remove(link)
+
+        return links
+
+    async def fetch_allowed_links(self, guild_id: int) -> List[str]:
+        async with self.bot.safe_connection() as connection:
+            data = await connection.fetchval('SELECT valid_links FROM infractions.settings WHERE guild_id = $1', guild_id)
+
+        if data:
+            return [l.lower() for l in data]
+
+        return []
