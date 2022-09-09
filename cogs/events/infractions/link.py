@@ -28,7 +28,16 @@ from discord.ext import commands
 
 from utils.bases.cog import BaseCog
 
-from .common import valid_message
+
+def valid_message(message: discord.Message) -> bool:
+    if not message.guild:
+        return False
+    if not isinstance(message.author, discord.Member):
+        return False
+    if not message.content:
+        return False
+
+    return True
 
 
 class Link(BaseCog):
@@ -37,7 +46,9 @@ class Link(BaseCog):
         if not valid_message(message):
             return
 
-        links = await self.bot.link_filter.get_links(message.content)
+        assert message.guild
+
+        links = await self.bot.link_filter.get_links(message.content, guild_id=message.guild.id)
         if not links:
             return
 
@@ -51,7 +62,9 @@ class Link(BaseCog):
         if not valid_message(after):
             return
 
-        links = await self.bot.link_filter.get_links(after.content)
+        assert after.guild
+
+        links = await self.bot.link_filter.get_links(after.content, guild_id=after.guild.id)
         if not links:
             return
 
