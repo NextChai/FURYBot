@@ -306,7 +306,7 @@ class Infractions(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
-                INSERT INTO infractions.settings(guild_id, valid_links) VALUES($1, ARRAY[ $2 ]::BIGINT[])
+                INSERT INTO infractions.settings(guild_id, valid_links) VALUES($1, ARRAY[ $2 ]::TEXT[])
                 ON CONFLICT (guild_id)
                 DO UPDATE
                     SET valid_links = array_append((SELECT valid_links FROM infractions.settings WHERE guild_id = $1), $2)
