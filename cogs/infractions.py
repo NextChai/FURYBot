@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import datetime
 import enum
 from typing import TYPE_CHECKING
 
@@ -36,7 +37,6 @@ if TYPE_CHECKING:
 
 
 class InfractionType(enum.Enum):
-    profanity = 'Profanity'
     links = 'Links'
 
 
@@ -76,6 +76,14 @@ class Infractions(BaseCog):
     infraction_ignored_channel = app_commands.Group(
         name='ignored_channel',
         description='Manage ignored channels for the infraction manager.',
+        default_permissions=discord.Permissions(moderate_members=True),
+        guild_only=True,
+        parent=infraction,
+    )
+
+    infraction_profanity = app_commands.Group(
+        name='profanity',
+        description='Manage the profanity filter.',
         default_permissions=discord.Permissions(moderate_members=True),
         guild_only=True,
         parent=infraction,
@@ -264,7 +272,7 @@ class Infractions(BaseCog):
     async def infraction_allowed_link_add(self, interaction: discord.Interaction, link: str) -> None:
         assert interaction.guild
 
-        if not await self.bot.link_filter.get_links(link):
+        if not await self.bot.link_filter.get_links(link, guild_id=interaction.guild.id):
             return await interaction.response.send_message(
                 'I couldn\'t find any links in the `link` parameter you sent...', ephemeral=True
             )
@@ -288,7 +296,7 @@ class Infractions(BaseCog):
     async def infraction_allowed_link_remove(self, interaction: discord.Interaction, link: str) -> None:
         assert interaction.guild
 
-        if not await self.bot.link_filter.get_links(link):
+        if not await self.bot.link_filter.get_links(link, guild_id=interaction.guild.id):
             return await interaction.response.send_message(
                 'I couldn\'t find any links in the `link` parameter you sent...', ephemeral=True
             )
@@ -304,18 +312,104 @@ class Infractions(BaseCog):
 
         return await interaction.response.send_message(f'I\'ve removed `{link}` as an allowed link.', ephemeral=True)
 
-    @app_commands.command(name='censor', description='Censor a message to check if it\'s profanity.')
-    @app_commands.default_permissions(manage_messages=True)
-    @app_commands.describe(phrase='The phrase to check for profanity.')
-    async def censor(self, interaction: discord.Interaction, phrase: str) -> None:
-        censored = await self.bot.profanity_filter.censor(phrase)
-        return await interaction.response.send_message(discord.utils.escape_markdown(censored), ephemeral=True)
+    @infraction_profanity.command(name='add', description='Add a profane word to the profanity filter.')
+    @app_commands.describe(term='The term to add.')
+    async def infraction_profanity_add(self, interaction: discord.Interaction, term: str) -> None:
+        assert interaction.guild
+
+        async with self.bot.safe_connection() as connection:
+            data = await connection.fetchrow('SELECT * FROM infractions.profanity WHERE guild_id = $1', interaction.guild.id)
+
+            if data:
+                automod_rule_id = data['automod_rule_id']
+                try:
+                    automod_rule = await interaction.guild.fetch_automod_rule(automod_rule_id)
+                except discord.NotFound:
+                    pass
+                else:
+                    wordset = automod_rule.trigger.keyword_filter
+                    wordset.append(term)
+                    await automod_rule.edit(trigger=automod_rule.trigger)
+                    return await interaction.response.send_message(
+                        f'Added `{term}` to the profanity filter.', ephemeral=True
+                    )
+
+            await interaction.response.defer(ephemeral=True)
+
+            settings = await connection.fetchrow(
+                'SELECT * FROM infractions.settings WHERE guild_id = $1', interaction.guild.id
+            )
+            settings = dict(settings) if settings else {}
+
+            word_data = await connection.fetch('SELECT word FROM profane_words')
+            words = [entry['word'] for entry in word_data]
+            if term not in words:
+                words.append(term)
+
+            automod_rule = await interaction.guild.create_automod_rule(
+                name='FuryBot Profanity',
+                event_type=discord.AutoModRuleEventType.message_send,
+                trigger=discord.AutoModTrigger(
+                    type=discord.AutoModRuleTriggerType.keyword,
+                    keyword_filter=words,
+                ),
+                actions=[
+                    discord.AutoModRuleAction(
+                        channel_id=settings.get('notification_channel_id'), duration=datetime.timedelta(minutes=5)
+                    )
+                ],
+                exempt_channels=[discord.Object(id=channel_id) for channel_id in settings.get('ignored_channel_ids', [])],
+                exempt_roles=[discord.Object(id=role_id) for role_id in settings.get('moderator_role_ids', [])],
+            )
+
+            await connection.execute(
+                """
+                INSERT INTO infractions.profanity(guild_id, automod_rule_id) VALUES($1, $2)
+                ON CONFLICT (guild_id)
+                DO UPDATE
+                    SET automod_rule_id = EXCLUDED.automod_rule_id
+                """,
+                interaction.guild.id,
+                automod_rule.id,
+            )
+
+        await interaction.edit_original_response(
+            content=f'Done. I\'ve created a new profanity filter for you and added the term `{term}`.'
+        )
+
+    @infraction_profanity.command(name='remove', description='Remove a profane word to the profanity filter.')
+    @app_commands.describe(term='The term to remove.')
+    async def infraction_profanity_remove(self, interaction: discord.Interaction, term: str) -> None:
+        assert interaction.guild
+
+        async with self.bot.safe_connection() as connection:
+            data = await connection.fetchrow('SELECT * FROM infractions.profanity WHERE guild_id = $1', interaction.guild.id)
+
+        if not data:
+            return await interaction.response.send_message('There is no profanity filter to remove the term from.')
+
+        automod_rule_id = data['automod_rule_id']
+        try:
+            automod_rule = await interaction.guild.fetch_automod_rule(automod_rule_id)
+        except discord.NotFound:
+            return await interaction.response.send_message('This automod rule was deleted.')
+
+        wordset = automod_rule.trigger.keyword_filter
+        if term not in wordset:
+            return await interaction.response.send_message(f'The term `{term}` is not profane.', ephemeral=True)
+
+        wordset.remove(term)
+        await automod_rule.edit(trigger=automod_rule.trigger)
+        return await interaction.response.send_message(f'Removed `{term}` from the profanity filter.', ephemeral=True)
 
     @app_commands.command(name='get_links', description='Get the links from a given text.')
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.describe(phrase='The phrase to check for links.')
+    @app_commands.guild_only()
     async def get_links(self, interaction: discord.Interaction, phrase: str) -> None:
-        links = await self.bot.link_filter.get_links(phrase)
+        assert interaction.guild
+
+        links = await self.bot.link_filter.get_links(phrase, guild_id=interaction.guild.id)
         return await interaction.response.send_message(
             '**Links found**:\n\n' + '\n'.join(f'- <{link}>' for link in links or ['No links found.']), ephemeral=True
         )
