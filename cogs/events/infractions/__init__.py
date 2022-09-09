@@ -24,7 +24,6 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import datetime
-import logging
 import textwrap
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -35,15 +34,12 @@ from cogs.infractions import InfractionType
 from utils import assertion
 
 from .link import Link
-from .profanity import Profanity
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
-_log = logging.getLogger(__name__)
 
-
-class InfractionListener(Link, Profanity):
+class InfractionListener(Link):
     def check_valid_operation(self, data: Dict[Any, Any], message: discord.Message) -> bool:
         assert isinstance(message.author, discord.Member)
 
@@ -124,48 +120,6 @@ class InfractionListener(Link, Profanity):
         )
         embed.add_field(name='Link(s) found.', value=', '.join(f'`{link}`' for link in links))
         embed.add_field(name='Original Content', value=textwrap.shorten(message.content, 1200, placeholder='...'))
-        await channel.send(embed=embed)
-
-    @commands.Cog.listener('on_profanity_found')
-    async def on_profanity_found(self, message: discord.Message, censored: str) -> None:
-        data = await self.validate_infraction(message, InfractionType.profanity)
-        if not data:
-            return
-
-        assert isinstance(message.author, discord.Member)
-        assert message.guild
-
-        embed = self.bot.Embed(
-            title='Profanity Found.',
-            description=f'You can\'t post that here, {message.author.mention}.',
-            author=message.author,
-        )
-        await message.channel.send(embed=embed)
-
-        mute_delta = datetime.timedelta(seconds=data['time'])
-        try:
-            await message.author.timeout(mute_delta)
-        except discord.Forbidden:
-            pass
-
-        await message.delete()
-
-        channel = assertion(message.guild.get_channel(data['notification_channel_id']), Optional[discord.TextChannel])
-        if not channel:
-            return
-
-        embed = self.bot.Embed(
-            title='Profanity Found',
-            description=f'{message.author.mention} has sent profanity in {message.channel.mention}.',  # pyright: ignore # NOTE: Come back
-            author=message.author,
-        )
-        embed.add_field(name='Censored', value=discord.utils.escape_markdown(censored))
-        embed.add_field(name='Original Content', value=message.content)
-        embed.add_field(
-            name='Action Taken',
-            value=f'I\'ve muted them for {discord.utils.format_dt(discord.utils.utcnow() + mute_delta, "R")}',
-            inline=False,
-        )
         await channel.send(embed=embed)
 
 
