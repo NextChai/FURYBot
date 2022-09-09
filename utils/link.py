@@ -19,6 +19,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import re
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -51,8 +52,11 @@ class LinkFilter(URLExtract):
 
         links = await self.bot.wrap(self.find_urls, text=text)
 
+        allowed_links = self._allowed_links[guild_id]
         for link in links:
-            if link in self._allowed_links[guild_id]:
+            if any(
+                [await self.bot.wrap(re.findall, allowed_link, link) for allowed_link in allowed_links]  # pyright: ignore
+            ):
                 links.remove(link)
 
         return links
