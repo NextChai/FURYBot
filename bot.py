@@ -52,7 +52,6 @@ from typing_extensions import Concatenate, Self
 from utils import assertion
 from utils.error_handler import ErrorHandler
 from utils.link import LinkFilter
-from utils.profanity import ProfantiyFilter
 
 if TYPE_CHECKING:
     import datetime
@@ -180,7 +179,6 @@ class FuryBot(commands.Bot):
         self.pool: PoolType = pool
         self.thread_pool: futures.ThreadPoolExecutor = futures.ThreadPoolExecutor(max_workers=20)
 
-        self.profanity_filter: ProfantiyFilter = ProfantiyFilter(self)
         self.link_filter: LinkFilter = LinkFilter(self)
 
         self.team_cache: Dict[int, asyncpg.Record] = {}
