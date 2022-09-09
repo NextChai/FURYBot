@@ -6,3 +6,4 @@ python-dotenv
 cachetools
 inflection
 asyncpg
+urlextract
