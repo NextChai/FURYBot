@@ -20,12 +20,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import re
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    List,
-)
+from typing import TYPE_CHECKING, Any, Dict, List
 
 if TYPE_CHECKING:
     from bot import FuryBot

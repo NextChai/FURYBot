@@ -9,13 +9,15 @@ cachefile.py - file with classes handling cached TLDs (e.g. downloads, updates)
 .. codeauthor:: Jan Lipovský <janlipovsky@gmail.com>, janlipovsky.cz
 .. contributors: https://github.com/lipoja/URLExtract/graphs/contributors
 """
+
 class CacheFileError(Exception):
     """Raised when some error occurred regarding file with cached TLDs."""
-    ...
 
+    ...
 
 class CacheFile:
     """Class for working with cached TLDs in file."""
+
     _CACHE_FILE_NAME = ...
     _DATA_DIR = ...
     _URLEXTRACT_NAME = ...
@@ -25,6 +27,3 @@ class CacheFile:
         :raises: CacheFileError when cached file is not readable for user
         """
         ...
-    
-
-

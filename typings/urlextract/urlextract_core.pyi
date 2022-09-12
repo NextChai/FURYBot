@@ -14,6 +14,7 @@ urlextract_core.py - file with definition of URLExtract class and urlextract cli
 """
 __version__ = ...
 DEFAULT_LIMIT = ...
+
 class URLExtract(CacheFile):
     """
     Class for finding and extracting URLs from given string.
@@ -36,6 +37,7 @@ class URLExtract(CacheFile):
         if extractor.has_urls(example_text):
             print("Given text contains some URL")
     """
+
     _hostname_re = ...
     _enclosure = ...
     _ipv4_tld = ...
@@ -58,36 +60,32 @@ class URLExtract(CacheFile):
             Enabled by default
         """
         ...
-    
     @property
-    def extract_email(self): # -> bool:
+    def extract_email(self):  # -> bool:
         """
         If set to True email will be extracted from text
 
         :rtype: bool
         """
         ...
-    
     @extract_email.setter
-    def extract_email(self, extract): # -> None:
+    def extract_email(self, extract):  # -> None:
         """
         Set if emails will be extracted from text
 
         :param bool extract: True if emails should be extracted False otherwise
         """
         ...
-    
     @property
-    def extract_localhost(self): # -> bool:
+    def extract_localhost(self):  # -> bool:
         """
         If set to True 'localhost' will be extracted as URL from text
 
         :rtype: bool
         """
         ...
-    
     @extract_localhost.setter
-    def extract_localhost(self, enable): # -> None:
+    def extract_localhost(self, enable):  # -> None:
         """
         Set if 'localhost' will be extracted as URL from text
 
@@ -95,9 +93,8 @@ class URLExtract(CacheFile):
             False otherwise
         """
         ...
-    
     @property
-    def ignore_list(self): # -> set[Unknown]:
+    def ignore_list(self):  # -> set[Unknown]:
         """
         Returns set of URLs on ignore list
 
@@ -105,26 +102,23 @@ class URLExtract(CacheFile):
         :rtype: set(str)
         """
         ...
-    
     @ignore_list.setter
-    def ignore_list(self, ignore_list): # -> None:
+    def ignore_list(self, ignore_list):  # -> None:
         """
         Set of URLs to be ignored (not returned) while extracting from text
 
         :param set(str) ignore_list: set of URLs
         """
         ...
-    
-    def load_ignore_list(self, file_name): # -> None:
+    def load_ignore_list(self, file_name):  # -> None:
         """
         Load URLs from file into ignore list
 
         :param str file_name: path to file containing URLs
         """
         ...
-    
     @property
-    def permit_list(self): # -> set[Unknown]:
+    def permit_list(self):  # -> set[Unknown]:
         """
         Returns set of URLs that can be processed
 
@@ -132,25 +126,22 @@ class URLExtract(CacheFile):
         :rtype: set(str)
         """
         ...
-    
     @permit_list.setter
-    def permit_list(self, permit_list): # -> None:
+    def permit_list(self, permit_list):  # -> None:
         """
         Set of URLs that can be processed
 
         :param set(str) permit_list: set of URLs
         """
         ...
-    
-    def load_permit_list(self, file_name): # -> None:
+    def load_permit_list(self, file_name):  # -> None:
         """
         Load URLs from file into permit list
 
         :param str file_name: path to file containing URLs
         """
         ...
-    
-    def update(self): # -> bool:
+    def update(self):  # -> bool:
         """
         Update TLD list cache file.
 
@@ -158,8 +149,7 @@ class URLExtract(CacheFile):
         :rtype: bool
         """
         ...
-    
-    def update_when_older(self, days): # -> bool:
+    def update_when_older(self, days):  # -> bool:
         """
         Update TLD list cache file if the list is older than
         number of days given in parameter `days` or if does not exist.
@@ -169,9 +159,8 @@ class URLExtract(CacheFile):
         :rtype: bool
         """
         ...
-    
     @staticmethod
-    def get_version(): # -> str:
+    def get_version():  # -> str:
         """
         Returns version number.
 
@@ -179,8 +168,7 @@ class URLExtract(CacheFile):
         :rtype: str
         """
         ...
-    
-    def get_after_tld_chars(self): # -> list[str]:
+    def get_after_tld_chars(self):  # -> list[str]:
         """
         Returns list of chars that are allowed after TLD
 
@@ -188,16 +176,14 @@ class URLExtract(CacheFile):
         :rtype: list
         """
         ...
-    
-    def set_after_tld_chars(self, after_tld_chars): # -> None:
+    def set_after_tld_chars(self, after_tld_chars):  # -> None:
         """
         Set chars that are allowed after TLD.
 
         :param list after_tld_chars: list of characters
         """
         ...
-    
-    def get_stop_chars_left(self): # -> set[str] | set[Unknown]:
+    def get_stop_chars_left(self):  # -> set[str] | set[Unknown]:
         """
         Returns set of stop chars for text on left from TLD.
 
@@ -205,8 +191,7 @@ class URLExtract(CacheFile):
         :rtype: set
         """
         ...
-    
-    def set_stop_chars_left(self, stop_chars): # -> None:
+    def set_stop_chars_left(self, stop_chars):  # -> None:
         """
         Set stop characters for text on left from TLD.
         Stop characters are used when determining end of URL.
@@ -215,8 +200,7 @@ class URLExtract(CacheFile):
         :raises: TypeError
         """
         ...
-    
-    def get_stop_chars_right(self): # -> set[str] | set[Unknown]:
+    def get_stop_chars_right(self):  # -> set[str] | set[Unknown]:
         """
         Returns set of stop chars for text on right from TLD.
 
@@ -224,8 +208,7 @@ class URLExtract(CacheFile):
         :rtype: set
         """
         ...
-    
-    def set_stop_chars_right(self, stop_chars): # -> None:
+    def set_stop_chars_right(self, stop_chars):  # -> None:
         """
         Set stop characters for text on right from TLD.
         Stop characters are used when determining end of URL.
@@ -234,8 +217,9 @@ class URLExtract(CacheFile):
         :raises: TypeError
         """
         ...
-    
-    def get_enclosures(self): # -> set[tuple[Literal['('], Literal[')']] | tuple[Literal['{'], Literal['}']] | tuple[Literal['['], Literal[']']] | tuple[Literal['"'], Literal['"']] | tuple[Literal['\\'], Literal['\\']] | tuple[Literal['\''], Literal['\'']] | tuple[Literal['`'], Literal['`']]]:
+    def get_enclosures(
+        self,
+    ):  # -> set[tuple[Literal['('], Literal[')']] | tuple[Literal['{'], Literal['}']] | tuple[Literal['['], Literal[']']] | tuple[Literal['"'], Literal['"']] | tuple[Literal['\\'], Literal['\\']] | tuple[Literal['\''], Literal['\'']] | tuple[Literal['`'], Literal['`']]]:
         """
         Returns set of enclosure pairs that might be used to enclosure URL.
         For example brackets (example.com), [example.com], {example.com}
@@ -244,8 +228,7 @@ class URLExtract(CacheFile):
         :rtype: set(tuple(str,str))
         """
         ...
-    
-    def add_enclosure(self, left_char, right_char): # -> None:
+    def add_enclosure(self, left_char, right_char):  # -> None:
         """
         Add new enclosure pair of characters. That and should be removed
         when their presence is detected at beginning and end of found URL
@@ -254,8 +237,7 @@ class URLExtract(CacheFile):
         :param str right_char: right character of enclosure pair - e.g. ")"
         """
         ...
-    
-    def remove_enclosure(self, left_char, right_char): # -> None:
+    def remove_enclosure(self, left_char, right_char):  # -> None:
         """
         Remove enclosure pair from set of enclosures.
 
@@ -263,7 +245,6 @@ class URLExtract(CacheFile):
         :param str right_char: right character of enclosure pair - e.g. ")"
         """
         ...
-    
     def gen_urls(self, text, check_dns=..., get_indices=..., with_schema_only=...):
         """
         Creates generator over found URLs in given text.
@@ -277,8 +258,7 @@ class URLExtract(CacheFile):
         :rtype: str|tuple(str, tuple(int, int))
         """
         ...
-    
-    def find_urls(self, text, only_unique=..., check_dns=..., get_indices=..., with_schema_only=...): # -> list[Unknown]:
+    def find_urls(self, text, only_unique=..., check_dns=..., get_indices=..., with_schema_only=...):  # -> list[Unknown]:
         """
         Find all URLs in given text.
 
@@ -296,8 +276,7 @@ class URLExtract(CacheFile):
             given limit. Processed URLs are returned in `data` argument.
         """
         ...
-    
-    def has_urls(self, text, check_dns=..., with_schema_only=...): # -> bool:
+    def has_urls(self, text, check_dns=..., with_schema_only=...):  # -> bool:
         """
         Checks if text contains any valid URL.
         Returns True if text contains at least one URL.
@@ -309,8 +288,6 @@ class URLExtract(CacheFile):
         :rtype: bool
         """
         ...
-    
-
 
 class URLExtractError(Exception):
     """
@@ -320,17 +297,13 @@ class URLExtractError(Exception):
         message -- explanation of the error
         data -- input expression in which the error occurred
     """
-    def __init__(self, message, data) -> None:
-        ...
-    
 
+    def __init__(self, message, data) -> None: ...
 
-def report_issue(func): # -> (*args: Unknown, **kwargs: Unknown) -> Unknown:
+def report_issue(func):  # -> (*args: Unknown, **kwargs: Unknown) -> Unknown:
     """Friendly message with link to GitHub for easier reporting"""
     ...
 
-def dns_cache_install(): # -> None:
-    ...
+def dns_cache_install(): ...
 
-if __name__ == "__main__":
-    ...
+if __name__ == "__main__": ...

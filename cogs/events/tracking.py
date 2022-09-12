@@ -85,7 +85,7 @@ class MessageTracker(BaseCog):
                     continue
 
                 files.append(file)
-        
+
         if not files and not message.embeds and not message.content:
             return
 
