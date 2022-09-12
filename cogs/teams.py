@@ -235,6 +235,11 @@ class Teams(BaseCog):
         
             await connection.executemany('INSERT INTO teams.members(team_id, member_id) VALUES($1, $2)', [(team['id'], member_id) for member_id in members.keys()])
         
+        category = assertion(interaction.guild.get_channel(team['category_id']), Optional[discord.CategoryChannel])
+        if category:
+            for member in members.values():
+                await category.set_permissions(member, view_channel=True, reason='Requested to add member to team.')
+        
         await self._sync_channels(interaction.guild, team['channels'])
         await interaction.edit_original_response(content='Added {} to the team.'.format(', '.join(m.mention for m in members.values())))
 
