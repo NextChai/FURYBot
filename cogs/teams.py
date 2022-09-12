@@ -229,7 +229,7 @@ class Teams(BaseCog):
         members = {member.id: member for member in [member1, member2, member3, member4, member5, member6] if member is not None}
 
         async with self.bot.safe_connection() as connection:
-            members_data = await connection.fetch("SELECT member_id FROM teams.members WHERE member_id = ANY($1) AND team_id = $1", list(members.keys()), team['id'])
+            members_data = await connection.fetch("SELECT member_id FROM teams.members WHERE member_id = ANY($1) AND team_id = $2", list(members.keys()), team['id'])
             for entry in members_data:
                 members.pop(entry['member_id'], None)
         
