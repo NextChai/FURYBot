@@ -91,6 +91,23 @@ class Teams(BaseCog):
     async def fetch_team(self, category: discord.CategoryChannel) -> Optional[asyncpg.Record]:
         return discord.utils.find(lambda x: x['category_id'] == category.id, self.bot.team_cache.values())
 
+    @team.command(name='get', description='Get the team(s) that a specific member is on.')
+    async def team_get(self, interaction: discord.Interaction, member: discord.Member) -> None:
+        async with self.bot.safe_connection() as connection:
+            data = await connection.fetch('SELECT * FROM teams.members WHERE member_id = $1', member.id)
+
+        if not data:
+            return await interaction.response.send_message(f'{member.mention} is not on any teams.')
+
+        fmt: List[str] = []
+        for entry in data:
+            team = self.bot.team_cache[entry['team_id']]
+            fmt.append(
+                f'**{team["name"]}**: {"Is on the main roster." if not entry["is_sub"] else "Is a sub for the team."}'
+            )
+
+        return await interaction.response.send_message('\n'.join(fmt))
+
     @team.command(name='create', description='Create a team.')
     @app_commands.describe(name='The name of the team.')
     @app_commands.guild_only()
