@@ -23,7 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import discord
 from discord import app_commands
@@ -35,8 +35,12 @@ if TYPE_CHECKING:
 
 
 class Moderation(BaseCog):
-
-    ...
+    @app_commands.command(name='nick', description='Nick a member.')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(member='The member to change the nick for.', nick='The nick to use. Do not include for no nick.')
+    async def nick(self, interaction: discord.Interaction, member: discord.Member, nick: Optional[str] = None) -> None:
+        await member.edit(nick=nick)
+        return await interaction.response.send_message(f'I\'ve updated the nickname on {member.mention} to `{nick}`')
 
 
 async def setup(bot: FuryBot):
