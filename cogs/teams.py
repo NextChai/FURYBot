@@ -218,6 +218,25 @@ class Teams(BaseCog):
 
         await self._sync_channels(interaction.guild, team['channels'])
         await interaction.edit_original_response(content=f'Added {member.mention} to the {team["name"]} team.')
+        
+    @team_members.command(name='bulk_add', description='Bulk add members to a team.')
+    @app_commands.describe(team="The team to add the member to.")
+    async def team_members_bulk_add(self, interaction: discord.Interaction, team: TEAM_TRANSFORM, member1: Optional[discord.Member] = None, member2: Optional[discord.Member] = None, member3: Optional[discord.Member] = None, member4: Optional[discord.Member] = None, member5: Optional[discord.Member] = None, member6: Optional[discord.Member] = None) -> None:
+        assert interaction.guild
+        
+        await interaction.response.defer(ephemeral=True)
+        
+        members = {member.id: member for member in [member1, member2, member3, member4, member5, member6] if member is not None}
+
+        async with self.bot.safe_connection() as connection:
+            members_data = await connection.fetch("SELECT member_id FROM teams.members WHERE member_id = ANY($1)", list(members.keys()))
+            for entry in members_data:
+                members.pop(entry['member_id'], None)
+        
+            await connection.executemany('INSERT INTO teams.members(team_id, member_id) VALUES($1, $2)', [(team['id'], member_id) for member_id in members.keys()])
+        
+        await self._sync_channels(interaction.guild, team['channels'])
+        await interaction.edit_original_response(content='Added {} to the team.'.format(', '.join(m.mention for m in members.values())))
 
     @team_members.command(name='remove', description='Remove a team member.')
     @app_commands.describe(team="The team to remove the member from.", member='The member to remove from the team.')
