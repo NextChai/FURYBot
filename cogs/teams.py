@@ -204,10 +204,10 @@ class Teams(BaseCog):
         await interaction.response.defer(ephemeral=True)
 
         async with self.bot.safe_connection() as connection:
-            member = await connection.fetchval(
+            member_data = await connection.fetchval(
                 'SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id
             )
-            if member:
+            if member_data:
                 return await interaction.response.send_message('This member is already on the team.', ephemeral=True)
 
             await connection.execute('INSERT INTO teams.members(team_id, member_id) VALUES($1, $2)', team['id'], member.id)
@@ -229,10 +229,10 @@ class Teams(BaseCog):
         await interaction.response.defer(ephemeral=True)
 
         async with self.bot.safe_connection() as connection:
-            member = await connection.fetchval(
+            member_data = await connection.fetchval(
                 'SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id
             )
-            if not member:
+            if not member_data:
                 return await interaction.response.send_message('This member is not on the team.', ephemeral=True)
 
             await connection.execute(
@@ -254,10 +254,10 @@ class Teams(BaseCog):
         self, interaction: discord.Interaction, team: TEAM_TRANSFORM, member: discord.Member
     ) -> None:
         async with self.bot.safe_connection() as connection:
-            member = await connection.fetchval(
+            member_data = await connection.fetchval(
                 'SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id
             )
-            if not member:
+            if not member_data:
                 return await interaction.response.send_message('This member is not on the team.', ephemeral=True)
 
             await connection.execute(
@@ -276,10 +276,10 @@ class Teams(BaseCog):
         await interaction.response.defer(ephemeral=True)
 
         async with self.bot.safe_connection() as connection:
-            member = await connection.fetchval(
+            member_data = await connection.fetchval(
                 'SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id
             )
-            if member:
+            if member_data:
                 return await interaction.response.send_message('This member is already on the team.', ephemeral=True)
 
             await connection.execute(
@@ -301,10 +301,10 @@ class Teams(BaseCog):
         await interaction.response.defer(ephemeral=True)
 
         async with self.bot.safe_connection() as connection:
-            member = await connection.fetchval(
+            member_data = await connection.fetchval(
                 'SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id
             )
-            if not member:
+            if not member_data:
                 return await interaction.response.send_message('This member is not on the team.', ephemeral=True)
 
             await connection.execute(
@@ -326,10 +326,10 @@ class Teams(BaseCog):
         self, interaction: discord.Interaction, team: TEAM_TRANSFORM, member: discord.Member
     ) -> None:
         async with self.bot.safe_connection() as connection:
-            member = await connection.fetchval(
+            member_data = await connection.fetchval(
                 'SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id
             )
-            if not member:
+            if not member_data:
                 return await interaction.response.send_message('This member is not on the team.', ephemeral=True)
 
             await connection.execute(
