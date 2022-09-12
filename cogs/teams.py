@@ -106,7 +106,7 @@ class Teams(BaseCog):
                 f'**{team["name"]}**: {"Is on the main roster." if not entry["is_sub"] else "Is a sub for the team."}'
             )
 
-        return await interaction.response.send_message('\n'.join(fmt))
+        return await interaction.response.send_message(f'{member.mention} is on:\n' + '\n'.join(fmt))
 
     @team.command(name='create', description='Create a team.')
     @app_commands.describe(name='The name of the team.')
