@@ -88,6 +88,9 @@ class Teams(BaseCog):
             if channel:
                 await channel.edit(sync_permissions=True)
 
+    async def fetch_team(self, category: discord.CategoryChannel) -> Optional[asyncpg.Record]:
+        return discord.utils.find(lambda x: x['category_id'] == category.id, self.bot.team_cache.values())
+
     @team.command(name='create', description='Create a team.')
     @app_commands.describe(name='The name of the team.')
     @app_commands.guild_only()
@@ -125,8 +128,21 @@ class Teams(BaseCog):
 
     @team.command(name='delete', description='Delete a team.')
     @app_commands.describe(team='The team to delete.')
-    async def team_delete(self, interaction: discord.Interaction, team: TEAM_TRANSFORM) -> None:
+    async def team_delete(self, interaction: discord.Interaction, team: Optional[TEAM_TRANSFORM] = None) -> None:
         assert interaction.guild
+
+        category = getattr(interaction.channel, 'category', None)
+        if not category:
+            return await interaction.response.send_message(
+                "Please use this command in a channel that has a category or mention the team parameter."
+            )
+
+        if not team:
+            team = await self.fetch_team(category)
+            if not team:
+                return await interaction.response.send_message(
+                    'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
+                )
 
         async with self.bot.safe_connection() as connection:
             await connection.execute('DELETE FROM teams.settings WHERE id = $1', team['id'])
@@ -150,8 +166,21 @@ class Teams(BaseCog):
 
     @team.command(name='info', description='View stats about a specific team.')
     @app_commands.describe(team='The team to get information on.')
-    async def team_info(self, interaction: discord.Interaction, team: TEAM_TRANSFORM) -> None:
+    async def team_info(self, interaction: discord.Interaction, team: Optional[TEAM_TRANSFORM] = None) -> None:
         assert interaction.guild
+
+        category = getattr(interaction.channel, 'category', None)
+        if not category:
+            return await interaction.response.send_message(
+                "Please use this command in a channel that has a category or mention the team parameter."
+            )
+
+        if not team:
+            team = await self.fetch_team(category)
+            if not team:
+                return await interaction.response.send_message(
+                    'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
+                )
 
         async with self.bot.safe_connection() as connection:
             team_roster_data = await connection.fetch('SELECT * FROM teams.members WHERE team_id = $1', team['id'])
@@ -198,8 +227,23 @@ class Teams(BaseCog):
 
     @team_members.command(name='add', description='Add a team member.')
     @app_commands.describe(team="The team to add the member to.", member='The member to add to the team.')
-    async def team_members_add(self, interaction: discord.Interaction, team: TEAM_TRANSFORM, member: discord.Member) -> None:
+    async def team_members_add(
+        self, interaction: discord.Interaction, member: discord.Member, team: Optional[TEAM_TRANSFORM] = None
+    ) -> None:
         assert interaction.guild
+
+        category = getattr(interaction.channel, 'category', None)
+        if not category:
+            return await interaction.response.send_message(
+                "Please use this command in a channel that has a category or mention the team parameter."
+            )
+
+        if not team:
+            team = await self.fetch_team(category)
+            if not team:
+                return await interaction.response.send_message(
+                    'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
+                )
 
         await interaction.response.defer(ephemeral=True)
 
@@ -218,37 +262,84 @@ class Teams(BaseCog):
 
         await self._sync_channels(interaction.guild, team['channels'])
         await interaction.edit_original_response(content=f'Added {member.mention} to the {team["name"]} team.')
-        
+
     @team_members.command(name='bulk_add', description='Bulk add members to a team.')
     @app_commands.describe(team="The team to add the member to.")
-    async def team_members_bulk_add(self, interaction: discord.Interaction, team: TEAM_TRANSFORM, member1: Optional[discord.Member] = None, member2: Optional[discord.Member] = None, member3: Optional[discord.Member] = None, member4: Optional[discord.Member] = None, member5: Optional[discord.Member] = None, member6: Optional[discord.Member] = None) -> None:
+    async def team_members_bulk_add(
+        self,
+        interaction: discord.Interaction,
+        team: Optional[TEAM_TRANSFORM] = None,
+        member1: Optional[discord.Member] = None,
+        member2: Optional[discord.Member] = None,
+        member3: Optional[discord.Member] = None,
+        member4: Optional[discord.Member] = None,
+        member5: Optional[discord.Member] = None,
+        member6: Optional[discord.Member] = None,
+    ) -> None:
         assert interaction.guild
-        
+
+        category = getattr(interaction.channel, 'category', None)
+        if not category:
+            return await interaction.response.send_message(
+                "Please use this command in a channel that has a category or mention the team parameter."
+            )
+
+        if not team:
+            team = await self.fetch_team(category)
+            if not team:
+                return await interaction.response.send_message(
+                    'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
+                )
+
         await interaction.response.defer(ephemeral=True)
-        
-        members = {member.id: member for member in [member1, member2, member3, member4, member5, member6] if member is not None}
+
+        members = {
+            member.id: member for member in [member1, member2, member3, member4, member5, member6] if member is not None
+        }
 
         async with self.bot.safe_connection() as connection:
-            members_data = await connection.fetch("SELECT member_id FROM teams.members WHERE member_id = ANY($1) AND team_id = $2", list(members.keys()), team['id'])
+            members_data = await connection.fetch(
+                "SELECT member_id FROM teams.members WHERE member_id = ANY($1) AND team_id = $2",
+                list(members.keys()),
+                team['id'],
+            )
             for entry in members_data:
                 members.pop(entry['member_id'], None)
-        
-            await connection.executemany('INSERT INTO teams.members(team_id, member_id) VALUES($1, $2)', [(team['id'], member_id) for member_id in members.keys()])
-        
+
+            await connection.executemany(
+                'INSERT INTO teams.members(team_id, member_id) VALUES($1, $2)',
+                [(team['id'], member_id) for member_id in members.keys()],
+            )
+
         category = assertion(interaction.guild.get_channel(team['category_id']), Optional[discord.CategoryChannel])
         if category:
             for member in members.values():
                 await category.set_permissions(member, view_channel=True, reason='Requested to add member to team.')
-        
+
         await self._sync_channels(interaction.guild, team['channels'])
-        await interaction.edit_original_response(content='Added {} to the team.'.format(', '.join(m.mention for m in members.values())))
+        await interaction.edit_original_response(
+            content='Added {} to the team.'.format(', '.join(m.mention for m in members.values()))
+        )
 
     @team_members.command(name='remove', description='Remove a team member.')
     @app_commands.describe(team="The team to remove the member from.", member='The member to remove from the team.')
     async def team_members_remove(
-        self, interaction: discord.Interaction, team: TEAM_TRANSFORM, member: discord.Member
+        self, interaction: discord.Interaction, member: discord.Member, team: Optional[TEAM_TRANSFORM] = None
     ) -> None:
         assert interaction.guild
+
+        category = getattr(interaction.channel, 'category', None)
+        if not category:
+            return await interaction.response.send_message(
+                "Please use this command in a channel that has a category or mention the team parameter."
+            )
+
+        if not team:
+            team = await self.fetch_team(category)
+            if not team:
+                return await interaction.response.send_message(
+                    'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
+                )
 
         await interaction.response.defer(ephemeral=True)
 
@@ -275,8 +366,21 @@ class Teams(BaseCog):
     @team_members.command(name='demote', description='Demote a team member to a sub.')
     @app_commands.describe(team='The team to demote the member on.', member='The member to demote.')
     async def team_members_demote(
-        self, interaction: discord.Interaction, team: TEAM_TRANSFORM, member: discord.Member
+        self, interaction: discord.Interaction, member: discord.Member, team: Optional[TEAM_TRANSFORM] = None
     ) -> None:
+        category = getattr(interaction.channel, 'category', None)
+        if not category:
+            return await interaction.response.send_message(
+                "Please use this command in a channel that has a category or mention the team parameter."
+            )
+
+        if not team:
+            team = await self.fetch_team(category)
+            if not team:
+                return await interaction.response.send_message(
+                    'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
+                )
+
         async with self.bot.safe_connection() as connection:
             member_data = await connection.fetchval(
                 'SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id
@@ -294,8 +398,23 @@ class Teams(BaseCog):
 
     @team_subs.command(name='add', description='Add a member to the subs list.')
     @app_commands.describe(team="The team to add the member to.", member='The member to add to the subs list.')
-    async def team_subs_add(self, interaction: discord.Interaction, team: TEAM_TRANSFORM, member: discord.Member) -> None:
+    async def team_subs_add(
+        self, interaction: discord.Interaction, member: discord.Member, team: Optional[TEAM_TRANSFORM] = None
+    ) -> None:
         assert interaction.guild
+
+        category = getattr(interaction.channel, 'category', None)
+        if not category:
+            return await interaction.response.send_message(
+                "Please use this command in a channel that has a category or mention the team parameter."
+            )
+
+        if not team:
+            team = await self.fetch_team(category)
+            if not team:
+                return await interaction.response.send_message(
+                    'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
+                )
 
         await interaction.response.defer(ephemeral=True)
 
@@ -319,8 +438,23 @@ class Teams(BaseCog):
 
     @team_subs.command(name='remove', description='Remove a sub from a team.')
     @app_commands.describe(team="The team to remove the member from.", member='The member to remove from the team.')
-    async def team_subs_remove(self, interaction: discord.Interaction, team: TEAM_TRANSFORM, member: discord.Member) -> None:
+    async def team_subs_remove(
+        self, interaction: discord.Interaction, member: discord.Member, team: Optional[TEAM_TRANSFORM] = None
+    ) -> None:
         assert interaction.guild
+
+        category = getattr(interaction.channel, 'category', None)
+        if not category:
+            return await interaction.response.send_message(
+                "Please use this command in a channel that has a category or mention the team parameter."
+            )
+
+        if not team:
+            team = await self.fetch_team(category)
+            if not team:
+                return await interaction.response.send_message(
+                    'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
+                )
 
         await interaction.response.defer(ephemeral=True)
 
@@ -347,8 +481,21 @@ class Teams(BaseCog):
     @team_subs.command(name='promote', description='Promote a team\'s sub to be apart of the main roster.')
     @app_commands.describe(member='The member to promote.', team='The team to promote the member on.')
     async def team_subs_promote(
-        self, interaction: discord.Interaction, team: TEAM_TRANSFORM, member: discord.Member
+        self, interaction: discord.Interaction, member: discord.Member, team: Optional[TEAM_TRANSFORM] = None
     ) -> None:
+        category = getattr(interaction.channel, 'category', None)
+        if not category:
+            return await interaction.response.send_message(
+                "Please use this command in a channel that has a category or mention the team parameter."
+            )
+
+        if not team:
+            team = await self.fetch_team(category)
+            if not team:
+                return await interaction.response.send_message(
+                    'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
+                )
+
         async with self.bot.safe_connection() as connection:
             member_data = await connection.fetchval(
                 'SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id
@@ -366,8 +513,23 @@ class Teams(BaseCog):
 
     @team_captains.command(name='add', description='Add a team captain role.')
     @app_commands.describe(role='The role to add.', team='The team to add the captain role to.')
-    async def team_captains_add(self, interaction: discord.Interaction, team: TEAM_TRANSFORM, role: discord.Role) -> None:
+    async def team_captains_add(
+        self, interaction: discord.Interaction, role: discord.Role, team: Optional[TEAM_TRANSFORM] = None
+    ) -> None:
         assert interaction.guild
+
+        category = getattr(interaction.channel, 'category', None)
+        if not category:
+            return await interaction.response.send_message(
+                "Please use this command in a channel that has a category or mention the team parameter."
+            )
+
+        if not team:
+            team = await self.fetch_team(category)
+            if not team:
+                return await interaction.response.send_message(
+                    'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
+                )
 
         if role.id in team['captain_roles']:
             return await interaction.response.send_message('This role is already a captain.', ephemeral=True)
@@ -390,8 +552,23 @@ class Teams(BaseCog):
 
     @team_captains.command(name='remove', description='Remove a team captain role.')
     @app_commands.describe(role='The role to remove.', team='The team to remove the captain role from.')
-    async def team_captains_remove(self, interaction: discord.Interaction, team: TEAM_TRANSFORM, role: discord.Role) -> None:
+    async def team_captains_remove(
+        self, interaction: discord.Interaction, role: discord.Role, team: Optional[TEAM_TRANSFORM] = None
+    ) -> None:
         assert interaction.guild
+
+        category = getattr(interaction.channel, 'category', None)
+        if not category:
+            return await interaction.response.send_message(
+                "Please use this command in a channel that has a category or mention the team parameter."
+            )
+
+        if not team:
+            team = await self.fetch_team(category)
+            if not team:
+                return await interaction.response.send_message(
+                    'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
+                )
 
         if role.id not in team['captain_roles']:
             return await interaction.response.send_message('This role is not a captain role on this team.', ephemeral=True)
