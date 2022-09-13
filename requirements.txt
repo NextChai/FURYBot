@@ -7,3 +7,4 @@ cachetools
 inflection
 asyncpg
 urlextract
+emoji
