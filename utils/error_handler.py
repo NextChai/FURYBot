@@ -13,6 +13,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from .context import Context
+from .errors import *
 from .types.exceptions import Traceback, TracebackOptional
 
 if TYPE_CHECKING:
@@ -317,7 +318,10 @@ class ErrorHandler:
             interaction.response.send_message if not interaction.response.is_done() else interaction.followup.send
         )
 
-        if isinstance(error, app_commands.CommandInvokeError):
+        if isinstance(error, AutocompleteValidationException):
+            return await sender(str(error))
+
+        elif isinstance(error, app_commands.CommandInvokeError):
             # Something bad happened here, oh no!
             return await self.log_error(error.original, origin=interaction, sender=sender)
 

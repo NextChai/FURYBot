@@ -52,6 +52,7 @@ from typing_extensions import Concatenate, Self
 from utils import assertion
 from utils.error_handler import ErrorHandler
 from utils.link import LinkFilter
+from utils.types.reaction_role import ReactionRoleCached, ReactionRoleReaction
 
 if TYPE_CHECKING:
     import datetime
@@ -183,6 +184,10 @@ class FuryBot(commands.Bot):
 
         self.team_cache: Dict[int, asyncpg.Record] = {}
 
+        self.reaction_role_cache: Dict[
+            int, Dict[int, ReactionRoleCached]
+        ] = {}  # Mapping of guild id to message id to reaction role obj
+
         super().__init__(
             command_prefix='fury.',
             help_command=None,
@@ -267,6 +272,26 @@ class FuryBot(commands.Bot):
         async with self.safe_connection() as connection:
             data = await connection.fetch('SELECT * FROM teams.settings')
             self.team_cache = {entry['id']: entry for entry in data}
+
+            raw_reaction_roles = await connection.fetch('SELECT * FROM reaction_role.container')
+            for entry in raw_reaction_roles:
+                reactions = await connection.fetch(
+                    'SELECT * FROM reaction_role.reaction WHERE reaction_role = $1', entry['id']
+                )
+                buttons = await connection.fetch('SELECT * FROM reaction_role.button WHERE reaction_role = $1', entry['id'])
+
+                reaction_roles = {entry.emoji: ReactionRoleReaction(**dict(entry)) for entry in reactions}
+                packet = ReactionRoleCached(
+                    message_id=entry['message_id'],
+                    channel_id=entry['channel_id'],
+                    guild_id=entry['guild_id'],
+                    reaction_roles=reaction_roles,
+                )
+                self.reaction_role_cache.setdefault(entry.guild_id, {})[entry.message_id] = packet
+
+                if buttons:
+                    view = ReactionView([dict(e) for e in buttons])
+                    self.add_view(view)
 
     # Events
     async def on_ready(self) -> None:
