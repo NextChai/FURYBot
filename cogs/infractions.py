@@ -298,11 +298,6 @@ class Infractions(BaseCog):
     async def infraction_allowed_link_add(self, interaction: discord.Interaction, link: str) -> None:
         assert interaction.guild
 
-        if not await self.bot.link_filter.get_links(link, guild_id=interaction.guild.id):
-            return await interaction.response.send_message(
-                'I couldn\'t find any links in the `link` parameter you sent...', ephemeral=True
-            )
-
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
@@ -322,12 +317,7 @@ class Infractions(BaseCog):
     @app_commands.describe(link='The link to remove.')
     async def infraction_allowed_link_remove(self, interaction: discord.Interaction, link: str) -> None:
         assert interaction.guild
-
-        if not await self.bot.link_filter.get_links(link, guild_id=interaction.guild.id):
-            return await interaction.response.send_message(
-                'I couldn\'t find any links in the `link` parameter you sent...', ephemeral=True
-            )
-
+        
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """
