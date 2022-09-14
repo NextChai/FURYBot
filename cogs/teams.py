@@ -246,7 +246,7 @@ class Teams(BaseCog):
     @app_commands.describe(team="The team to add the member to.", member='The member to add to the team.')
     async def team_members_add(
         self, interaction: discord.Interaction, member: discord.Member, team: Optional[TEAM_TRANSFORM] = None
-    ) -> None:
+    ) -> Optional[discord.InteractionMessage]:
         assert interaction.guild
 
         category = getattr(interaction.channel, 'category', None)
@@ -269,7 +269,7 @@ class Teams(BaseCog):
                 'SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id
             )
             if member_data:
-                return await interaction.response.send_message('This member is already on the team.', ephemeral=True)
+                return await interaction.edit_original_response(content='This member is already on the team.')
 
             await connection.execute('INSERT INTO teams.members(team_id, member_id) VALUES($1, $2)', team['id'], member.id)
 
@@ -417,7 +417,7 @@ class Teams(BaseCog):
     @app_commands.describe(team="The team to add the member to.", member='The member to add to the subs list.')
     async def team_subs_add(
         self, interaction: discord.Interaction, member: discord.Member, team: Optional[TEAM_TRANSFORM] = None
-    ) -> None:
+    ) -> Optional[discord.InteractionMessage]:
         assert interaction.guild
 
         category = getattr(interaction.channel, 'category', None)
@@ -440,7 +440,7 @@ class Teams(BaseCog):
                 'SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id
             )
             if member_data:
-                return await interaction.response.send_message('This member is already on the team.', ephemeral=True)
+                return await interaction.edit_original_response(content='This member is already on the team.')
 
             await connection.execute(
                 'INSERT INTO teams.members(team_id, member_id, is_sub) VALUES($1, $2, True)', team['id'], member.id
@@ -457,7 +457,7 @@ class Teams(BaseCog):
     @app_commands.describe(team="The team to remove the member from.", member='The member to remove from the team.')
     async def team_subs_remove(
         self, interaction: discord.Interaction, member: discord.Member, team: Optional[TEAM_TRANSFORM] = None
-    ) -> None:
+    ) -> Optional[discord.InteractionMessage]:
         assert interaction.guild
 
         category = getattr(interaction.channel, 'category', None)
@@ -480,7 +480,7 @@ class Teams(BaseCog):
                 'SELECT member_id FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id
             )
             if not member_data:
-                return await interaction.response.send_message('This member is not on the team.', ephemeral=True)
+                return await interaction.edit_original_response(content='This member is not on the team.')
 
             await connection.execute(
                 'DELETE FROM teams.members WHERE team_id = $1 AND member_id = $2', team['id'], member.id
