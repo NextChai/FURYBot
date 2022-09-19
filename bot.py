@@ -52,6 +52,7 @@ from typing_extensions import Concatenate, Self
 from utils import assertion
 from utils.error_handler import ErrorHandler
 from utils.link import LinkFilter
+from utils.timers import TimerManager
 
 if TYPE_CHECKING:
     import datetime
@@ -179,6 +180,7 @@ class FuryBot(commands.Bot):
         self.session: aiohttp.ClientSession = session
         self.pool: PoolType = pool
         self.thread_pool: futures.ThreadPoolExecutor = futures.ThreadPoolExecutor(max_workers=20)
+        self.timer_manager: TimerManager = TimerManager(bot=self)
 
         self.link_filter: LinkFilter = LinkFilter(self)
 
