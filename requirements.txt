@@ -8,3 +8,4 @@ inflection
 asyncpg
 urlextract
 emoji
+parsedatetime
