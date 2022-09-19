@@ -37,3 +37,35 @@ class AutocompleteValidationException(ApplicationCommandException, app_commands.
     """
 
     pass
+
+
+class BadArgument(ApplicationCommandException):
+    """An exception raised when a command argument is invalid.
+
+    This inherits :class:`ApplicationCommandException`.
+    """
+
+    pass
+
+
+class TimerNotFound(Exception):
+    """An exception raised when a timer is not found.
+
+    This inherits from :class:`BotException`
+
+    Parameters
+    ----------
+    id: :class:`int`
+        The ID of the timer that was not found.
+
+    Attributes
+    ----------
+    id: :class:`int`
+        The ID of the timer.
+    """
+
+    __slots__: Tuple[str, ...] = ('id',)
+
+    def __init__(self, id: int) -> None:
+        super().__init__(f'Timer {id} was not found!')
+        self.id: int = id
