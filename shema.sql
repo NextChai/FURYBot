@@ -40,3 +40,29 @@ CREATE TABLE IF NOT EXISTS teams.members (
     member_id BIGINT,
     is_sub BOOLEAN DEFAULT FALSE
 )
+
+CREATE TABLE IF NOT EXISTS teams.scrims (
+    host_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
+    scrimmer_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
+    host_votes BIGINT[] DEFAULT ARRAY[]::BIGINT[],
+    scrimmer_votes BIGINT[] DEFAULT ARRAY[]::BIGINT[],
+    when TIMESTAMP WITH TIME ZONE
+);
+
+CREATE TABLE IF NOT EXISTS timers(
+    id BIGSERIAL PRIMARY KEY,
+    precise BOOLEAN DEFAULT TRUE,
+    event TEXT,
+    extra JSONB,
+    created TIMESTAMP,
+    expires TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS timer_storage(
+    id BIGSERIAL PRIMARY KEY,
+    precise BOOLEAN,
+    event TEXT,
+    extra JSONB,
+    created TIMESTAMP,
+    expires TIMESTAMP
+);
