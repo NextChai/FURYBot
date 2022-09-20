@@ -155,7 +155,7 @@ class ScrimConfirmation(discord.ui.View):
     @property
     def embed(self) -> discord.Embed:
         embed = self.bot.Embed(
-            title=f'Do You Want to Scrim {self.opposing["name"]}?',
+            title=f'Do You Want to Scrim Team {self.opposing["name"]}?',
             description=f'Use the "Confirm" button below to scrim **{self.opposing["name"]}** {discord.utils.format_dt(self.when, "R")}! '
             f'I need **{self.per_team - len(self.votes)} more votes** to confirm the scrim, as the the "per-team" is set to {self.per_team}.',
             timestamp=self.when,
