@@ -87,6 +87,7 @@ def _build_scrim_scheduled(
         value='When the scrim starts, the home team will have a special channel automatically created '
         'in which both teams will be able to communicate and create the private game to play in. After 2 '
         'hours, the chat will automatically be deleted for you.',
+        inline=False,
     )
 
     return embed
