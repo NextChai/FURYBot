@@ -80,6 +80,7 @@ def _build_scrim_scheduled(
         embed.add_field(
             name='Who am I Playing Against?',
             value='You will be playing against: ' + ', '.join(f'<@{m_id}>' for m_id in opposing_votes),
+            inline=False,
         )
 
     embed.add_field(
@@ -169,6 +170,7 @@ class ScrimConfirmation(discord.ui.View):
             embed.add_field(
                 name='Who am I Playing Against?',
                 value='You will be playing against: ' + ', '.join(f'<@{m_id}>' for m_id in self.opposing_votes),
+                inline=False,
             )
 
         embed.set_footer(
@@ -281,12 +283,10 @@ class ScrimConfirmation(discord.ui.View):
     async def handle_team_full(self, interaction: discord.Interaction) -> None:
         assert interaction.guild
 
-        print(self.type)
-
         if self.type is ScrimStatus.pending_host:
-            await self.shift_to_opposing_team(interaction)
+            return await self.shift_to_opposing_team(interaction)
         elif self.type is ScrimStatus.pending_scrimmer:
-            await self.finalize_scrim(interaction)
+            return await self.finalize_scrim(interaction)
 
         raise Exception('Unknown type provided.')
 
