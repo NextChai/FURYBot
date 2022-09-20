@@ -281,6 +281,8 @@ class ScrimConfirmation(discord.ui.View):
     async def handle_team_full(self, interaction: discord.Interaction) -> None:
         assert interaction.guild
 
+        print(self.type)
+
         if self.type is ScrimStatus.pending_host:
             await self.shift_to_opposing_team(interaction)
         elif self.type is ScrimStatus.pending_scrimmer:
