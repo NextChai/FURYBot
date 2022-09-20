@@ -380,7 +380,7 @@ class Teams(BaseCog):
             )
 
             data = await connection.fetchrow(
-                'INSERT INTO teams.scrims (home_id, away_id, home_message_id, status, when) VALUES($1, $2, $3, $4, $5) RETURNING id;',
+                'INSERT INTO teams.scrims (home_id, away_id, home_message_id, status, scheduled_for) VALUES($1, $2, $3, $4, $5) RETURNING id;',
                 home_team['id'],
                 away_team['id'],
                 view.message.id,
