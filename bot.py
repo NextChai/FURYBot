@@ -180,7 +180,7 @@ class FuryBot(commands.Bot):
         self.session: aiohttp.ClientSession = session
         self.pool: PoolType = pool
         self.thread_pool: futures.ThreadPoolExecutor = futures.ThreadPoolExecutor(max_workers=20)
-        # self.timer_manager: TimerManager = TimerManager(bot=self)
+        self.timer_manager: TimerManager = TimerManager(bot=self)
 
         self.link_filter: LinkFilter = LinkFilter(self)
 
