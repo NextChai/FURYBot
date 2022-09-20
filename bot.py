@@ -49,6 +49,7 @@ import discord
 from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
+from cogs.teams import ScrimConfirmation, ScrimStatus
 from utils import assertion
 from utils.error_handler import ErrorHandler
 from utils.link import LinkFilter
@@ -270,6 +271,38 @@ class FuryBot(commands.Bot):
         async with self.safe_connection() as connection:
             data = await connection.fetch('SELECT * FROM teams.settings')
             self.team_cache = {entry['id']: entry for entry in data}
+
+            data = await connection.fetch('SELECT * FROM teams.scrims')
+            for entry in data:
+                status = ScrimStatus(entry['status'])
+                if status is ScrimStatus.pending_host:
+                    members = await connection.fetch('SELECT * FROM teams.members WHERE team_id = $1', entry['home_id'])
+
+                    view = ScrimConfirmation(
+                        self,
+                        status,
+                        entry['per_team'],
+                        when=entry['scheduled_for'],
+                        voter=self.team_cache[entry['home_id']],
+                        opposing=self.team_cache[entry['away_id']],
+                        members=[e['member_id'] for e in members],
+                        votes=entry['home_votes'],
+                    )
+                    self.add_view(view, message_id=entry['home_message_id'])
+                elif status is ScrimStatus.pending_scrimmer:
+                    members = await connection.fetch('SELECT * FROM teams.members WHERE team_id = $1', entry['away_id'])
+
+                    view = ScrimConfirmation(
+                        self,
+                        status,
+                        entry['per_team'],
+                        when=entry['scheduled_for'],
+                        voter=self.team_cache[entry['away_id']],
+                        opposing=self.team_cache[entry['home_id']],
+                        members=[e['member_id'] for e in members],
+                        votes=entry['away_votes'],
+                    )
+                    self.add_view(view, message_id=entry['away_message_id'])
 
     # Events
     async def on_ready(self) -> None:

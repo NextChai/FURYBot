@@ -201,9 +201,8 @@ class ScrimConfirmation(discord.ui.View):
 
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
-                'UPDATE teams.scrims SET status = $1, home_votes = $2 WHERE id = $3 RETURNING away_id',
+                'UPDATE teams.scrims SET status = $1 WHERE id = $3 RETURNING away_id',
                 new_type.value,
-                self.votes,
                 self.scrim_id,
             )
             assert data is not None
@@ -248,9 +247,7 @@ class ScrimConfirmation(discord.ui.View):
         # due to the type being ScrimStatus.pending_scrimmer
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
-                'UPDATE teams.scrims SET away_votes = $1, status = $2, confirmed = True WHERE scrim_id = $3 '
-                'RETURNING home_message_id',
-                self.votes,
+                'UPDATE teams.scrims SET status = $1, confirmed = True WHERE scrim_id = $2 ' 'RETURNING home_message_id',
                 ScrimStatus.scheduled.value,
                 self.scrim_id,
             )
@@ -270,9 +267,29 @@ class ScrimConfirmation(discord.ui.View):
 
         raise Exception('Unknown type provided.')
 
-    @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green)
+    @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green, custom_id='confirm-scrim')
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         self.votes.append(interaction.user.id)
+
+        async with self.bot.safe_connection() as connection:
+            if self.type is ScrimStatus.pending_host:
+                await connection.execute(
+                    'UPDATE teams.scrims SET home_votes = array_append(home_votes, $1) WHERE id = $2',
+                    interaction.user.id,
+                    self.scrim_id,
+                )
+
+            elif self.type is ScrimStatus.pending_scrimmer:
+                await connection.execute(
+                    'UPDATE teams.scrims SET away_votes = array_append(away_votes, $1) WHERE id = $2',
+                    interaction.user.id,
+                    self.scrim_id,
+                )
+
+        await interaction.response.edit_message(embed=self.embed, view=self)
+
+        if len(self.votes) == self.per_team:
+            await self.handle_team_full(interaction)
 
 
 class TeamTransformer(app_commands.Transformer):
