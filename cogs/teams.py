@@ -159,6 +159,9 @@ class ConfirmAnywaysButton(discord.ui.Button['ScrimConfirmation']):
         super().__init__(label='Vote to Force Confirm Scrim', custom_id='vote-to-force-confirm-scrim')
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        if self.parent._force_confirm_message_id is not None:
+            return await interaction.response.send_message('There is already a vote in progress.', ephemeral=True)
+
         window = self.parent.when - datetime.timedelta(minutes=30)
         if interaction.created_at < window:
             return await interaction.response.send_message(
@@ -178,7 +181,10 @@ class ConfirmAnywaysButton(discord.ui.Button['ScrimConfirmation']):
         await interaction.response.defer(thinking=True)
 
         view = ConfirmAnywaysView(self.parent, self.parent.members, [interaction.user.id])
-        self.parent._force_confirm = message = await interaction.followup.send(view=view, embed=view.embed, wait=True)
+        message = await interaction.followup.send(view=view, embed=view.embed, wait=True)
+
+        self.parent._force_confirm_message_id = message.id
+        self.parent._force_confirm_votes = [interaction.user.id]
 
         async with self.parent.bot.safe_connection() as connection:
             await connection.execute(
@@ -212,6 +218,9 @@ class ScrimConfirmation(discord.ui.View):
         A list of member IDs who have voted to srim.
     """
 
+    _force_confirm_votes: List[int] = []
+    _force_confirm_message_id: Optional[int] = None
+
     if TYPE_CHECKING:
         message: discord.Message
         scrim_id: int
@@ -238,8 +247,6 @@ class ScrimConfirmation(discord.ui.View):
         self.members: List[int] = members
         self.votes: List[int] = votes
         self.opposing_votes: Optional[List[int]] = opposing_votes
-
-        self._force_confirm: Optional[discord.Message] = None
 
         super().__init__(timeout=None)
 
@@ -286,8 +293,21 @@ class ScrimConfirmation(discord.ui.View):
         self.scrim_id = scrim_id
 
         async with self.bot.safe_connection() as connection:
-            guild_id: int = await connection.fetchval('SELECT guild_id FROM teams.scrims WHERE id = $1', scrim_id)
-            guild = self.bot.get_guild(guild_id)
+            data = await connection.fetchrow(
+                'SELECT guild_id, away_confirm_anyways, away_confirm_anyways_message_id FROM teams.scrims WHERE id = $1',
+                scrim_id,
+            )
+            if not data:
+                return
+
+            self._force_confirm_votes = data['away_confirm_anyways']
+            self._force_confirm_message_id = data['away_confirm_anyways_message_id']
+
+            if self._force_confirm_message_id:
+                view = ConfirmAnywaysView(self, self._force_confirm_votes, [])
+                self.bot.add_view(view, message_id=self._force_confirm_message_id)
+
+            guild = self.bot.get_guild(data['guild_id'])
             if not guild:
                 return
 
