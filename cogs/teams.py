@@ -403,7 +403,7 @@ class Teams(BaseCog):
         async with self.bot.safe_connection() as connection:
             home_members = await connection.fetch('SELECT member_id FROM teams.members WHERE team_id = $1', home_team['id'])
 
-            status = ScrimStatus.pending_scrimmer
+            status = ScrimStatus.pending_host
             view = ScrimConfirmation(
                 self.bot,
                 status,
