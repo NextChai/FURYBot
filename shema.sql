@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS teams.scrims (
     status scrim_status,
     home_votes BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
     away_votes BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
-    when TIMESTAMP WITH TIME ZONE,
+    scheduled_for TIMESTAMP WITH TIME ZONE,
     confirmed BOOLEAN DEFAULT FALSE,
     scrim_chat BIGINT -- Can be None
 );
