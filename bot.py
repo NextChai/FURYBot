@@ -286,11 +286,13 @@ class FuryBot(commands.Bot):
                         opposing=self.team_cache[entry['away_id']],
                         members=[e['member_id'] for e in members],
                         votes=entry['home_votes'],
+                        opposing_votes=entry['away_votes'],
                     )
                     self.create_task(view._load_attributes(entry['id']))
                     self.add_view(view, message_id=entry['home_message_id'])
                 elif status is ScrimStatus.pending_scrimmer:
                     members = await connection.fetch('SELECT * FROM teams.members WHERE team_id = $1', entry['away_id'])
+
                     view = ScrimConfirmation(
                         self,
                         status,
@@ -300,6 +302,7 @@ class FuryBot(commands.Bot):
                         opposing=self.team_cache[entry['home_id']],
                         members=[e['member_id'] for e in members],
                         votes=entry['away_votes'],
+                        opposing_votes=entry['home_votes'],
                     )
                     self.create_task(view._load_attributes(entry['id']))
                     self.add_view(view, message_id=entry['away_message_id'])

@@ -70,7 +70,7 @@ def _build_scrim_scheduled(
         description=f'The scrim against {opposing["name"]} has been scheduled to be played {discord.utils.format_dt(when, "R")}',
     )
 
-    if votes:
+    if votes is not None:
         embed.add_field(
             name='Confirmed Members',
             value=', '.join([f'<@{m_id}>' for m_id in votes] or ['No team members have voted yet.']),
@@ -279,6 +279,7 @@ class ScrimConfirmation(discord.ui.View):
                 name='Teammates not Showing Up?',
                 value='You can force Confirm the scrm and try to play with a less amount of teammates. This requires '
                 'confirmation from all confirmed teammates.',
+                inline=False,
             )
 
         embed.set_footer(
@@ -396,7 +397,7 @@ class ScrimConfirmation(discord.ui.View):
         # due to the type being ScrimStatus.pending_scrimmer
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
-                'UPDATE teams.scrims SET status = $1, confirmed = True WHERE id = $2 RETURNING home_message_id',
+                'UPDATE teams.scrims SET status = $1 WHERE id = $2 RETURNING home_message_id',
                 ScrimStatus.scheduled.value,
                 self.scrim_id,
             )
@@ -538,13 +539,13 @@ class Teams(BaseCog):
                 voter=home_team,
                 opposing=away_team,
                 members=[e['member_id'] for e in home_members],
-                votes=[],
+                votes=[interaction.user.id],
             )
             channel = _find_team_text_channel(interaction.guild, home_team['channels'])
             view.message = await interaction.edit_original_response(embed=view.embed, view=view)
 
             data = await connection.fetchrow(
-                'INSERT INTO teams.scrims (home_id, away_id, home_message_id, status, scheduled_for, guild_id, per_team) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id;',
+                'INSERT INTO teams.scrims (home_id, away_id, home_message_id, status, scheduled_for, guild_id, per_team, home_votes) VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;',
                 home_team['id'],
                 away_team['id'],
                 view.message.id,
@@ -552,6 +553,7 @@ class Teams(BaseCog):
                 when_why.dt,
                 interaction.guild.id,
                 per_team,
+                [interaction.user.id],
             )
             assert data
 
@@ -1079,7 +1081,7 @@ class Teams(BaseCog):
         )
 
     @commands.Cog.listener('on_scrim_scheduled_start_timer_complete')
-    async def on_scrim_scheduled_start_timer_complete(self, guild_id: int, scrim_id: int) -> None:
+    async def on_scrim_scheduled_start_timer_complete(self, guild_id: int, scrim_id: int) -> Optional[discord.Message]:
         await self.bot.wait_until_ready()
 
         guild = self.bot.get_guild(guild_id)
@@ -1092,11 +1094,46 @@ class Teams(BaseCog):
             if not data:
                 return
 
-            if not data['confirmed']:
-                return
+            status = ScrimStatus(data['status'])
 
             home_team = self.bot.team_cache[data['home_id']]
             home_team_channel = _find_team_text_channel(guild, home_team['channels'])
+
+            if status is not ScrimStatus.scheduled:
+                # The scrim did not start, we need to edit any messages.
+                if status is ScrimStatus.pending_host:
+                    embed = self.bot.Embed(
+                        title='Scrim has been Cancelled.',
+                        description='The required number of members did not confirm the scrim, '
+                        'so the scrim was cancelled. If you wish to try again, feel free to schedule '
+                        'another scrim.',
+                    )
+
+                    message = await home_team_channel.fetch_message(data['home_message_id'])
+                    return await message.edit(embed=embed)
+                elif status is ScrimStatus.pending_scrimmer:
+                    # Edit the host and the scrimmer messages
+                    embed = self.bot.Embed(
+                        title='Scrim Cancelled',
+                        description='The required number of members on the other team did not '
+                        'confirm the scrim, so the scrim has been cancelled. If you wish to try again, feel '
+                        'free to schedule another scrim.',
+                    )
+
+                    message = await home_team_channel.fetch_message(data['home_message_id'])
+                    await message.edit(embed=embed)
+
+                    embed = self.bot.Embed(
+                        title='Scrim has been Cancelled.',
+                        description='The required number of members did not confirm the scrim, '
+                        'so the scrim was cancelled. If you wish to try again, feel free to schedule '
+                        'another scrim.',
+                    )
+
+                    away_team = self.bot.team_cache[data['away_id']]
+                    away_team_channel = _find_team_text_channel(guild, away_team['channels'])
+                    message = await away_team_channel.fetch_message(data['away_message_id'])
+                    return await message.edit(embed=embed)
 
             overwrites: Dict[Union[discord.Member, discord.Role], discord.PermissionOverwrite] = {
                 guild.default_role: discord.PermissionOverwrite(view_channel=False)
