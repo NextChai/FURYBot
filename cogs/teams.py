@@ -140,7 +140,7 @@ class ConfirmAnywaysView(discord.ui.View):
 
         return True
 
-    @discord.ui.button(label='Confirm Anyways')
+    @discord.ui.button(label='Confirm Anyways', custom_id='confirm-anyways')
     async def start_anyways(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         self.confirmed_voters.append(interaction.user.id)
 
