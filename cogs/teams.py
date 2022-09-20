@@ -101,6 +101,94 @@ class ScrimStatus(enum.Enum):
     pending_host = 'pending_host'
 
 
+class ConfirmAnywaysView(discord.ui.View):
+    def __init__(self, parent: ScrimConfirmation, voters: List[int], confirmed_voters: List[int]) -> None:
+        self.parent: ScrimConfirmation = parent
+        self.voters: List[int] = voters
+        self.confirmed_voters: List[int] = confirmed_voters
+        super().__init__(timeout=None)
+
+    @property
+    def embed(self) -> discord.Embed:
+        embed = self.parent.bot.Embed(
+            title='Force Confirm?',
+            description='All currently confirmed members need to press the "Confirm Anyways" button to force '
+            'confirm the scrim.',
+        )
+        embed.add_field(
+            name='Members Needed to Vote:',
+            value=', '.join(f'<@{m_id}>' for m_id in self.voters if m_id not in self.confirmed_voters),
+        )
+        embed.add_field(name='Members Voted:', value=', '.join(f'<@{m_id}>' for m_id in self.confirmed_voters), inline=False)
+
+        return embed
+
+    async def interaction_check(self, interaction: discord.Interaction) -> Optional[bool]:
+        if interaction.user.id not in self.voters:
+            return await interaction.response.send_message(
+                'You are not a member who has confirmed the scrim, you can not vote on this.', ephemeral=True
+            )
+
+        if interaction.user.id in self.confirmed_voters:
+            return await interaction.response.send_message('You have already voted on this.', ephemeral=True)
+
+        return True
+
+    @discord.ui.button(label='Confirm Anyways')
+    async def start_anyways(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        self.confirmed_voters.append(interaction.user.id)
+        async with self.parent.bot.safe_connection() as connection:
+            await connection.execute(
+                'UPDATE teams.scrims SET away_confirm_anyways = ARRAY_APPEND(away_confirm_anyways, $1) WHERE id = $2',
+                interaction.user.id,
+                self.parent.scrim_id,
+            )
+
+        await interaction.response.edit_message(embed=self.embed, view=self)
+
+        if len(self.confirmed_voters) == len(self.voters):
+            await interaction.delete_original_response()
+            await self.parent.finalize_scrim(interaction)
+
+
+class ConfirmAnywaysButton(discord.ui.Button['ScrimConfirmation']):
+    def __init__(self, *, parent: ScrimConfirmation, voters: List[int], team: asyncpg.Record) -> None:
+        self.parent: ScrimConfirmation = parent
+        self.voters: List[int] = voters
+        self.team: asyncpg.Record = team
+        super().__init__(label='Vote to Force Confirm Scrim', custom_id='vote-to-force-confirm-scrim')
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        window = self.parent.when - datetime.timedelta(minutes=30)
+        if interaction.created_at < window:
+            return await interaction.response.send_message(
+                'You can\'t vote to force confirm the scrim unless the scrim has less '
+                'than or equal to 30 minutes until its start.',
+                ephemeral=True,
+            )
+
+        minimum_amount = len(self.parent.members) // 2
+        if len(self.voters) < minimum_amount:
+            return await interaction.response.send_message(
+                'You can\'t vote to force start a scrim when not even half of the members '
+                f'required have not confirmed. **{minimum_amount - len(self.voters)} more people need to Confirm** to vote a force start.',
+                ephemeral=True,
+            )
+
+        await interaction.response.defer(thinking=True)
+
+        view = ConfirmAnywaysView(self.parent, self.parent.members, [interaction.user.id])
+        self.parent._force_confirm = message = await interaction.followup.send(view=view, embed=view.embed, wait=True)
+
+        async with self.parent.bot.safe_connection() as connection:
+            await connection.execute(
+                'UPDATE teams.scrims SET away_confirm_anyways_message_id = $1, away_confirm_anyways = ARRAY_APPEND(away_confirm_anyways, $2) WHERE id = $3',
+                message.id,
+                interaction.user.id,
+                self.parent.scrim_id,
+            )
+
+
 class ScrimConfirmation(discord.ui.View):
     """Represents a Scrim Confirmation View. This view will
     manage the voting process from both teams confirming the scrim.
@@ -150,7 +238,13 @@ class ScrimConfirmation(discord.ui.View):
         self.members: List[int] = members
         self.votes: List[int] = votes
         self.opposing_votes: Optional[List[int]] = opposing_votes
+
+        self._force_confirm: Optional[discord.Message] = None
+
         super().__init__(timeout=None)
+
+        if self.type is ScrimStatus.pending_scrimmer:
+            self.add_item(ConfirmAnywaysButton(parent=self, voters=self.votes, team=self.voter))
 
     @property
     def embed(self) -> discord.Embed:
@@ -171,6 +265,13 @@ class ScrimConfirmation(discord.ui.View):
                 name='Who am I Playing Against?',
                 value='You will be playing against: ' + ', '.join(f'<@{m_id}>' for m_id in self.opposing_votes),
                 inline=False,
+            )
+
+        if self.type is ScrimStatus.pending_scrimmer:
+            embed.add_field(
+                name='Teammates not Showing Up?',
+                value='You can force Confirm the scrm and try to play with a less amount of teammates. This requires '
+                'confirmation from all confirmed teammates.',
             )
 
         embed.set_footer(
@@ -203,13 +304,13 @@ class ScrimConfirmation(discord.ui.View):
         if interaction.user.id not in self.members:
             return await interaction.response.send_message('You aren\'t on this team!', ephemeral=True)
 
-        if interaction.user.id in self.votes:
-            return await interaction.response.send_message('You\'ve already voted!', ephemeral=True)
-
         return True
 
     async def shift_to_opposing_team(self, interaction: discord.Interaction):
         assert interaction.guild
+
+        if interaction.user.id in self.votes:
+            return await interaction.response.send_message('You\'ve already voted!', ephemeral=True)
 
         # Before we do anything else with the other team, let's edit this original message
         embed = self.bot.Embed(
@@ -964,6 +1065,9 @@ class Teams(BaseCog):
             data = await connection.fetchrow('SELECT * FROM teams.scrims WHERE id = $1', scrim_id)
 
             if not data:
+                return
+
+            if not data['confirmed']:
                 return
 
             home_team = self.bot.team_cache[data['home_id']]
