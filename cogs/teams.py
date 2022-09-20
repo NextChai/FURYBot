@@ -23,19 +23,256 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import itertools
+import datetime
+import enum
 import asyncio
 import difflib
-from typing import TYPE_CHECKING, Any, Coroutine, List, Optional, TypeAlias, Union
+from typing import TYPE_CHECKING, Dict, Any, Coroutine, List, Optional, TypeAlias, Union
+from typing_extensions import Self
 
 import asyncpg
 import discord
 from discord import app_commands
+from discord.ext import commands
 
 from utils import assertion
 from utils.bases.cog import BaseCog
+from utils.time import TimeTransformer
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
+
+def _find_team_text_channel(guild: discord.Guild, channels: List[int]) -> discord.TextChannel:
+    channel: Optional[discord.TextChannel] = None
+    for channel_id in channels:
+        raw_channel = guild.get_channel(channel_id)
+        if isinstance(raw_channel, discord.TextChannel):
+            channel = raw_channel
+            break
+    else:
+        # We couldn't find the team's text channel, panick
+        raise Exception('Couldn\'t find the team\'s text channel.')
+
+    return channel
+
+
+def _build_scrim_scheduled(
+    bot: FuryBot,
+    opposing: asyncpg.Record,
+    when: datetime.datetime,
+    votes: Optional[List[int]] = None,
+    opposing_votes: Optional[List[int]] = None,
+) -> discord.Embed:
+    embed = bot.Embed(
+        title='Scrim Scheduled',
+        description=f'The scrim against {opposing["name"]} has been scheduled to be played {discord.utils.format_dt(when, "R")}',
+    )
+
+    if votes:
+        embed.add_field(
+            name='Confirmed Members',
+            value=', '.join([f'<@{m_id}>' for m_id in votes] or ['No team members have voted yet.']),
+        )
+
+    if opposing_votes:
+        embed.add_field(
+            name='Who am I Playing Against?',
+            value='You will be playing against: ' + ', '.join(f'<@{m_id}>' for m_id in opposing_votes),
+        )
+
+    embed.add_field(
+        name='How Do I Scrim?',
+        value='When the scrim starts, the home team will have a special channel automatically created '
+        'in which both teams will be able to communicate and create the private game to play in. After 2 '
+        'hours, the chat will automatically be deleted for you.',
+    )
+
+    return embed
+
+
+# Persistent views for team scrim confirmation from both
+class ScrimStatus(enum.Enum):
+    pending_scrimmer = 'pending_scrimer'
+    scheduled = 'scheduled'
+    pending_host = 'pending_host'
+
+
+class ScrimConfirmation(discord.ui.View):
+    """Represents a Scrim Confirmation View. This view will
+    manage the voting process from both teams confirming the scrim.
+
+    bot: :class:`FuryBot`
+        The main bot instance.
+    type: :class:`ScrimStatus`
+        The status of the scrim. If the type is :attr:`ScrimStatus.pending_host`,
+        then the :attr:`voter` is the home team and the :attr:`opposing` is the away team.
+        If the type is :attr:`ScrimStatus.pending_scrimmer`,
+        then the :attr:`voter` is the away team and the :attr:`opposing` is the home team.
+    when: :class:`datetime.datetime`
+        Then the scrim will happen.
+    voter: :class:`asyncpg.Record`
+        The team that's voting to scrim. More information in :attr:`type`.
+    opposing: :class:`asyncpg.Record`
+        Who the voter team will play against. More information in :attr:`type`.
+    members: List[:class:`int`]
+        A list of member IDS who are on the :attr:`voter` team.
+    votes: List[:class:`int`]
+        A list of member IDs who have voted to srim.
+    """
+
+    if TYPE_CHECKING:
+        message: discord.Message
+        scrim_id: int
+
+    def __init__(
+        self,
+        bot: FuryBot,
+        type: ScrimStatus,
+        per_team: int,
+        *,
+        when: datetime.datetime,
+        voter: asyncpg.Record,
+        opposing: asyncpg.Record,
+        members: List[int],
+        votes: List[int],
+        opposing_votes: Optional[List[int]] = None,
+    ) -> None:
+        self.bot: FuryBot = bot
+        self.type: ScrimStatus = type
+        self.per_team: int = per_team
+        self.when: datetime.datetime = when
+        self.voter: asyncpg.Record = voter
+        self.opposing: asyncpg.Record = opposing
+        self.members: List[int] = members
+        self.votes: List[int] = votes
+        self.opposing_votes: Optional[List[int]] = opposing_votes
+        super().__init__(timeout=None)
+
+    @property
+    def embed(self) -> discord.Embed:
+        embed = self.bot.Embed(
+            title=f'Do You Want to Scrim {self.opposing["name"]}?',
+            description=f'Use the "Confirm" button below to scrim **{self.opposing["name"]}** {discord.utils.format_dt(self.when, "R")}! '
+            f'I need **{self.per_team - len(self.votes)} more votes** to confirm the scrim, as the the "per-team" is set to {self.per_team}.',
+            timestamp=self.when,
+        )
+
+        embed.add_field(
+            name='Confirmed Members',
+            value=', '.join([f'<@{m_id}>' for m_id in self.votes] or ['No team members have voted yet.']),
+        )
+
+        if self.opposing_votes:
+            embed.add_field(
+                name='Who am I Playing Against?',
+                value='You will be playing against: ' + ', '.join(f'<@{m_id}>' for m_id in self.opposing_votes),
+            )
+
+        embed.set_footer(
+            text='You have up until the scrim date to confirm.',
+        )
+
+        return embed
+
+    async def interaction_check(self, interaction: discord.Interaction) -> Optional[bool]:
+        if interaction.user.id not in self.members:
+            return await interaction.response.send_message('You aren\'t on this team!', ephemeral=True)
+
+        if interaction.user.id in self.votes:
+            return await interaction.response.send_message('You\'ve already voted!', ephemeral=True)
+
+        return True
+
+    async def shift_to_opposing_team(self, interaction: discord.Interaction):
+        assert interaction.guild
+
+        # Before we do anything else with the other team, let's edit this original message
+        embed = self.bot.Embed(
+            title='Confirmed!',
+            description='I\'m waiting of the opposing team to confirm the scrim. You will receive a message '
+            'in this channel when the other team has confirmed, or a message stating the scrim failed to start '
+            'if they did not. The other team has until the scrim start date to confirm.',
+        )
+        await self.message.edit(embed=embed, view=None)
+
+        new_type = ScrimStatus.pending_scrimmer
+
+        async with self.bot.safe_connection() as connection:
+            data = await connection.fetchrow(
+                'UPDATE teams.scrims SET status = $1, home_votes = $2 WHERE id = $3 RETURNING away_id',
+                new_type.value,
+                self.votes,
+                self.scrim_id,
+            )
+            assert data is not None
+
+            away_team_id = data['away_id']
+            away_team = self.bot.team_cache[away_team_id]
+
+            members = await connection.fetch('SELECT * FROM teams.members WHERE team_id = $1', away_team_id)
+            member_ids: List[int] = [m['member_id'] for m in members]
+
+            channel = _find_team_text_channel(interaction.guild, away_team['channels'])
+
+            view = ScrimConfirmation(
+                self.bot,
+                new_type,
+                self.per_team,
+                when=self.when,
+                voter=away_team,
+                opposing=self.voter,
+                members=member_ids,
+                votes=[],
+                opposing_votes=self.votes,
+            )
+            view.message = await channel.send(embed=view.embed, view=view)
+            view.scrim_id = self.scrim_id
+
+            await connection.execute(
+                'UPDATE teams.scrims SET away_message_id = $1 WHERE id = $2', view.message.id, self.scrim_id
+            )
+
+    async def finalize_scrim(self, interaction: discord.Interaction) -> None:
+        assert interaction.guild
+
+        # Let's edit the embed for the current team
+        embed = _build_scrim_scheduled(self.bot, self.opposing, self.when, self.votes, self.opposing_votes)
+        await self.message.edit(embed=embed, view=None)
+
+        # Now let's fetch the message and edit the embed for the other team
+        channel = _find_team_text_channel(interaction.guild, self.opposing['channels'])
+
+        # The "opposing" team in this situation is in reality the home team,
+        # due to the type being ScrimStatus.pending_scrimmer
+        async with self.bot.safe_connection() as connection:
+            data = await connection.fetchrow(
+                'UPDATE teams.scrims SET away_votes = $1, status = $2, confirmed = True WHERE scrim_id = $3 '
+                'RETURNING home_message_id',
+                self.votes,
+                ScrimStatus.scheduled.value,
+                self.scrim_id,
+            )
+            assert data
+
+            message = await channel.fetch_message(data['home_message_id'])
+            embed = _build_scrim_scheduled(self.bot, self.voter, self.when, self.opposing_votes, self.votes)
+            await message.edit(embed=embed, view=None)
+
+    async def handle_team_full(self, interaction: discord.Interaction) -> None:
+        assert interaction.guild
+
+        if self.type is ScrimStatus.pending_host:
+            await self.shift_to_opposing_team(interaction)
+        elif self.type is ScrimStatus.pending_scrimmer:
+            await self.finalize_scrim(interaction)
+
+        raise Exception('Unknown type provided.')
+
+    @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        self.votes.append(interaction.user.id)
 
 
 class TeamTransformer(app_commands.Transformer):
@@ -88,8 +325,73 @@ class Teams(BaseCog):
             if channel:
                 await channel.edit(sync_permissions=True)
 
-    async def fetch_team(self, category: discord.CategoryChannel) -> Optional[asyncpg.Record]:
+    def fetch_team(self, category: discord.CategoryChannel) -> Optional[asyncpg.Record]:
         return discord.utils.find(lambda x: x['category_id'] == category.id, self.bot.team_cache.values())
+
+    @app_commands.command(name='scrim', description='Scrim another team!')
+    @app_commands.describe(
+        per_team='The number of players per team. Max is 10.',
+        when_why='When you want to scrim the other team and why. For example: `Tomorrow at 4pm for practice`.',
+    )
+    @app_commands.rename(when_why='when-why', away_team='team')
+    @app_commands.guild_only()
+    @app_commands.default_permissions(moderate_members=True)
+    async def scrim(
+        self,
+        interaction: discord.Interaction,
+        away_team: TEAM_TRANSFORM,
+        per_team: app_commands.Range[int, 1, 10],
+        when_why: app_commands.Transform[TimeTransformer, TimeTransformer(default='[NO REASON GIVEN]')],
+    ) -> None:
+        assert when_why.dt
+        assert interaction.guild
+
+        channel = interaction.channel
+        if not isinstance(channel, discord.TextChannel):
+            return await interaction.response.send_message(
+                'You need to use this command in a team chat text channel.', ephemeral=True
+            )
+
+        category = channel.category
+        if not category or not (home_team := self.fetch_team(category)):
+            return await interaction.response.send_message(
+                'You need to use this command in a team chat text channel.', ephemeral=True
+            )
+
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            home_members = await connection.fetch('SELECT member_id FROM teams.members WHERE team_id = $1', home_team['id'])
+
+            status = ScrimStatus.pending_scrimmer
+            view = ScrimConfirmation(
+                self.bot,
+                status,
+                per_team,
+                when=when_why.dt,
+                voter=home_team,
+                opposing=away_team,
+                members=[e['member_id'] for e in home_members],
+                votes=[],
+            )
+            channel = _find_team_text_channel(interaction.guild, home_team['channels'])
+            view.message = await interaction.edit_original_response(
+                embed=view.embed, view=view, content='@everyone', allowed_mentions=discord.AllowedMentions(everyone=True)
+            )
+
+            data = await connection.fetchrow(
+                'INSERT INTO teams.scrims (home_id, away_id, home_message_id, status, when) VALUES($1, $2, $3, $4, $5) RETURNING id;',
+                home_team['id'],
+                away_team['id'],
+                view.message.id,
+                status.value,
+                when_why.dt,
+            )
+            assert data
+
+            view.scrim_id = data['id']
+
+        await self.bot.timer_manager.create_timer(when_why.dt, 'scrim_scheduled_start', interaction.guild.id, data['id'])
 
     @team.command(name='get', description='Get the team(s) that a specific member is on.')
     async def team_get(self, interaction: discord.Interaction, member: discord.Member) -> None:
@@ -155,7 +457,7 @@ class Teams(BaseCog):
             )
 
         if not team:
-            team = await self.fetch_team(category)
+            team = self.fetch_team(category)
             if not team:
                 return await interaction.response.send_message(
                     'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
@@ -193,7 +495,7 @@ class Teams(BaseCog):
             )
 
         if not team:
-            team = await self.fetch_team(category)
+            team = self.fetch_team(category)
             if not team:
                 return await interaction.response.send_message(
                     'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
@@ -256,7 +558,7 @@ class Teams(BaseCog):
             )
 
         if not team:
-            team = await self.fetch_team(category)
+            team = self.fetch_team(category)
             if not team:
                 return await interaction.response.send_message(
                     'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
@@ -302,7 +604,7 @@ class Teams(BaseCog):
             )
 
         if not team:
-            team = await self.fetch_team(category)
+            team = self.fetch_team(category)
             if not team:
                 return await interaction.response.send_message(
                     'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
@@ -352,7 +654,7 @@ class Teams(BaseCog):
             )
 
         if not team:
-            team = await self.fetch_team(category)
+            team = self.fetch_team(category)
             if not team:
                 return await interaction.response.send_message(
                     'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
@@ -392,7 +694,7 @@ class Teams(BaseCog):
             )
 
         if not team:
-            team = await self.fetch_team(category)
+            team = self.fetch_team(category)
             if not team:
                 return await interaction.response.send_message(
                     'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
@@ -427,7 +729,7 @@ class Teams(BaseCog):
             )
 
         if not team:
-            team = await self.fetch_team(category)
+            team = self.fetch_team(category)
             if not team:
                 return await interaction.response.send_message(
                     'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
@@ -467,7 +769,7 @@ class Teams(BaseCog):
             )
 
         if not team:
-            team = await self.fetch_team(category)
+            team = self.fetch_team(category)
             if not team:
                 return await interaction.response.send_message(
                     'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
@@ -507,7 +809,7 @@ class Teams(BaseCog):
             )
 
         if not team:
-            team = await self.fetch_team(category)
+            team = self.fetch_team(category)
             if not team:
                 return await interaction.response.send_message(
                     'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
@@ -542,7 +844,7 @@ class Teams(BaseCog):
             )
 
         if not team:
-            team = await self.fetch_team(category)
+            team = self.fetch_team(category)
             if not team:
                 return await interaction.response.send_message(
                     'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
@@ -581,7 +883,7 @@ class Teams(BaseCog):
             )
 
         if not team:
-            team = await self.fetch_team(category)
+            team = self.fetch_team(category)
             if not team:
                 return await interaction.response.send_message(
                     'You did not include a team to use and I couldn\'t find one from this channel.', ephemeral=True
@@ -609,6 +911,73 @@ class Teams(BaseCog):
         return await interaction.response.send_message(
             f'Removed {role.mention} from the {team["name"]} team.', ephemeral=True
         )
+
+    @commands.Cog.listener('on_scrim_scheduled_start_timer_complete')
+    async def on_scrim_scheduled_start_timer_complete(self, guild_id: int, scrim_id: int) -> None:
+        await self.bot.wait_until_ready()
+
+        guild = self.bot.get_guild(guild_id)
+        if not guild:
+            return
+
+        async with self.bot.safe_connection() as connection:
+            data = await connection.fetchrow('SELECT * FROM teams.scrims WHERE id = $1', scrim_id)
+
+            if not data:
+                return
+
+            home_team = self.bot.team_cache[data['home_id']]
+            home_team_channel = _find_team_text_channel(guild, home_team['channels'])
+
+            overwrites: Dict[Union[discord.Member, discord.Role], discord.PermissionOverwrite] = {
+                guild.default_role: discord.PermissionOverwrite(view_channel=False)
+            }
+
+            for entry in itertools.chain(*[data['home_votes'], data['away_votes']]):
+                member = guild.get_member(entry) or await guild.fetch_member(entry)
+                overwrites[member] = discord.PermissionOverwrite(view_channel=True)
+
+            category = assertion(home_team_channel.category, discord.CategoryChannel)
+            scrim_channel = await category.create_text_channel(
+                name='scrim-chat',
+                reason=f'Scrim {scrim_id} starting',
+                topic='The scrim text chat to communicate.',
+                overwrites=overwrites,
+            )
+
+            await connection.execute('UPDATE teams.scrims SET scrim_chat = $1 WHERE id = $2', scrim_channel.id, scrim_id)
+
+        embed = self.bot.Embed(
+            title='Scrim Started!',
+            description='Welcome to the Scrim Channel! Use this channel to communicate game invite codes, rules, etc.',
+        )
+        embed.add_field(name='Note', value='This channel will delete itself in 2 hours.')
+        await scrim_channel.send(embed=embed, content='@everyone', allowed_mentions=discord.AllowedMentions(everyone=True))
+
+        await self.bot.timer_manager.create_timer(
+            discord.utils.utcnow() + datetime.timedelta(hours=2),
+            'scrim_channel_timeout',
+            guild.id,
+            scrim_channel.id,
+            scrim_id,
+        )
+
+    @commands.Cog.listener('on_scrim_channel_timeout_timer_complete')
+    async def on_scrim_channel_timeout_timer_complete(self, guild_id: int, channel_id: int, scrim_id: int) -> None:
+        guild = self.bot.get_guild(guild_id)
+        if not guild:
+            return
+
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return
+
+        await channel.delete(reason='Scrim ended.')
+
+        async with self.bot.safe_connection() as connection:
+            await connection.execute(
+                'DELETE FROM teams.scrims WHERE scrim_id = $1 AND scrim_chat = $2', scrim_id, channel_id
+            )
 
 
 async def setup(bot: FuryBot) -> None:
