@@ -137,6 +137,7 @@ class ConfirmAnywaysView(discord.ui.View):
     @discord.ui.button(label='Confirm Anyways')
     async def start_anyways(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         self.confirmed_voters.append(interaction.user.id)
+
         async with self.parent.bot.safe_connection() as connection:
             await connection.execute(
                 'UPDATE teams.scrims SET away_confirm_anyways = ARRAY_APPEND(away_confirm_anyways, $1) WHERE id = $2',
@@ -180,11 +181,11 @@ class ConfirmAnywaysButton(discord.ui.Button['ScrimConfirmation']):
 
         await interaction.response.defer(thinking=True)
 
-        view = ConfirmAnywaysView(self.parent, self.parent.members, [interaction.user.id])
+        view = ConfirmAnywaysView(self.parent, self.parent.votes, [])
         message = await interaction.followup.send(view=view, embed=view.embed, wait=True)
 
         self.parent._force_confirm_message_id = message.id
-        self.parent._force_confirm_votes = [interaction.user.id]
+        self.parent._force_confirm_votes = []
 
         async with self.parent.bot.safe_connection() as connection:
             await connection.execute(
