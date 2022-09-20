@@ -247,7 +247,7 @@ class ScrimConfirmation(discord.ui.View):
         # due to the type being ScrimStatus.pending_scrimmer
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
-                'UPDATE teams.scrims SET status = $1, confirmed = True WHERE scrim_id = $2 ' 'RETURNING home_message_id',
+                'UPDATE teams.scrims SET status = $1, confirmed = True WHERE id = $2 RETURNING home_message_id',
                 ScrimStatus.scheduled.value,
                 self.scrim_id,
             )
