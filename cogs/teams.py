@@ -418,13 +418,14 @@ class Teams(BaseCog):
             view.message = await interaction.edit_original_response(embed=view.embed, view=view)
 
             data = await connection.fetchrow(
-                'INSERT INTO teams.scrims (home_id, away_id, home_message_id, status, scheduled_for, guild_id) VALUES($1, $2, $3, $4, $5, $6) RETURNING id;',
+                'INSERT INTO teams.scrims (home_id, away_id, home_message_id, status, scheduled_for, guild_id, per_team) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id;',
                 home_team['id'],
                 away_team['id'],
                 view.message.id,
                 status.value,
                 when_why.dt,
                 interaction.guild.id,
+                per_team,
             )
             assert data
 
