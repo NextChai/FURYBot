@@ -280,25 +280,30 @@ class ScrimConfirmation(discord.ui.View):
 
         return embed
 
-    async def _load_attributes(self, scrim_id: int, connection: asyncpg.Connection[asyncpg.Record]) -> None:
+    async def _load_attributes(self, scrim_id: int) -> None:
         await self.bot.wait_until_ready()
 
         self.scrim_id = scrim_id
 
-        guild_id: int = await connection.fetchval('SELECT guild_id FROM teams.scrims WHERE id = $1', scrim_id)
-        guild = self.bot.get_guild(guild_id)
-        if not guild:
-            return
+        async with self.bot.safe_connection() as connection:
+            guild_id: int = await connection.fetchval('SELECT guild_id FROM teams.scrims WHERE id = $1', scrim_id)
+            guild = self.bot.get_guild(guild_id)
+            if not guild:
+                return
 
-        team_channel = _find_team_text_channel(guild, self.voter['channels'])
+            team_channel = _find_team_text_channel(guild, self.voter['channels'])
 
-        if self.type is ScrimStatus.pending_host:
-            home_message_id = await connection.fetchval('SELECT home_message_id FROM teams.scrims WHERE id = $1', scrim_id)
-        else:
-            home_message_id = await connection.fetchval('SELECT away_message_id FROM teams.scrims WHERE id = $1', scrim_id)
+            if self.type is ScrimStatus.pending_host:
+                home_message_id = await connection.fetchval(
+                    'SELECT home_message_id FROM teams.scrims WHERE id = $1', scrim_id
+                )
+            else:
+                home_message_id = await connection.fetchval(
+                    'SELECT away_message_id FROM teams.scrims WHERE id = $1', scrim_id
+                )
 
-        message = await team_channel.fetch_message(home_message_id)
-        self.message = message
+            message = await team_channel.fetch_message(home_message_id)
+            self.message = message
 
     async def interaction_check(self, interaction: discord.Interaction) -> Optional[bool]:
         if interaction.user.id not in self.members:
