@@ -27,6 +27,7 @@ import datetime
 import re
 from typing import Any, Optional, Tuple, Type, TypeVar
 
+import pytz
 import discord
 import parsedatetime
 from dateutil.relativedelta import relativedelta
@@ -78,14 +79,16 @@ class ShortTime:
         re.VERBOSE,
     )
 
-    def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None) -> None:
+    def __init__(self, argument: str) -> None:
         match = self.compiled.fullmatch(argument)
         if match is None or not match.group(0):
             raise BadArgument(None, 'invalid time provided')  # type: ignore
 
         data = {k: int(v) for k, v in match.groupdict(default=0).items()}
-        now = now or datetime.datetime.now(datetime.timezone.utc)
-        self.dt = now + relativedelta(**data)
+        now = datetime.datetime.now(pytz.timezone('US/Eastern'))
+
+        dt = now + relativedelta(**data)
+        self.dt = dt.replace(tzinfo=datetime.timezone.utc)
 
     @classmethod
     async def convert(cls: Type[STT], interaction: discord.Interaction, argument: str) -> STT:
@@ -105,7 +108,7 @@ class ShortTime:
         :class:`ShortTime`
             The transformed argument.
         """
-        return cls(argument, now=interaction.created_at)
+        return cls(argument)
 
 
 class HumanTime:
@@ -133,13 +136,13 @@ class HumanTime:
         now = now or datetime.datetime.utcnow()
         dt, status = self.calendar.parseDT(argument, sourceTime=now)
         if not status.hasDateOrTime:
-            raise BadArgument(None, 'invalid time provided, try e.g. "tomorrow" or "3 days"')  # type: ignore
+            raise BadArgument(None, 'invalid time provided, try e.g. "tomorrow" or "3 days"', tzinfo=pytz.timezone('US/Eastern'))  # type: ignore
 
         if not status.hasTime:
             # replace it with the current time
             dt = dt.replace(hour=now.hour, minute=now.minute, second=now.second, microsecond=now.microsecond)
 
-        self.dt: datetime.datetime = dt
+        self.dt: datetime.datetime = dt.replace(tzinfo=datetime.timezone.utc)
         self._past = dt < now
 
     @classmethod
@@ -186,7 +189,7 @@ class Time(HumanTime):
 
     def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None) -> None:
         try:
-            o = ShortTime(argument, now=now)
+            o = ShortTime(argument)
         except Exception:
             super().__init__(argument)
         else:
