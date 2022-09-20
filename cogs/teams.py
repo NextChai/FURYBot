@@ -222,7 +222,7 @@ class ScrimConfirmation(discord.ui.View):
 
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
-                'UPDATE teams.scrims SET status = $1 WHERE id = $3 RETURNING away_id',
+                'UPDATE teams.scrims SET status = $1 WHERE id = $2 RETURNING away_id',
                 new_type.value,
                 self.scrim_id,
             )
