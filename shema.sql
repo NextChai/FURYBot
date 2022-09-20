@@ -48,6 +48,7 @@ CREATE TYPE scrim_status AS ENUM ('pending_scrimer', 'scheduled', 'pending_host'
 
 CREATE TABLE IF NOT EXISTS teams.scrims (
     id SERIAL PRIMARY KEY,
+    guild_id BIGINT,
     home_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     away_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     home_message_id BIGINT,
