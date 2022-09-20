@@ -419,6 +419,9 @@ class ScrimConfirmation(discord.ui.View):
 
     @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green, custom_id='confirm-scrim')
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        if interaction.user.id in self.votes:
+            return await interaction.response.send_message('You\'ve already voted on this!', ephemeral=True)
+
         self.votes.append(interaction.user.id)
 
         async with self.bot.safe_connection() as connection:
