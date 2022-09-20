@@ -1163,8 +1163,16 @@ class Teams(BaseCog):
         embed = self.bot.Embed(
             title='Scrim Started!',
             description='Welcome to the Scrim Channel! Use this channel to communicate game invite codes, rules, etc.',
+            timestamp=data['scheduled_for'],
         )
-        embed.add_field(name='Note', value='This channel will delete itself in 2 hours.')
+
+        embed.add_field(name='Home Team', value=', '.join(f'<@{m_id}>' for m_id in data['home_votes']), inline=False)
+        embed.add_field(name='Away Team', value=', '.join(f'<@{m_id}>' for m_id in data['away_votes']), inline=False)
+
+        # NOTE: Add members on each team here
+
+        embed.set_footer(text='Note: This channel will delete itself in 2 hours.')
+
         await scrim_channel.send(embed=embed, content='@everyone', allowed_mentions=discord.AllowedMentions(everyone=True))
 
         await self.bot.timer_manager.create_timer(
