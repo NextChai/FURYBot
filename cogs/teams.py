@@ -335,9 +335,6 @@ class ScrimConfirmation(discord.ui.View):
     async def shift_to_opposing_team(self, interaction: discord.Interaction):
         assert interaction.guild
 
-        if interaction.user.id in self.votes:
-            return await interaction.response.send_message('You\'ve already voted!', ephemeral=True)
-
         # Before we do anything else with the other team, let's edit this original message
         embed = self.bot.Embed(
             title='Confirmed!',
