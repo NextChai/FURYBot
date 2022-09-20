@@ -60,7 +60,6 @@ CREATE TABLE IF NOT EXISTS teams.scrims (
     away_confirm_anyways BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
     away_confirm_anyways_message_id BIGINT,
     scheduled_for TIMESTAMP WITH TIME ZONE,
-    confirmed BOOLEAN DEFAULT FALSE,
     scrim_chat BIGINT -- Can be None
 );
 
