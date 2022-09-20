@@ -117,9 +117,15 @@ class ConfirmAnywaysView(discord.ui.View):
         )
         embed.add_field(
             name='Members Needed to Vote:',
-            value=', '.join(f'<@{m_id}>' for m_id in self.voters if m_id not in self.confirmed_voters),
+            value=', '.join(
+                [f'<@{m_id}>' for m_id in self.voters if m_id not in self.confirmed_voters] or ['No members needed to vote.']
+            ),
         )
-        embed.add_field(name='Members Voted:', value=', '.join(f'<@{m_id}>' for m_id in self.confirmed_voters), inline=False)
+        embed.add_field(
+            name='Members Voted:',
+            value=', '.join([f'<@{m_id}>' for m_id in self.confirmed_voters] or ['No confirmed voters.']),
+            inline=False,
+        )
 
         return embed
 
