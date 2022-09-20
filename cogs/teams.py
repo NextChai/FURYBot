@@ -393,9 +393,7 @@ class Teams(BaseCog):
                 votes=[],
             )
             channel = _find_team_text_channel(interaction.guild, home_team['channels'])
-            view.message = await interaction.edit_original_response(
-                embed=view.embed, view=view, content='@everyone', allowed_mentions=discord.AllowedMentions(everyone=True)
-            )
+            view.message = await interaction.edit_original_response(embed=view.embed, view=view)
 
             data = await connection.fetchrow(
                 'INSERT INTO teams.scrims (home_id, away_id, home_message_id, status, scheduled_for) VALUES($1, $2, $3, $4, $5) RETURNING id;',
