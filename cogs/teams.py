@@ -624,8 +624,10 @@ class Teams(BaseCog):
 
     @scrim.command(name='cancel', description='Cancel an existing scrim.')
     @app_commands.describe(scrim='The scrim you want to cancel.')
-    async def scrim_delete(self, interaction: discord.Interaction, scrim: SCRIM_TRANSFORM) -> None:
+    async def scrim_cancel(self, interaction: discord.Interaction, scrim: SCRIM_TRANSFORM) -> None:
         assert interaction.guild
+
+        await interaction.response.defer()
 
         async with self.bot.safe_connection() as connection:
             await connection.execute('DELETE FROM teams.scrims WHERE id = $1', scrim['id'])
@@ -637,9 +639,23 @@ class Teams(BaseCog):
 
         embed = self.bot.Embed(
             title='Scrim has been Cancelled.',
-            description=f'The creator of the srim, <@{interaction.user.id}> has cancelled the scrim.',
+            description=f'The creator of the srim, <@{interaction.user.id}> has cancelled the scrim that was '
+            f'scheduled for {discord.utils.format_dt(scrim["scheduled_for"], "F")}.',
             author=interaction.user,
         )
+        if scrim['home_votes']:
+            embed.add_field(
+                name='Previously Confirmed Home Team Members',
+                value=', '.join([f'<@{m_id}>' for m_id in scrim['home_votes']]),
+                inline=False,
+            )
+
+        if scrim['away_votes']:
+            embed.add_field(
+                name='Previously Confirmed Away Team Members',
+                value=', '.join([f'<@{m_id}>' for m_id in scrim['away_votes']]),
+                inline=False,
+            )
 
         home_message = await home_channel.fetch_message(scrim['home_message_id'])
         await home_message.edit(embed=embed, view=None, content=None)
@@ -654,6 +670,8 @@ class Teams(BaseCog):
             if channel:
                 await channel.send(embed=embed)
                 await channel.delete(reason='Scrim Cancelled.')
+
+        await interaction.edit_original_response(content='Scrim has been cancelled.')
 
     @team.command(name='get', description='Get the team(s) that a specific member is on.')
     async def team_get(self, interaction: discord.Interaction, member: discord.Member) -> None:
