@@ -457,7 +457,7 @@ class ScrimConverter(app_commands.Transformer):
 
         async with bot.safe_connection() as connection:
             data = await connection.fetch(
-                'SELECT * FROM teams.scrims WHERE creator_id = $1 AND scheduled_for < $2',
+                'SELECT * FROM teams.scrims WHERE creator_id = $1 AND scheduled_for > $2',
                 interaction.user.id,
                 discord.utils.utcnow(),
             )
@@ -619,6 +619,7 @@ class Teams(BaseCog):
         )
 
     @scrim.command(name='cancel', description='Cancel an existing scrim.')
+    @app_commands.describe(scrim='The scrim you want to cancel.')
     async def scrim_delete(self, interaction: discord.Interaction, scrim: SCRIM_TRANSFORM) -> None:
         assert interaction.guild
 
