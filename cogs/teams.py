@@ -521,23 +521,18 @@ class TeamTransformer(app_commands.Transformer):
 
         bot: FuryBot = interaction.client  # type: ignore
 
-        if not self.lock_team_type:
-            team_mapping = {team['name']: team for team in bot.team_cache.values()}
-        else:
-            team_mapping = {team['name']: team for team in self._find_valid_teams(bot, interaction.channel.id)}
+        team_mapping = {
+            team['name']: team
+            for team in (
+                self._find_valid_teams(bot, interaction.channel.id) if self.lock_team_type else bot.team_cache.values()
+            )
+        }
 
         if not team_mapping:
             return []
 
         if not value:
-            if not self.lock_team_type:
-                return [
-                    app_commands.Choice(name=team['name'], value=str(team['id']))
-                    for team in list(bot.team_cache.values())[:20]
-                ]
-
-            teams = self._find_valid_teams(bot, interaction.channel.id)
-            return [app_commands.Choice(name=team['name'], value=str(team['id'])) for team in list(teams)[:20]]
+            return [app_commands.Choice(name=team['name'], value=str(team['id'])) for team in team_mapping.values()]
 
         similar: List[str] = await bot.wrap(difflib.get_close_matches, str(value), team_mapping.keys(), n=20)  # type: ignore
 
