@@ -568,7 +568,9 @@ class Teams(BaseCog):
 
             view.scrim_id = data['id']
 
-        await self.bot.timer_manager.create_timer(when_why.dt, 'scrim_scheduled_start', interaction.guild.id, data['id'])
+        await self.bot.timer_manager.create_timer(
+            when_why.dt - datetime.timedelta(minutes=10), 'scrim_scheduled_start', interaction.guild.id, data['id']
+        )
 
     @team.command(name='get', description='Get the team(s) that a specific member is on.')
     async def team_get(self, interaction: discord.Interaction, member: discord.Member) -> None:
