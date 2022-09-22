@@ -39,6 +39,7 @@ from discord.ext import commands
 from utils import assertion
 from utils.bases.cog import BaseCog
 from utils.time import TimeTransformer
+from utils.errors import BadArgument
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -485,7 +486,7 @@ class ScrimConverter(app_commands.Transformer):
             )
 
         if not data:
-            raise Exception('Invalid ID given.')
+            raise BadArgument(interaction, 'You did not select one of the scrim options.')
 
         return data
 
@@ -518,10 +519,16 @@ class TeamTransformer(app_commands.Transformer):
         ]
 
     async def transform(self, interaction: discord.Interaction, value: Any, /) -> asyncpg.Record:
-        if not value.isdigit():
-            raise Exception('Invalid team selected.')
-
         bot: FuryBot = interaction.client  # type: ignore
+
+        if not value.isdigit():
+            # Try and locate from name
+            for team in bot.team_cache.values():
+                if team['name'].lower() == value.lower():
+                    return team
+
+            raise BadArgument(interaction, 'You did not select one of the team options.')
+
         return bot.team_cache[int(value)]
 
 
