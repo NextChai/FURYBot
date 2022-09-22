@@ -608,7 +608,7 @@ class Teams(BaseCog):
 
         if when.dt - interaction.created_at < datetime.timedelta(minutes=59):
             return await interaction.response.send_message(
-                'The minimum amount of time to schedule a scrim is an hour.', ephemeral=True
+                'You can not schedule a scrim that starts in under an hour.', ephemeral=True
             )
 
         channel = interaction.channel
