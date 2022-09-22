@@ -466,7 +466,11 @@ class ScrimConverter(app_commands.Transformer):
             return []
 
         return [
-            app_commands.Choice(name=entry['scheduled_for'].strftime('%Y-%m-%d %H:%M:%S.%f%z (%Z)'), value=str(entry['id']))
+            app_commands.Choice(
+                name=f'{bot.team_cache[entry["away_id"]]["name"]} '
+                + entry['scheduled_for'].strftime('%Y-%m-%d %H:%M:%S.%f%z (%Z)'),
+                value=str(entry['id']),
+            )
             for entry in data
         ]
 
