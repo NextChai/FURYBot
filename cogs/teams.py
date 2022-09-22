@@ -290,7 +290,7 @@ class ScrimConfirmation(discord.ui.View):
             )
 
         embed.set_footer(
-            text='You have up until the scrim date to confirm.',
+            text='You have up until the scrim date to confirm. This message will auto edit itself.',
         )
 
         return embed
@@ -532,7 +532,7 @@ class Teams(BaseCog):
                 'You need to use this command in a team chat text channel.', ephemeral=True
             )
 
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         async with self.bot.safe_connection() as connection:
             home_members = await connection.fetch('SELECT member_id FROM teams.members WHERE team_id = $1', home_team['id'])
@@ -549,7 +549,9 @@ class Teams(BaseCog):
                 votes=[interaction.user.id],
             )
             channel = _find_team_text_channel(interaction.guild, home_team['channels'])
-            view.message = await interaction.edit_original_response(embed=view.embed, view=view)
+            await interaction.edit_original_response(content='Scrim Created.')
+
+            view.message = await channel.send(embed=view.embed, view=view)
 
             data = await connection.fetchrow(
                 'INSERT INTO teams.scrims (home_id, away_id, home_message_id, status, scheduled_for, guild_id, per_team, home_votes) VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;',
