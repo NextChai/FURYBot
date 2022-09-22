@@ -570,6 +570,11 @@ class Teams(BaseCog):
         assert when.dt
         assert interaction.guild
 
+        if when.dt - interaction.created_at < datetime.timedelta(minutes=59):
+            return await interaction.response.send_message(
+                'The minimum amount of time to schedule a scrim is an hour.', ephemeral=True
+            )
+
         channel = interaction.channel
         if not isinstance(channel, discord.TextChannel):
             return await interaction.response.send_message(
@@ -625,7 +630,10 @@ class Teams(BaseCog):
             view.scrim_id = data['id']
 
         await self.bot.timer_manager.create_timer(
-            when.dt - datetime.timedelta(minutes=10), 'scrim_scheduled_start', interaction.guild.id, data['id']
+            when.dt - datetime.timedelta(minutes=10),
+            'scrim_scheduled_start',
+            interaction.guild.id,
+            data['id'],
         )
 
     @scrim.command(name='cancel', description='Cancel an existing scrim.')
