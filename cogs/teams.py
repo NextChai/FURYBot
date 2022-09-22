@@ -594,6 +594,7 @@ class Teams(BaseCog):
 
     @scrim.command(name='create', description='Scrim another team!')
     @app_commands.describe(
+        away_team='The team you want to scrim.',
         per_team='The number of players per team. Max is 10.',
         when='When to scrim (in UTC Time). For example: "Tomorrow at 4pm for practice" is 12pm EST.',
     )
