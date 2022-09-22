@@ -492,20 +492,52 @@ class ScrimConverter(app_commands.Transformer):
 
 
 class TeamTransformer(app_commands.Transformer):
+    def __init__(self, /, *, lock_team_type: Optional[bool] = None) -> None:
+        self.lock_team_type: Optional[bool] = lock_team_type
+
+    def _find_valid_teams(self, bot: FuryBot, channel_id: int) -> List[asyncpg.Record]:
+        # Find the team first
+        team = None
+        for local_team in bot.team_cache.values():
+            if channel_id in local_team['channels']:
+                team = local_team
+                break
+        else:
+            return []
+
+        teams: List[asyncpg.Record] = []
+        name = [e.lower() for e in team['name'].split(' ')[:-1]]
+        for local_team in bot.team_cache.values():
+            c_name = [e.lower() for e in local_team['name'].split(' ')[:-1]]
+            if c_name == name and local_team is not team:
+                teams.append(local_team)
+
+        return teams
+
     async def autocomplete(
         self, interaction: discord.Interaction, value: Union[int, float, str], /
     ) -> List[app_commands.Choice[Union[int, float, str]]]:
-        # Show available teams
+        assert interaction.channel
+
         bot: FuryBot = interaction.client  # type: ignore
 
-        team_mapping = {team['name']: team for team in bot.team_cache.values()}
+        if not self.lock_team_type:
+            team_mapping = {team['name']: team for team in bot.team_cache.values()}
+        else:
+            team_mapping = {team['name']: team for team in self._find_valid_teams(bot, interaction.channel.id)}
+
         if not team_mapping:
             return []
 
         if not value:
-            return [
-                app_commands.Choice(name=team['name'], value=str(team['id'])) for team in list(bot.team_cache.values())[:20]
-            ]
+            if not self.lock_team_type:
+                return [
+                    app_commands.Choice(name=team['name'], value=str(team['id']))
+                    for team in list(bot.team_cache.values())[:20]
+                ]
+
+            teams = self._find_valid_teams(bot, interaction.channel.id)
+            return [app_commands.Choice(name=team['name'], value=str(team['id'])) for team in list(teams)[:20]]
 
         similar: List[str] = await bot.wrap(difflib.get_close_matches, str(value), team_mapping.keys(), n=20)  # type: ignore
 
@@ -534,6 +566,7 @@ class TeamTransformer(app_commands.Transformer):
 
 TEAM_TRANSFORM: TypeAlias = app_commands.Transform[asyncpg.Record, TeamTransformer]
 SCRIM_TRANSFORM: TypeAlias = app_commands.Transform[asyncpg.Record, ScrimConverter]
+FRONT_END_TEAM_TRANSFORM: TypeAlias = app_commands.Transform[asyncpg.Record, TeamTransformer(lock_team_type=True)]
 
 
 class Teams(BaseCog):
@@ -570,7 +603,7 @@ class Teams(BaseCog):
     async def scrim_create(
         self,
         interaction: discord.Interaction,
-        away_team: TEAM_TRANSFORM,
+        away_team: FRONT_END_TEAM_TRANSFORM,
         per_team: app_commands.Range[int, 1, 10],
         when: app_commands.Transform[TimeTransformer, TimeTransformer(default='[NO REASON GIVEN]')],
     ) -> Optional[discord.InteractionMessage]:
