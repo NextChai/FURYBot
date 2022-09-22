@@ -507,6 +507,12 @@ class TeamTransformer(app_commands.Transformer):
             ]
 
         similar: List[str] = await bot.wrap(difflib.get_close_matches, str(value), team_mapping.keys(), n=20)  # type: ignore
+
+        first = similar[0]
+        first_team = team_mapping[first]
+        if first == first_team['name']:
+            return [app_commands.Choice(name=first_team['name'], value=str(first_team['id']))]
+
         return [
             app_commands.Choice(name=team_mapping[entry]['name'], value=str(team_mapping[entry]['id'])) for entry in similar
         ]
