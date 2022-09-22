@@ -317,8 +317,8 @@ class ErrorHandler:
         sender: Callable[..., Awaitable[Optional[discord.WebhookMessage]]] = (
             interaction.response.send_message if not interaction.response.is_done() else interaction.followup.send
         )
-
-        if isinstance(error, AutocompleteValidationException):
+        
+        if isinstance(error, (AutocompleteValidationException, BadArgument)):
             return await sender(str(error))
 
         elif isinstance(error, app_commands.CommandInvokeError):
