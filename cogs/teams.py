@@ -449,6 +449,43 @@ class ScrimConfirmation(discord.ui.View):
             await self.handle_team_full(interaction)
 
 
+class ScrimConverter(app_commands.Transformer):
+    async def autocomplete(
+        self, interaction: discord.Interaction, value: Union[int, float, str], /
+    ) -> List[app_commands.Choice[Union[int, float, str]]]:
+        bot: FuryBot = interaction.client  # type: ignore
+
+        async with bot.safe_connection() as connection:
+            data = await connection.fetch(
+                'SELECT * FROM teams.scrims WHERE creator_id = $1 WHERE scheduled_for < $2',
+                interaction.user.id,
+                discord.utils.utcnow(),
+            )
+
+        if not data:
+            return []
+
+        return [
+            app_commands.Choice(name=entry['scheduled_for'].strftime('%Y-%m-%d %H:%M:%S.%f%z (%Z)'), value=str(entry['id']))
+            for entry in data
+        ]
+
+    async def transform(self, interaction: discord.Interaction, value: Any, /) -> asyncpg.Record:
+        if not value.isdigit():
+            raise Exception('Invalid team selected.')
+
+        bot: FuryBot = interaction.client  # type: ignore
+        async with bot.safe_connection() as connection:
+            data = await connection.fetchrow(
+                'SELECT * FROM teams.scrims WHERE id = $1 AND creator_id = $2', int(value), interaction.user.id
+            )
+
+        if not data:
+            raise Exception('Invalid ID given.')
+
+        return data
+
+
 class TeamTransformer(app_commands.Transformer):
     async def autocomplete(
         self, interaction: discord.Interaction, value: Union[int, float, str], /
@@ -479,6 +516,7 @@ class TeamTransformer(app_commands.Transformer):
 
 
 TEAM_TRANSFORM: TypeAlias = app_commands.Transform[asyncpg.Record, TeamTransformer]
+SCRIM_TRANSFORM: TypeAlias = app_commands.Transform[asyncpg.Record, ScrimConverter]
 
 
 class Teams(BaseCog):
@@ -493,6 +531,8 @@ class Teams(BaseCog):
     team_subs = app_commands.Group(name='subs', description='Manage team subs.', parent=team)
     team_captains = app_commands.Group(name='captains', description='Manage team captainis.', parent=team)
 
+    scrim = app_commands.Group(name='scrim', description='Create and manage scrims.', guild_only=True)
+
     async def _sync_channels(self, guild: discord.Guild, channel_ids: List[int]) -> None:
         for channel_id in channel_ids:
             channel = assertion(guild.get_channel(channel_id), Optional[Union[discord.TextChannel, discord.VoiceChannel]])
@@ -502,22 +542,22 @@ class Teams(BaseCog):
     def fetch_team(self, category: discord.CategoryChannel) -> Optional[asyncpg.Record]:
         return discord.utils.find(lambda x: x['category_id'] == category.id, self.bot.team_cache.values())
 
-    @app_commands.command(name='scrim', description='Scrim another team!')
+    @scrim.command(name='create', description='Scrim another team!')
     @app_commands.describe(
         per_team='The number of players per team. Max is 10.',
-        when_why='When you want to scrim the other team and why. For example: `Tomorrow at 4pm for practice`.',
+        when='When to scrim (in UTC Time). For example: "Tomorrow at 4pm for practice" is 12pm EST.',
     )
-    @app_commands.rename(when_why='when-why', away_team='team')
+    @app_commands.rename(away_team='team')
     @app_commands.guild_only()
     @app_commands.default_permissions(moderate_members=True)
-    async def scrim(
+    async def scrim_create(
         self,
         interaction: discord.Interaction,
         away_team: TEAM_TRANSFORM,
         per_team: app_commands.Range[int, 1, 10],
-        when_why: app_commands.Transform[TimeTransformer, TimeTransformer(default='[NO REASON GIVEN]')],
-    ) -> None:
-        assert when_why.dt
+        when: app_commands.Transform[TimeTransformer, TimeTransformer(default='[NO REASON GIVEN]')],
+    ) -> Optional[discord.InteractionMessage]:
+        assert when.dt
         assert interaction.guild
 
         channel = interaction.channel
@@ -536,41 +576,79 @@ class Teams(BaseCog):
 
         async with self.bot.safe_connection() as connection:
             home_members = await connection.fetch('SELECT member_id FROM teams.members WHERE team_id = $1', home_team['id'])
+            home_member_ids = [e['member_id'] for e in home_members]
+
+            if interaction.user.id not in home_member_ids:
+                return await interaction.edit_original_response(content='You aren\'t on this team!')
 
             status = ScrimStatus.pending_host
             view = ScrimConfirmation(
                 self.bot,
                 status,
                 per_team,
-                when=when_why.dt,
+                when=when.dt,
                 voter=home_team,
                 opposing=away_team,
-                members=[e['member_id'] for e in home_members],
+                members=home_member_ids,
                 votes=[interaction.user.id],
             )
             channel = _find_team_text_channel(interaction.guild, home_team['channels'])
-            await interaction.edit_original_response(content='Scrim Created.')
+            await interaction.edit_original_response(content='Scrim Created. You can cancel it using `/scrim cancel`.')
 
             view.message = await channel.send(embed=view.embed, view=view)
 
             data = await connection.fetchrow(
-                'INSERT INTO teams.scrims (home_id, away_id, home_message_id, status, scheduled_for, guild_id, per_team, home_votes) VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;',
+                'INSERT INTO teams.scrims (home_id, away_id, home_message_id, status, scheduled_for, guild_id, per_team, home_votes, creator_id) '
+                'VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id;',
                 home_team['id'],
                 away_team['id'],
                 view.message.id,
                 status.value,
-                when_why.dt,
+                when.dt,
                 interaction.guild.id,
                 per_team,
                 [interaction.user.id],
+                interaction.user.id,
             )
             assert data
 
             view.scrim_id = data['id']
 
         await self.bot.timer_manager.create_timer(
-            when_why.dt - datetime.timedelta(minutes=10), 'scrim_scheduled_start', interaction.guild.id, data['id']
+            when.dt - datetime.timedelta(minutes=10), 'scrim_scheduled_start', interaction.guild.id, data['id']
         )
+
+    @scrim.command(name='cancel', description='Cancel an existing scrim.')
+    async def scrim_delete(self, interaction: discord.Interaction, scrim: SCRIM_TRANSFORM) -> None:
+        assert interaction.guild
+
+        async with self.bot.safe_connection() as connection:
+            await connection.execute('DELETE FROM teams.scrims WHERE id = $1', scrim['id'])
+
+        home_team = self.bot.team_cache[scrim['home_id']]
+        away_team = self.bot.team_cache[scrim['away_id']]
+
+        home_channel = _find_team_text_channel(interaction.guild, home_team['channels'])
+
+        embed = self.bot.Embed(
+            title='Scrim has been Cancelled.',
+            description=f'The creator of the srim, <@{interaction.user.id}> has cancelled the scrim.',
+            author=interaction.user,
+        )
+
+        home_message = await home_channel.fetch_message(scrim['home_message_id'])
+        await home_message.edit(embed=embed, view=None, content=None)
+
+        if scrim['away_message_id']:
+            away_channel = _find_team_text_channel(interaction.guild, away_team['channels'])
+            away_message = await away_channel.fetch_message(scrim['away_message_id'])
+            await away_message.edit(embed=embed, view=None, content=None)
+
+        if scrim['scrim_chat'] is not None:
+            channel = assertion(interaction.guild.get_channel(scrim['scrim_chat']), Optional[discord.TextChannel])
+            if channel:
+                await channel.send(embed=embed)
+                await channel.delete(reason='Scrim Cancelled.')
 
     @team.command(name='get', description='Get the team(s) that a specific member is on.')
     async def team_get(self, interaction: discord.Interaction, member: discord.Member) -> None:
