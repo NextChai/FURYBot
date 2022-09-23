@@ -531,7 +531,7 @@ class TeamTransformer(app_commands.Transformer):
         if not team_mapping:
             return []
 
-        if not value:
+        if not value or self.lock_team_type:
             return [app_commands.Choice(name=team['name'], value=str(team['id'])) for team in team_mapping.values()]
 
         similar: List[str] = await bot.wrap(difflib.get_close_matches, str(value), team_mapping.keys(), n=20)  # type: ignore
