@@ -449,6 +449,30 @@ class ScrimConfirmation(discord.ui.View):
         if len(self.votes) == self.per_team:
             await self.handle_team_full(interaction)
 
+    @discord.ui.button(label='Unconfirm', style=discord.ButtonStyle.red, custom_id='unconfirm-scrim')
+    async def unconfirm(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        if interaction.user.id not in self.votes:
+            return await interaction.response.send_message('You haven\'t confirmed yet!', ephemeral=True)
+
+        self.votes.remove(interaction.user.id)
+
+        async with self.bot.safe_connection() as connection:
+            if self.type is ScrimStatus.pending_host:
+                await connection.execute(
+                    'UPDATE teams.scrims SET home_votes = array_remove(home_votes, $1) WHERE id = $2',
+                    interaction.user.id,
+                    self.scrim_id,
+                )
+
+            elif self.type is ScrimStatus.pending_scrimmer:
+                await connection.execute(
+                    'UPDATE teams.scrims SET away_votes = array_remove(away_votes, $1) WHERE id = $2',
+                    interaction.user.id,
+                    self.scrim_id,
+                )
+
+        await interaction.response.edit_message(embed=self.embed, view=self)
+
 
 class ScrimConverter(app_commands.Transformer):
     async def autocomplete(
@@ -1272,7 +1296,7 @@ class Teams(BaseCog):
                     )
 
                     message = await home_team_channel.fetch_message(data['home_message_id'])
-                    return await message.edit(embed=embed)
+                    return await message.edit(embed=embed, view=None, content=None)
                 elif status is ScrimStatus.pending_scrimmer:
                     # Edit the host and the scrimmer messages
                     embed = self.bot.Embed(
@@ -1295,7 +1319,7 @@ class Teams(BaseCog):
                     away_team = self.bot.team_cache[data['away_id']]
                     away_team_channel = _find_team_text_channel(guild, away_team['channels'])
                     message = await away_team_channel.fetch_message(data['away_message_id'])
-                    return await message.edit(embed=embed)
+                    return await message.edit(embed=embed, view=None, content=None)
 
             overwrites: Dict[Union[discord.Member, discord.Role], discord.PermissionOverwrite] = {
                 guild.default_role: discord.PermissionOverwrite(view_channel=False)
