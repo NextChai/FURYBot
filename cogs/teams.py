@@ -381,7 +381,9 @@ class ScrimConfirmation(discord.ui.View):
                 votes=[],
                 opposing_votes=self.votes,
             )
-            view.message = await channel.send(embed=view.embed, view=view)
+            view.message = await channel.send(
+                embed=view.embed, view=view, content='@everyone', allowed_mentions=discord.AllowedMentions(everyone=True)
+            )
             view.scrim_id = self.scrim_id
 
             await connection.execute(
@@ -670,7 +672,9 @@ class Teams(BaseCog):
             channel = _find_team_text_channel(interaction.guild, home_team['channels'])
             await interaction.edit_original_response(content='Scrim Created. You can cancel it using `/scrim cancel`.')
 
-            view.message = await channel.send(embed=view.embed, view=view)
+            view.message = await channel.send(
+                embed=view.embed, view=view, content='@everyone', allowed_mentions=discord.AllowedMentions(everyone=True)
+            )
 
             data = await connection.fetchrow(
                 'INSERT INTO teams.scrims (home_id, away_id, home_message_id, status, scheduled_for, guild_id, per_team, home_votes, creator_id) '
