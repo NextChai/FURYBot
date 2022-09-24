@@ -327,3 +327,12 @@ class TimeTransformer(app_commands.Transformer):
             raise BadArgument(interaction, 'I\'m so sorry but I didn\'t understand this time!')
 
         return await result._check_constraints(interaction, now, remaining)
+
+
+class EstTimeTransformer(TimeTransformer):
+    async def transform(self, interaction: discord.Interaction, value: Any) -> Self:
+        result = await super().transform(interaction, value)
+        assert result.dt
+
+        result.dt += datetime.timedelta(hours=4)
+        return result
