@@ -330,9 +330,7 @@ class TimeTransformer(app_commands.Transformer):
 
 
 class EstTimeTransformer(TimeTransformer):
-    async def transform(self, interaction: discord.Interaction, value: Any) -> Self:
-        result = await super().transform(interaction, value)
-        assert result.dt
-
-        result.dt += datetime.timedelta(hours=4)
-        return result
+    async def _check_constraints(self, interaction: discord.Interaction, now: datetime.datetime, remaining: str) -> Self:
+        assert self.dt
+        self.dt += datetime.timedelta(hours=4)
+        return await super()._check_constraints(interaction, now, remaining)
