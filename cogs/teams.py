@@ -617,7 +617,7 @@ class Teams(BaseCog):
     @app_commands.describe(
         away_team='The team you want to scrim.',
         per_team='The number of players per team. Max is 10.',
-        when='When to scrim (in UTC Time). For example: "Tomorrow at 4pm for practice" is 12pm EST.',
+        when='When to scrim (in EST Time). For example: "Tomorrow at 4pm for practice."',
     )
     @app_commands.rename(away_team='team')
     @app_commands.guild_only()
