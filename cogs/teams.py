@@ -38,7 +38,7 @@ from discord.ext import commands
 
 from utils import assertion
 from utils.bases.cog import BaseCog
-from utils.time import EstTimeTransformer
+from utils.time import TimeTransformer
 from utils.errors import BadArgument
 
 if TYPE_CHECKING:
@@ -627,7 +627,7 @@ class Teams(BaseCog):
         interaction: discord.Interaction,
         away_team: FRONT_END_TEAM_TRANSFORM,
         per_team: app_commands.Range[int, 1, 10],
-        when: app_commands.Transform[EstTimeTransformer, EstTimeTransformer(default='[NO REASON GIVEN]')],
+        when: app_commands.Transform[TimeTransformer, TimeTransformer(default='[NO REASON GIVEN]')],
     ) -> Optional[discord.InteractionMessage]:
         assert when.dt
         assert interaction.guild
