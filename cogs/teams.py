@@ -145,14 +145,14 @@ class ConfirmAnywaysView(discord.ui.View):
     async def confirm_anyways(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         self.confirmed_voters.append(interaction.user.id)
 
+        await interaction.response.edit_message(embed=self.embed, view=self)
+
         async with self.parent.bot.safe_connection() as connection:
             await connection.execute(
                 'UPDATE teams.scrims SET away_confirm_anyways = ARRAY_APPEND(away_confirm_anyways, $1) WHERE id = $2',
                 interaction.user.id,
                 self.parent.scrim_id,
             )
-
-        await interaction.response.edit_message(embed=self.embed, view=self)
 
         if len(self.confirmed_voters) == len(self.voters):
             await interaction.delete_original_response()
@@ -431,6 +431,8 @@ class ScrimConfirmation(discord.ui.View):
 
         self.votes.append(interaction.user.id)
 
+        await interaction.response.edit_message(embed=self.embed, view=self)
+
         async with self.bot.safe_connection() as connection:
             if self.type is ScrimStatus.pending_host:
                 await connection.execute(
@@ -446,8 +448,6 @@ class ScrimConfirmation(discord.ui.View):
                     self.scrim_id,
                 )
 
-        await interaction.response.edit_message(embed=self.embed, view=self)
-
         if len(self.votes) == self.per_team:
             await self.handle_team_full(interaction)
 
@@ -457,6 +457,8 @@ class ScrimConfirmation(discord.ui.View):
             return await interaction.response.send_message('You haven\'t confirmed yet!', ephemeral=True)
 
         self.votes.remove(interaction.user.id)
+
+        await interaction.response.edit_message(embed=self.embed, view=self)
 
         async with self.bot.safe_connection() as connection:
             if self.type is ScrimStatus.pending_host:
@@ -472,8 +474,6 @@ class ScrimConfirmation(discord.ui.View):
                     interaction.user.id,
                     self.scrim_id,
                 )
-
-        await interaction.response.edit_message(embed=self.embed, view=self)
 
 
 class ScrimConverter(app_commands.Transformer):
