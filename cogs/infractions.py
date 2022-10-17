@@ -317,7 +317,7 @@ class Infractions(BaseCog):
     @app_commands.describe(link='The link to remove.')
     async def infraction_allowed_link_remove(self, interaction: discord.Interaction, link: str) -> None:
         assert interaction.guild
-        
+
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 """

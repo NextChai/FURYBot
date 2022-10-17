@@ -8,28 +8,19 @@ parsedatetime/context.py
 Context related classes
 
 """
+
 class pdtContextStack:
     """
     A thread-safe stack to store context(s)
 
     Internally used by L{Calendar} object
     """
-    def __init__(self) -> None:
-        ...
-    
-    def push(self, ctx): # -> None:
-        ...
-    
-    def pop(self): # -> Any | None:
-        ...
-    
-    def last(self): # -> Any:
-        ...
-    
-    def isEmpty(self): # -> bool:
-        ...
-    
 
+    def __init__(self) -> None: ...
+    def push(self, ctx): ...
+    def pop(self): ...
+    def last(self): ...
+    def isEmpty(self): ...
 
 class pdtContext:
     """
@@ -48,6 +39,7 @@ class pdtContext:
         ACU_NOW - "now"
 
     """
+
     __slots__ = ...
     ACU_YEAR = ...
     ACU_MONTH = ...
@@ -73,52 +65,39 @@ class pdtContext:
         @return: L{pdtContext} instance
         """
         ...
-    
-    def updateAccuracy(self, *accuracy): # -> None:
+    def updateAccuracy(self, *accuracy):  # -> None:
         """
         Updates current accuracy flag
         """
         ...
-    
-    def update(self, context): # -> None:
+    def update(self, context):  # -> None:
         """
         Uses another L{pdtContext} instance to update current one
         """
         ...
-    
     @property
-    def hasDate(self): # -> bool:
+    def hasDate(self):  # -> bool:
         """
         Returns True if current context is accurate to date
         """
         ...
-    
     @property
-    def hasTime(self): # -> bool:
+    def hasTime(self):  # -> bool:
         """
         Returns True if current context is accurate to time
         """
         ...
-    
     @property
-    def dateTimeFlag(self): # -> int:
+    def dateTimeFlag(self):  # -> int:
         """
         Returns the old date/time flag code
         """
         ...
-    
     @property
-    def hasDateOrTime(self): # -> bool:
+    def hasDateOrTime(self):  # -> bool:
         """
         Returns True if current context is accurate to date/time
         """
         ...
-    
-    def __repr__(self): # -> str:
-        ...
-    
-    def __eq__(self, ctx) -> bool:
-        ...
-    
-
-
+    def __repr__(self): ...
+    def __eq__(self, ctx) -> bool: ...

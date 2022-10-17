@@ -23,29 +23,5 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import Any, Type, TypeVar, cast
-
-
-T = TypeVar('T')
-
-
-def assertion(obj: Any, type: Type[T]) -> T:
-    """Allows you to assert return the type of an object.
-
-    Useful when dealing with :meth:`Bot.get_channel` and want
-    to return a :class:`discord.TextChannel` without using assert
-    every time.
-
-    Parameters
-    ----------
-    obj: Any
-        The obj to return.
-    type: Type[T]
-        The type of the obj.
-
-    Returns
-    -------
-    T
-        The type of the obj.
-    """
-    return cast(type, obj)
+from .persistent import *
+from .scrim import *

@@ -29,10 +29,13 @@ CREATE SCHEMA teams;
 
 CREATE TABLE IF NOT EXISTS teams.settings (
     id SERIAL PRIMARY KEY,
-    category_id BIGINT,
-    channels BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
+    guild_id BIGINT,
+    category_channel_id BIGINT,
+    text_channel_id BIGINT,
+    voice_channel_id BIGINT,
+    extra_channel_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
     name TEXT UNIQUE,
-    captain_roles BIGINT [] DEFAULT ARRAY [] :: BIGINT []
+    captain_role_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT []
 );
 
 CREATE TABLE IF NOT EXISTS teams.members (
@@ -44,7 +47,7 @@ CREATE TABLE IF NOT EXISTS teams.members (
 -- pending_scrimer: Pending for scrimmer to confirm
 -- pending_host: Pending for host to confirm
 -- scheduled: Scirm has been scheduled.
-CREATE TYPE scrim_status AS ENUM ('pending_scrimer', 'scheduled', 'pending_host');
+CREATE TYPE scrim_status AS ENUM ('pending_away', 'scheduled', 'pending_home');
 
 CREATE TABLE IF NOT EXISTS teams.scrims (
     id SERIAL PRIMARY KEY,
@@ -56,12 +59,12 @@ CREATE TABLE IF NOT EXISTS teams.scrims (
     home_message_id BIGINT,
     away_message_id BIGINT,
     status scrim_status,
-    home_votes BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
-    away_votes BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
-    away_confirm_anyways BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
+    home_voter_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
+    away_voter_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
+    away_confirm_anyways_voter_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
     away_confirm_anyways_message_id BIGINT,
     scheduled_for TIMESTAMP WITH TIME ZONE,
-    scrim_chat BIGINT -- Can be None
+    scrim_chat_id BIGINT -- Can be None
 );
 
 CREATE TABLE IF NOT EXISTS timers(

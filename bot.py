@@ -49,7 +49,8 @@ import discord
 from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
-from cogs.teams import ScrimConfirmation, ScrimStatus
+from cogs.teams.scrim import Scrim
+from cogs.teams.team import Team
 from utils import assertion
 from utils.error_handler import ErrorHandler
 from utils.link import LinkFilter
@@ -184,7 +185,8 @@ class FuryBot(commands.Bot):
 
         self.link_filter: LinkFilter = LinkFilter(self)
 
-        self.team_cache: Dict[int, asyncpg.Record] = {}
+        self.team_cache: Dict[int, Team] = {}
+        self.team_scrim_cache: Dict[int, Scrim] = {}
 
         super().__init__(
             command_prefix='fury.',
@@ -269,43 +271,11 @@ class FuryBot(commands.Bot):
 
         async with self.safe_connection() as connection:
             data = await connection.fetch('SELECT * FROM teams.settings')
-            self.team_cache = {entry['id']: entry for entry in data}
 
-            data = await connection.fetch('SELECT * FROM teams.scrims')
-            for entry in data:
-                status = ScrimStatus(entry['status'])
-                if status is ScrimStatus.pending_host:
-                    members = await connection.fetch('SELECT * FROM teams.members WHERE team_id = $1', entry['home_id'])
+            self.team_cache = {entry['id']: Team(self, **dict(entry)) for entry in data}
 
-                    view = ScrimConfirmation(
-                        self,
-                        status,
-                        entry['per_team'],
-                        when=entry['scheduled_for'],
-                        voter=self.team_cache[entry['home_id']],
-                        opposing=self.team_cache[entry['away_id']],
-                        members=[e['member_id'] for e in members],
-                        votes=entry['home_votes'],
-                        opposing_votes=entry['away_votes'],
-                    )
-                    self.create_task(view._load_attributes(entry['id']))
-                    self.add_view(view, message_id=entry['home_message_id'])
-                elif status is ScrimStatus.pending_scrimmer:
-                    members = await connection.fetch('SELECT * FROM teams.members WHERE team_id = $1', entry['away_id'])
-
-                    view = ScrimConfirmation(
-                        self,
-                        status,
-                        entry['per_team'],
-                        when=entry['scheduled_for'],
-                        voter=self.team_cache[entry['away_id']],
-                        opposing=self.team_cache[entry['home_id']],
-                        members=[e['member_id'] for e in members],
-                        votes=entry['away_votes'],
-                        opposing_votes=entry['home_votes'],
-                    )
-                    self.create_task(view._load_attributes(entry['id']))
-                    self.add_view(view, message_id=entry['away_message_id'])
+            scrim_records = await connection.fetch('SELECT * FROM teams.scrims')
+            self.team_scrim_cache = {entry['id']: Scrim(self, **dict(entry)) for entry in scrim_records}
 
     # Events
     async def on_ready(self) -> None:

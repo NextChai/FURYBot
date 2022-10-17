@@ -34,7 +34,7 @@ import discord
 from .errors import TimerNotFound
 
 if TYPE_CHECKING:
-    from bot import FuryBot, ConnectionType
+    from bot import ConnectionType, FuryBot
 
 
 if TYPE_CHECKING:
