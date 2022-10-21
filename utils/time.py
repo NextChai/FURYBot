@@ -82,7 +82,7 @@ class ShortTime:
     def __init__(self, argument: str) -> None:
         match = self.compiled.fullmatch(argument)
         if match is None or not match.group(0):
-            raise BadArgument(None, 'invalid time provided')  # type: ignore
+            raise BadArgument('invalid time provided')
 
         data = {k: int(v) for k, v in match.groupdict(default=0).items()}
         now = datetime.datetime.now(pytz.timezone('US/Eastern'))
@@ -136,7 +136,7 @@ class HumanTime:
         now = now or datetime.datetime.utcnow()
         dt, status = self.calendar.parseDT(argument, sourceTime=now)
         if not status.hasDateOrTime:
-            raise BadArgument(None, 'invalid time provided, try e.g. "tomorrow" or "3 days"', tzinfo=pytz.timezone('US/Eastern'))  # type: ignore
+            raise BadArgument('invalid time provided, try e.g. "tomorrow" or "3 days"', tzinfo=pytz.timezone('US/Eastern'))
 
         if not status.hasTime:
             # replace it with the current time
@@ -243,10 +243,10 @@ class TimeTransformer(app_commands.Transformer):
         assert self.dt is not None
 
         if self.dt < now:
-            raise BadArgument(interaction, 'This time is in the past.')
+            raise BadArgument('This time is in the past.')
 
         if not remaining and not self.default:
-            raise BadArgument(interaction, 'Missing argument after the time.')
+            raise BadArgument('Missing argument after the time.')
 
         self.arg = remaining or self.default
         return self
@@ -292,15 +292,15 @@ class TimeTransformer(app_commands.Transformer):
 
         elements = calendar.nlp(value, sourceTime=now)
         if elements is None or len(elements) == 0:
-            raise BadArgument(interaction, 'Invalid time provided, try e.g. "tomorrow" or "3 days".')
+            raise BadArgument('Invalid time provided, try e.g. "tomorrow" or "3 days".')
 
         dt, status, begin, end, _ = elements[0]
 
         if not status.hasDateOrTime:
-            raise BadArgument(interaction, 'Invalid time provided, try e.g. "tomorrow" or "3 days".')
+            raise BadArgument('Invalid time provided, try e.g. "tomorrow" or "3 days".')
 
         if begin not in (0, 1) and end != len(value):
-            raise BadArgument(interaction, 'I\'m so sorry but I didn\'t understand this time!')
+            raise BadArgument('I\'m so sorry but I didn\'t understand this time!')
 
         if not status.hasTime:
             dt = dt.replace(hour=now.hour, minute=now.minute, second=now.second, microsecond=now.microsecond)
@@ -313,10 +313,10 @@ class TimeTransformer(app_commands.Transformer):
         if begin in (0, 1):
             if begin == 1:
                 if value[0] != '"':
-                    raise BadArgument(interaction, 'Expected quote before time input...')
+                    raise BadArgument('Expected quote before time input...')
 
                 if not (end < len(value) and value[end] == '"'):
-                    raise BadArgument(interaction, 'If the time is quoted, you must unquote it.')
+                    raise BadArgument('If the time is quoted, you must unquote it.')
 
                 remaining = value[end + 1 :].lstrip(' ,.!')
             else:
@@ -324,13 +324,6 @@ class TimeTransformer(app_commands.Transformer):
         elif len(value) == end:
             remaining = value[:begin].strip()
         else:
-            raise BadArgument(interaction, 'I\'m so sorry but I didn\'t understand this time!')
+            raise BadArgument('I\'m so sorry but I didn\'t understand this time!')
 
         return await result._check_constraints(interaction, now, remaining)
-
-
-class EstTimeTransformer(TimeTransformer):
-    async def _check_constraints(self, interaction: discord.Interaction, now: datetime.datetime, remaining: str) -> Self:
-        assert self.dt
-        self.dt += datetime.timedelta(hours=4)
-        return await super()._check_constraints(interaction, now, remaining)

@@ -26,9 +26,13 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import enum
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, cast, Type
+from typing_extensions import Self
 
 import discord
+
+from utils.query import MiniQueryBuilder
+from .persistent import HomeConfirm, AwayConfirm
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -109,6 +113,55 @@ class Scrim:
     scheduled_for: datetime.datetime
     scrim_chat_id: Optional[int]
 
+    @classmethod
+    async def create(
+        cls: Type[Self],
+        when: datetime.datetime,
+        /,
+        *,
+        home_team: Team,
+        away_team: Team,
+        per_team: int,
+        creator_id: int,
+        bot: FuryBot,
+    ) -> Self:
+        # Let's create the home message
+        status = ScrimStatus.pending_host
+
+        async with bot.safe_connection() as connection:
+            data = await connection.fetchrow(
+                'INSERT INTO teams.scrims(guild_id, creator_id, per_team, home_id, away_id, status, scheduled_for) '
+                'VALUES ($1, $2, $3, $4, $5, $6, $7) '
+                'RETURNING *',
+                home_team.guild_id,
+                creator_id,
+                per_team,
+                home_team.id,
+                away_team.id,
+                status.value,
+                when,
+            )
+            assert data
+
+            clean = dict(data)
+            clean['status'] = status  # Fix the status
+
+            scrim: Self = cls(bot, **clean)
+
+            # Now send the home message
+            home_channel = home_team.text_channel
+            view = HomeConfirm(scrim)
+
+            message = await home_channel.send(
+                embed=view.embed, view=view, content='@everyone', allowed_mentions=discord.AllowedMentions(everyone=True)
+            )
+
+            scrim.home_message_id = message.id
+
+            await connection.execute('UPDATE teams.scrims SET home_message_id = $1 WHERE id = $2', message.id, scrim.id)
+
+        return scrim
+
     @property
     def home_team(self) -> Team:
         """:class:`Team`: The home team."""
@@ -120,9 +173,9 @@ class Scrim:
         return self.bot.team_cache[self.away_id]
 
     @property
-    def guild(self) -> Optional[discord.Guild]:
+    def guild(self) -> discord.Guild:
         """Optional[:class:`discord.Guild`]: The guild the scrim is in. Can be None if the guild is not found."""
-        return self.bot.get_guild(self.guild_id)
+        return cast(discord.Guild, self.bot.get_guild(self.guild_id))
 
     @property
     def home_voters(self) -> List[TeamMember]:
@@ -167,6 +220,14 @@ class Scrim:
         """:class:`bool`: Whether the away team has all voted."""
         return len(self.away_voter_ids) >= self.per_team
 
+    @property
+    def scrim_chat(self) -> Optional[discord.TextChannel]:
+        """Optional[:class:`discord.TextChannel`]: The scrim chat. Can be None if the channel is not found."""
+        if not self.scrim_chat_id:
+            return None
+
+        return cast(discord.TextChannel, self.guild.get_channel(self.scrim_chat_id))
+
     def scheduled_for_formatted(self) -> str:
         """:class:`str`: The time the scrim is scheduled for in a human readable format."""
         return f'{discord.utils.format_dt(self.scheduled_for, "F")} ({discord.utils.format_dt(self.scheduled_for, "R")})'
@@ -194,6 +255,13 @@ class Scrim:
 
         channel = self.away_team.text_channel
         return await channel.fetch_message(self.away_message_id)
+
+    async def away_confirm_anyways_message(self) -> Optional[discord.Message]:
+        if not self.away_confirm_anyways_message_id:
+            return
+
+        channel = self.away_team.text_channel
+        return await channel.fetch_message(self.away_confirm_anyways_message_id)
 
     async def change_status(self, status: ScrimStatus, /) -> None:
         """|coro|
@@ -282,7 +350,65 @@ class Scrim:
                 f'UPADTE teams.scrims SET {column} = array_remove({column}, $1) WHERE id = $2', member_id, self.id
             )
 
-    async def reschedle(self) -> None:
-        # NOTE: Maybe restart the voting for the other team as they'll need
-        # to all confirm.
-        ...
+    async def reschedle(self, when: datetime.datetime, *, editor: discord.abc.User) -> None:
+        # Let's update the scrim's messages from the old time to the new time and update the scrim
+        builder = MiniQueryBuilder('teams.scrims')
+        builder.add_arg('scheduled_for', when)
+        builder.add_condition('id', self.id)
+        await builder(self.bot)
+
+        self.scheduled_for = when
+
+        # Now let's update the messages, if any
+        home_message = await self.home_message()
+        view = HomeConfirm(self)
+        await home_message.edit(embed=view.embed)
+        await home_message.reply(
+            content=f'@everyone, this scrim has been rescheduled by {editor.mention}',
+            allowed_mentions=discord.AllowedMentions(everyone=True, users=False),
+        )
+
+        # Check for an away message, if any
+        away_message = await self.away_message()
+        if away_message is not None:
+            view = AwayConfirm(self)
+            await away_message.edit(embed=view.embed)
+            await away_message.reply(
+                content=f'@everyone, this scrim has been rescheduled by a moderator.',
+                allowed_mentions=discord.AllowedMentions(everyone=True, users=False),
+            )
+
+    async def cancel(self) -> None:
+        async with self.bot.safe_connection() as connection:
+            await connection.execute('DELETE FROM teams.scrims WHERE id = $1', self.id)
+
+        embed = self.bot.Embed(
+            title='Scrim Cancelled',
+            description=f'The scrim scheduled for {self.scheduled_for_formatted()} has been cancelled by a moderator.',
+        )
+        embed.set_footer(text='This scrim has been cancelled.')
+
+        home_message = await self.home_message()
+        await home_message.edit(embed=embed, view=None)
+        await home_message.reply(
+            '@everyone, this scrim has been cancelled by a moderator.',
+            allowed_mentions=discord.AllowedMentions(everyone=True),
+        )
+
+        away_message = await self.away_message()
+        if away_message is not None:
+            await away_message.edit(embed=embed, view=None)
+            await away_message.reply(
+                '@everyone, this scrim has been cancelled by a moderator.',
+                allowed_mentions=discord.AllowedMentions(everyone=True),
+            )
+
+        away_confirm_anyways = await self.away_confirm_anyways_message()
+        if away_confirm_anyways is not None:
+            await away_confirm_anyways.delete()
+
+        chat = self.scrim_chat
+        if chat is not None:
+            await chat.delete()
+
+        # NOTE: Need to add timer deletion here

@@ -30,6 +30,8 @@ from typing import TYPE_CHECKING, Any, Optional, Union, List, cast, Mapping
 import discord
 from discord import app_commands
 
+from utils.errors import AutocompleteValidationException
+
 if TYPE_CHECKING:
     from bot import FuryBot
     from .team import Team
@@ -100,9 +102,18 @@ class TeamTransformer(app_commands.Transformer):
 
     async def transform(self, interaction: discord.Interaction, value: Any, /) -> Team:
         teams = await self._get_available_teams(interaction, None)
-        
+
         if not value.isdigit():
             # We have an idiot on our hands who didnt select one
-            # of the options... bruh
-            # Check by name now.
-            
+            # of the options... bruh. Check by name now.
+            maybe_team = discord.utils.find(lambda team: team.name.lower() == value.lower(), teams)
+            if maybe_team:
+                return maybe_team
+
+            raise AutocompleteValidationException("You must select a team from the list.")
+
+        maybe_team = discord.utils.find(lambda team: team.id == int(value), teams)
+        if not maybe_team:
+            raise AutocompleteValidationException("You must select a team from the list.")
+
+        return maybe_team

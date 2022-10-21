@@ -23,4 +23,19 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+from typing import Mapping, Type, Union
+import discord
+
 RULES_CHANNEL_ID: int = 763418952243347467
+
+TEXT_CHANNEL_EMOJI: str = '<:text:1033064232767467560> '
+VOICE_CHANNEL_EMOJI: str = '<:voice:1033064208457285784>'
+THREAD_CHANNEL_EMOJI: str = '<:thread:1033064225133822073>'
+CATEGORY_CHANNEL_EMOJI: str = '<:category:1033064217336615004> '
+
+CHANNEL_EMOJI_MAPPING: Mapping[Type[Union[discord.abc.GuildChannel, discord.Thread]], str] = {
+    discord.TextChannel: TEXT_CHANNEL_EMOJI,
+    discord.VoiceChannel: VOICE_CHANNEL_EMOJI,
+    discord.CategoryChannel: CATEGORY_CHANNEL_EMOJI,
+    discord.Thread: THREAD_CHANNEL_EMOJI,
+}

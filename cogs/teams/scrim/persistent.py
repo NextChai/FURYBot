@@ -119,7 +119,7 @@ class HomeConfirm(discord.ui.View):
         raise Exception('Unknown scrim status.')
 
     async def interaction_check(self, interaction: discord.Interaction) -> Optional[bool]:
-        members = await self.scrim.home_team.fetch_team_members()
+        members = self.scrim.home_team.team_members
         if interaction.user.id not in members:
             return await interaction.response.send_message(
                 'Hey, you aren\'t on this team so you can\'t vote!', ephemeral=True
@@ -177,7 +177,7 @@ class AwayForceConfirm(discord.ui.View):
         self.required_to_confirm = self.scrim.per_team // 2
 
     async def interaction_check(self, interaction: discord.Interaction) -> Optional[bool]:
-        members = await self.scrim.away_team.fetch_team_members()
+        members = self.scrim.away_team.team_members
         if interaction.user.id not in members:
             return await interaction.response.send_message(
                 'Hey, you aren\'t on this team so you can\'t vote!', ephemeral=True
@@ -320,7 +320,7 @@ class AwayConfirm(discord.ui.View):
         raise Exception('Unknown scrim status provided')
 
     async def interaction_check(self, interaction: discord.Interaction) -> Optional[bool]:
-        members = await self.scrim.away_team.fetch_team_members()
+        members = self.scrim.away_team.team_members
         if interaction.user.id not in members:
             return await interaction.response.send_message(
                 'Hey, you aren\'t on this team so you can\'t vote!', ephemeral=True

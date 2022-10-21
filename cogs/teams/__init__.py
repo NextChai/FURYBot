@@ -23,88 +23,29 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import difflib
-from typing import TYPE_CHECKING, Any, List, Optional, TypeAlias, Union
+from typing import TYPE_CHECKING, TypeAlias
 
 import discord
 from discord import app_commands
 
 from utils.bases.cog import BaseCog
-from utils.errors import BadArgument
+from utils.time import TimeTransformer
 
 from .team import Team
+from .views import TeamView
+from .scrim import Scrim
+from .transformers import TeamTransformer
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
 
-class TeamTransformer(app_commands.Transformer):
-    def __init__(self, /, *, lock_team_type: Optional[bool] = None) -> None:
-        self.lock_team_type: Optional[bool] = lock_team_type
-
-    def _get_similar_teams(self, bot: FuryBot, channel_id: int) -> List[Team]:
-        # Find the team first
-        team = discord.utils.get(bot.team_cache.values(), text_channel_id=channel_id)
-        if team is None:
-            return []
-
-        teams: List[Team] = []
-        name = [e.lower() for e in team.name.split(' ')[:-1]]
-        for local_team in bot.team_cache.values():
-            c_name = [e.lower() for e in local_team.name.split(' ')[:-1]]
-            if c_name == name and local_team is not team:
-                teams.append(local_team)
-
-        return teams
-
-    async def autocomplete(
-        self, interaction: discord.Interaction, value: Union[int, float, str], /
-    ) -> List[app_commands.Choice[Union[int, float, str]]]:
-        assert interaction.channel
-
-        bot: FuryBot = interaction.client  # type: ignore
-
-        team_mapping = {
-            team.name: team
-            for team in (
-                self._get_similar_teams(bot, interaction.channel.id) if self.lock_team_type else bot.team_cache.values()
-            )
-        }
-
-        if not team_mapping:
-            return []
-
-        if not value or self.lock_team_type:
-            return [app_commands.Choice(name=team.name, value=str(team.id)) for team in team_mapping.values()]
-
-        similar: List[str] = await bot.wrap(difflib.get_close_matches, str(value), team_mapping.keys(), n=20)  # type: ignore
-
-        first = similar[0]
-        first_team = team_mapping[first]
-        if first == first_team.name:
-            return [app_commands.Choice(name=first_team.name, value=str(first_team.id))]
-
-        return [app_commands.Choice(name=team_mapping[entry].name, value=str(team_mapping[entry].id)) for entry in similar]
-
-    async def transform(self, interaction: discord.Interaction, value: Any, /) -> Team:
-        bot: FuryBot = interaction.client  # type: ignore
-
-        if not value.isdigit():
-            # Try and locate from name
-            for team in bot.team_cache.values():
-                if team.name.lower() == value.lower():
-                    return team
-
-            raise BadArgument(interaction, 'You did not select one of the team options.')
-
-        return bot.team_cache[int(value)]
-
-
 TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer]
-FRONT_END_TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(lock_team_type=True)]
+FRONT_END_TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=True)]
 
 
 class Teams(BaseCog):
+    """A cog to manage teams and allow teams to create scrims and find subs."""
 
     team = app_commands.Group(
         name='team',
@@ -117,6 +58,91 @@ class Teams(BaseCog):
     team_captains = app_commands.Group(name='captains', description='Manage team captainis.', parent=team)
 
     scrim = app_commands.Group(name='scrim', description='Create and manage scrims.', guild_only=True)
+    subs = app_commands.Group(name='subs', description='Find a sub for your games.', guild_only=True)
+
+    @team.command(name='create', description='Create a team.')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(name='The name of the team.')
+    async def team_create(self, interaction: discord.Interaction, name: str) -> discord.InteractionMessage:
+        """|coro|
+
+        Create a team.
+
+        Parameters
+        ----------
+        name: :class:`str`
+            The name of the team.
+        """
+        assert interaction.guild
+
+        await interaction.response.defer()
+
+        team = await Team.create(name, guild=interaction.guild, bot=self.bot)
+        view = TeamView(team, target=interaction)
+        return await interaction.edit_original_response(embed=view.embed, view=view)
+
+    @team.command(name='manage', description='Manage a team. Assign members, subs, captains, scrims, etc.')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(team='The team you want to manage.')
+    async def team_manage(self, interaction: discord.Interaction, team: TEAM_TRANSFORM) -> discord.InteractionMessage:
+        """|coro|
+
+        A command used to manage a team. This will launch an depth view in which you can manage the team.
+
+        Use this command to add subs, remove subs, add members, remove members, create extra channels, assign captain roles,
+        etc.
+
+        Parameters
+        ----------
+        team: :class:`Team`
+            The team you want to manage.
+        """
+        await interaction.response.defer()
+
+        view = TeamView(team, target=interaction)
+        return await interaction.edit_original_response(embed=view.embed, view=view)
+
+    @scrim.command(name='create', description='Create a scrim')
+    @app_commands.describe(
+        team='The team you want to scrim against.',
+        when='When you want to scrim the other team. For ex: "Tomorrow at 4pm", "Next tuesday at 12pm", etc.',
+        per_team='The amount of players per team. For ex: 5, 3, 2, etc.',
+    )
+    async def scrim_create(
+        self,
+        interaction: discord.Interaction,
+        team: FRONT_END_TEAM_TRANSFORM,
+        when: TimeTransformer,
+        per_team: app_commands.Range[int, 2, 10],
+    ) -> discord.InteractionMessage:
+        """|coro|
+
+        A command used to create a scrim.
+
+        Parameters
+        ----------
+        team: :class:`Team`
+            The team you want to scrim against.
+        when: :class:`TimeTransformer`
+            When you want to scrim the other team. For ex: "Tomorrow at 4pm", "Next tuesday at 12pm", etc.
+        per_team: :class:`int`
+            The amount of players per team. For ex: 5, 3, 2, etc.
+        """
+        assert isinstance(interaction.channel, (discord.abc.GuildChannel, discord.Thread))
+        assert interaction.channel.category
+        assert when.dt
+
+        await interaction.response.defer(ephemeral=True)
+
+        home_team = Team.from_category(interaction.channel.category.id, bot=self.bot)
+
+        scrim = await Scrim.create(
+            when.dt, home_team=home_team, away_team=team, per_team=per_team, creator_id=interaction.user.id, bot=self.bot
+        )
+
+        return await interaction.edit_original_response(
+            content=f'A scrim for {scrim.scheduled_for_formatted()} has been created against {team.name}).'
+        )
 
 
 async def setup(bot: FuryBot) -> None:

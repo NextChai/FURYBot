@@ -1,6 +1,5 @@
 from typing import Any, Tuple
 
-import discord
 from discord import app_commands
 
 
@@ -24,8 +23,7 @@ class ApplicationCommandException(app_commands.AppCommandError):
 
     __slots__: Tuple[str, ...] = ()
 
-    def __init__(self, interaction: discord.Interaction, *args: Any, **kwargs: Any) -> None:
-        self.interaction: discord.Interaction = interaction
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 

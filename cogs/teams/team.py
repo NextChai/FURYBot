@@ -25,14 +25,20 @@ from __future__ import annotations
 
 import dataclasses
 from typing import TYPE_CHECKING, Dict, List, Optional, cast, Type
-from typing_extensions import Self
+from typing_extensions import Self, TypeVarTuple
 
 import discord
+
+from utils.query import MiniQueryBuilder
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
     from .scrim import Scrim
+
+Ts = TypeVarTuple("Ts")
+
+MISSING = discord.utils.MISSING
 
 
 @dataclasses.dataclass(init=True, repr=True, eq=True)
@@ -74,25 +80,7 @@ class TeamMember:
         return f'<@{self.member_id}>'
 
     async def remove_from_team(self) -> None:
-        """|coro|
-
-        A method used to remove this member from its team.
-        """
-        async with self.bot.safe_connection() as connection:
-            await connection.execute(
-                'DELETE FROM teams.members WHERE team_id = $1 AND member_id = $2', self.team_id, self.member_id
-            )
-
-        member = self.member or await self.fetch_member()
-
-        team = self.team
-        category = team.category_channel
-        overwrites = category.overwrites
-        overwrites.pop(member, None)
-        await category.edit(overwrites=overwrites)
-
-        # Update the object
-        self.team.team_members.pop(self.member_id, None)
+        return await self.team.remove_team_member(self)
 
     async def demote(self) -> None:
         """|coro|
@@ -189,6 +177,9 @@ class Team:
     captain_role_ids: List[int]
     extra_channel_ids: List[int]
     team_members: Dict[int, TeamMember]
+    nickname: Optional[str]
+    description: Optional[str]
+    logo: Optional[str]
 
     @classmethod
     def from_category(cls, category_channel_id: int, /, *, bot: FuryBot) -> Team:
@@ -250,6 +241,44 @@ class Team:
 
         return team
 
+    @classmethod
+    async def create(cls: Type[Self], name: str, /, *, guild: discord.Guild, bot: FuryBot) -> Self:
+        """|coro|
+
+        Used to create a new team.
+
+        Parameters
+        ----------
+        name: :class:`str`
+            The name of the team.
+        guild: :class:`discord.Guild`
+            The guild the team is being created in.
+        bot: :class:`FuryBot`
+            The bot instance.
+        """
+        category = await guild.create_category(
+            name=name, overwrites={guild.default_role: discord.PermissionOverwrite(read_messages=False)}
+        )
+        text_channel = await guild.create_text_channel(name='team-chat', category=category)
+        voice_channel = await guild.create_voice_channel(name='Team Voice', category=category)
+
+        async with bot.safe_connection() as connection:
+            data = await connection.fetchrow(
+                'INSERT INTO teams.settings (guild_id, category_channel_id, text_channel_id, voice_channel_id, name) '
+                'VALUES($1, $2, $3, $4, $5) RETURNING *',
+                guild.id,
+                category.id,
+                text_channel.id,
+                voice_channel.id,
+                name,
+            )
+            assert data
+
+        team = cls(bot, **dict(data), team_members={})
+        bot.team_cache[team.id] = team
+
+        return team
+
     @property
     def guild(self) -> discord.Guild:
         """:class:`discord.Guild`: The guild this team is bound to."""
@@ -274,6 +303,11 @@ class Team:
         return cast(discord.CategoryChannel, guild.get_channel(self.category_channel_id))
 
     @property
+    def extra_channels(self) -> List[discord.abc.GuildChannel]:
+        guild = self.guild
+        return [cast(discord.abc.GuildChannel, guild.get_channel(channel_id)) for channel_id in self.extra_channel_ids]
+
+    @property
     def scrims(self) -> List[Scrim]:
         """List[:class:`Scrim`]: A list of all scrims this team has."""
         return [scrim for scrim in self.bot.team_scrim_cache.values() if scrim.home_id == self.id]
@@ -284,7 +318,7 @@ class Team:
         return [role for role_id in self.captain_role_ids if (role := guild.get_role(role_id))]
 
     def has_channel(self, channel: discord.abc.GuildChannel, /) -> bool:
-        return channel.id in [self.category_channel_id, self.text_channel_id, self.voice_channel_id]
+        return channel.id in [self.category_channel_id, self.text_channel_id, self.voice_channel_id] + self.extra_channel_ids
 
     async def add_team_member(self, member_id: int, is_sub: bool = False) -> TeamMember:
         """|coro|
@@ -323,6 +357,26 @@ class Team:
         await category.set_permissions(member, view_channel=True)
 
         return team_member
+
+    async def remove_team_member(self, team_member: TeamMember, /) -> None:
+        """|coro|
+
+        A method used to remove this member from its team.
+        """
+        async with self.bot.safe_connection() as connection:
+            await connection.execute(
+                'DELETE FROM teams.members WHERE team_id = $1 AND member_id = $2', self.id, team_member.member_id
+            )
+
+        member = team_member.member or await team_member.fetch_member()
+
+        category = self.category_channel
+        overwrites = category.overwrites
+        overwrites.pop(member, None)
+        await category.edit(overwrites=overwrites)
+
+        # Update the object
+        self.team_members.pop(team_member.member_id, None)
 
     async def add_captain(self, role_id: int, /) -> None:
         """|coro|
@@ -389,3 +443,75 @@ class Team:
         category = self.category_channel
         role = cast(discord.Role, self.guild.get_role(role_id))
         await category.set_permissions(role, view_channel=False)
+
+    async def edit(
+        self,
+        /,
+        *,
+        name: str = MISSING,
+        nickname: Optional[str] = MISSING,
+        description: Optional[str] = MISSING,
+        logo: Optional[str] = MISSING,
+        category_channel_id: int = MISSING,
+        text_channel_id: int = MISSING,
+        voice_channel_id: int = MISSING,
+        extra_channel_ids: List[int] = MISSING,
+    ) -> None:
+        """|coro|
+
+        Edit the team settings and update the team's values, such as name, description, logo, etc.
+
+        Any of these parameters can be omitted to not edit them. Any passed parameters will override
+        the current values.
+
+        Parameters
+        ----------
+        name: :class:`str`
+            The new name of the team.
+        description: :class:`str`
+            The new description of the team.
+        logo: :class:`str`
+            The new logo of the team.
+        category_channel_id: :class:`int`
+            Change the teams category channel id.
+        text_channel_id: :class:`int`
+            Change the teams text channel id.
+        voice_channel_id: :class:`int`
+            Change the teams voice channel id.
+        extra_channel_ids: List[:class:`int`]
+            Change the teams extra channel ids.
+
+        Returns
+        --------
+        None
+            When updated, the current instance is edited.
+        """
+        builder = MiniQueryBuilder('teams.settings')
+        builder.add_condition('id', self.id)
+
+        if name is not MISSING:
+            builder.add_arg('name', name)
+            self.name = name
+        if nickname is not MISSING:
+            builder.add_arg('nickname', nickname)
+            self.nickname = nickname
+        if description is not MISSING:
+            builder.add_arg('description', description)
+            self.description = description
+        if logo is not MISSING:
+            builder.add_arg('logo', logo)
+            self.logo = logo
+        if category_channel_id is not MISSING:
+            builder.add_arg('category_channel_id', category_channel_id)
+            self.category_channel_id = category_channel_id
+        if text_channel_id is not MISSING:
+            builder.add_arg('text_channel_id', text_channel_id)
+            self.text_channel_id = text_channel_id
+        if voice_channel_id is not MISSING:
+            builder.add_arg('voice_channel_id', voice_channel_id)
+            self.voice_channel_id = voice_channel_id
+        if extra_channel_ids is not MISSING:
+            builder.add_arg('extra_channel_ids', extra_channel_ids)
+            self.extra_channel_ids = extra_channel_ids
+
+        await builder(self.bot)

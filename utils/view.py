@@ -240,6 +240,11 @@ class BaseView(discord.ui.View, abc.ABC):
         """BaseViewKwargs: A helper to dump the view's create kwargs when creating a child view."""
         return {'target': self.target, 'timeout': self.timeout, 'parent': self}
 
+    def create_child(self, cls: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
+        """Creates a new instance of the view from the parent view."""
+        kwargs.update(self.dump_kwargs())
+        return cls(*args, **kwargs)
+
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """|coro|
 

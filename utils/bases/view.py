@@ -281,6 +281,23 @@ class BaseView(discord.ui.View, abc.ABC):
 
         return check
 
+    async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item[Self]) -> None:
+        """|coro|
+
+        Called when an error is raised within the view. This will log the error
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that was created by interacting with the view.
+        error: :class:`Exception`
+            The error that was raised.
+        item: :class:`discord.ui.Item`
+            The item that raised the error.
+        """
+        if self.bot.error_handler:
+            await self.bot.error_handler.log_error(error, origin=interaction)
+
 
 class PaginatorView(BaseView):
     """Represents a Paginator View. This class will wrap around a paginator

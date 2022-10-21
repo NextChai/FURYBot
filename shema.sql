@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS teams.settings (
     voice_channel_id BIGINT,
     extra_channel_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
     name TEXT UNIQUE,
+    nickname TEXT,
+    description TEXT,
+    logo TEXT,
     captain_role_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT []
 );
 
