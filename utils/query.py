@@ -23,7 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Tuple, List, Coroutine
+from typing import TYPE_CHECKING, Any, Coroutine, List, Tuple
 
 if TYPE_CHECKING:
     from bot import FuryBot

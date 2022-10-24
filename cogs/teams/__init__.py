@@ -31,10 +31,10 @@ from discord import app_commands
 from utils.bases.cog import BaseCog
 from utils.time import TimeTransformer
 
-from .team import Team
-from .views import TeamView
 from .scrim import Scrim
+from .team import Team
 from .transformers import TeamTransformer
+from .views import TeamView
 
 if TYPE_CHECKING:
     from bot import FuryBot

@@ -24,21 +24,22 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, cast, Any, Callable, Coroutine, List, Optional, TypeVar
-from typing_extensions import Unpack, Self
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, List, Optional, TypeVar, cast
 
 import discord
-from cogs.teams.scrim.persistent import AwayConfirm, HomeConfirm
+from typing_extensions import Self, Unpack
 
-from utils.view import BaseView, BaseViewKwargs
-from utils.time import TimeTransformer
+from cogs.teams.scrim.persistent import AwayConfirm, HomeConfirm
 from utils.constants import CHANNEL_EMOJI_MAPPING
-from .ui_kit import BasicInputModal, AutoRemoveSelect
+from utils.time import TimeTransformer
+from utils.view import BaseView, BaseViewKwargs
+
 from .scrim import ScrimStatus
+from .ui_kit import AutoRemoveSelect, BasicInputModal
 
 if TYPE_CHECKING:
-    from .team import Team, TeamMember
     from .scrim import Scrim
+    from .team import Team, TeamMember
 
 BV = TypeVar('BV', bound='BaseView')
 ButtonCallback = Callable[[BV, discord.Interaction, discord.ui.Button[BV]], Coroutine[Any, Any, Any]]

@@ -24,10 +24,10 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING, Dict, List, Optional, cast, Type
-from typing_extensions import Self, TypeVarTuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Type, cast
 
 import discord
+from typing_extensions import Self, TypeVarTuple
 
 from utils.query import MiniQueryBuilder
 

@@ -26,13 +26,14 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import enum
-from typing import TYPE_CHECKING, List, Optional, cast, Type
-from typing_extensions import Self
+from typing import TYPE_CHECKING, List, Optional, Type, cast
 
 import discord
+from typing_extensions import Self
 
 from utils.query import MiniQueryBuilder
-from .persistent import HomeConfirm, AwayConfirm
+
+from .persistent import AwayConfirm, HomeConfirm
 
 if TYPE_CHECKING:
     from bot import FuryBot

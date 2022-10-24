@@ -24,6 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 from typing import Mapping, Type, Union
+
 import discord
 
 RULES_CHANNEL_ID: int = 763418952243347467

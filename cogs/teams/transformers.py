@@ -23,9 +23,9 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import difflib
 import dataclasses
-from typing import TYPE_CHECKING, Any, Optional, Union, List, cast, Mapping
+import difflib
+from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Union, cast
 
 import discord
 from discord import app_commands
@@ -34,6 +34,7 @@ from utils.errors import AutocompleteValidationException
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
     from .team import Team
 
 

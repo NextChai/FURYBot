@@ -23,11 +23,11 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Coroutine, Generic, Tuple, Callable
-from typing_extensions import TypeVarTuple, Unpack, Self
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Generic, Tuple
 
 import discord
 from discord.ui.select import BaseSelect, BaseSelectT
+from typing_extensions import Self, TypeVarTuple, Unpack
 
 if TYPE_CHECKING:
     from utils.view import BaseView
