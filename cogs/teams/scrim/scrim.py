@@ -126,6 +126,10 @@ class Scrim:
         creator_id: int,
         bot: FuryBot,
     ) -> Self:
+        raise NotImplemented
+
+        # NOTE: Need to add timer making
+
         # Let's create the home message
         status = ScrimStatus.pending_host
 
