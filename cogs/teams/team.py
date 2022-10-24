@@ -319,7 +319,7 @@ class Team:
 
     def has_channel(self, channel: discord.abc.GuildChannel, /) -> bool:
         return channel.id in [self.category_channel_id, self.text_channel_id, self.voice_channel_id] + self.extra_channel_ids
-    
+
     def get_member(self, member_id: int, /) -> Optional[TeamMember]:
         return self.team_members.get(member_id)
 
