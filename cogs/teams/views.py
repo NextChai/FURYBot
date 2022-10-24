@@ -752,6 +752,17 @@ class TeamView(BaseView):
         embed.set_footer(text=f'Team ID: {self.team.id}')
         return embed
 
+    async def _delete_team_after(
+        self, modal: BasicInputModal[discord.ui.TextInput[Any]], interaction: discord.Interaction
+    ) -> None:
+        value = modal.children[0].value
+
+        if value.lower() != 'delete':
+            return await interaction.response.send_message('Aborted as `delete` was not typed.', ephemeral=True)
+
+        await self.team.delete()
+        return await interaction.response.edit_message(content='This team has been deleted.', view=None, embed=None)
+
     @discord.ui.button(label='Customization')
     @_default_button_doc_string
     async def customization(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
@@ -784,4 +795,14 @@ class TeamView(BaseView):
     @_default_button_doc_string
     async def delete(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Delete this team."""
-        ...
+        modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
+            after=self._delete_team_after, title='Delete Team?'
+        )
+        modal.add_item(
+            discord.ui.TextInput(
+                label='Delete Team Confirmation',
+                placeholder='Type "DELETE" to confirm...',
+                max_length=6,
+            )
+        )
+        return await interaction.response.send_modal(modal)

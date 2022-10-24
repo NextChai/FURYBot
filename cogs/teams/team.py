@@ -518,3 +518,14 @@ class Team:
             self.extra_channel_ids = extra_channel_ids
 
         await builder(self.bot)
+
+    async def delete(self) -> None:
+        async with self.bot.safe_connection() as connection:
+            await connection.execute('DELETE FROM teams.settings WHERE id = $1', self.id)
+
+        await self.voice_channel.delete()
+        await self.text_channel.delete()
+        await self.category_channel.delete()
+
+        for channel in self.extra_channels:
+            await channel.delete()
