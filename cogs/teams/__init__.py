@@ -53,9 +53,6 @@ class Teams(BaseCog):
         guild_only=True,
         default_permissions=discord.Permissions(moderate_members=True),
     )
-    team_members = app_commands.Group(name='members', description='Manage team members.', parent=team)
-    team_subs = app_commands.Group(name='subs', description='Manage team subs.', parent=team)
-    team_captains = app_commands.Group(name='captains', description='Manage team captainis.', parent=team)
 
     scrim = app_commands.Group(name='scrim', description='Create and manage scrims.', guild_only=True)
     subs = app_commands.Group(name='subs', description='Find a sub for your games.', guild_only=True)
