@@ -23,10 +23,11 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Coroutine, Generic, List, Tuple, Callable
+from typing import TYPE_CHECKING, Any, Coroutine, Generic, Tuple, Callable
 from typing_extensions import TypeVarTuple, Unpack, Self
 
 import discord
+from discord.ui.select import BaseSelect, BaseSelectT
 
 if TYPE_CHECKING:
     from utils.view import BaseView
@@ -56,7 +57,7 @@ class BasicInputModal(discord.ui.Modal, Generic[Unpack[ITs]]):
         self.stop()
 
 
-class AutoRemoveSelect(discord.ui.Select['BaseView']):
+class AutoRemoveSelect(BaseSelect['BaseView']):
     """A select that removes all children from its parent and replaces them with itself.
     After the user selects an option, the select is removed and the original children are
     added back to the parent.
@@ -65,7 +66,7 @@ class AutoRemoveSelect(discord.ui.Select['BaseView']):
     ----------
     parent: :class:`BaseView`
         The parent view of the select.
-    calback: Callable[[:class:`AutoRemoveSelect`, :class:`discord.Interaction`], Coroutine[Any, Any, Any]]
+    calback: Callable[[Any, :class:`discord.Interaction`], Coroutine[Any, Any, Any]]
         The callback to be called when the user selects an option.
 
     Attributes
@@ -76,23 +77,25 @@ class AutoRemoveSelect(discord.ui.Select['BaseView']):
 
     def __init__(
         self,
+        item: BaseSelectT,
         parent: BaseView,
-        callback: Callable[[Self, discord.Interaction], Coroutine[Any, Any, Any]],
-        *args: Any,
-        **kwargs: Any,
+        callback: Callable[[BaseSelectT, discord.Interaction], Coroutine[Any, Any, Any]],
     ) -> None:
-        super().__init__(*args, **kwargs)
+        item.__class__.__name__ = self.__class__.__name__
+        setattr(item, 'callback', self.callback)
 
-        self.parent = parent
-        self._original_children: List[discord.ui.Item['BaseView']] = parent.children
-        self._callback: Callable[[Self, discord.Interaction], Coroutine[Any, Any, Any]] = callback
+        self.parent: BaseView = parent
+        self.item: BaseSelectT = item
 
-        self.parent.clear_items()
-        self.parent.add_item(self)
+        self._callback: Callable[[BaseSelectT, discord.Interaction], Coroutine[Any, Any, Any]] = callback
+        self._original_children = parent.children
+
+        parent.clear_items()
+        parent.add_item(item)
 
     async def callback(self, interaction: discord.Interaction) -> Any:
         self.parent.clear_items()
         for child in self._original_children:
             self.parent.add_item(child)
 
-        await self._callback(self, interaction)
+        await self._callback(self.item, interaction)

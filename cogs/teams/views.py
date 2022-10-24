@@ -23,7 +23,8 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, List, Optional, TypeVar
+import functools
+from typing import TYPE_CHECKING, cast, Any, Callable, Coroutine, List, Optional, TypeVar
 from typing_extensions import Unpack, Self
 
 import discord
@@ -74,24 +75,22 @@ class TeamMemberView(BaseView):
         The member to manage.
     """
 
-    def __init__(self, member: TeamMember, *args: Any, **kwargs: Unpack[BaseViewKwargs]) -> None:
-        self.member: TeamMember = member
+    def __init__(self, member: discord.Member, team: Team, *args: Any, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        self.member: discord.Member = member
+        self.team: Team = team
         super().__init__(*args, **kwargs)
 
     @property
     def embed(self) -> discord.Embed:
         """:class:`discord.Embed`: The embed for this view."""
-        embed = self.bot.Embed(title=f'Manage Team {self.member.team.name} Member.')
+        embed = self.bot.Embed(title=f'Manage Team {self.team.name} Member.')
 
-        discord_member = self.member.member
-        if discord_member is not None:
-            embed.set_author(name=discord_member.display_name, icon_url=discord_member.display_avatar.url)
-            embed.set_thumbnail(url=discord_member.display_avatar.url)
-        else:
-            embed.set_author(name=self.member.team.name, icon_url=self.member.team.logo)
-            embed.set_thumbnail(url=self.member.team.logo)
+        embed.set_author(name=self.member.display_name, icon_url=self.member.display_avatar.url)
+        embed.set_thumbnail(url=self.member.display_avatar.url)
 
-        embed.add_field(name='Is Sub?', value='Member is a sub.' if self.member.is_sub else 'Member is not a sub.')
+        team_member = cast(TeamMember, self.team.get_member(self.member.id))
+        embed.add_field(name='Is Sub?', value='Member is a sub.' if team_member.is_sub else 'Member is not a sub.')
+
         return embed
 
     @discord.ui.button(label='Toggle Role')
@@ -102,7 +101,8 @@ class TeamMemberView(BaseView):
         """Swap the members role on the team. If they're on the main roster they'll be moved to a sub, and vice versa."""
         await interaction.response.defer()
 
-        coro = self.member.promote if self.member.is_sub else self.member.demote
+        team_member = cast(TeamMember, self.team.get_member(self.member.id))
+        coro = team_member.promote if team_member.is_sub else team_member.demote
         await coro()
 
         return await interaction.edit_original_response(embed=self.embed, view=self)
@@ -115,8 +115,10 @@ class TeamMemberView(BaseView):
         """Remove this member from the team."""
         await interaction.response.defer()
 
-        await self.member.remove_from_team()
-        view = TeamMembersView(self.member.team, target=interaction)
+        team_member = cast(TeamMember, self.team.get_member(self.member.id))
+        await team_member.remove_from_team()
+
+        view = TeamMembersView(self.team, target=interaction)
         return await interaction.edit_original_response(embed=view.embed, view=view)
 
 
@@ -157,40 +159,85 @@ class TeamMembersView(BaseView):
 
         return embed
 
+    async def _manage_member_after(self, select: discord.ui.UserSelect[Self], interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
+
+        member = cast(discord.Member, select.values[0])
+        view = self.create_child(TeamMemberView, member=member, team=self.team)
+        await interaction.edit_original_response(embed=view.embed, view=view)
+
+    async def _manage_member_assignment(
+        self,
+        select: discord.ui.UserSelect[Self],
+        interaction: discord.Interaction,
+        *,
+        assign_sub: bool = False,
+        remove_member: bool = False,
+    ) -> None:
+        await interaction.response.defer()
+
+        for member in select.values:
+            if remove_member:
+                team_member = self.team.get_member(member.id)
+                if team_member is not None:
+                    await self.team.remove_team_member(team_member)
+            else:
+                team_member = self.team.get_member(member.id)
+                if team_member is None:
+                    await self.team.add_team_member(member.id, is_sub=assign_sub)
+
+        await interaction.edit_original_response(embed=self.embed, view=self)
+
     @discord.ui.button(label='Manage Member')
     @_default_button_doc_string
     async def manage_member(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Manage this member on the team. You can remove them from it and demote them to a sub."""
-        # NOTE: Impl when we have a user select
-        ...
+        AutoRemoveSelect(item=discord.ui.UserSelect[Self](), parent=self, callback=self._manage_member_after)
+        return await interaction.response.edit_message(view=self)
 
-    @discord.ui.button(label='Add Member')
+    @discord.ui.button(label='Add Members')
     @_default_button_doc_string
     async def add_members(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Add members to this team."""
-        # NOTE: IMPL when member selects are a thing.
-        ...
+        AutoRemoveSelect(
+            item=discord.ui.UserSelect[Self](max_values=20, placeholder='Select members to add...'),
+            parent=self,
+            callback=self._manage_member_assignment,
+        )
+        return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Remove Members')
     @_default_button_doc_string
     async def remove_members(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Remove members from this team."""
-        # NOTE: IMPL when member selects are a thing.
-        ...
+        AutoRemoveSelect(
+            item=discord.ui.UserSelect[Self](max_values=20, placeholder='Select members to add...'),
+            parent=self,
+            callback=functools.partial(self._manage_member_assignment, remove_member=True),
+        )
+        return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Add Subs')
     @_default_button_doc_string
     async def add_subs(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Add subs to this team."""
-        # NOTE: IMPL when member selects are a thing.
-        ...
+        AutoRemoveSelect(
+            item=discord.ui.UserSelect[Self](max_values=20, placeholder='Select members to add...'),
+            parent=self,
+            callback=functools.partial(self._manage_member_assignment, assign_sub=True),
+        )
+        return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Remove Subs')
     @_default_button_doc_string
     async def remove_subs(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Remove subs from this team."""
-        # NOTE: IMPL when member selects are a thing.
-        ...
+        AutoRemoveSelect(
+            item=discord.ui.UserSelect[Self](max_values=20, placeholder='Select members to add...'),
+            parent=self,
+            callback=functools.partial(self._manage_member_assignment, remove_member=True),
+        )
+        return await interaction.response.edit_message(view=self)
 
 
 class ScrimView(BaseView):
@@ -259,6 +306,25 @@ class ScrimView(BaseView):
             content=f'I\'ve rescheduled this scrim for {self.scrim.scheduled_for_formatted()}.'
         )
 
+    async def _manage_member_assignment(
+        self, select: discord.ui.UserSelect[Self], interaction: discord.Interaction, *, add_vote: bool = True
+    ) -> None:
+        await interaction.response.defer()
+
+        home_team = self.scrim.home_team
+        away_team = self.scrim.away_team
+
+        for member in select.values:
+            home_member = home_team.get_member(member.id)
+            team = home_team if home_member is not None else away_team
+
+            if add_vote:
+                await self.scrim.add_vote(member.id, team.id)
+            else:
+                await self.scrim.remove_vote(member.id, team.id)
+
+        await interaction.edit_original_response(embed=self.embed, view=self)
+
     @discord.ui.button(label='Reschedule')
     @_default_button_doc_string
     async def reschedule_scrim(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
@@ -273,14 +339,23 @@ class ScrimView(BaseView):
     @_default_button_doc_string
     async def remove_confirmation(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Forcefully remove confirmation for a member."""
-        # NOTE: Add whem dpy adds new select types.
-        ...
+        AutoRemoveSelect(
+            item=discord.ui.UserSelect[Self](max_values=20, placeholder='Select members to remove confirmation for...'),
+            callback=functools.partial(self._manage_member_assignment, add_vote=False),
+            parent=self,
+        )
+        return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Force Add Confirmation')
     @_default_button_doc_string
     async def force_add_confirmation(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Forcefully add confirmation for a member."""
-        ...
+        AutoRemoveSelect(
+            item=discord.ui.UserSelect[Self](max_values=20, placeholder='Select members to remove confirmation for...'),
+            callback=self._manage_member_assignment,
+            parent=self,
+        )
+        return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Force Schedule Scrim')
     @_default_button_doc_string
@@ -374,7 +449,7 @@ class TeamScrimsView(BaseView):
 
         return embed
 
-    async def _manage_a_scrim_callback(self, select: AutoRemoveSelect, interaction: discord.Interaction) -> None:
+    async def _manage_a_scrim_callback(self, select: discord.ui.Select[Any], interaction: discord.Interaction) -> None:
         scrim = discord.utils.get(self.team.scrims, id=int(select.values[0]))
         if not scrim:
             # Something really went wrong!
@@ -391,16 +466,18 @@ class TeamScrimsView(BaseView):
             return await interaction.response.send_message('This team has no scrims.', ephemeral=True)
 
         AutoRemoveSelect(
-            self,
-            self._manage_a_scrim_callback,
-            placeholder='Select a scrim to manage...',
-            options=[
-                discord.SelectOption(
-                    label=scrim.scheduled_for.strftime("%A, %B %d, %Y at %I:%M %p"),
-                    value=str(scrim.id),
-                )
-                for scrim in self.team.scrims
-            ],
+            item=discord.ui.Select[Self](
+                placeholder='Select a scrim to manage...',
+                options=[
+                    discord.SelectOption(
+                        label=scrim.scheduled_for.strftime("%A, %B %d, %Y at %I:%M %p"),
+                        value=str(scrim.id),
+                    )
+                    for scrim in self.team.scrims
+                ],
+            ),
+            parent=self,
+            callback=self._manage_a_scrim_callback,
         )
 
         # The AutoRemoveSelect automatically removes all children
@@ -467,7 +544,7 @@ class TeamChannelsView(BaseView):
 
         await interaction.edit_original_response(view=self, embed=self.embed)
 
-    async def _delete_extra_channels_after(self, select: AutoRemoveSelect, interaction: discord.Interaction) -> None:
+    async def _delete_extra_channels_after(self, select: discord.ui.Select[Self], interaction: discord.Interaction) -> None:
         await interaction.response.defer()
 
         for channel_id in select.values:
@@ -498,17 +575,20 @@ class TeamChannelsView(BaseView):
             return await interaction.response.send_message('This team has no extra channels.', ephemeral=True)
 
         AutoRemoveSelect(
-            self,
-            self._delete_extra_channels_after,
-            max_values=25,
-            options=[
-                discord.SelectOption(
-                    label=channel.name, value=str(channel.id), emoji=CHANNEL_EMOJI_MAPPING.get(type(channel), None)
-                )
-                for channel in self.team.extra_channels
-            ],
-            placeholder='Select the channels to delete...',
+            item=discord.ui.Select[Self](
+                max_values=25,
+                placeholder='Select the channels to delete...',
+                options=[
+                    discord.SelectOption(
+                        label=channel.name, value=str(channel.id), emoji=CHANNEL_EMOJI_MAPPING.get(type(channel), None)
+                    )
+                    for channel in self.team.extra_channels
+                ],
+            ),
+            parent=self,
+            callback=self._delete_extra_channels_after,
         )
+
         return await interaction.response.edit_message(view=self)
 
 
