@@ -82,7 +82,7 @@ class AutoRemoveSelect(BaseSelect['BaseView']):
         callback: Callable[[BaseSelectT, discord.Interaction], Coroutine[Any, Any, Any]],
     ) -> None:
         item.__class__.__name__ = self.__class__.__name__
-        setattr(item, 'callback', self.callback)
+        item.callback = self.callback
 
         self.parent: BaseView = parent
         self.item: BaseSelectT = item
