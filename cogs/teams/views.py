@@ -251,7 +251,7 @@ class ScrimView(BaseView):
             transformed = await TimeTransformer('n/a').transform(interaction, value)
         except Exception as exc:
             await interaction.edit_original_response(embed=self.embed, view=self)
-            return await interaction.followup.send(str(exc), ephemeral=True)
+            return await interaction.followup.send(content=str(exc), ephemeral=True)
 
         assert transformed.dt
         await self.scrim.reschedle(transformed.dt, editor=interaction.user)
