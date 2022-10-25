@@ -28,28 +28,28 @@ import functools
 from typing import (
     TYPE_CHECKING,
     Any,
-    Tuple,
-    Generic,
     Callable,
-    Coroutine,
-    ParamSpec,
-    TypeVar,
-    TypeAlias,
-    Union,
     Concatenate,
-    Optional,
-    TypedDict,
-    Type,
+    Coroutine,
     Generator,
+    Generic,
+    Optional,
+    ParamSpec,
+    Tuple,
+    Type,
+    TypeAlias,
+    TypedDict,
+    TypeVar,
+    Union,
 )
-from typing_extensions import Unpack, NotRequired
 
 import discord
 from discord.ui.select import BaseSelect, BaseSelectT
-from typing_extensions import Self, TypeVarTuple
+from typing_extensions import NotRequired, Self, TypeVarTuple, Unpack
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
     from .context import Context
 
 __all__: Tuple[str, ...] = ('BaseModal', 'BasicInputModal', 'BaseView', 'BaseViewKwargs', 'AutoRemoveSelect')

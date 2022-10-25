@@ -30,7 +30,7 @@ import discord
 from typing_extensions import Self, Unpack
 
 from cogs.teams.scrim.persistent import AwayConfirm, HomeConfirm
-from utils import BaseView, BaseViewKwargs, AutoRemoveSelect, BasicInputModal, CHANNEL_EMOJI_MAPPING, TimeTransformer
+from utils import CHANNEL_EMOJI_MAPPING, AutoRemoveSelect, BaseView, BaseViewKwargs, BasicInputModal, TimeTransformer
 
 from .scrim import ScrimStatus
 

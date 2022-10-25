@@ -23,7 +23,8 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from .types import *
+import os
+
 from .cog import *
 from .constants import *
 from .context import *
@@ -33,9 +34,8 @@ from .link import *
 from .query import *
 from .time import *
 from .timers import *
+from .types import *
 from .ui_kit import *
-
-import os
 
 
 def _parse_environ_boolean(key: str) -> bool:

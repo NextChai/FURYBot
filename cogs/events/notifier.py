@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, List, Optional, cast
 import discord
 from discord.ext import commands, tasks
 
-from utils import BaseCog, RULES_CHANNEL_ID
+from utils import RULES_CHANNEL_ID, BaseCog
 
 if TYPE_CHECKING:
     from bot import FuryBot

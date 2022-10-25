@@ -23,10 +23,10 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import os
 import asyncio
 import functools
 import logging
+import os
 import time
 from concurrent import futures
 from typing import (

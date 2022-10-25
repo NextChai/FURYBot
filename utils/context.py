@@ -23,7 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, TypeAlias, Union, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple, TypeAlias, Union
 
 import discord
 from discord.ext import commands
