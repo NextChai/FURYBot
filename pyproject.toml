@@ -1,7 +1,7 @@
 [tool.black]
 line-length = 125
 skip-string-normalization = true
-force-exclude = "LICENSE|pyproject.toml|requirements.txt|README.rst|schema.sql|.+.json|README.md|.+.bat"
+force-exclude = "LICENSE|pyproject.toml|requirements.txt|README.rst|schema.sql|.+.json|README.md|.+.bat|.+.service|.+.sql"
 
 [tool.pyright]
 typeCheckingMode = "strict"
