@@ -39,9 +39,6 @@ CREATE TABLE IF NOT EXISTS teams.settings (
     description TEXT,
     logo TEXT,
     captain_role_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
-    scrim_scheduled_timer_id BIGINT,
-    scrim_reminder_timer_id BIGINT,
-    scrim_delete_timer_id BIGINT
 );
 
 CREATE TABLE IF NOT EXISTS teams.members (
@@ -71,6 +68,9 @@ CREATE TABLE IF NOT EXISTS teams.scrims (
     away_confirm_anyways_message_id BIGINT,
     scheduled_for TIMESTAMP WITH TIME ZONE,
     scrim_chat_id BIGINT -- Can be None
+    scrim_scheduled_timer_id BIGINT,
+    scrim_reminder_timer_id BIGINT,
+    scrim_delete_timer_id BIGINT
 );
 
 CREATE TABLE IF NOT EXISTS timers(
