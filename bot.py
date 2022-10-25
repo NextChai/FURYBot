@@ -73,7 +73,9 @@ _log = logging.getLogger(__name__)
 RUN_DEVELOPMENT: bool = os.environ.get('RUN_DEVELOPMENT', 'false').lower() == 'true'
 
 initial_extensions: Tuple[str, ...]
-if not RUN_DEVELOPMENT:
+if RUN_DEVELOPMENT:
+    initial_extensions = tuple(v for k, v in os.environ.items() if k.startswith('FURY_EXTENSION'))
+else:
     initial_extensions = (
         'jishaku',
         'cogs.events.infractions',
@@ -84,8 +86,6 @@ if not RUN_DEVELOPMENT:
         'cogs.events.tracking',
         'cogs.teams',
     )
-else:
-    initial_extensions = tuple(v for k, v in os.environ.items() if k.startswith('FURY_EXTENSION'))
 
 
 def wrap_extension(coro: DecoFunc[P, T]) -> DecoFunc[P, T]:
