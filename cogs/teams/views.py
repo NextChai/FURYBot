@@ -618,7 +618,9 @@ class TeamNamingView(BaseView):
         )
         embed.set_author(name=self.team.name, icon_url=self.team.logo, url=self.team.logo)
         embed.add_field(name='Team Nickname', value=self.team.nickname or 'Team has no nickname.', inline=False)
-        embed.add_field(name='Team Logo', value=self.team.logo or 'Team has no logo.', inline=False)
+        embed.add_field(
+            name='Team Logo', value=f'[Click here for logo.]({self.team.logo}).' or 'Team has no logo.', inline=False
+        )
 
         if self.team.logo:
             embed.set_thumbnail(url=self.team.logo)
@@ -648,6 +650,11 @@ class TeamNamingView(BaseView):
         self, modal: BasicInputModal[discord.ui.TextInput[Any]], interaction: discord.Interaction
     ) -> None:
         await self._perform_after('description', modal, interaction)
+
+    async def _change_logo_after(
+        self, modal: BasicInputModal[discord.ui.TextInput[Any]], interaction: discord.Interaction
+    ) -> None:
+        await self.perform_after('logo', modal, interaction)
 
     @discord.ui.button(label='Rename')
     @_default_button_doc_string
@@ -710,9 +717,6 @@ class TeamNamingView(BaseView):
             )
         )
         await interaction.response.send_modal(modal)
-
-        await modal.wait()
-        await self.team.edit(logo=modal.children[0].value)
 
 
 class TeamCaptainsView(BaseView):
