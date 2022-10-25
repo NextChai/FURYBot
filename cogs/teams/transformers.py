@@ -101,6 +101,8 @@ class TeamTransformer(app_commands.Transformer):
         return [app_commands.Choice(name=team.name, value=str(team.id)) for team in teams]
 
     async def transform(self, interaction: discord.Interaction, value: Any, /) -> Team:
+        print(value)
+
         teams = await self._get_available_teams(interaction, None)
         team_mapping = {team.id: team for team in teams}
 
