@@ -102,18 +102,11 @@ class TeamTransformer(app_commands.Transformer):
 
     async def transform(self, interaction: discord.Interaction, value: Any, /) -> Team:
         teams = await self._get_available_teams(interaction, None)
+        team_mapping = {team.id: team for team in teams}
 
-        if not value.isdigit():
-            # We have an idiot on our hands who didnt select one
-            # of the options... bruh. Check by name now.
-            maybe_team = discord.utils.find(lambda team: team.name.lower() == value.lower(), teams)
-            if maybe_team:
-                return maybe_team
-
-            raise AutocompleteValidationException("You must select a team from the list.")
-
-        maybe_team = discord.utils.find(lambda team: team.id == int(value), teams)
-        if not maybe_team:
-            raise AutocompleteValidationException("You must select a team from the list.")
-
-        return maybe_team
+        try:
+            return team_mapping[int(value)]
+        except KeyError:
+            raise AutocompleteValidationException(f"The team you entered was not found.")
+        except ValueError:
+            raise AutocompleteValidationException(f"The team you entered was not a valid team.")
