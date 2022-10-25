@@ -47,7 +47,7 @@ __all__: Tuple[str, ...] = ('Timer', 'TimerManager')
 
 T = TypeVar('T')
 
-_log = logging.getLogger('FuryBot.utils.timer')
+_log = logging.getLogger(__name__)
 
 
 class Timer:
