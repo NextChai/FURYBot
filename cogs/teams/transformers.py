@@ -112,7 +112,9 @@ class TeamTransformer(app_commands.Transformer):
 
         try:
             return team_mapping[int(value)]
-        except KeyError:
-            raise AutocompleteValidationException(f"The team you entered was not found.")
-        except ValueError:
-            raise AutocompleteValidationException(f"The team you entered was not a valid team.")
+        # except KeyError:
+        #     raise AutocompleteValidationException(f"The team you entered was not found. {value}")
+        # except ValueError:
+        #     raise AutocompleteValidationException(f"The team you entered was not a valid team. {value}")
+        except Exception as exc:
+            raise AutocompleteValidationException(f'Unknown value of {value}') from exc
