@@ -469,6 +469,7 @@ class Team:
         text_channel_id: int = MISSING,
         voice_channel_id: int = MISSING,
         extra_channel_ids: List[int] = MISSING,
+        sub_role_ids: List[int] = MISSING,
     ) -> None:
         """|coro|
 
@@ -526,6 +527,9 @@ class Team:
         if extra_channel_ids is not MISSING:
             builder.add_arg('extra_channel_ids', extra_channel_ids)
             self.extra_channel_ids = extra_channel_ids
+        if sub_role_ids is not MISSING:
+            builder.add_arg('sub_role_ids', sub_role_ids)
+            self.sub_role_ids = sub_role_ids
 
         await builder(self.bot)
 

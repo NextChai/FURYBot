@@ -161,7 +161,7 @@ class TeamMembersView(BaseView):
         embed = self.bot.Embed(
             title=f'Team {self.team.display_name} Members',
             description='Use the buttons below to manage team members.\n\n{}'.format(
-                "\n".join(member_metadata or ['Team has no members.'])
+                "\n".join(member_metadata) or 'Team has no members.'
             ),
         )
         embed.set_author(name=self.team.name, icon_url=self.team.logo)
@@ -295,12 +295,12 @@ class ScrimView(BaseView):
         )
         embed.add_field(
             name='Home Team',
-            value=f'{self.scrim.home_team.name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.home_voters] or ["No home voters."])}',
+            value=f'{self.scrim.home_team.name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.home_voters]) or "No home voters."}',
             inline=False,
         )
         embed.add_field(
             name='Away Team',
-            value=f'{self.scrim.away_team.name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.away_voters] or ["No away voters."])}',
+            value=f'{self.scrim.away_team.name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.away_voters]) or "No away voters."}',
         )
         embed.add_field(name='Status', value=self.scrim.status.value.title())
 
@@ -458,8 +458,8 @@ class TeamScrimsView(BaseView):
                 value=f'**Team Created Scrim**: {scrim.home_team.name}\n'
                 f'**Away Team**: {scrim.away_team.name}\n'
                 f'**Status**: {scrim.status.value.title()}'
-                f'**Home Team Confirmed**: {", ".join([m.mention for m in scrim.home_voters] or ["No home votes."])}\n'
-                f'**Away Team Confirmed**: {", ".join([m.mention for m in scrim.away_voters] or ["No away votes."])}\n',
+                f'**Home Team Confirmed**: {", ".join([m.mention for m in scrim.home_voters]) or "No home votes."}\n'
+                f'**Away Team Confirmed**: {", ".join([m.mention for m in scrim.away_voters]) or "No away votes."}\n',
             )
 
         embed.description = (
@@ -540,7 +540,7 @@ class TeamChannelsView(BaseView):
         embed.add_field(name='Voice Channel', value=self.team.voice_channel.mention)
         embed.add_field(
             name='Extra Channels',
-            value='\n'.join([c.mention for c in self.team.extra_channels] or ['Team has no extra channels.']),
+            value='\n'.join([c.mention for c in self.team.extra_channels] or 'Team has no extra channels.'),
         )
 
         return embed
@@ -820,6 +820,79 @@ class TeamCaptainsView(BaseView):
         return await interaction.response.edit_message(view=self)
 
 
+class TeamSubRoleView(BaseView):
+    """A view used to manage the sub roles on a team.
+
+    Parameters
+    ----------
+    team: :class:`.Team`
+        The team to manage the scrims for.
+
+    Attributes
+    ----------
+    team: :class:`.Team`
+        The team to manage the scrims for.
+    """
+
+    def __init__(self, team: Team, *args: Any, **kwargs: Any) -> None:
+        self.team: Team = team
+        super().__init__(*args, **kwargs)
+
+    @property
+    def embed(self) -> discord.Embed:
+        embed = self.bot.Embed(
+            title=f'{self.team.display_name} Sub Roles',
+            description='Use the buttons below to manage team sub roles. This team '
+            f'has **{len(self.team.sub_role_ids)}** sub role(s).',
+        )
+        embed.add_field(
+            name='Current Sub Roles',
+            value='\n'.join(r.mention for r in self.team.sub_roles) or 'This team has no current sub roles.',
+        )
+
+        return embed
+
+    async def handle_sub_role_action(
+        self, select: discord.ui.RoleSelect[Self], interaction: discord.Interaction, *, add: bool = True
+    ) -> None:
+        await interaction.response.defer()
+
+        current_sub_role_ids: List[int] = self.team.sub_role_ids.copy()
+        if add:
+            for role in select.values:
+                current_sub_role_ids.append(role.id)
+        else:
+            for role in select.values:
+                if role.id in current_sub_role_ids:
+                    current_sub_role_ids.remove(role.id)
+
+        await self.team.edit(sub_role_ids=current_sub_role_ids)
+
+        await interaction.edit_original_response(embed=self.embed, view=self)
+
+    @discord.ui.button(label='Add Sub Roles')
+    @_default_button_doc_string
+    async def add_captain(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Add a captain role to this team."""
+        AutoRemoveSelect(
+            item=discord.ui.RoleSelect[Self](max_values=clamp(len(self.team.captain_roles), 25)),
+            parent=self,
+            callback=self.handle_sub_role_action,
+        )
+        return await interaction.response.edit_message(view=self)
+
+    @discord.ui.button(label='Remove Sub Roles')
+    @_default_button_doc_string
+    async def remove_captain(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Remove a captain role from this team."""
+        AutoRemoveSelect(
+            item=discord.ui.RoleSelect[Self](max_values=clamp(len(self.team.captain_roles), 25)),
+            parent=self,
+            callback=functools.partial(self.handle_sub_role_action, add=False),
+        )
+        return await interaction.response.edit_message(view=self)
+
+
 class TeamView(BaseView):
     """The main Team View to edit a team."""
 
@@ -839,18 +912,22 @@ class TeamView(BaseView):
 
         embed.add_field(
             name='Members',
-            value=", ".join(
-                [m.mention for m in self.team.team_members.values() if m.is_sub is False] or ["Team has no members."]
-            ),
+            value=", ".join([m.mention for m in self.team.team_members.values() if m.is_sub is False])
+            or "Team has no members.",
         )
         embed.add_field(
             name='Subs',
-            value=", ".join([m.mention for m in self.team.team_members.values() if m.is_sub] or ["Team has no subs."]),
+            value=", ".join([m.mention for m in self.team.team_members.values() if m.is_sub])
+            or "Team has no dedicated subs.",
         )
 
         embed.add_field(
-            name='Captains', value=", ".join(r.mention for r in self.team.captain_roles) or ["Team has no captains."]
+            name='Captains', value=", ".join(r.mention for r in self.team.captain_roles) or "Team has no captains."
         )
+        embed.add_field(
+            name='Sub Roles', value=", ".join(r.mention for r in self.team.sub_roles) or "Team has no sub roles."
+        )
+
         embed.add_field(
             name='Channels',
             value=", ".join(c.mention for c in [self.team.text_channel, self.team.voice_channel, *self.team.extra_channels]),
@@ -903,6 +980,13 @@ class TeamView(BaseView):
     async def captains(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Manage the team\'s captains."""
         view = self.create_child(TeamCaptainsView, self.team)
+        return await interaction.response.edit_message(embed=view.embed, view=view)
+
+    @discord.ui.button(label='Sub Roles')
+    @_default_button_doc_string
+    async def sub_roles(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Manage the team\'s sub roles."""
+        view = self.create_child(TeamSubRoleView, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
     @discord.ui.button(label='Delete Team', style=discord.ButtonStyle.danger)
