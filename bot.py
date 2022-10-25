@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import os
 import asyncio
 import functools
 import logging
@@ -69,16 +70,22 @@ DecoFunc: TypeAlias = Callable[Concatenate['FuryBot', P], Coroutine[T, Any, Any]
 
 _log = logging.getLogger(__name__)
 
-initial_extensions: Tuple[str, ...] = (
-    'jishaku',
-    'cogs.events.infractions',
-    'cogs.events.notifier',
-    'cogs.infractions',
-    'utils.error_handler',
-    'cogs.owner',
-    'cogs.events.tracking',
-    'cogs.teams',
-)
+RUN_DEVELOPMENT: bool = os.environ.get('RUN_DEVELOPMENT', 'false').lower() == 'true'
+
+initial_extensions: Tuple[str, ...]
+if not RUN_DEVELOPMENT:
+    initial_extensions = (
+        'jishaku',
+        'cogs.events.infractions',
+        'cogs.events.notifier',
+        'cogs.infractions',
+        'utils.error_handler',
+        'cogs.owner',
+        'cogs.events.tracking',
+        'cogs.teams',
+    )
+else:
+    initial_extensions = tuple(v for k, v in os.environ.items() if k.startswith('FURY_EXTENSION'))
 
 
 def wrap_extension(coro: DecoFunc[P, T]) -> DecoFunc[P, T]:
