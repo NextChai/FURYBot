@@ -329,11 +329,11 @@ class ErrorHandler:
             # Something bad happened here, oh no!
             return await self.log_error(error.original, origin=interaction, sender=sender)
 
-        elif isinstance(error, app_commands.TransformerError):
-            await sender(content=f'Failed to convert `{error.value}` to a {error.type.name.title()}!')
-
-            # This is a development error as well, but we don't need to pass a sender
-            return await self.log_error(error, origin=interaction)
+        # elif isinstance(error, app_commands.TransformerError):
+        #     await sender(content=f'Failed to convert `{error.value}` to a {error.type.name.title()}!')
+        #
+        #     # This is a development error as well, but we don't need to pass a sender
+        #     return await self.log_error(error, origin=interaction)
         elif isinstance(error, app_commands.CheckFailure):
             if isinstance(error, app_commands.NoPrivateMessage):
                 return await sender(content=str(error))
