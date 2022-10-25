@@ -41,7 +41,7 @@ from .ui_kit import *
 def _parse_environ_boolean(key: str) -> bool:
     val = os.environ.get(key)
     if val is None:
-        return True
+        return False
 
     return val.lower() in ("true", "1")
 
