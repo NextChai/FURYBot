@@ -89,8 +89,8 @@ class TeamTransformer(app_commands.Transformer):
         if not available_teams:
             return []
 
-        similar: List[str] = await bot.wrap(difflib.get_close_matches, value, list(available_team_mapping.keys(), n=25))  # type: ignore
         available_team_mapping = {team.name: team for team in available_teams}
+        similar: List[str] = await bot.wrap(difflib.get_close_matches, value, list(available_team_mapping.keys()), n=25)  # type: ignore
         available_teams = [available_team_mapping[team_name] for team_name in similar]
 
         return available_teams[:25]
