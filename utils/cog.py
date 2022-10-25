@@ -23,29 +23,34 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import Mapping, Tuple, Type, Union
+from typing import TYPE_CHECKING, Tuple
 
-import discord
+from discord.ext import commands
 
-__all__: Tuple[str, ...] = (
-    'RULES_CHANNEL_ID',
-    'TEXT_CHANNEL_EMOJI',
-    'VOICE_CHANNEL_EMOJI',
-    'THREAD_CHANNEL_EMOJI',
-    'CATEGORY_CHANNEL_EMOJI',
-    'CHANNEL_EMOJI_MAPPING',
-)
+if TYPE_CHECKING:
+    from bot import FuryBot
 
-RULES_CHANNEL_ID: int = 763418952243347467
+__all__: Tuple[str, ...] = ('BaseCog',)
 
-TEXT_CHANNEL_EMOJI: str = '<:text:1033064232767467560> '
-VOICE_CHANNEL_EMOJI: str = '<:voice:1033064208457285784>'
-THREAD_CHANNEL_EMOJI: str = '<:thread:1033064225133822073>'
-CATEGORY_CHANNEL_EMOJI: str = '<:category:1033064217336615004> '
 
-CHANNEL_EMOJI_MAPPING: Mapping[Type[Union[discord.abc.GuildChannel, discord.Thread]], str] = {
-    discord.TextChannel: TEXT_CHANNEL_EMOJI,
-    discord.VoiceChannel: VOICE_CHANNEL_EMOJI,
-    discord.CategoryChannel: CATEGORY_CHANNEL_EMOJI,
-    discord.Thread: THREAD_CHANNEL_EMOJI,
-}
+class BaseCog(commands.Cog):
+    """Implementation for a base cog class. This class is meant to be inherited from,
+    instead of directly inheriting :class:`commands.Cog`. This is so if you don't have a unique
+    :meth:`__init__` you don't have you add it.
+
+    .. note::
+        Down the road this will also hold special methods that all cogs can access.
+
+    Parameters
+    ----------
+    bot: :class:`FuryBot`
+        The bot instance.
+
+    Attributes
+    ----------
+    bot: :class:`Bot`
+        The bot instance.
+    """
+
+    def __init__(self, bot: FuryBot) -> None:
+        self.bot: FuryBot = bot

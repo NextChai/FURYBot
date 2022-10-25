@@ -23,8 +23,50 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import asyncio
-from launcher import run_bot
+import dotenv
 
-if __name__ == '__main__':
-    asyncio.run(run_bot())
+dotenv.load_dotenv()  # pyright: ignore # This is out of my control
+
+
+import asyncio
+import logging
+import os
+from typing import TYPE_CHECKING
+
+import aiohttp
+import discord
+
+from bot import FuryBot
+
+if TYPE_CHECKING:
+    import asyncpg
+
+_log = logging.getLogger(__name__)
+
+os.environ['JISHAKU_NO_UNDERSCORE'] = 'true'
+os.environ['JISHAKU_NO_DM_TRACEBACK'] = 'true'
+os.environ['JISHAKU_RETAIN'] = 'true'
+
+
+async def main() -> None:
+    discord.utils.setup_logging()
+
+    loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
+
+    try:
+        pool: asyncpg.Pool[asyncpg.Record] = await FuryBot.setup_pool(uri=os.environ['POSTGRES_URI'])
+    except Exception as exc:
+        return _log.warning('Failed to create the postgres pool.', exc_info=exc)
+
+    session = aiohttp.ClientSession()
+
+    try:
+        bot = FuryBot(loop=loop, session=session, pool=pool)
+    except Exception as exc:
+        return _log.warning('Failed to create an instance of FuryBot.', exc_info=exc)
+
+    async with bot, pool, session:
+        await bot.start(os.environ['TOKEN'])
+
+
+asyncio.run(main())

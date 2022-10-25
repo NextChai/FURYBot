@@ -21,1028 +21,348 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
-
 from __future__ import annotations
 
-import sys
-import time
-import logging
-import traceback
-import functools
-import datetime
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from types import TracebackType
+import functools
+import logging
+import os
+import time
+from concurrent import futures
 from typing import (
     TYPE_CHECKING,
-    Awaitable,
-    List,
+    Any,
+    Callable,
+    Coroutine,
     Dict,
     Literal,
     Optional,
-    Protocol,
-    Union,
-    Coroutine,
-    Type,
-    Generic,
+    ParamSpec,
     Tuple,
+    Type,
+    TypeAlias,
     TypeVar,
-    Callable,
-    Any,
-    Generator,
-    overload,
+    Union,
 )
-from typing_extensions import ParamSpec, Self
 
-import aiohttp
-import mystbin
 import asyncpg
-import googletrans  # type: ignore # Stub file not found
-
 import discord
 from discord.ext import commands
+from typing_extensions import Concatenate, Self
 
-from utils import context, constants
-from utils.errors import *
-from utils import ProfanityChecker
-from utils.timer import TimerManager, Timer
-from utils.time import UserFriendlyTime, human_timedelta
-from utils.links import LinkChecker
-from config import postgresql as uri, logging_webhook, message_webhook
+from cogs.teams import Team
+from cogs.teams.scrim import Scrim, ScrimStatus
+from utils import RUNNING_DEVELOPMENT, ErrorHandler, LinkFilter, TimerManager
 
+if TYPE_CHECKING:
+    import datetime
+
+    import aiohttp
 
 T = TypeVar('T')
 P = ParamSpec('P')
-FuryT = TypeVar('FuryT', bound='FuryBot')
-BotT = TypeVar('BotT', bound='Union[FuryBot, DiscordBot]')
+PoolType: TypeAlias = 'asyncpg.Pool[asyncpg.Record]'
+ConnectionType: TypeAlias = 'asyncpg.Connection[asyncpg.Record]'
+DecoFunc: TypeAlias = Callable[Concatenate['FuryBot', P], Coroutine[T, Any, Any]]
 
-__all__ = (
-    'DiscordBot',
-    'FuryBot',
-)
+_log = logging.getLogger(__name__)
 
-log = logging.getLogger(__name__)
-
-MISSING = discord.utils.MISSING
-
-initial_extensions = (
-    # Utilities
-    'utils.error_handler',
-    'utils.help',
-    'utils.jishaku',
-    'cogs.commands',
-    'cogs.moderation',
-    'cogs.safety',
-    'cogs.teams',
-    'cogs.owner',
-)
+initial_extensions: Tuple[str, ...]
+if RUNNING_DEVELOPMENT:
+    initial_extensions = tuple(v for k, v in os.environ.items() if k.startswith('FURY_EXTENSION'))
+else:
+    initial_extensions = (
+        'jishaku',
+        'cogs.events.infractions',
+        'cogs.events.notifier',
+        'cogs.infractions',
+        'utils.error_handler',
+        'cogs.owner',
+        'cogs.events.tracking',
+        'cogs.teams',
+    )
 
 
-def _yield_chunks(value: str):
-    const = 2000 - 10  # The legnth of 2000 (total content legnth) - "```py\n```"
-
-    for i in range(0, len(value), const):
-        yield f'```py\n{value[i:i + const]}\n```'
-
-
-@discord.utils.copy_doc(discord.Embed)  # type: ignore
-def Embed(
-    *,
-    title: str = MISSING,
-    description: str = MISSING,
-    url: str = MISSING,
-    timestamp: datetime.datetime = datetime.datetime.now(),
-    color: Union[discord.Color, int] = MISSING,
-    author: Union[discord.User, discord.Member] = MISSING,
-    cls: Optional[Type[discord.Embed]] = None,
-) -> discord.Embed:
-    """A method used to have a consistent color across all bot Embeds.
+def wrap_extension(coro: DecoFunc[P, T]) -> DecoFunc[P, T]:
+    """A method to wrap an extension coroutine in the Bot class. This will handle all
+    logging and error handling.
 
     Parameters
     ----------
-    title: :class:`str`
-        The title of the embed.
-    description: :class:`str`
-        The description of the embed.
-    url: :class:`str`
-        The url of the embed.
-    timestamp: :class:`datetime.datetime`
-        The timestamp of the embed. Defaults to the current time.
-    color: :class:`discord.Color`
-        The color of the embed.
-    author: Union[:class:`discord.User`, :class:`discord.Member`]
-        The author of the embed.
-    cls: Optional[Type[:class:`discord.Embed`]]
-        The embed class to use. Defaults to :class:`discord.Embed`.
+    coro: DecoFunc[P, T]
+        The coroutine to wrap.
+
+    Returns
+    -------
+    DecoFunc[P, T]
+        A wrapped function that logs and handles errors.
     """
-    new_cls = cls or discord.Embed
 
-    kwargs: Dict[str, Union[str, datetime.datetime, discord.Color]] = {'timestamp': timestamp}
+    async def wrapped(self: FuryBot, *args: P.args, **kwargs: P.kwargs) -> T:
+        ext_name, *_ = args
 
-    if color is MISSING:
-        kwargs['color'] = discord.Color.blue()
-    if title is not MISSING:
-        kwargs['title'] = title
-    if description is not MISSING:
-        kwargs['description'] = description
-    if url is not MISSING:
-        kwargs['url'] = url
-
-    new = new_cls(**kwargs)
-
-    if author is not MISSING:
-        new.set_author(name=str(author), icon_url=author.display_avatar.url)
-        new.set_footer(text=f'ID: {author.id}')
-
-    return new
-
-
-def _wrap_extension(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[Optional[T]]]:
-    async def wrapped(*args: P.args, **kwargs: P.kwargs) -> Optional[T]:
-        fmt_args = 'on ext "{}"{}'.format(args[1], f' with kwargs {kwargs}' if kwargs else '')
-        start = time.perf_counter()
-
+        start = time.time()
         try:
-            result = await func(*args, **kwargs)
+            result = await coro(self, *args, **kwargs)
+        except commands.ExtensionFailed as exc:
+            raise exc.original from exc
         except Exception as exc:
-            log.warning(f'Failed to load extension in {time.perf_counter() - start:.2f} seconds {fmt_args}', exc_info=exc)
-            return
+            raise exc from None
 
-        fmt = f'{func.__name__} took {time.perf_counter() - start:.2f} seconds {fmt_args}'
-        log.info(fmt)
-
+        _log.info(f'Loaded the "{ext_name}" extension in {time.time() - start:.2f} seconds')
         return result
 
     return wrapped
 
 
-class _Chunkable(Protocol):
-    def __len__(self) -> int:
-        ...
-
-    def __getitem__(self, __k: Any) -> Any:
-        ...
-
-
-class DbContextManager(Generic[BotT]):
-    """A simple context manager used to manage database connections.
-
-    Please note this was created instead of using `contextlib.asynccontextmanager` because
-    I plan to add additional functionality to this class in the future.
+class DbContextManager:
+    """A simple context manager used to manage database Connectionections.
 
     Attributes
     ----------
     bot: :class:`FuryBot`
         The bot instance.
     timeout: :class:`float`
-        The timeout for acquiring a connection.
+        The timeout for acquiring a Connectionection.
     """
 
-    __slots__: Tuple[str, ...] = ('bot', 'timeout', '_pool', '_conn', '_tr')
+    __slots__: Tuple[str, ...] = ('bot', 'timeout', '_pool', '_Connection', '_tr', '_connection')
 
-    def __init__(self, bot: BotT, *, timeout: float = 10.0) -> None:
-        self.bot: BotT = bot
-        self.timeout: float = timeout
-        self._pool: asyncpg.Pool[asyncpg.Record] = bot.pool
-        self._conn: Optional[asyncpg.Connection[asyncpg.Record]] = None
-        self._tr: Optional[Any] = None  # note: look into fixing this later
+    def __init__(self, bot: FuryBot, *, timeout: Optional[float] = 10.0) -> None:
+        self.bot: FuryBot = bot
+        self.timeout: Optional[float] = timeout
+        self._pool: PoolType = bot.pool
+        self._connection: Optional[ConnectionType] = None
+        self._tr: Optional[Any] = None
 
-    async def acquire(self) -> Coroutine[Any, Any, asyncpg.Connection[asyncpg.Record]]:
+    async def acquire(self) -> ConnectionType:
         return await self.__aenter__()
 
     async def release(self) -> None:
         return await self.__aexit__(None, None, None)
 
-    async def __aenter__(self) -> Any:
-        self._conn = conn = await self._pool.acquire(timeout=self.timeout)  # type: ignore
-        self._tr = conn.transaction()
-        await self._tr.start()
-        return conn
+    async def __aenter__(self) -> ConnectionType:
+        self._connection = connection = await self._pool.acquire(timeout=self.timeout)  # type: ignore
+        self._tr = tr = connection.transaction()
+        await tr.start()
+        return connection  # type: ignore
 
-    async def __aexit__(self, exc_type: Optional[Type[Exception]], exc: Optional[Exception], tb: Optional[TracebackType]):
+    async def __aexit__(
+        self, exc_type: Optional[Type[Exception]], exc: Optional[Exception], tb: Optional[Type[Exception]]
+    ) -> None:
         if exc and self._tr:
             await self._tr.rollback()
 
         elif not exc and self._tr:
             await self._tr.commit()
 
-        if self._conn:
-            await self._pool.release(self._conn)  # type: ignore
+        if self._connection:
+            await self._pool.release(self._connection)  # type: ignore
 
 
-class DiscordBot(commands.Bot):
-    """The base container for FURY Bot.
+class FuryBot(commands.Bot):
+    """The main fury bot instance. This bot subclass contains many useful utiities
+    shared between all extensions / cogs.
 
-    Will contain all discord.py related activities and methods.
-
-    Attributes
+    Parameters
     ----------
-    pool: :class:`asyncpg.Pool`
-        The connection pool for the bot to use.
+    loop: :class:`asyncio.AbstractEventLoop`
+        The current running event loop.
     session: :class:`aiohttp.ClientSession`
-        The session for the bot to use.
-    Embed: Callable[..., :class:`discord.Embed`]
-        An embed callable to use. This gives you the bots embed to
-        use across all commands.
-    debug: :class:`bool`
-        Whether or not the bot is in debug mode.
-    spam_control: :class:`commands.CooldownMapping`
-        A spam control mapping to use for members who try
-        and spam messages.
-    logging_webhook_url: :class:`str`
-        The logging webhook url to use for the bot.
-    message_webhook_url: :class:`str`
-        The message webhook url to use for the bot.
+        A client session to use for generic requests.
+    pool: :class:`asyncpg.Pool`
+        A database pool connection to use for requests.
     """
 
     if TYPE_CHECKING:
-        logging_webhook_url: str
-        message_webhook_url: str
+        user: discord.ClientUser  # This isn't accessed before the client has been logged in so it's OK to overwrite it.
+        error_handler: ErrorHandler
 
-        # This is mainly to ignore NoneType errors.
-        # This won't be used unless the bot is ready and this
-        # is not None.
-        user: discord.ClientUser  # type: ignore
-
-    def __init__(self, pool: asyncpg.Pool[asyncpg.Record], session: aiohttp.ClientSession, *args: Any, **kwargs: Any):
-        self.pool: asyncpg.Pool[asyncpg.Record] = pool
+    def __init__(self, *, loop: asyncio.AbstractEventLoop, session: aiohttp.ClientSession, pool: PoolType) -> None:
+        self.loop: asyncio.AbstractEventLoop = loop
         self.session: aiohttp.ClientSession = session
+        self.pool: PoolType = pool
+        self.thread_pool: futures.ThreadPoolExecutor = futures.ThreadPoolExecutor(max_workers=20)
+
+        if os.environ.get('FURY_START_TIMER_MANAGER', 'false').lower() == 'true':
+            self.timer_manager: TimerManager = TimerManager(bot=self)
+
+        self.link_filter: LinkFilter = LinkFilter(self)
+
+        self.team_cache: Dict[int, Team] = {}
+        self.team_scrim_cache: Dict[int, Scrim] = {}
 
         super().__init__(
-            help_command=commands.MinimalHelpCommand(),
-            description='The Discord bot for the FLVS Fury server.',
+            command_prefix=commands.when_mentioned_or('fury.'),
+            help_command=None,
+            description='A helpful moderation tool',
             intents=discord.Intents.all(),
-            command_prefix=('fury.', 'f.'),
             strip_after_prefix=True,
-            hartbeat_timeout=180,
-            case_insensitive=True,
-            owner_ids=[757663899532132418, 146348630926819328],
-            *args,
-            **kwargs,
+            allowed_mentions=discord.AllowedMentions.none(),
+            max_messages=5000,
         )
 
-        self.Embed: Callable[..., discord.Embed] = Embed
-        self.debug: bool = True
-
-        # TODO: Implement me
-        self.spam_control = commands.CooldownMapping.from_cooldown(10, 12.0, commands.BucketType.user)
-
-        # Webhooks
-        self.logging_webhook_url = logging_webhook
-        self.message_webhook_url = message_webhook
-        self._webhook_lock: asyncio.Lock = asyncio.Lock()
-
     @classmethod
-    async def setup_pool(cls) -> asyncpg.Pool[asyncpg.Record]:
+    async def setup_pool(cls: Type[Self], *, uri: str, **kwargs: Any) -> PoolType:
         """:meth: `asyncpg.create_pool` with some extra functionality.
 
         Parameters
         ----------
         uri: :class:`str`
-            The Postgres connection URI.
+            The Postgres Connectionection URI.
         **kwargs:
             Extra keyword arguments to pass to :meth:`asyncpg.create_pool`.
         """
 
-        def _encode_jsonb(value: Any) -> str:
-            return discord.utils._to_json(value)  # type: ignore
+        def _encode_jsonb(value: Dict[Any, Any]) -> str:
+            return discord.utils._to_json(value)
 
-        def _decode_jsonb(value: Any) -> Any:
-            return discord.utils._from_json(value)  # type: ignore
+        def _decode_jsonb(value: str) -> Dict[Any, Any]:
+            return discord.utils._from_json(value)
 
-        async def init(con: asyncpg.Connection[asyncpg.Record]):
+        old_init = kwargs.pop('init', None)
+
+        async def init(con: asyncpg.Connection[asyncpg.Record]) -> None:
             await con.set_type_codec(
                 'jsonb', schema='pg_catalog', encoder=_encode_jsonb, decoder=_decode_jsonb, format='text'
             )
+            if old_init is not None:
+                await old_init(con)
 
-        pool = await asyncpg.create_pool(uri, init=init)
-        if pool is None:
-            raise RuntimeError('Failed to create pool!')
+        return await asyncpg.create_pool(uri, init=init, **kwargs)
 
-        return pool
+    @staticmethod
+    def Embed(
+        *,
+        colour: Optional[Union[int, discord.Colour]] = None,
+        color: Optional[Union[int, discord.Colour]] = None,
+        title: Optional[Any] = None,
+        type: Literal['rich', 'image', 'video', 'gifv', 'article', 'link'] = 'rich',
+        url: Optional[Any] = None,
+        description: Optional[Any] = None,
+        timestamp: Optional[datetime.datetime] = None,
+        author: Optional[Union[discord.User, discord.Member]] = None,
+    ) -> discord.Embed:
+        """Get an instance of the bot's global :class:`discord.Embed` with the default
+        bot's color, "Craig yellow".
 
-    @_wrap_extension
-    @discord.utils.copy_doc(commands.Bot.load_extension)  # type: ignore
-    def load_extension(self, name: str, *, package: Optional[str] = None) -> Coroutine[Any, Any, None]:  # type: ignore
-        return super().load_extension(name, package=package)
-
-    @_wrap_extension
-    @discord.utils.copy_doc(commands.Bot.unload_extension)  # type: ignore
-    def unload_extension(self, name: str, *, package: Optional[str] = None) -> Coroutine[Any, Any, None]:  # type: ignore
-        return super().unload_extension(name, package=package)
-
-    @_wrap_extension
-    @discord.utils.copy_doc(commands.Bot.reload_extension)  # type: ignore
-    def reload_extension(self, name: str, *, package: Optional[str] = None) -> Coroutine[Any, Any, None]:  # type: ignore
-        return super().reload_extension(name, package=package)
-
-    async def load_extensions(self, /, *, force_task: bool = True) -> List[Optional[asyncio.Task[None]]]:
-        """Loads the bot's extensions.
+        The parameters are the same as :class:`discord.Embed` except for one additional one.
 
         Parameters
         ----------
-        force_task: :class:`bool`
-            Whether or not to force the task to run :meth:`Scott.load_extensions`. This is for any
-            modules that wish to wait for an event to be fired before loading.
-        """
-        if force_task:
-            return [self.loop.create_task(self.load_extension(ext)) for ext in initial_extensions]  # type: ignore
-
-        return [await self.load_extension(ext) for ext in initial_extensions]  # type: ignore
-
-    async def setup_hook(self) -> None:
-        """|coro|
-
-        Called before the bot is ready to setup all extensions.
-        """
-        await self.load_extensions()
-
-    def safe_connection(self, timeout: float = 10) -> DbContextManager[Self]:
-        """|coro|
-
-        Generates a safe connection used to make database calls.
-
-        Parameters
-        ----------
-        timeout: Optional[:class:`float`]
-            The timeout to use for the connection. Defaults to 10.
-        """
-        return DbContextManager(self, timeout=timeout)  # type: ignore
-
-    async def get_context(self, message: discord.Message, *, cls: Type[context.Context[Self]] = context.Context) -> Any:  # type: ignore
-        """|coro|
-
-        Used to get context of a :class:`discord.Message`.
-
-        Parameters
-        ----------
-        interaction: :class:`discord.Interaction`
-            The interaction for the command.
-        cls: :class:`context.Context`
-            The subclassed context to pass onto the command.
-
-        Returns
-        --------
-        :class:`context.Context`
-        """
-        return await super().get_context(message, cls=cls)
-
-    async def get_logging_webhook(self) -> discord.Webhook:
-        """|coro|
-
-        Used to get the logging webhook for Fury Bot. This is the webhook that
-        is used to log anything the moderation needs to know about.
-        """
-        if not (webhook := getattr(self, 'logging_webhook', None)):
-            partial = discord.Webhook.from_url(self.logging_webhook_url, session=self.session, bot_token=self.http.token)
-            self.logging_webhook = webhook = await partial.fetch()
-
-        return webhook
-
-    async def _send_to_logging_webhook(self, *args: Any, **kwargs: Any) -> discord.WebhookMessage:
-        if args:
-            kwargs['content'] = args[0]
-
-        ping_staff = kwargs.pop('ping_staff', True)
-
-        if ping_staff:
-            mentions = discord.AllowedMentions(roles=[discord.Object(id=constants.LOCKDOWN_NOTIFICATIONS_ROLE)])
-
-            if content := kwargs.get('content'):
-                content = f'<@&{constants.LOCKDOWN_NOTIFICATIONS_ROLE}>\n{content}'
-            else:
-                content = f'<@&{constants.LOCKDOWN_NOTIFICATIONS_ROLE}>'
-
-            kwargs['content'] = content
-        else:
-            mentions = discord.AllowedMentions.none()
-
-        kwargs['allowed_mentions'] = mentions
-
-        webhook = await self.get_logging_webhook()
-        return await webhook.send(**kwargs)
-
-    async def send_to_logging_channel(self, *args: Any, **kwargs: Any) -> discord.WebhookMessage:
-        """Send a message to the logging channel.
-
-        This is the only non-native dpy related coro. This is so the on_error can get placed here and not
-        in the other class.
-
-        Parameters
-        ----------
-        *args: Tuple[Any]
-            The args to send along to the channel
-        **kwargs: Dict[Any, Any]
-            The kwargs to send along to the channel.
-
-        Raises
-        ------
-        :class:`discord.HTTPException`
-            Sending the message failed.
-        :class:`discord.Forbidden`
-            You do not have the proper permissions to send the message.
-        :class:`disord.InvalidArgument`
-            The files list is not of the appropriate size, you specified both file and files, or you specified both embed and embeds, or the reference object is not a Message, MessageReference or PartialMessage.
+        author: Optional[Union[:class:`discord.User`, :class:`discord.Member`]]
+            An optional author of this embed. When passed, will call :meth:`Embed.set_author` and set
+            the author's name nad icon url.
 
         Returns
         -------
-        :class:`discord.WebhookMessage`
-            The message that was sent.
+        :class:`discord.Embed`
         """
-        await self.wait_until_ready()
-
-        async with self._webhook_lock:
-            return await self._send_to_logging_webhook(
-                username=self.user.display_name, avatar_url=self.user.display_avatar.url, *args, **kwargs
-            )
-
-    async def send_many_to_logging_channel(
-        self,
-        args: List[Tuple[Any, ...]],
-        kwargs: List[Dict[Any, Any]],
-    ) -> List[discord.WebhookMessage]:
-        """|coro|
-
-        Used to send many messages to the logging channel whilst ensuring
-        that the messages are sent in order.
-
-        Parameters
-        ----------
-        args: List[Tuple[Any]]
-            A list of args to send along to the channel.
-        kwargs: List[Dict[Any, Any]]
-            A list of kwargs to send along to the channel. The index
-            of each arg item must match the index of the kwarg item.
-
-        Returns
-        -------
-        List[:class:`discord.WebhookMessage`]
-            The list of messages that were sent.
-        """
-        await self.wait_until_ready()
-
-        items: List[discord.WebhookMessage] = []
-        async with self._webhook_lock:
-            for index, arg in enumerate(args):
-                try:
-                    kwarg = kwargs[index]
-                except IndexError:
-                    kwarg = {}
-
-                message = await self._send_to_logging_webhook(
-                    username=self.user.display_name, avatar_url=self.user.display_avatar.url, *arg, **kwarg
-                )
-                items.append(message)
-
-        return items
-
-    async def on_ready(self):
-        """|coro|
-
-        An event that's called when the bot's internal state reaches ready. At this point,
-        cahce has been fully populated and the bot is ready to be used.
-        """
-        log.info(f"{self.user.name} has come online.")
-        log.info(
-            discord.utils.oauth_url(
-                self.application_id,  # type: ignore
-                permissions=discord.Permissions(8),
-            )
+        embed = discord.Embed(
+            title=title, description=description, url=url, color=color, colour=colour, type=type, timestamp=timestamp
         )
 
-    async def on_error(self, event_method: str, /, *args: Any, **kwargs: Any) -> None:
-        """Called when the Bot runs into an error that is not handled by `on_command_error`.
+        if author:
+            embed.set_author(name=author.name, icon_url=author.display_avatar.url)
 
-        This will log error and send it to the logging channel.
+        return embed
 
-        Parameters
-        ----------
-        event_method: :class:`str`
-            The name of the method that created the error.
-        *args: Any
-            The arguments that were passed to the method.
-        **kwargs: Any
-            The keyword arguments that were passed to the method.
-        """
-        type, value, traceback_str = sys.exc_info()
-        if not type:
-            raise
-
-        trace_str = ''.join(traceback.format_exception(type, value, traceback_str))
-        log.exception(f'Exception in {event_method}', exc_info=value)
-
-        sending_args: List[Tuple[str, ...]] = [(item,) for item in _yield_chunks(trace_str)]
-        await self.send_many_to_logging_channel(args=sending_args, kwargs=[])
-
-
-class FuryBot(DiscordBot, TimerManager):  # type: ignore
-    """
-    The main implementation of Fury Bot. This combines
-    both the Discord Bot and the Timer Manager into one, and adds
-    methods to the bot that are used to manage lockdowns, profanity,
-    and link checking.
-
-    Attributes
-    ----------
-    profanity: :class:`ProfanityChecker`
-        The profanity manager for the bot.
-    links: :class:`LinkChecker`
-        The link checker for the bot.
-    executor: :class:`concurrent.futures.ThreadPoolExecutor`
-        The executor used to run tasks in the background.
-    mystbin: :class:`Mystbin`
-        The mystbin manager for the bot.
-    start_time: :class:`datetime.datetime`
-        The time the bot started, in utc.
-    """
-
-    def __init__(
-        self, *, pool: asyncpg.Pool[asyncpg.Record], session: aiohttp.ClientSession, loop: asyncio.AbstractEventLoop
-    ) -> None:
-        super().__init__(pool=pool, session=session, loop=loop)
-        self.profanity = ProfanityChecker(wrap=self.wrap, safe_connection=self.safe_connection)  # type: ignore
-        self.links: LinkChecker = LinkChecker(wrap=self.wrap, safe_connection=self.safe_connection, extract_email=True)  # type: ignore
-
-        self.executor = ThreadPoolExecutor(max_workers=15)
-        self.mystbin: mystbin.Client = mystbin.Client(session=self.session)  # type: ignore
-        self.start_time: datetime.datetime = datetime.datetime.utcnow()
-        self.translator = googletrans.Translator()  # type: ignore
-
-        self._have_data = asyncio.Event()
-        self._current_timer = None
-
-        self.highlight_cache: Dict[int, List[Dict[str, Any]]] = {}
-
-    @discord.utils.cached_property
-    def uptime_timestamp(self) -> str:
-        """:class:`str`: The uptime of the bot in a human-readable Discord timestamp format.
-
-        Raises
-        ------
-        AttributeError
-            The bot has not hit on-ready yet.
-        """
-        if not self.is_ready():
-            raise AttributeError('The bot has not hit on-ready yet.')
-
-        return discord.utils.format_dt(self.start_time)
-
-    @discord.utils.cached_property
-    def fury_guild(self) -> discord.Guild:
-        """:class:`discord.Guild`: The FLVS Fury guild."""
-        guild = self.get_guild(constants.FURY_GUILD)
-        if not guild:
-            raise ValueError(f'Could not find guild {constants.FURY_GUILD}')
-
-        return guild
-
-    def get_lockdown_role(self) -> discord.Role:
-        """:class:`discord.Role`: Get the lockdown role for the guild."""
-        role = self.fury_guild.get_role(constants.LOCKDOWN_ROLE)
-        if not role:
-            raise RuntimeError('Get lockdown role returned None')
-
-        return role
-
+    # Hooks
     async def setup_hook(self) -> None:
-        """|coro|
+        for extension in initial_extensions:
+            await self.load_extension(extension)
 
-        Called before the bot is ready to setup all extensions.
-        """
-        self._task = self.loop.create_task(self.dispatch_timers())
-        self.loop.create_task(self.censor('Hello'))  # To load the profanity cache
-
-        await self.load_cache()
-        await super().setup_hook()
-
-    async def load_cache(self) -> None:
         async with self.safe_connection() as connection:
-            data = await connection.fetch('SELECT * FROM highlight')
+            data = await connection.fetch('SELECT * FROM teams.settings')
 
-        if not data:
-            return
+            for row in data:
+                team = await Team.from_connection(dict(row), bot=self, connection=connection)
+                self.team_cache[team.id] = team
 
-        for item in data:
-            try:
-                self.highlight_cache[item['member']].append(dict(item))
-            except:
-                self.highlight_cache[item['member']] = [dict(item)]
+            scrim_records = await connection.fetch('SELECT * FROM teams.scrims')
 
-    def chunker(
-        self, iterable: Union[str, _Chunkable], /, *, size: int = 2000
-    ) -> Generator[Union[str, _Chunkable], None, None]:
-        """
-        A generator used to chunk a string or iterable.
+            for entry in scrim_records:
+                data = dict(entry)
+                data['status'] = ScrimStatus(data['status'])
 
-        Parameters
-        ----------
-        iterable: Union[:class:`str`, :class:`_Chunkable`]
-            The iterable to chunk.
-        size: :class:`int`
-            The size of each chunk.
+                scrim = Scrim(self, **data)
+                scrim.load_persistent_views()
+                self.team_scrim_cache[scrim.id] = scrim
 
-        Yields
-        -------
-        Union[:class:`str`, :class:`_Chunkable`]
-            The chunked iterable.
-        """
-        yield from [iterable[i : i + size] for i in range(0, len(iterable), size)]
-
-    def code_chunker(self, iterable: Union[str, _Chunkable], /) -> Generator[Union[str, _Chunkable], None, None]:
-        """
-        A generator used to chunk a string or iterable.
-
-        Parameters
-        ----------
-        iterable: Union[:class:`str`, :class:`_Chunkable`]
-            The iterable to chunk.
-        size: :class:`int`
-            The size of each chunk.
-
-        Yields
-        -------
-        Union[:class:`str`, :class:`_Chunkable`]
-            The chunked iterable.
-        """
-        yield from (f'```python\n{item}\n```' for item in self.chunker(iterable, size=1500))
-
-    async def wrap(self, method: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
+    # Events
+    async def on_ready(self) -> None:
         """|coro|
 
-        A utility method used to wrap a blocking call in a `run_in_executor` to not block the bot.
+        Called when the client has hit READY. Please note this can be called more than once during the clients
+        uptime.
+        """
+        _log.info(f"Logged in as {self.user.name}")
+        _log.info(
+            f'Connected to {len(self.guilds)} servers total watching over {sum(list(m_count for g in self.guilds if (m_count := g.member_count))):,} members.'
+        )
+        _log.info(f'Invite link: {discord.utils.oauth_url(self.user.id, permissions=discord.Permissions(0))}')
+
+    # Helper utilities
+    def safe_connection(self, *, timeout: Optional[float] = 10.0) -> DbContextManager:
+        """A context manager that will acquire a Connection from the bot's pool.
+
+        This will neatly manage the Connection and release it back to the pool when the context is exited.
+
+        .. code-block:: python3
+
+            async with bot.safe_connection(timeout=10) as connection:
+                await connection.execute('SELECT 1')
+        """
+        return DbContextManager(self, timeout=timeout)
+
+    def create_task(self, coro: Coroutine[T, Any, Any], *, name: Optional[str] = None) -> asyncio.Task[T]:
+        """Create a task from a coroutine object.
 
         Parameters
         ----------
-        method: Callable[P, T]
-            The method to wrap.
+        coro: :class:`~asyncio.Coroutine`
+            The coroutine to create the task from.
+        name: Optional[:class:`str`]
+            The name of the task.
+
+        Returns
+        -------
+        :class:`~asyncio.Task`
+            The task that was created.
+        """
+
+        return self.loop.create_task(coro, name=name)
+
+    def wrap(self, func: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> asyncio.Future[T]:
+        """|coro|
+
+        A helper function to bind blocking cpu bound functions to the event loop to make them not blocking.
+
+
+        Parameters
+        ----------
+        func: Callable[P, T]
+            The function to wrap.
         *args: P.args
-            The arguments to pass to the method.
+            The arguments to pass to the function.
         **kwargs: P.kwargs
-            The keyword arguments to pass to the method.
+            The keyword arguments to pass to the function.
 
         Returns
         -------
-        T
-            The result of the method.
+        asyncio.Future[T]
+            The future that will be resolved when the function is done.
         """
-        wrapped = functools.partial(method, *args, **kwargs)
-        return await self.loop.run_in_executor(self.executor, wrapped)
-
-    async def censor(self, text: str) -> str:
-        """|coro|
-
-        Censor a text string using the profanity manager.
-
-        Parameters
-        ----------
-        text: :class:`str`
-            The text to censor.
-
-        Returns
-        -------
-        :class:`str`
-            The censored text.
-        """
-        return await self.profanity.censor(text)  # type: ignore
-
-    async def contains_profanity(self, text: str) -> bool:
-        """|coro|
-
-        Used to determine if a message has profanity.
-
-        Parameters
-        ----------
-        text: :class:`str`
-            The text to check.
-
-        Returns
-        -------
-        :class:`bool`
-            Whether or not the text contains profanity.
-        """
-        return await self.profanity.censor(text) != text  # type: ignore
-
-    async def get_links(self, text: str) -> List[str]:
-        """|coro|
-
-        Extract links from a a text string.
-
-        Parameters
-        ----------
-        text: :class:`str`
-            The text to extract URL's from.
-
-        Returns
-        -------
-        List[:class:`str`]
-            The list of url's extracted from the text.
-        """
-        return await self.links.get_links(text)
-
-    async def contains_links(self, text: str) -> bool:
-        """|coro|
-
-        Determine if a text contains links.
-
-        Parameters
-        ----------
-        text: :class:`str`
-            The text to determine.
-
-        Returns
-        -------
-        :class:`bool
-            Whether or not the text contains links.
-        """
-        return await self.links.contains_links(text)
-
-    async def is_valid_link(self, link: str) -> bool:
-        """|coro|
-
-        A method used to determine if a link is valid or not. A valid
-        link is one that has been authorized for use by the moderation team.
-
-        Parameters
-        ----------
-        link: :class:`str`
-            The link to check.
-
-        Returns
-        -------
-        :class:`bool`
-            Whether or not the link is valid.
-        """
-        if any(prefix in link for prefix in self.command_prefix):  # type: ignore
-            return True
-
-        return await self.links.is_valid_link(link)
-
-    async def post_to_mystbin(self, content: str, syntax: str = 'python') -> mystbin.Paste:  # type: ignore # module is incorrect
-        """Post content to Mystbin and get the response back.
-
-        Parameters
-        ----------
-        content: :class:`str`
-            The content to pass along to mystbin
-        syntax: :class:`str`
-            The syntax to use with your upload.
-
-        Returns
-        -------
-        :class:`mystbin.Post`
-        """
-        return await self.mystbin.post(content, syntax)  # type: ignore # This is not of concern to us.
-
-    async def translate(self, text: str) -> googletrans.Translated:  # type: ignore # The module is built incorrectly
-        """|coro|
-
-        Used to translate text from one language to another.
-
-        Parameters
-        ----------
-        text: :class:`str`
-            The text to translate.
-
-        Returns
-        -------
-        :class:`googletrans.Translated`
-            The translated text.
-        """
-        try:
-            return await self.wrap(self.translator.translate, text)  # type: ignore
-        except IndexError:
-            return type('Translated', (object,), {'text': text})  # type: ignore
-
-    @overload
-    async def is_locked(
-        self,
-        member: Union[discord.Member, discord.User],
-        *,
-        return_record: Literal[True] = True,
-        connection: Optional[asyncpg.Connection[asyncpg.Record]] = None,
-    ) -> asyncpg.Record:
-        ...
-
-    @overload
-    async def is_locked(
-        self,
-        member: Union[discord.Member, discord.User],
-        *,
-        return_record: Literal[False] = False,
-        connection: Optional[asyncpg.Connection[asyncpg.Record]] = None,
-    ) -> bool:
-        ...
-
-    async def is_locked(
-        self,
-        member: Union[discord.Member, discord.User],
-        *,
-        return_record: bool = False,
-        connection: Optional[asyncpg.Connection[asyncpg.Record]] = None,
-    ) -> Union[asyncpg.Record, bool]:
-        """Determine if a member is locked.
-
-        Parameters
-        ----------
-        member: Union[:class:`discord.Member`, :class:`discord.User`]
-            The member to check.
-        return_record: Optional[:class:`bool`]
-            Denotes if the record should be returned.
-        connection: Optional[:class:`asyncpg.Connection`]
-            The connection to use, if any.
-
-        Returns
-        -------
-        :class:`bool`
-        """
-        query = 'SELECT * FROM timers WHERE extra#>\'{kwargs, member}\' = $1 AND extra#>\'{kwargs, type}\' = $2 AND dispatched = $3'
-        if not connection:
-            async with self.safe_connection() as conn:
-                data = await conn.fetchrow(
-                    query,
-                    member.id,
-                    'lockdowns',
-                    False,
-                )
-        else:
-            data = await connection.fetchrow(query, member.id, 'lockdowns', False)
-
-        if return_record:
-            return data
-
-        return False if not data else True
-
-    async def send_to(self, member: discord.abc.Messageable, *args: Any, **kwargs: Any) -> Optional[discord.Message]:
-        """Neatly sends a message to a member. Any exceptions thrown will be quietly handled.
-
-        Parameters
-        ----------
-        member: Union[:class:`discord.Member`, :class:`discord.User`]
-            The member or user to send to.
-        args: List[Any]
-            The args to pass along to the send function.
-        kwargs: Dict[Any, Any]
-            The args to pass along to the send function.
-
-        Returns
-        -------
-        Optional[:class:`discord.Message`]
-            The message returned from sending to the member. Is none if sending failed.
-        """
-        try:
-            return await member.send(*args, **kwargs)
-        except (discord.HTTPException, discord.Forbidden):
-            return None
-
-    async def lockdown(
-        self, member: discord.Member, *, reason: Optional[str] = None, time: datetime.datetime, **kwargs: Any
-    ) -> Optional[Timer]:
-        """Adds a user to Lockdown.
-
-        Parameters
-        ----------
-        member: :class:`discord.Member`
-            The member to Lockdown.
-        reason: Optional[:class:`str`]
-            The reason for locking down the member.
-        time: :class:`datetime.datetime`
-            The time to lock the member down until.
-        raise_for_exception: Optional[:class:`bool`]
-            Whether or not to raise an exception if the member is already locked.
-
-        Returns
-        -------
-        Optional[:class:`Timer`]
-            The timer created for the lockdown. If ``None`` is returned,
-            locking this member failed.
-
-        Raises
-        ------
-        MemberAlreadyLocked
-            The member is already locked.
-        """
-        log.info('Coro lockdown was called on %s for reason %s', member, reason)
-
-        raise_for_exception = kwargs.pop('raise_for_exception', True)
-
-        if await self.is_locked(member):
-            if not raise_for_exception:
-                return None
-
-            raise MemberAlreadyLocked(f'Member {member} is already locked.')
-
-        channels: List[int] = []
-        for channel in member.guild.channels:  # Remove any special team creation. EX: rocket-league-1
-            overwrites = channel.overwrites
-            if (specific := overwrites.get(member)) and (specific.view_channel or specific.send_messages):
-
-                # NOTE: I dont like this, update it so it keeps
-                # track of the correct permission.
-                specific.update(view_channel=False, send_messages=False)
-                await channel.edit(overwrites=overwrites)  # type: ignore
-                channels.append(channel.id)
-
-        kwargs['channels'] = channels
-        kwargs['roles'] = [r.id for r in member.roles if r.is_assignable()]
-        kwargs['reason'] = reason
-
-        lr = self.get_lockdown_role()
-        roles = [lr]
-        roles.extend([r for r in member.roles if not r.is_assignable()])  # The role(s) a bot can not change.
-
-        try:
-            await member.edit(roles=roles, reason='Member is getting locked down.')
-        except discord.Forbidden:
-            return None
-
-        timer = await self.create_timer(time, 'lockdowns', precise=False, member=member.id, type='lockdowns', **kwargs)
-
-        embed = Embed(
-            title='Oh no!',
-            description=f'You have been given the **Lockdown** role in the FLVS Fury server. '
-            'This means you cannot interact with the server for now.',
-            author=member,
-        )
-        embed.add_field(name='Reason', value=f'Locked down for reason: {reason}')
-        embed.add_field(
-            name='Expires',
-            value=f'The lockdown expires in {human_timedelta(time)}{" ({})".format(discord.utils.format_dt(time))}',
-        )
-
-        await self.send_to(member, embed=embed)
-        return timer
-
-    async def lockdown_for(
-        self, seconds: int, member: discord.Member, *, reason: Optional[str] = None, **kwargs: Any
-    ) -> Optional[Timer]:
-        """|coro|
-
-        Used to lockdown a member for a specific amount of time.
-
-        Parameters
-        ----------
-        seconds: :class:`int`
-            The total time, in seconds, to lockdown the member.
-        member: :class:`discord.Member`
-            The member to Lockdown.
-        reason: Optional[:class:`str`]
-            The reason for locking down the member.
-        raise_for_exception: Optional[:class:`bool`]
-            Whether or not to raise an exception if the member is already locked.
-
-        Returns
-        -------
-        Optional[:class:`Timer`]
-            The timer created for the lockdown. If ``None`` is returned,
-            locking this member failed.
-
-        Raises
-        ------
-        MemberAlreadyLocked
-            The member is already locked.
-
-        """
-        # Let's convert the time first
-        when = await UserFriendlyTime(converter=None, default='for lockdown').convert(context.DummyContext(), f'{seconds}s')  # type: ignore
-        return await self.lockdown(member, reason=reason, time=when.dt, **kwargs)
-
-    async def freedom(self, member: discord.Member, *, raise_for_exception: bool = True) -> Optional[Timer]:
-        """|coro|
-
-        Called to prematurely remove the lockdown timer, this will override the existing timer.
-
-        Parameters
-        ----------
-        member: :class:`discord.Member`
-            The member to free from lockdown.
-        raise_for_exception: Optional[:class:`bool`]
-            Whether or not to raise an exception if the member is not locked.
-
-        Returns
-        -------
-        Optional[:class:`Timer`]
-            The timer that was removed. If ``None`` is returned,
-            there was no timer to remove.
-
-        Raises
-        ------
-        MemberNotLocked
-            The Member was not locked.
-        """
-        log.info(f'Coro freedom called on {member}')
-
-        # Called to prematurely remove the lockdown timer.
-        async with self.safe_connection() as conn:
-            if not (data := await self.is_locked(member, return_record=True, connection=conn)):
-                if not raise_for_exception:
-                    return None
-
-                raise MemberNotLocked(f'Member {member} is not locked.')
-
-            timer = Timer(record=data)
-            await conn.execute('UPDATE timers SET dispatched = $1 WHERE id = $2', True, timer.id)
-
-        timer.member = member
-
-        self.dispatch('lockdowns_timer_complete', timer)
-        return timer
+        return self.loop.run_in_executor(self.thread_pool, functools.partial(func, *args, **kwargs))
+
+    @wrap_extension
+    async def load_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
+        return await super().load_extension(name, package=package)
+
+    @wrap_extension
+    async def reload_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
+        return await super().reload_extension(name, package=package)
+
+    @wrap_extension
+    async def unload_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
+        return await super().unload_extension(name, package=package)

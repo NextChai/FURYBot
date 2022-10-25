@@ -23,29 +23,22 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import Mapping, Tuple, Type, Union
+import enum
 
-import discord
+# Persistent views for team scrim confirmation from both
+class ScrimStatus(enum.Enum):
+    """
+    An enum to represent the status of a scrim.
 
-__all__: Tuple[str, ...] = (
-    'RULES_CHANNEL_ID',
-    'TEXT_CHANNEL_EMOJI',
-    'VOICE_CHANNEL_EMOJI',
-    'THREAD_CHANNEL_EMOJI',
-    'CATEGORY_CHANNEL_EMOJI',
-    'CHANNEL_EMOJI_MAPPING',
-)
+    pending_away: The away team has not yet confirmed the scrim.
+    scheduled: The scrim has been scheduled.
+    pending_host: The scrim is pending confirmation from the host.
+    """
 
-RULES_CHANNEL_ID: int = 763418952243347467
+    pending_away = 'pending_away'
+    scheduled = 'scheduled'
+    pending_host = 'pending_host'
 
-TEXT_CHANNEL_EMOJI: str = '<:text:1033064232767467560> '
-VOICE_CHANNEL_EMOJI: str = '<:voice:1033064208457285784>'
-THREAD_CHANNEL_EMOJI: str = '<:thread:1033064225133822073>'
-CATEGORY_CHANNEL_EMOJI: str = '<:category:1033064217336615004> '
 
-CHANNEL_EMOJI_MAPPING: Mapping[Type[Union[discord.abc.GuildChannel, discord.Thread]], str] = {
-    discord.TextChannel: TEXT_CHANNEL_EMOJI,
-    discord.VoiceChannel: VOICE_CHANNEL_EMOJI,
-    discord.CategoryChannel: CATEGORY_CHANNEL_EMOJI,
-    discord.Thread: THREAD_CHANNEL_EMOJI,
-}
+from .persistent import *
+from .scrim import *

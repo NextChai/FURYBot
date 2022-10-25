@@ -1,4 +1,4 @@
-"""
+""" 
 The MIT License (MIT)
 
 Copyright (c) 2020-present NextChai
@@ -23,40 +23,70 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Any, Tuple
 
-import discord
+from discord import app_commands
 
-__all__: Tuple[str, ...] = ('FuryException', 'ProfanityFailure', 'MemberAlreadyLocked', 'MemberNotLocked')
-
-
-class FuryException(discord.ClientException):
-    """The base Fury Exception for all custom Fury bot excpetions."""
-
-    pass
-
-
-class ProfanityFailure(FuryException):
-    """The exception raised when a profanity filter fails."""
-
-    pass
+__all__: Tuple[str, ...] = (
+    'ApplicationCommandException',
+    'AutocompleteValidationException',
+    'BadArgument',
+    'TimerNotFound',
+)
 
 
-class MemberAlreadyLocked(FuryException):
-    """Raised when a member is already locked."""
+class ApplicationCommandException(app_commands.AppCommandError):
 
-    pass
+    """A custom exception raised when an operation fails in an application command's
+    callback.
 
+    This inherits :class:`discord.AppCommandError` and :class:`BotException`.
 
-class MemberNotLocked(FuryException):
-    """Raised when a member is not locked."""
+    Parameters
+    ----------
+    interaction: :class:`discord.Interaction`
+        The interaction created from the command invocation.
 
-    pass
-
-
-class TimerNotFound(FuryException):
+    Attributes
+    ----------
+    interaction: :class:`discord.Interaction`
+        The interaction created from the command invocation.
     """
-    An exception raised when a timer is not found.
+
+    __slots__: Tuple[str, ...] = ()
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class AutocompleteValidationException(ApplicationCommandException, app_commands.TransformerError):
+    """An exception raised when validating the input from an autocomplete
+    fails.
+
+    This inherits :class:`ApplicationCommandException`.
+    """
+
+    pass
+
+
+class BadArgument(ApplicationCommandException):
+    """An exception raised when a command argument is invalid.
+
+    This inherits :class:`ApplicationCommandException`.
+    """
+
+    pass
+
+
+class TimerNotFound(Exception):
+    """An exception raised when a timer is not found.
+
+    This inherits from :class:`BotException`
+
+    Parameters
+    ----------
+    id: :class:`int`
+        The ID of the timer that was not found.
 
     Attributes
     ----------

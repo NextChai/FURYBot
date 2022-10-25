@@ -23,14 +23,49 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Tuple, TypeAlias, Union
-
 import discord
 from discord.ext import commands
 
-if TYPE_CHECKING:
-    from bot import FuryBot
+from utils import BaseCog
 
-__all__: Tuple[str, ...] = ('Context',)
 
-Context: TypeAlias = 'commands.Context[FuryBot]'
+def valid_message(message: discord.Message) -> bool:
+    if not message.guild:
+        return False
+    if not isinstance(message.author, discord.Member):
+        return False
+    if not message.content:
+        return False
+
+    return True
+
+
+class Link(BaseCog):
+    @commands.Cog.listener('on_message')
+    async def link_check(self, message: discord.Message) -> None:
+        if not valid_message(message):
+            return
+
+        assert message.guild
+
+        links = await self.bot.link_filter.get_links(message.content, guild_id=message.guild.id)
+        if not links:
+            return
+
+        self.bot.dispatch('links_found', message, links)
+
+    @commands.Cog.listener('on_message_edit')
+    async def link_check_on_edit(self, before: discord.Message, after: discord.Message) -> None:
+        if before.content == after.content:
+            return
+
+        if not valid_message(after):
+            return
+
+        assert after.guild
+
+        links = await self.bot.link_filter.get_links(after.content, guild_id=after.guild.id)
+        if not links:
+            return
+
+        self.bot.dispatch('links_found', after, links)

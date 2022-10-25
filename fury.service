@@ -1,0 +1,9 @@
+[Unit]
+Description=The Fury bot service.
+
+[Service]
+ExecStart=python3.10 /root/Fury-Bot/__main__.py
+WorkingDirectory=/root/Fury-Bot/
+
+[Install]
+WantedBy=multi-user.target
