@@ -39,8 +39,7 @@ CREATE TABLE IF NOT EXISTS teams.settings (
     description TEXT,
     logo TEXT,
     captain_role_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
-    sub_role_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
-    -- Roles of subs for this team
+    sub_role_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [] -- Roles of subs for this team
 );
 
 CREATE TABLE IF NOT EXISTS teams.members (
