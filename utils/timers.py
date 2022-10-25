@@ -288,6 +288,11 @@ class TimerManager:
             self.bot.dispatch(timer.event_name, *timer.args, **timer.kwargs)
         else:
             self.bot.dispatch(timer.event_name, timer)
+            
+    def restart_task(self) -> None:
+        if self._task:
+            self._task.cancel()
+            self._task = self.bot.create_task(self.dispatch_timers())
 
     async def dispatch_timers(self):
         """|coro|

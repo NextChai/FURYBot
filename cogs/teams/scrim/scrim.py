@@ -31,6 +31,8 @@ from typing import TYPE_CHECKING, List, Optional, Type, cast
 import discord
 from typing_extensions import Self
 
+from discord.utils import MISSING
+
 from utils import MiniQueryBuilder
 
 from .persistent import AwayConfirm, HomeConfirm
@@ -114,6 +116,11 @@ class Scrim:
     scheduled_for: datetime.datetime
     scrim_chat_id: Optional[int]
 
+    # Items for timers
+    scrim_scheduled_timer_id: Optional[int]
+    scrim_reminder_timer_id: Optional[int]
+    scrim_delete_timer_id: Optional[int]
+
     @classmethod
     async def create(
         cls: Type[Self],
@@ -161,11 +168,19 @@ class Scrim:
 
             await connection.execute('UPDATE teams.scrims SET home_message_id = $1 WHERE id = $2', message.id, scrim.id)
 
-        await bot.timer_manager.create_timer(when, 'scrim_scheduled', scrim_id=scrim.id)
+        scrim_scheduled_timer = await bot.timer_manager.create_timer(when, 'scrim_scheduled', scrim_id=scrim.id)
 
         # If the scrim is more than a day out, create a reminder
+        scrim_reminder_timer = None
         if (when - datetime.datetime.utcnow()).days > 1:
-            await bot.timer_manager.create_timer(when - datetime.timedelta(minutes=30), 'scrim_reminder', scrim_id=scrim.id)
+            scrim_reminder_timer = await bot.timer_manager.create_timer(
+                when - datetime.timedelta(minutes=30), 'scrim_reminder', scrim_id=scrim.id
+            )
+
+        await scrim.edit(
+            scrim_scheduled_timer_id=scrim_scheduled_timer.id,
+            scrim_reminder_timer_id=scrim_reminder_timer and scrim_reminder_timer.id,
+        )
 
         return scrim
 
@@ -270,6 +285,45 @@ class Scrim:
         channel = self.away_team.text_channel
         return await channel.fetch_message(self.away_confirm_anyways_message_id)
 
+    async def edit(
+        self,
+        *,
+        scrim_chat_id: Optional[int] = MISSING,
+        scrim_scheduled_timer_id: Optional[int] = MISSING,
+        scrim_reminder_timer_id: Optional[int] = MISSING,
+        scrim_delete_timer_id: Optional[int] = MISSING,
+        scheduled_for: datetime.datetime = MISSING,
+    ) -> None:
+        builder = MiniQueryBuilder('teams.scrims')
+        builder.add_condition('id', self.id)
+
+        if scrim_chat_id is not MISSING:
+            builder.add_arg('scrim_chat_id', scrim_chat_id)
+            self.scrim_chat_id = scrim_chat_id
+        if scrim_scheduled_timer_id is not MISSING:
+            builder.add_arg('scrim_scheduled_timer_id', scrim_scheduled_timer_id)
+            self.scrim_scheduled_timer_id = scrim_scheduled_timer_id
+        if scrim_reminder_timer_id is not MISSING:
+            builder.add_arg('scrim_reminder_timer_id', scrim_reminder_timer_id)
+            self.scrim_reminder_timer_id = scrim_reminder_timer_id
+        if scrim_delete_timer_id is not MISSING:
+            builder.add_arg('scrim_delete_timer_id', scrim_delete_timer_id)
+            self.scrim_delete_timer_id = scrim_delete_timer_id
+        if scheduled_for is not MISSING:
+            builder.add_arg('scheduled_for', scheduled_for)
+            self.scheduled_for = scheduled_for
+
+        await builder(self.bot)
+
+    async def create_scrim_chat(self) -> discord.TextChannel:
+        channel = await self.home_team.category_channel.create_text_channel(
+            name='scrim-chat', topic=f'Scrim chat for {self.home_team.name} vs {self.away_team.name}'
+        )
+
+        await self.edit(scrim_chat_id=channel.id)
+
+        return channel
+
     async def change_status(self, status: ScrimStatus, /) -> None:
         """|coro|
 
@@ -359,12 +413,7 @@ class Scrim:
 
     async def reschedle(self, when: datetime.datetime, *, editor: discord.abc.User) -> None:
         # Let's update the scrim's messages from the old time to the new time and update the scrim
-        builder = MiniQueryBuilder('teams.scrims')
-        builder.add_arg('scheduled_for', when)
-        builder.add_condition('id', self.id)
-        await builder(self.bot)
-
-        self.scheduled_for = when
+        await self.edit(scheduled_for=when)
 
         # Now let's update the messages, if any
         home_message = await self.home_message()
@@ -389,16 +438,30 @@ class Scrim:
         async with self.bot.safe_connection() as connection:
             await connection.execute('DELETE FROM teams.scrims WHERE id = $1', self.id)
 
+            if self.scrim_scheduled_timer_id:
+                await connection.execute('DELETE FROM timers WHERE id = $1', self.scrim_scheduled_timer_id)
+
+            if self.scrim_reminder_timer_id:
+                await connection.execute('DELETE FROM timers WHERE id = $1', self.scrim_reminder_timer_id)
+
+            if self.scrim_delete_timer_id:
+                await connection.execute('DELETE FROM timers WHERE id = $1', self.scrim_delete_timer_id)
+
+        # Just in case the bot was waiting on one of these timers, restart the timer loop
+        self.bot.timer_manager.restart_task()
+
+        self.bot.team_scrim_cache.pop(self.id, None)
+
         embed = self.bot.Embed(
             title='Scrim Cancelled',
-            description=f'The scrim scheduled for {self.scheduled_for_formatted()} has been cancelled by a moderator.',
+            description=f'The scrim scheduled for {self.scheduled_for_formatted()} has been cancelled.',
         )
         embed.set_footer(text='This scrim has been cancelled.')
 
         home_message = await self.home_message()
         await home_message.edit(embed=embed, view=None)
         await home_message.reply(
-            '@everyone, this scrim has been cancelled by a moderator.',
+            '@everyone, this scrim has been cancelled.',
             allowed_mentions=discord.AllowedMentions(everyone=True),
         )
 
@@ -406,7 +469,7 @@ class Scrim:
         if away_message is not None:
             await away_message.edit(embed=embed, view=None)
             await away_message.reply(
-                '@everyone, this scrim has been cancelled by a moderator.',
+                '@everyone, this scrim has been cancelled.',
                 allowed_mentions=discord.AllowedMentions(everyone=True),
             )
 
