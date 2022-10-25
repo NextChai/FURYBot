@@ -288,7 +288,7 @@ class TimerManager:
             self.bot.dispatch(timer.event_name, *timer.args, **timer.kwargs)
         else:
             self.bot.dispatch(timer.event_name, timer)
-            
+
     def restart_task(self) -> None:
         if self._task:
             self._task.cancel()
@@ -320,9 +320,7 @@ class TimerManager:
         except asyncio.CancelledError:
             raise
         except (OSError, discord.ConnectionClosed, asyncpg.PostgresConnectionError):
-            if self._task:
-                self._task.cancel()
-                self._task = self.bot.create_task(self.dispatch_timers())
+            self.restart_task()
 
     async def create_timer(
         self,
