@@ -12,3 +12,4 @@ parsedatetime
 python-dateutil
 pytz
 jishaku
+fuzzywuzzy

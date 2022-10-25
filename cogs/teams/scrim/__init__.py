@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import enum
 
+
 # Persistent views for team scrim confirmation from both
 class ScrimStatus(enum.Enum):
     """

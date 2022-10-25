@@ -24,10 +24,11 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import difflib
-from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union, cast
 
 import discord
 from discord import app_commands
+from fuzzywuzzy import process as fuzzy_process
 
 from utils import AutocompleteValidationException
 
@@ -90,8 +91,9 @@ class TeamTransformer(app_commands.Transformer):
             return []
 
         available_team_mapping = {team.name: team for team in available_teams}
-        similar: List[str] = await bot.wrap(difflib.get_close_matches, value, list(available_team_mapping.keys()), n=25)  # type: ignore
-        available_teams = [available_team_mapping[team_name] for team_name in similar]
+
+        similar: List[Tuple[str, int]] = await bot.wrap(fuzzy_process.extract, value, list(available_team_mapping.keys()), limit=25)  # type: ignore
+        available_teams = [available_team_mapping[team_name] for team_name, _match_percentage in similar]
 
         return available_teams[:25]
 

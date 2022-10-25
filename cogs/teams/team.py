@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING, Dict, List, Optional, Type, cast, Any
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, cast
 
 import discord
 from typing_extensions import Self, TypeVarTuple
@@ -33,6 +33,7 @@ from utils import MiniQueryBuilder
 
 if TYPE_CHECKING:
     from asyncpg import Connection, Record
+
     from bot import FuryBot
 
     from .scrim import Scrim

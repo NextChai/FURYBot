@@ -28,14 +28,13 @@ import datetime
 from typing import TYPE_CHECKING, List, Literal, Optional, Type, cast
 
 import discord
-from typing_extensions import Self
-
 from discord.utils import MISSING
+from typing_extensions import Self
 
 from utils import MiniQueryBuilder
 
-from .persistent import AwayConfirm, HomeConfirm, AwayForceConfirm
 from . import ScrimStatus
+from .persistent import AwayConfirm, AwayForceConfirm, HomeConfirm
 
 if TYPE_CHECKING:
     from bot import FuryBot

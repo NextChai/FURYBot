@@ -24,14 +24,14 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Callable, Annotated, Optional, TypeAlias, cast
+from typing import TYPE_CHECKING, Annotated, Callable, Optional, TypeAlias, cast
 
 import discord
 from discord import app_commands
 from discord.ext import commands
-from cogs.teams.scrim import ScrimStatus
 
-from utils import BaseCog, TimeTransformer, Context
+from cogs.teams.scrim import ScrimStatus
+from utils import BaseCog, Context, TimeTransformer
 
 from .scrim import Scrim
 from .team import Team
