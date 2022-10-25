@@ -182,7 +182,7 @@ class Teams(BaseCog):
                     text_channel.id,
                     voice_channel.id,
                     category_channel.name,
-                    captain_roles,
+                    [r.id for r in captain_roles],
                 )
 
                 assert data
