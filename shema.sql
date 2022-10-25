@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS teams.settings (
     -- Roles of subs for this team
     scrim_scheduled_timer_id BIGINT,
     scrim_reminder_timer_id BIGINT,
-    scrim_delete_timer_id BIGINT,
+    scrim_delete_timer_id BIGINT
 );
 
 CREATE TABLE IF NOT EXISTS teams.members (
