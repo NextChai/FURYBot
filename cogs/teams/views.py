@@ -43,8 +43,15 @@ BV = TypeVar('BV', bound='BaseView')
 ButtonCallback = Callable[[BV, discord.Interaction, discord.ui.Button[BV]], Coroutine[Any, Any, Any]]
 
 
-def clamp(minimum: int, maximum: int) -> int:
-    # Return the minimum if its less than or equal the maximum else the maximum
+def clamp(minimum: Optional[int], maximum: int) -> int:
+    if minimum is None:
+        return maximum
+
+    if minimum <= 0:
+        return 1
+
+    # Return the minimum if its less than or equal the maximum else the maximum.
+    # If the minimum is 0 though, return 1 in replace of it.
     return minimum if minimum <= maximum else maximum
 
 
@@ -87,10 +94,9 @@ class TeamMemberView(BaseView):
     @property
     def embed(self) -> discord.Embed:
         """:class:`discord.Embed`: The embed for this view."""
-        embed = self.bot.Embed(title=f'Manage Team {self.team.name} Member.')
+        embed = self.bot.Embed(title=f'Manage Team {self.team.display_name} Member.')
 
         embed.set_author(name=self.member.display_name, icon_url=self.member.display_avatar.url)
-        embed.set_thumbnail(url=self.member.display_avatar.url)
 
         team_member = cast(TeamMember, self.team.get_member(self.member.id))
         embed.add_field(name='Is Sub?', value='Member is a sub.' if team_member.is_sub else 'Member is not a sub.')
@@ -150,23 +156,22 @@ class TeamMembersView(BaseView):
         member_metadata: List[str] = []
 
         for member in self.team.team_members.values():
-            member_metadata.append(f'{member.mention}: {"Is Sub" if member.is_sub else "Is Not Sub"}')
+            member_metadata.append(f'{member.mention}: {"**Is a sub.**" if member.is_sub else "**On the main roster.**"}')
 
         embed = self.bot.Embed(
-            title=f'Team {self.team.name} Members',
+            title=f'Team {self.team.display_name} Members',
             description='Use the buttons below to manage team members.\n\n{}'.format(
                 "\n".join(member_metadata or ['Team has no members.'])
             ),
         )
         embed.set_author(name=self.team.name, icon_url=self.team.logo)
-        embed.set_thumbnail(url=self.team.logo)
 
         return embed
 
     async def _manage_member_after(self, select: discord.ui.UserSelect[Self], interaction: discord.Interaction) -> None:
         await interaction.response.defer()
 
-        team_member = self.team.get_member(select.values[0])
+        team_member = self.team.get_member(select.values[0].id)
         if not team_member:
             await interaction.edit_original_response(embed=self.embed, view=self)
             await interaction.followup.send('This member is not on the team.', ephemeral=True)
@@ -300,7 +305,6 @@ class ScrimView(BaseView):
         embed.add_field(name='Status', value=self.scrim.status.value.title())
 
         embed.set_author(name=self.scrim.home_team.name, icon_url=self.scrim.home_team.logo)
-        embed.set_thumbnail(url=self.scrim.home_team.logo)
 
         embed.set_footer(text=f'Scrim ID: {self.scrim.id}')
         return embed
@@ -442,7 +446,7 @@ class TeamScrimsView(BaseView):
     @property
     def embed(self) -> discord.Embed:
         """:class:`discord.Embed`: The embed for this view."""
-        embed = self.bot.Embed(title=f"{self.team.name}'s Scrims")
+        embed = self.bot.Embed(title=f"{self.team.display_name}'s Scrims")
 
         hosted_scrims: int = 0
         for scrim in self.team.scrims:
@@ -467,7 +471,6 @@ class TeamScrimsView(BaseView):
             embed.add_field(name='No Scrims', value='This team has no scrims.')
 
         embed.set_author(name=self.team.name, icon_url=self.team.logo)
-        embed.set_thumbnail(url=self.team.logo)
 
         return embed
 
@@ -529,9 +532,8 @@ class TeamChannelsView(BaseView):
     @property
     def embed(self) -> discord.Embed:
         """discord.Embed: The embed for this view."""
-        embed = self.bot.Embed(title=f'{self.team.name} Channels.')
+        embed = self.bot.Embed(title=f'{self.team.display_name} Channels.')
         embed.set_author(name=self.team.name, icon_url=self.team.logo)
-        embed.set_thumbnail(url=self.team.logo)
 
         embed.add_field(name='Category Channel', value=self.team.category_channel.mention)
         embed.add_field(name='Text Channel', value=self.team.text_channel.mention)
@@ -647,16 +649,13 @@ class TeamNamingView(BaseView):
     def embed(self) -> discord.Embed:
         """The embed for this view."""
         embed = self.bot.Embed(
-            title=f'{self.team.name} Customization', description=self.team.description or 'Team has no description.'
+            title=f'{self.team.display_name} Customization', description=self.team.description or 'Team has no description.'
         )
         embed.set_author(name=self.team.name, icon_url=self.team.logo, url=self.team.logo)
         embed.add_field(name='Team Nickname', value=self.team.nickname or 'Team has no nickname.', inline=False)
         embed.add_field(
             name='Team Logo', value=f'[Click here for logo.]({self.team.logo}).' or 'Team has no logo.', inline=False
         )
-
-        if self.team.logo:
-            embed.set_thumbnail(url=self.team.logo)
 
         return embed
 
@@ -687,7 +686,7 @@ class TeamNamingView(BaseView):
     async def _change_logo_after(
         self, modal: BasicInputModal[discord.ui.TextInput[Any]], interaction: discord.Interaction
     ) -> None:
-        await self.perform_after('logo', modal, interaction)
+        await self._perform_after('logo', modal, interaction)
 
     @discord.ui.button(label='Rename')
     @_default_button_doc_string
@@ -772,11 +771,14 @@ class TeamCaptainsView(BaseView):
 
     @property
     def embed(self) -> discord.Embed:
-        captain_fmt = '\n'.join(r.mention for r in self.team.captain_roles)
         embed = self.bot.Embed(
-            title=f'{self.team.name} Captains',
+            title=f'{self.team.display_name} Captains',
             description='Use the buttons below to manage team captain roles. This team '
-            f'has **{len(captain_fmt)}** captain(s).\n\n{captain_fmt}',
+            f'has **{len(self.team.captain_role_ids)}** captain(s).',
+        )
+        embed.add_field(
+            name='Current Captains',
+            value='\n'.join(r.mention for r in self.team.captain_roles) or 'This team has no current captains.',
         )
 
         return embed
@@ -788,7 +790,10 @@ class TeamCaptainsView(BaseView):
 
         meth = self.team.add_captain if add else self.team.remove_captain
         for role in select.values:
-            await meth(role.id)
+            try:
+                await meth(role.id)
+            except Exception:
+                pass
 
         await interaction.edit_original_response(embed=self.embed, view=self)
 
@@ -826,47 +831,29 @@ class TeamView(BaseView):
     def embed(self) -> discord.Embed:
         """The embed for this view."""
         embed = self.bot.Embed(
-            title=self.team.name,
+            title=self.team.display_name,
             description=self.team.description or 'Team has no description.',
         )
 
         embed.set_author(name=self.team.name, icon_url=self.team.logo)
 
-        if self.team.logo is not None:
-            embed.set_thumbnail(url=self.team.logo)
-
-        if self.team.nickname is not None:
-            embed.add_field(name='Team Nickname', value=self.team.nickname or 'Team has no nickname.', inline=False)
-
         embed.add_field(
-            name='Team Members',
-            value=', '.join(
-                [m.mention for m in self.team.team_members.values() if m.is_sub is False] or ['Team has no members.']
+            name='Members',
+            value=", ".join(
+                [m.mention for m in self.team.team_members.values() if m.is_sub is False] or ["Team has no members."]
             ),
         )
         embed.add_field(
-            name='Team Subs',
-            value=', '.join(
-                [m.mention for m in self.team.team_members.values() if m.is_sub is False] or ['Team has no members.']
-            ),
+            name='Subs',
+            value=", ".join([m.mention for m in self.team.team_members.values() if m.is_sub] or ["Team has no subs."]),
         )
 
         embed.add_field(
-            name='Team Channels',
-            value='\n'.join(
-                c.mention
-                for c in [
-                    self.team.text_channel,
-                    self.team.voice_channel,
-                    self.team.category_channel,
-                    *self.team.extra_channels,
-                ]
-            ),
-            inline=False,
+            name='Captains', value=", ".join(r.mention for r in self.team.captain_roles) or ["Team has no captains."]
         )
-
         embed.add_field(
-            name='Team Captains', value='\n'.join([r.mention for r in self.team.captain_roles] or ['Team has no captains.'])
+            name='Channels',
+            value=", ".join(c.mention for c in [self.team.text_channel, self.team.voice_channel, *self.team.extra_channels]),
         )
 
         embed.set_footer(text=f'Team ID: {self.team.id}')

@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING, Dict, List, Optional, Type, cast
+from typing import TYPE_CHECKING, Dict, List, Optional, Type, cast, Any
 
 import discord
 from typing_extensions import Self, TypeVarTuple
@@ -32,7 +32,7 @@ from typing_extensions import Self, TypeVarTuple
 from utils import MiniQueryBuilder
 
 if TYPE_CHECKING:
-    from asyncpg import Connection
+    from asyncpg import Connection, Record
     from bot import FuryBot
 
     from .scrim import Scrim
@@ -212,7 +212,9 @@ class Team:
         return team
 
     @classmethod
-    async def from_connection(cls: Type[Self], data: Dict[str, Any], /, *, bot: FuryBot, connection: Connection) -> Self:
+    async def from_connection(
+        cls: Type[Self], data: Dict[str, Any], /, *, bot: FuryBot, connection: Connection[Record]
+    ) -> Self:
         """|coro|
 
         Fetch the team from the database and return its instance. This will only be called in
@@ -234,7 +236,7 @@ class Team:
         """
         member_data = await connection.fetch('SELECT * FROM teams.members WHERE team_id = $1', data['id'])
 
-        members = {entry['id']: TeamMember(bot, **dict(entry)) for entry in member_data or []}
+        members = {entry['member_id']: TeamMember(bot, **dict(entry)) for entry in member_data or []}
         team = cls(bot, **dict(data), team_members=members)
         bot.team_cache[team.id] = team
 
@@ -321,6 +323,10 @@ class Team:
         guild = self.guild
         return [role for role_id in self.sub_role_ids if (role := guild.get_role(role_id))]
 
+    @property
+    def display_name(self) -> str:
+        return f'{self.name} {f"({self.nickname})" if self.nickname else ""}'.strip()
+
     def has_channel(self, channel: discord.abc.GuildChannel, /) -> bool:
         return channel.id in [self.category_channel_id, self.text_channel_id, self.voice_channel_id] + self.extra_channel_ids
 
@@ -406,7 +412,7 @@ class Team:
 
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                'UPDATE teams.settings SET captain_role_ids = array_append(captain_role_ids, $1) WHERE team_id = $2',
+                'UPDATE teams.settings SET captain_role_ids = array_append(captain_role_ids, $1) WHERE id = $2',
                 role_id,
                 self.id,
             )
@@ -439,7 +445,7 @@ class Team:
 
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                'UPDATE teams.settings SET captain_role_ids = array_remove(captain_role_ids, $1) WHERE team_id = $2',
+                'UPDATE teams.settings SET captain_role_ids = array_remove(captain_role_ids, $1) WHERE id = $2',
                 role_id,
                 self.id,
             )
