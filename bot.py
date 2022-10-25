@@ -291,6 +291,7 @@ class FuryBot(commands.Bot):
         _log.info(
             f'Connected to {len(self.guilds)} servers total watching over {sum(list(m_count for g in self.guilds if (m_count := g.member_count))):,} members.'
         )
+        _log.info(f'Invite link: {discord.utils.oauth_url(self.user.id, permissions=discord.Permissions(0))}')
 
     # Helper utilities
     def safe_connection(self, *, timeout: Optional[float] = 10.0) -> DbContextManager:
