@@ -152,6 +152,19 @@ class AutoRemoveSelect(BaseSelect['BaseView']):
 
 
 class BaseModal(discord.ui.Modal):
+    """Represents a modal that raises an excpetion to the bots error handler when an error occurs.
+
+    Parameters
+    ----------
+    bot: :class:`FuryBot`
+        The bot instance.
+
+    Attributes
+    ----------
+    bot: :class:`FuryBot`
+        The bot instance.
+    """
+
     def __init__(self, bot: FuryBot, **kwargs: Any) -> None:
         self.bot: FuryBot = bot
         super().__init__(**kwargs)
