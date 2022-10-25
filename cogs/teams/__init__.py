@@ -24,14 +24,14 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Annotated, TypeAlias
+from typing import TYPE_CHECKING, Callable, Annotated, Optional, TypeAlias, cast
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 from cogs.teams.scrim import ScrimStatus
 
-from utils import BaseCog, TimeTransformer
+from utils import BaseCog, TimeTransformer, Context
 
 from .scrim import Scrim
 from .team import Team
@@ -57,7 +57,6 @@ class Teams(BaseCog):
     )
 
     scrim = app_commands.Group(name='scrim', description='Create and manage scrims.', guild_only=True)
-    subs = app_commands.Group(name='subs', description='Find a sub for your games.', guild_only=True)
 
     @team.command(name='create', description='Create a team.')
     @app_commands.default_permissions(moderate_members=True)
@@ -142,6 +141,63 @@ class Teams(BaseCog):
         return await interaction.edit_original_response(
             content=f'A scrim for {scrim.scheduled_for_formatted()} has been created against {team.display_name}.'
         )
+
+    @commands.command(name='_team_import', hidden=True)
+    @commands.is_owner()
+    async def team_import(self, ctx: Context) -> discord.Message:
+        text_channel = cast(discord.TextChannel, ctx.channel)
+        category_channel = cast(discord.CategoryChannel, text_channel.category)
+
+        voice_channel = discord.utils.find(lambda c: isinstance(c, discord.VoiceChannel), category_channel.channels)
+        if not voice_channel:
+            return await ctx.send('No voice channel found.')
+
+        default_check: Callable[[discord.Message], Optional[bool]] = (
+            lambda message: message.author == ctx.author and message.channel == ctx.channel
+        )
+
+        # Get the members now
+        await ctx.send('Send members.')
+        member_message: discord.Message = await self.bot.wait_for('message', check=default_check, timeout=None)
+        members = member_message.mentions
+
+        # Get the subs
+        await ctx.send('Send subs.')
+        sub_message: discord.Message = await self.bot.wait_for('message', check=default_check, timeout=None)
+        subs = sub_message.mentions
+
+        # Get the captain role
+        await ctx.send('Send captain roles.')
+        captain_message: discord.Message = await self.bot.wait_for('message', check=default_check, timeout=None)
+        captain_roles = captain_message.role_mentions
+
+        async with ctx.typing():
+            async with self.bot.safe_connection() as connection:
+                data = await connection.fetchrow(
+                    'INSERT INTO teams.settings(guild_id, category_channel_id, text_channel_id, voice_channel_id, name, captain_role_ids) '
+                    'VALUES($1, $2, $3, $4, $5, $6) '
+                    'RETURNING *',
+                    category_channel.guild.id,
+                    category_channel.id,
+                    text_channel.id,
+                    voice_channel.id,
+                    category_channel.name,
+                    captain_roles,
+                )
+
+                assert data
+
+                team = Team(self.bot, **dict(data))
+                self.bot.team_cache[team.id] = team
+
+            for member in members:
+                await team.add_team_member(member.id)
+
+            for sub in subs:
+                await team.add_team_member(sub.id, is_sub=True)
+
+        view = TeamView(team, target=ctx)
+        return await ctx.send(view=view, embed=view.embed)
 
     @classmethod
     def _create_scrim_cancelled_message(cls, bot: FuryBot, scrim: Scrim) -> discord.Embed:
