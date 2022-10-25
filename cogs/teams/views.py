@@ -695,6 +695,65 @@ class TeamNamingView(BaseView):
         await self.team.text_channel.edit(topic=modal.children[0].value)
 
 
+class TeamCaptainsView(BaseView):
+    """A view used to manage the captains of a team.
+
+    Parameters
+    ----------
+    team: :class:`.Team`
+        The team to manage the scrims for.
+
+    Attributes
+    ----------
+    team: :class:`.Team`
+        The team to manage the scrims for.
+    """
+
+    def __init__(self, team: Team, *args: Any, **kwargs: Any) -> None:
+        self.team: Team = team
+        super().__init__(*args, **kwargs)
+
+    @property
+    def embed(self) -> discord.Embed:
+        captain_fmt = '\n'.join(r.mention for r in self.team.captain_roles)
+        embed = self.bot.Embed(
+            title=f'{self.team.name} Captains',
+            description='Use the buttons below to manage team captain roles. This team '
+            f'has **{len(captain_fmt)}** captain(s).\n\n{captain_fmt}',
+        )
+
+        return embed
+
+    async def handle_captain_action(
+        self, select: discord.ui.RoleSelect[Self], interaction: discord.Interaction, *, add: bool = True
+    ) -> None:
+        await interaction.response.defer()
+
+        meth = self.team.add_captain if add else self.team.remove_captain
+        for role in select.values:
+            await meth(role.id)
+
+        await interaction.edit_original_response(embed=self.embed, view=self)
+
+    @discord.ui.button(label='Add Captains')
+    @_default_button_doc_string
+    async def add_captain(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Add a captain role to this team."""
+        AutoRemoveSelect(item=discord.ui.RoleSelect[Self](max_values=20), parent=self, callback=self.handle_captain_action)
+        return await interaction.response.edit_message(view=self)
+
+    @discord.ui.button(label='Remove Captains')
+    @_default_button_doc_string
+    async def remove_captain(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Remove a captain role from this team."""
+        AutoRemoveSelect(
+            item=discord.ui.RoleSelect[Self](max_values=20),
+            parent=self,
+            callback=functools.partial(self.handle_captain_action, add=False),
+        )
+        return await interaction.response.edit_message(view=self)
+
+
 class TeamView(BaseView):
     """The main Team View to edit a team."""
 
@@ -789,6 +848,13 @@ class TeamView(BaseView):
     async def members(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Manage the team\'s members."""
         view = self.create_child(TeamMembersView, self.team)
+        return await interaction.response.edit_message(embed=view.embed, view=view)
+
+    @discord.ui.button(label='Captains')
+    @_default_button_doc_string
+    async def captains(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Manage the team\'s captains."""
+        view = self.create_child(TeamCaptainsView, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
     @discord.ui.button(label='Delete Team', style=discord.ButtonStyle.danger)
