@@ -126,10 +126,6 @@ class Scrim:
         creator_id: int,
         bot: FuryBot,
     ) -> Self:
-        raise NotImplemented
-
-        # NOTE: Need to add timer making
-
         # Let's create the home message
         status = ScrimStatus.pending_host
 
@@ -164,6 +160,12 @@ class Scrim:
             scrim.home_message_id = message.id
 
             await connection.execute('UPDATE teams.scrims SET home_message_id = $1 WHERE id = $2', message.id, scrim.id)
+
+        await bot.timer_manager.create_timer(when, 'scrim_scheduled', scrim_id=scrim.id)
+
+        # If the scrim is more than a day out, create a reminder
+        if (when - datetime.datetime.utcnow()).days > 1:
+            await bot.timer_manager.create_timer(when - datetime.timedelta(minutes=30), 'scrim_reminder', scrim_id=scrim.id)
 
         return scrim
 

@@ -276,7 +276,7 @@ class FuryBot(commands.Bot):
             data = await connection.fetch('SELECT * FROM teams.settings')
 
             for row in data:
-                team = await Team.from_connection(row, bot=self, connection=connection)
+                team = await Team.from_connection(dict(row), bot=self, connection=connection)
                 self.team_cache[team.id] = team
 
             scrim_records = await connection.fetch('SELECT * FROM teams.scrims')

@@ -39,7 +39,11 @@ from .ui_kit import *
 
 
 def _parse_environ_boolean(key: str) -> bool:
-    return os.environ.get(key, "false").lower() in ("true", "1")
+    val = os.environ.get(key)
+    if val is None:
+        return True
+
+    return val.lower() in ("true", "1")
 
 
 RUNNING_DEVELOPMENT: bool = _parse_environ_boolean('RUN_DEVELOPMENT')
