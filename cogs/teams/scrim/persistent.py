@@ -156,11 +156,7 @@ class HomeConfirm(discord.ui.View):
             embed=view.embed, view=view, content='@everyone', allowed_mentions=discord.AllowedMentions.all()
         )
 
-        self.away_message_id = message.id
-
-        # Update the DB
-        async with self.bot.safe_connection() as connection:
-            await connection.execute('UPDATE teams.scrims SET away_message_id = $1 WHERE id = $2', message.id, self.scrim.id)
+        await self.scrim.edit(away_message_id=message.id)
 
     @discord.ui.button(label='Remove Confirmation', custom_id='home-confirm-remove')
     async def remove_confirmation(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
@@ -234,13 +230,7 @@ class AwayForceConfirm(discord.ui.View):
 
         await interaction.response.edit_message(embed=self.embed, view=self)
 
-        async with self.bot.safe_connection() as connection:
-            await connection.execute(
-                'UPDATE teams.scrims SET away_confirm_anyways_voter_ids = array_append(away_confirm_anyways_voter_ids, $1) '
-                'WHERE id = $2',
-                interaction.user.id,
-                self.scrim.id,
-            )
+        await self.scrim.edit(away_confirm_anyways_voter_ids=self.scrim.away_confirm_anyways_voter_ids)
 
         if len(self.scrim.away_confirm_anyways_voter_ids) < self.required_to_confirm:
             # We don't have enough members to force econfirm
@@ -394,12 +384,7 @@ class AwayConfirm(discord.ui.View):
         message = await away_text_channel.send(
             embed=view.embed, view=view, content='@everyone', allowed_mentions=discord.AllowedMentions.all()
         )
-        self.scrim.away_confirm_anyways_message_id = message.id
-
-        async with self.bot.safe_connection() as connection:
-            await connection.execute(
-                'UPDATE teams.scrims SET away_confirm_anyways_message_id = $1 WHERE id = $2', message.id, self.scrim.id
-            )
+        await self.scrim.edit(away_confirm_anyways_message_id=message.id)
 
     @discord.ui.button(label='Unconfirm', custom_id='away-confirm-unconfirm')
     async def unconfirm(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:

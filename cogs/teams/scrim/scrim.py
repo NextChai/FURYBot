@@ -148,10 +148,7 @@ class Scrim:
             message = await home_channel.send(
                 embed=view.embed, view=view, content='@everyone', allowed_mentions=discord.AllowedMentions(everyone=True)
             )
-
-            scrim.home_message_id = message.id
-
-            await connection.execute('UPDATE teams.scrims SET home_message_id = $1 WHERE id = $2', message.id, scrim.id)
+            await scrim.edit(home_message_id=message.id)
 
         scrim_scheduled_timer = await bot.timer_manager.create_timer(when, 'scrim_scheduled', scrim_id=scrim.id)
 
@@ -167,6 +164,7 @@ class Scrim:
             scrim_reminder_timer_id=scrim_reminder_timer and scrim_reminder_timer.id,
         )
 
+        bot.team_scrim_cache[scrim.id] = scrim
         return scrim
 
     @property
@@ -290,6 +288,10 @@ class Scrim:
         scrim_reminder_timer_id: Optional[int] = MISSING,
         scrim_delete_timer_id: Optional[int] = MISSING,
         scheduled_for: datetime.datetime = MISSING,
+        away_confirm_anyways_message_id: Optional[int] = MISSING,
+        away_message_id: Optional[int] = MISSING,
+        away_confirm_anyways_voter_ids: List[int] = MISSING,
+        home_message_id: int = MISSING,
     ) -> None:
         builder = MiniQueryBuilder('teams.scrims')
         builder.add_condition('id', self.id)
@@ -309,6 +311,18 @@ class Scrim:
         if scheduled_for is not MISSING:
             builder.add_arg('scheduled_for', scheduled_for)
             self.scheduled_for = scheduled_for
+        if away_confirm_anyways_message_id is not MISSING:
+            builder.add_arg('away_confirm_anyways_message_id', away_confirm_anyways_message_id)
+            self.away_confirm_anyways_message_id = away_confirm_anyways_message_id
+        if away_message_id is not MISSING:
+            builder.add_arg('away_message_id', away_message_id)
+            self.away_message_id = away_message_id
+        if away_confirm_anyways_voter_ids is not MISSING:
+            builder.add_arg('away_confirm_anyways_voter_ids', away_confirm_anyways_voter_ids)
+            self.away_confirm_anyways_voter_ids = away_confirm_anyways_voter_ids
+        if home_message_id is not MISSING:
+            builder.add_arg('home_message_id', home_message_id)
+            self.home_message_id = home_message_id
 
         await builder(self.bot)
 

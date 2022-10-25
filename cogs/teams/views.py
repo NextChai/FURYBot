@@ -291,7 +291,7 @@ class ScrimView(BaseView):
         """:class:`discord.Embed`: The embed for this view."""
         embed = self.bot.Embed(
             title='Team Scrim Information',
-            description=f'This scrim is scheduled for {self.scrim.scheduled_for_formatted()}',
+            description=f'This scrim was originally scheduled for {self.scrim.scheduled_for_formatted()}. This scrim is currently **{self.scrim.status.value.replace("_", " ").title()}**.',
         )
         embed.add_field(
             name='Home Team',
@@ -302,7 +302,16 @@ class ScrimView(BaseView):
             name='Away Team',
             value=f'{self.scrim.away_team.display_name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.away_voters]) or "No away voters."}',
         )
-        embed.add_field(name='Status', value=self.scrim.status.value.title())
+
+        if self.scrim.status is ScrimStatus.scheduled and self.scrim.scheduled_for < discord.utils.utcnow():
+            # This scrim has started
+            addition = ''
+            if self.scrim.scrim_chat:
+                addition = f' The scrim chat is {self.scrim.scrim_chat.mention}'
+
+            embed.add_field(
+                name='Scrim In Progress', value=f'This scrim is **currently in progress**.{addition}', inline=False
+            )
 
         embed.set_author(name=self.scrim.home_team.name, icon_url=self.scrim.home_team.logo)
 
@@ -345,12 +354,47 @@ class ScrimView(BaseView):
             else:
                 await self.scrim.remove_vote(member.id, team.id)
 
+        # Let's say we're removing / adding votes and the scrim is now scheduled due
+        # to the votes, we should let the team know. #
+        # NOTE: We wont cancel the scrim when we force remove votes.
+        if self.scrim.status is ScrimStatus.pending_host and self.scrim.home_all_voted:
+            # We need to update the scrim status to pending away and send the message
+            await self.scrim.change_status(ScrimStatus.pending_away)
+
+            view = HomeConfirm(self.scrim)
+            home_message = await self.scrim.home_message()
+            await home_message.edit(view=None, embed=view.embed)
+
+            # Send the message to the other channel now
+            view = AwayConfirm(self.scrim)
+            away_message = await self.scrim.away_team.text_channel.send(embed=view.embed, view=view)
+            await self.scrim.edit(away_message_id=away_message.id)
+
+        elif self.scrim.status is ScrimStatus.pending_away and self.scrim.away_all_voted:
+            # We need to change the status to scheduled and edit the messages
+            await self.scrim.change_status(ScrimStatus.scheduled)
+
+            view = HomeConfirm(self.scrim)
+            home_message = await self.scrim.home_message()
+            await home_message.edit(view=None, embed=view.embed)
+
+            view = AwayConfirm(self.scrim)
+            away_message = await self.scrim.away_message()
+            if away_message:
+                await away_message.edit(view=None, embed=view.embed)
+
         await interaction.edit_original_response(embed=self.embed, view=self)
 
     @discord.ui.button(label='Reschedule')
     @_default_button_doc_string
     async def reschedule_scrim(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Reschedule this scrim to a later date."""
+        # If this scrim has already started, we can't reschedule it
+        if self.scrim.scheduled_for < interaction.created_at:
+            return await interaction.response.send_message(
+                'This scrim has already started, you cannot reschedule it.', ephemeral=True
+            )
+
         modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(self.bot, after=self._reschedule_scrim_after)
         modal.add_item(
             discord.ui.TextInput(label='When you want to reschedule this scrim to. For example: Tomorrow at 4pm.')
@@ -457,7 +501,7 @@ class TeamScrimsView(BaseView):
                 name=f'Scrim {discord.utils.format_dt(scrim.scheduled_for, "R")}',
                 value=f'**Team Created Scrim**: {scrim.home_team.display_name}\n'
                 f'**Away Team**: {scrim.away_team.display_name}\n'
-                f'**Status**: {scrim.status.value.title()}'
+                f'**Status**: {scrim.status.value.title()}\n'
                 f'**Home Team Confirmed**: {", ".join([m.mention for m in scrim.home_voters]) or "No home votes."}\n'
                 f'**Away Team Confirmed**: {", ".join([m.mention for m in scrim.away_voters]) or "No away votes."}\n',
             )

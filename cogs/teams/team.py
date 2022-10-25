@@ -188,7 +188,7 @@ class Team:
     description: Optional[str]
     logo: Optional[str]
     sub_role_ids: List[int]
-    
+
     def __eq__(self, __o: object) -> bool:
         return isinstance(__o, self.__class__) and self.id == __o.id
 
@@ -323,7 +323,7 @@ class Team:
     @property
     def scrims(self) -> List[Scrim]:
         """List[:class:`Scrim`]: A list of all scrims this team has."""
-        return [scrim for scrim in self.bot.team_scrim_cache.values() if scrim.home_id == self.id]
+        return [scrim for scrim in self.bot.team_scrim_cache.values() if self in (scrim.home_team, scrim.away_team)]
 
     @property
     def captain_roles(self) -> List[discord.Role]:
