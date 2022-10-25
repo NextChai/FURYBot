@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS teams.members (
 -- pending_scrimer: Pending for scrimmer to confirm
 -- pending_host: Pending for host to confirm
 -- scheduled: Scirm has been scheduled.
-CREATE TYPE scrim_status AS ENUM ('pending_away', 'scheduled', 'pending_home');
+CREATE TYPE scrim_status AS ENUM ('pending_away', 'scheduled', 'pending_host');
 
 CREATE TABLE IF NOT EXISTS teams.scrims (
     id SERIAL PRIMARY KEY,

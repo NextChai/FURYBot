@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING, Annotated, TypeAlias
 
 import discord
 from discord import app_commands
@@ -111,7 +111,7 @@ class Teams(BaseCog):
         self,
         interaction: discord.Interaction,
         team: FRONT_END_TEAM_TRANSFORM,
-        when: TimeTransformer,
+        when: Annotated[TimeTransformer, TimeTransformer(default='n/a')],
         per_team: app_commands.Range[int, 2, 10],
     ) -> discord.InteractionMessage:
         """|coro|
