@@ -58,7 +58,7 @@ class HomeConfirm(discord.ui.View):
                 title='Confirm The Scrim',
                 description='Use the "Confirm" button below to confirm you want to participate '
                 f'in the scrim scheduled for {scrim.scheduled_for_formatted()},** playing '
-                f'against {scrim.away_team.name}**.',
+                f'against {scrim.away_team.display_name}**.',
             )
             embed.add_field(
                 name='Confirmed Members',
@@ -75,8 +75,8 @@ class HomeConfirm(discord.ui.View):
         elif scrim.status in (ScrimStatus.pending_away, ScrimStatus.scheduled):
             if scrim.status is ScrimStatus.pending_away:
                 embed = self.bot.Embed(
-                    title=f'Waiting {scrim.away_team.name} Confirmation!',
-                    description=f'This team has confirmed the scrim, now it\'s time for **{scrim.away_team.name}** '
+                    title=f'Waiting {scrim.away_team.display_name} Confirmation!',
+                    description=f'This team has confirmed the scrim, now it\'s time for **{scrim.away_team.display_name}** '
                     f'to do the same. I\'m waiting for **{scrim.per_team - len(scrim.away_voter_ids)} vote(s) from '
                     'the opposing team** to confirm the scrim, then the scrim will be officially scheduled.',
                 )
@@ -84,15 +84,15 @@ class HomeConfirm(discord.ui.View):
             else:
                 embed = self.bot.Embed(
                     title='Scrim Scheduled!',
-                    description=f'A scrim on {scrim.scheduled_for_formatted()} **against {scrim.away_team.name}** has '
+                    description=f'A scrim on {scrim.scheduled_for_formatted()} **against {scrim.away_team.display_name}** has '
                     'been fully scheduled.',
                 )
                 embed.add_field(
                     name='How do I Scrim?',
                     value='10 minutes before the scrim is scheduled to begin, '
                     'FuryBot will create a chat for both teams to communicate. In this chat, '
-                    f'the home team, **{scrim.home_team.name}**, will create the private match for the away team, '
-                    f'**{scrim.away_team.name}**, to join with. You decide how much and long you want to play. The scrim channel '
+                    f'the home team, **{scrim.home_team.display_name}**, will create the private match for the away team, '
+                    f'**{scrim.away_team.display_name}**, to join with. You decide how much and long you want to play. The scrim channel '
                     'will automatically be deleted after 5 hours.',
                     inline=False,
                 )
@@ -283,27 +283,29 @@ class AwayConfirm(discord.ui.View):
 
             embed = self.bot.Embed(
                 title='Scrim Incoming!',
-                description=f'Team **{self.scrim.home_team.name}** would like to scrim your team on '
+                description=f'Team **{self.scrim.home_team.display_name}** would like to scrim your team on '
                 f'{scrim.scheduled_for_formatted()}. Do you want to scrim? Press "Confirm" below to do so. '
                 f'**{scrim.per_team - len(scrim.away_voter_ids)} vote(s) are needed** before the scrim '
                 'is officially confirmed.',
             )
-            embed.add_field(name='Confirmed Teammates', value=', '.join(m.mention for m in scrim.away_voters))
+            embed.add_field(
+                name='Confirmed Teammates', value=', '.join(m.mention for m in scrim.away_voters) or 'No one yet.'
+            )
             embed.add_field(name='Opposing Team:', value=', '.join(m.mention for m in scrim.home_voters))
             return embed
 
         elif scrim.status is ScrimStatus.scheduled:
             embed = self.bot.Embed(
                 title='Scrim Scheduled',
-                description=f'Your scrim against **{self.scrim.home_team.name}** has been confirmed for '
+                description=f'Your scrim against **{self.scrim.home_team.display_name}** has been confirmed for '
                 f'{scrim.scheduled_for_formatted()}.',
             )
             embed.add_field(
                 name='How do I Scrim?',
                 value='10 minutes before the scrim is scheduled to begin, '
                 'FuryBot will create a chat for bothho teams to communicate. In this chat, '
-                f'the home team, **{scrim.away_team.name}**, will create the private match for the away team, '
-                f'**{scrim.home_team.name}**, to join with. You decide how much and long you want to play. The scrim channel '
+                f'the home team, **{scrim.away_team.display_name}**, will create the private match for the away team, '
+                f'**{scrim.home_team.display_name}**, to join with. You decide how much and long you want to play. The scrim channel '
                 'will automatically be deleted after 5 hours.',
                 inline=False,
             )
@@ -346,8 +348,10 @@ class AwayConfirm(discord.ui.View):
             # All members have voted, change the status
             await self.scrim.change_status(ScrimStatus.scheduled)
 
-        # We need to update our local message
-        await interaction.response.edit_message(view=self, embed=self.embed)
+            # We need to update our local message with NO view
+            await interaction.response.edit_message(view=None, embed=self.embed)
+        else:
+            await interaction.response.edit_message(embed=self.embed, view=self)
 
         # And update the other message from the home team's chat:
         home_message = await self.scrim.home_message()

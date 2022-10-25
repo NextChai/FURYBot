@@ -295,12 +295,12 @@ class ScrimView(BaseView):
         )
         embed.add_field(
             name='Home Team',
-            value=f'{self.scrim.home_team.name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.home_voters]) or "No home voters."}',
+            value=f'{self.scrim.home_team.display_name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.home_voters]) or "No home voters."}',
             inline=False,
         )
         embed.add_field(
             name='Away Team',
-            value=f'{self.scrim.away_team.name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.away_voters]) or "No away voters."}',
+            value=f'{self.scrim.away_team.display_name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.away_voters]) or "No away voters."}',
         )
         embed.add_field(name='Status', value=self.scrim.status.value.title())
 
@@ -455,8 +455,8 @@ class TeamScrimsView(BaseView):
 
             embed.add_field(
                 name=f'Scrim {discord.utils.format_dt(scrim.scheduled_for, "R")}',
-                value=f'**Team Created Scrim**: {scrim.home_team.name}\n'
-                f'**Away Team**: {scrim.away_team.name}\n'
+                value=f'**Team Created Scrim**: {scrim.home_team.display_name}\n'
+                f'**Away Team**: {scrim.away_team.display_name}\n'
                 f'**Status**: {scrim.status.value.title()}'
                 f'**Home Team Confirmed**: {", ".join([m.mention for m in scrim.home_voters]) or "No home votes."}\n'
                 f'**Away Team Confirmed**: {", ".join([m.mention for m in scrim.away_voters]) or "No away votes."}\n',

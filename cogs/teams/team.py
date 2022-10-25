@@ -42,7 +42,7 @@ Ts = TypeVarTuple("Ts")
 MISSING = discord.utils.MISSING
 
 
-@dataclasses.dataclass(init=True, repr=True, eq=True)
+@dataclasses.dataclass(init=True, repr=True)
 class TeamMember:
     """Represents a member of a team.
 
@@ -63,6 +63,12 @@ class TeamMember:
     team_id: int
     member_id: int
     is_sub: Optional[bool] = dataclasses.field(default=None)
+
+    def __eq__(self, __o: object) -> bool:
+        return isinstance(__o, self.__class__) and self.member_id == __o.member_id
+
+    def __ne__(self, __o: object) -> bool:
+        return not self.__eq__(__o)
 
     @property
     def team(self) -> Team:
@@ -182,6 +188,12 @@ class Team:
     description: Optional[str]
     logo: Optional[str]
     sub_role_ids: List[int]
+    
+    def __eq__(self, __o: object) -> bool:
+        return isinstance(__o, self.__class__) and self.id == __o.id
+
+    def __ne__(self, __o: object) -> bool:
+        return not self.__eq__(__o)
 
     @classmethod
     def from_category(cls, category_channel_id: int, /, *, bot: FuryBot) -> Team:

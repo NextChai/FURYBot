@@ -314,7 +314,7 @@ class Scrim:
 
     async def create_scrim_chat(self) -> discord.TextChannel:
         channel = await self.home_team.category_channel.create_text_channel(
-            name='scrim-chat', topic=f'Scrim chat for {self.home_team.name} vs {self.away_team.name}'
+            name='scrim-chat', topic=f'Scrim chat for {self.home_team.display_name} vs {self.away_team.display_name}'
         )
 
         await self.edit(scrim_chat_id=channel.id)
