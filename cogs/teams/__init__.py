@@ -187,7 +187,7 @@ class Teams(BaseCog):
 
                 assert data
 
-                team = Team(self.bot, **dict(data))
+                team = Team(self.bot, **dict(data), team_members={})
                 self.bot.team_cache[team.id] = team
 
             for member in members:
