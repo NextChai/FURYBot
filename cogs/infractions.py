@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING
 import discord
 from discord import app_commands
 
-from utils.bases.cog import BaseCog
+from utils import BaseCog
 
 if TYPE_CHECKING:
     from bot import FuryBot

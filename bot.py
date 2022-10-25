@@ -50,12 +50,9 @@ import discord
 from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
+from cogs.teams import Team
 from cogs.teams.scrim import Scrim
-from cogs.teams.team import Team
-from utils import assertion
-from utils.error_handler import ErrorHandler
-from utils.link import LinkFilter
-from utils.timers import TimerManager
+from utils import RUNNING_DEVELOPMENT, ErrorHandler, LinkFilter, TimerManager
 
 if TYPE_CHECKING:
     import datetime
@@ -70,10 +67,8 @@ DecoFunc: TypeAlias = Callable[Concatenate['FuryBot', P], Coroutine[T, Any, Any]
 
 _log = logging.getLogger(__name__)
 
-RUN_DEVELOPMENT: bool = os.environ.get('RUN_DEVELOPMENT', 'false').lower() == 'true'
-
 initial_extensions: Tuple[str, ...]
-if RUN_DEVELOPMENT:
+if RUNNING_DEVELOPMENT:
     initial_extensions = tuple(v for k, v in os.environ.items() if k.startswith('FURY_EXTENSION'))
 else:
     initial_extensions = (
@@ -188,7 +183,9 @@ class FuryBot(commands.Bot):
         self.session: aiohttp.ClientSession = session
         self.pool: PoolType = pool
         self.thread_pool: futures.ThreadPoolExecutor = futures.ThreadPoolExecutor(max_workers=20)
-        self.timer_manager: TimerManager = TimerManager(bot=self)
+
+        if os.environ.get('FURY_START_TIMER_MANAGER', 'false').lower() == 'true':
+            self.timer_manager: TimerManager = TimerManager(bot=self)
 
         self.link_filter: LinkFilter = LinkFilter(self)
 
@@ -232,8 +229,7 @@ class FuryBot(commands.Bot):
             if old_init is not None:
                 await old_init(con)
 
-        pool = await asyncpg.create_pool(uri, init=init, **kwargs)
-        return assertion(pool, PoolType)
+        return await asyncpg.create_pool(uri, init=init, **kwargs)
 
     @staticmethod
     def Embed(

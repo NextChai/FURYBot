@@ -7,6 +7,8 @@ from typing_extensions import NotRequired
 if TYPE_CHECKING:
     import datetime
 
+__all__: Tuple[str, ...] = ('Traceback', 'TracebackOptional')
+
 
 class TracebackOptional(TypedDict, total=False):
     author: Optional[int]

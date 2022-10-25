@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Union, cast
 import discord
 from discord import app_commands
 
-from utils.errors import AutocompleteValidationException
+from utils import AutocompleteValidationException
 
 if TYPE_CHECKING:
     from bot import FuryBot

@@ -28,8 +28,7 @@ from typing import TYPE_CHECKING, TypeAlias
 import discord
 from discord import app_commands
 
-from utils.bases.cog import BaseCog
-from utils.time import TimeTransformer
+from utils import BaseCog, TimeTransformer
 
 from .scrim import Scrim
 from .team import Team

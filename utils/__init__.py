@@ -23,28 +23,23 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import Any, Type, TypeVar, cast
+from .types import *
+from .cog import *
+from .constants import *
+from .context import *
+from .error_handler import *
+from .errors import *
+from .link import *
+from .query import *
+from .time import *
+from .timers import *
+from .ui_kit import *
 
-T = TypeVar('T')
+import os
 
 
-def assertion(obj: Any, type: Type[T]) -> T:
-    """Allows you to assert return the type of an object.
+def _parse_environ_boolean(key: str) -> bool:
+    return os.environ.get(key, "false").lower() in ("true", "1")
 
-    Useful when dealing with :meth:`Bot.get_channel` and want
-    to return a :class:`discord.TextChannel` without using assert
-    every time.
 
-    Parameters
-    ----------
-    obj: Any
-        The obj to return.
-    type: Type[T]
-        The type of the obj.
-
-    Returns
-    -------
-    T
-        The type of the obj.
-    """
-    return cast(type, obj)
+RUNNING_DEVELOPMENT: bool = _parse_environ_boolean('RUN_DEVELOPMENT')

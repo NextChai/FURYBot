@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Type, cast
 import discord
 from typing_extensions import Self, TypeVarTuple
 
-from utils.query import MiniQueryBuilder
+from utils import MiniQueryBuilder
 
 if TYPE_CHECKING:
     from bot import FuryBot

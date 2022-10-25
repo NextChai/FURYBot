@@ -24,14 +24,12 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, cast
 
 import discord
 from discord.ext import commands, tasks
 
-from utils import assertion
-from utils.bases.cog import BaseCog
-from utils.constants import RULES_CHANNEL_ID
+from utils import BaseCog, RULES_CHANNEL_ID
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -138,7 +136,7 @@ class Notifier(BaseCog):
         if not data['notification_channel_id']:
             return
 
-        channel = assertion(guild.get_channel(data['notification_channel_id']), Optional[discord.TextChannel])
+        channel = cast(Optional[discord.TextChannel], guild.get_channel(data['notification_channel_id']))
         if not channel:
             return
 

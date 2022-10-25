@@ -20,11 +20,13 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
+    # The urlextract lib does not have great type hints. To combat this, we'll create
+    # a dummy class that has the required arguments we need.
     class URLExtract:
         if TYPE_CHECKING:
 
@@ -33,6 +35,8 @@ if TYPE_CHECKING:
 
 else:
     from urlextract import URLExtract
+
+__all__: Tuple[str, ...] = ('LinkFilter',)
 
 
 class LinkFilter(URLExtract):

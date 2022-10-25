@@ -30,12 +30,9 @@ import discord
 from typing_extensions import Self, Unpack
 
 from cogs.teams.scrim.persistent import AwayConfirm, HomeConfirm
-from utils.constants import CHANNEL_EMOJI_MAPPING
-from utils.time import TimeTransformer
-from utils.view import BaseView, BaseViewKwargs
+from utils import BaseView, BaseViewKwargs, AutoRemoveSelect, BasicInputModal, CHANNEL_EMOJI_MAPPING, TimeTransformer
 
 from .scrim import ScrimStatus
-from .ui_kit import AutoRemoveSelect, BasicInputModal
 
 if TYPE_CHECKING:
     from .scrim import Scrim
@@ -330,7 +327,7 @@ class ScrimView(BaseView):
     @_default_button_doc_string
     async def reschedule_scrim(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Reschedule this scrim to a later date."""
-        modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(self._reschedule_scrim_after)
+        modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(self.bot, after=self._reschedule_scrim_after)
         modal.add_item(
             discord.ui.TextInput(label='When you want to reschedule this scrim to. For example: Tomorrow at 4pm.')
         )
@@ -560,7 +557,8 @@ class TeamChannelsView(BaseView):
     async def create_extra_channel(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Allows the user to create an extra channel for the team."""
         modal: BasicInputModal[discord.ui.TextInput[Any], discord.ui.TextInput[Any]] = BasicInputModal(
-            self._create_extra_channel_after,
+            self.bot,
+            after=self._create_extra_channel_after,
             title='Create Extra Channel',
             timeout=None,
         )
@@ -655,7 +653,9 @@ class TeamNamingView(BaseView):
     @_default_button_doc_string
     async def rename(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Rename this team."""
-        modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(title='Rename Team', after=self._rename_after)
+        modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
+            self.bot, title='Rename Team', after=self._rename_after
+        )
         modal.add_item(discord.ui.TextInput(label='New Name', placeholder='Enter a new name...', max_length=100))
         await interaction.response.send_modal(modal)
 
@@ -664,7 +664,7 @@ class TeamNamingView(BaseView):
     async def change_nickname(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Change the nickname of this team."""
         modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
-            title='Change Team Nickname', after=self._change_nickname_after
+            self.bot, title='Change Team Nickname', after=self._change_nickname_after
         )
         modal.add_item(
             discord.ui.TextInput(
@@ -678,7 +678,7 @@ class TeamNamingView(BaseView):
     async def change_description(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Change the description of this team."""
         modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
-            title='Change Team Nickname', after=self._change_description_after
+            self.bot, title='Change Team Nickname', after=self._change_description_after
         )
         modal.add_item(
             discord.ui.TextInput(
@@ -862,7 +862,7 @@ class TeamView(BaseView):
     async def delete(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Delete this team."""
         modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
-            after=self._delete_team_after, title='Delete Team?'
+            self.bot, after=self._delete_team_after, title='Delete Team?'
         )
         modal.add_item(
             discord.ui.TextInput(

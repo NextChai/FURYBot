@@ -23,9 +23,18 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import Mapping, Type, Union
+from typing import Mapping, Type, Union, Tuple
 
 import discord
+
+__all__: Tuple[str, ...] = (
+    'RULES_CHANNEL_ID',
+    'TEXT_CHANNEL_EMOJI',
+    'VOICE_CHANNEL_EMOJI',
+    'THREAD_CHANNEL_EMOJI',
+    'CATEGORY_CHANNEL_EMOJI',
+    'CHANNEL_EMOJI_MAPPING',
+)
 
 RULES_CHANNEL_ID: int = 763418952243347467
 

@@ -23,7 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, TypeAlias, Union
+from typing import TYPE_CHECKING, Optional, TypeAlias, Union, Tuple
 
 import discord
 from discord.ext import commands
@@ -31,32 +31,6 @@ from discord.ext import commands
 if TYPE_CHECKING:
     from bot import FuryBot
 
+__all__: Tuple[str, ...] = ('Context',)
+
 Context: TypeAlias = 'commands.Context[FuryBot]'
-
-
-class DummyContext:
-    """A dummy context constructed to get a :class:`commands.Context` like object
-    from an interaction when interaction command data is not complete.
-
-    Parameters
-    ----------
-    interaction: :class:`discord.Interaction`
-        The interaction to transform into :class:`DummyContext`.
-
-    Attributes
-    ----------
-    bot: :class:`FuryBot`
-        The main bot instance.
-    guild: Optional[:class:`discord.Guild`]
-        The guild this interaction was created in. ``None`` for no guild.
-    channel: Optional[:class:`discord.interactions.InteractionChannel`]
-        The channel this interaction was invoked in.
-    author: Union[:class:`discord.Member`, :class:`discord.User`]
-        The author of this interaction instance.
-    """
-
-    def __init__(self, interaction: discord.Interaction) -> None:
-        self.bot: FuryBot = interaction.client  # pyright: ignore
-        self.guild: Optional[discord.Guild] = interaction.guild
-        self.channel: Optional[discord.interactions.InteractionChannel] = interaction.channel
-        self.author: Union[discord.User, discord.Member] = interaction.user

@@ -26,7 +26,7 @@ from __future__ import annotations
 import discord
 from discord.ext import commands
 
-from utils.bases.cog import BaseCog
+from utils import BaseCog
 
 
 def valid_message(message: discord.Message) -> bool:

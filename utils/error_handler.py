@@ -21,6 +21,9 @@ if TYPE_CHECKING:
 
     from bot import FuryBot
 
+__all__: Tuple[str, ...] = ('ErrorHandler',)
+
+
 _log = logging.getLogger(__name__)
 
 
@@ -282,6 +285,7 @@ class ErrorHandler:
         *,
         origin: Union[Context, discord.Interaction],
         sender: Optional[Callable[..., Awaitable[Optional[discord.WebhookMessage]]]] = None,
+        event_name: Optional[Any] = None,
     ) -> None:
         """|coro|
 
@@ -300,7 +304,7 @@ class ErrorHandler:
         if sender is not None:
             await sender('Oh no! Something went wrong! I\'ve notified the developer to get this issue fixed, my apologies!')
 
-        await self.exception_manager.add_error(error=exception, target=origin)
+        await self.exception_manager.add_error(error=exception, target=origin, event_name=event_name)
 
     async def on_tree_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
         """|coro|

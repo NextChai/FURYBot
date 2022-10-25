@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, List, Optional, Type, cast
 import discord
 from typing_extensions import Self
 
-from utils.query import MiniQueryBuilder
+from utils import MiniQueryBuilder
 
 from .persistent import AwayConfirm, HomeConfirm
 

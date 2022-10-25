@@ -25,23 +25,48 @@ from __future__ import annotations
 
 import abc
 import functools
-from typing import TYPE_CHECKING, Callable, Final, Generator, Optional, Tuple, Type, TypedDict, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Tuple,
+    Generic,
+    Callable,
+    Coroutine,
+    ParamSpec,
+    TypeVar,
+    TypeAlias,
+    Union,
+    Concatenate,
+    Optional,
+    TypedDict,
+    Type,
+    Generator,
+)
+from typing_extensions import Unpack, NotRequired
 
 import discord
-from discord.ext import commands
-from typing_extensions import Concatenate, NotRequired, ParamSpec, Self, TypeAlias, Unpack
+from discord.ui.select import BaseSelect, BaseSelectT
+from typing_extensions import Self, TypeVarTuple
 
 if TYPE_CHECKING:
     from bot import FuryBot
-    from utils.context import Context, DummyContext
+    from .context import Context
 
+__all__: Tuple[str, ...] = ('BaseModal', 'BasicInputModal', 'BaseView', 'BaseViewKwargs', 'AutoRemoveSelect')
+
+ITs = TypeVarTuple("ITs")
 T = TypeVar('T')
 P = ParamSpec('P')
-BT = TypeVar('BT', bound='commands.Bot')
-TargetType: TypeAlias = Union['discord.Interaction', 'Context', 'DummyContext']
-BaseViewInit: TypeAlias = Callable[Concatenate['BaseView', P], T]
+BT = TypeVar('BT', bound='FuryBot')
+TargetType: TypeAlias = Union[
+    'discord.Interaction',
+    'Context',
+]
+BaseViewInit: TypeAlias = Callable[Concatenate["BaseView", P], T]
 
-HOME: Final[str] = "\N{HOUSE BUILDING}"
+QUESTION_MARK = "\N{BLACK QUESTION MARK ORNAMENT}"
+HOME = "\N{HOUSE BUILDING}"
+NON_MARKDOWN_INFORMATION_SOURCE = "\N{INFORMATION SOURCE}"
 
 
 def _wrap_init(__init__: BaseViewInit[P, T]) -> BaseViewInit[P, T]:
@@ -82,13 +107,82 @@ def find_home(view: BaseView) -> Optional[BaseView]:
     return parents[-1]
 
 
-class _OptionalBaseViewKwargs(TypedDict):
-    timeout: NotRequired[Optional[float]]
-    parent: NotRequired[BaseView]
+class AutoRemoveSelect(BaseSelect['BaseView']):
+    """A select that removes all children from its parent and replaces them with itself.
+    After the user selects an option, the select is removed and the original children are
+    added back to the parent.
+
+    Parameters
+    ----------
+    parent: :class:`BaseView`
+        The parent view of the select.
+    calback: Callable[[Any, :class:`discord.Interaction`], Coroutine[Any, Any, Any]]
+        The callback to be called when the user selects an option.
+
+    Attributes
+    ----------
+    parent: :class:`BaseView`
+        The parent view of the select.
+    """
+
+    def __init__(
+        self,
+        item: BaseSelectT,
+        parent: BaseView,
+        callback: Callable[[BaseSelectT, discord.Interaction], Coroutine[Any, Any, Any]],
+    ) -> None:
+        item.__class__.__name__ = self.__class__.__name__
+        item.callback = self.callback
+
+        self.parent: BaseView = parent
+        self.item: BaseSelectT = item
+
+        self._callback: Callable[[BaseSelectT, discord.Interaction], Coroutine[Any, Any, Any]] = callback
+        self._original_children = parent.children
+
+        parent.clear_items()
+        parent.add_item(item)
+
+    async def callback(self, interaction: discord.Interaction) -> Any:
+        self.parent.clear_items()
+        for child in self._original_children:
+            self.parent.add_item(child)
+
+        await self._callback(self.item, interaction)
 
 
-class BaseViewKwargs(_OptionalBaseViewKwargs):
-    target: TargetType
+class BaseModal(discord.ui.Modal):
+    def __init__(self, bot: FuryBot, **kwargs: Any) -> None:
+        self.bot: FuryBot = bot
+        super().__init__(**kwargs)
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        if self.bot.error_handler:
+            return await self.bot.error_handler.log_error(error, origin=interaction, event_name=repr(self))
+
+        return await super().on_error(interaction, error)
+
+
+class BasicInputModal(BaseModal, Generic[Unpack[ITs]]):
+    """A very simple modal that allows other callbacks to wait for its
+    completion then manually handle child values.
+
+    Please note this is TypeVarTuple generic, meaning you can do ``BasicInputModal[discord.ui.TextInput[Any], discord.ui.Button[Any]]``
+    and the childen will reflect this.
+    """
+
+    if TYPE_CHECKING:
+        children: Tuple[Unpack[ITs]]
+
+    def __init__(
+        self, bot: FuryBot, /, *, after: Callable[[Self, discord.Interaction], Coroutine[Any, Any, Any]], **kwargs: Any
+    ) -> None:
+        self.after: Callable[..., Coroutine[Any, Any, Any]] = after
+        super().__init__(bot, **kwargs)
+
+    async def on_submit(self, interaction: discord.Interaction, /) -> None:
+        await self.after(self, interaction)
+        self.stop()
 
 
 class Stop(discord.ui.Button["BaseView"]):
@@ -134,7 +228,7 @@ class GoHome(discord.ui.Button["BaseView"]):
     ----------
     parent: Any
         The parent of the help command.
-    bot: :class:`Bot`
+    bot: :class:`FuryBot`
         The bot that the help command is running on.
     """
 
@@ -192,12 +286,18 @@ class GoBack(discord.ui.Button["BaseView"]):
         return await interaction.response.edit_message(embed=self.parent.embed, view=self.parent)  # type: ignore
 
 
+class BaseViewKwargs(TypedDict):
+    target: TargetType
+    timeout: NotRequired[Optional[float]]
+    parent: NotRequired[BaseView]
+
+
 class BaseView(discord.ui.View, abc.ABC):
     """A base view that implements the logic that all other views implement.
 
     Parameters
     ----------
-    context: Union[:class:`Context`, :class:`DummyContext`]
+    context: :class:`Context`
         The context of the help command.
     timeout: Optional[:class:`float`]
         The amount of time in seconds before the view times out. Defaults
@@ -207,7 +307,7 @@ class BaseView(discord.ui.View, abc.ABC):
 
     Attributes
     ----------
-    context: Union[:class:`Context`, :class:`DummyContext`]
+    context: :class:`Context`
         The context of the help command.
     timeout: Optional[:class:`float`]
         The amount of time in seconds before the view times out. Defaults
@@ -227,8 +327,10 @@ class BaseView(discord.ui.View, abc.ABC):
         if target.guild is None:
             raise ValueError("Cannot create a view in a DM context.")
 
-        self.bot: FuryBot = (  # pyright: ignore # Gonna need to eat this one.
-            target.client if isinstance(target, discord.Interaction) else target.bot
+        self.bot: FuryBot = (
+            target.client
+            if isinstance(target, discord.Interaction)
+            else target.bot  # pyright: ignore # We're gonna have to eat this one, thank you dpy
         )
         self.author: Union[discord.Member, discord.User] = (
             target.user if isinstance(target, discord.Interaction) else target.author
@@ -258,6 +360,11 @@ class BaseView(discord.ui.View, abc.ABC):
         """BaseViewKwargs: A helper to dump the view's create kwargs when creating a child view."""
         return {'target': self.target, 'timeout': self.timeout, 'parent': self}
 
+    def create_child(self, cls: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
+        """Creates a new instance of the view from the parent view."""
+        kwargs.update(self.dump_kwargs())
+        return cls(*args, **kwargs)
+
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """|coro|
 
@@ -284,7 +391,7 @@ class BaseView(discord.ui.View, abc.ABC):
     async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item[Self]) -> None:
         """|coro|
 
-        Called when an error is raised within the view. This will log the error
+        A helper to handle errors that occur within the view.
 
         Parameters
         ----------
@@ -296,77 +403,8 @@ class BaseView(discord.ui.View, abc.ABC):
             The item that raised the error.
         """
         if self.bot.error_handler:
-            await self.bot.error_handler.log_error(error, origin=interaction)
+            return await self.bot.error_handler.exception_manager.add_error(
+                error=error, target=interaction, event_name=repr(item)
+            )
 
-
-class PaginatorView(BaseView):
-    """Represents a Paginator View. This class will wrap around a paginator
-    and allow for buttons to interact between the pages of this paginator.
-
-    Parameters
-    ----------
-    paginator: :class:`commands.Paginator`
-        The paginator to wrap around.
-    **kwargs: Any
-        The kwargs to pass to the :class:`BaseView` constructor.
-
-    Attributes
-    ----------
-    paginator: :class:`commands.Paginator`
-        The paginator to wrap around.
-    current: :class:`int`
-        The current index of the page that is being displayed.
-    """
-
-    def __init__(self, paginator: commands.Paginator, **kwargs: Unpack[BaseViewKwargs]) -> None:
-        self.paginator: commands.Paginator = paginator
-        self.current: int = 0
-
-        super().__init__(**kwargs)
-
-    @property
-    def embed(self) -> discord.Embed:
-        """:class:`discord.Embed`: Although not used, this property is required by the ABC."""
-        raise NotImplementedError
-
-    @discord.ui.button(emoji=discord.PartialEmoji(name='\N{BLACK LEFT-POINTING TRIANGLE}'))
-    async def backward(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
-        """|coro|
-
-        Used to go backwards on the paginator view.
-
-        Parameters
-        ----------
-        interaction: :class:`discord.Interaction`
-            The interaction created from pressing the button.
-        button: :class:`discord.ui.Button`
-            The button that was pressed.
-        """
-        self.current -= 1
-        try:
-            page = self.paginator.pages[self.current]
-        except IndexError:
-            return await interaction.response.send_message('That\'s the last page!', ephemeral=True)
-
-        return await interaction.response.edit_message(content=page)
-
-    @discord.ui.button(emoji=discord.PartialEmoji(name='\N{BLACK RIGHT-POINTING TRIANGLE}'))
-    async def forward(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
-        """|coro|
-
-        Used to go forward on the paginator view.
-
-        Parameters
-        ----------
-        interaction: :class:`discord.Interaction`
-            The interaction created from pressing the button.
-        button: :class:`discord.ui.Button`
-            The button that was pressed.
-        """
-        self.current += 1
-        try:
-            page = self.paginator.pages[self.current]
-        except IndexError:
-            return await interaction.response.send_message('That\'s the last page!', ephemeral=True)
-
-        return await interaction.response.edit_message(content=page)
+        return await super().on_error(interaction, error, item)

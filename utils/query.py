@@ -28,6 +28,8 @@ from typing import TYPE_CHECKING, Any, Coroutine, List, Tuple
 if TYPE_CHECKING:
     from bot import FuryBot
 
+__all__: Tuple[str, ...] = ('MiniQueryBuilder',)
+
 
 class MiniQueryBuilder:
     def __init__(self, table: str) -> None:

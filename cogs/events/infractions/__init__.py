@@ -25,13 +25,12 @@ from __future__ import annotations
 
 import datetime
 import textwrap
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
 import discord
 from discord.ext import commands
 
 from cogs.infractions import InfractionType
-from utils import assertion
 
 from .link import Link
 
@@ -109,7 +108,7 @@ class InfractionListener(Link):
 
         await message.delete()
 
-        channel = assertion(message.guild.get_channel(data['notification_channel_id']), Optional[discord.TextChannel])
+        channel = cast(Optional[discord.TextChannel], message.guild.get_channel(data['notification_channel_id']))
         if not channel:
             return
 

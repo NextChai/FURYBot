@@ -28,8 +28,7 @@ from typing import TYPE_CHECKING, Optional
 import discord
 from discord.ext import commands
 
-from utils.bases.cog import BaseCog
-from utils.context import Context
+from utils import BaseCog, Context
 
 if TYPE_CHECKING:
     from bot import FuryBot
