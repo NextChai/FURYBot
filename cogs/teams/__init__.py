@@ -137,7 +137,7 @@ class Teams(BaseCog):
         )
 
         return await interaction.edit_original_response(
-            content=f'A scrim for {scrim.scheduled_for_formatted()} has been created against {team.name}).'
+            content=f'A scrim for {scrim.scheduled_for_formatted()} has been created against {team.display_name}).'
         )
 
 
