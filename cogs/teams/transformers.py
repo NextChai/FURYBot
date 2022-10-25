@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import difflib
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
 
 import discord
 from discord import app_commands
@@ -84,15 +84,16 @@ class TeamTransformer(app_commands.Transformer):
             available_teams = teams
 
         # Nice, sort by name now base on user input
-        if not value:
+        if value == '':
             return available_teams[:25]
         if not available_teams:
             return []
 
-        team_mapping: Mapping[str, Team] = {team.name: team for team in available_teams}
+        similar: List[str] = await bot.wrap(difflib.get_close_matches, value, list(available_team_mapping.keys(), n=25))  # type: ignore
+        available_team_mapping = {team.name: team for team in available_teams}
+        available_teams = [available_team_mapping[team_name] for team_name in similar]
 
-        similar: List[str] = await bot.wrap(difflib.get_close_matches, value, list(team_mapping.keys()), n=25)  # type: ignore
-        return [team_mapping[result] for result in similar]
+        return available_teams[:25]
 
     async def autocomplete(
         self, interaction: discord.Interaction, value: Union[int, float, str], /
@@ -105,6 +106,7 @@ class TeamTransformer(app_commands.Transformer):
 
         teams = await self._get_available_teams(interaction, None)
         team_mapping = {team.id: team for team in teams}
+        print(list(team_mapping.keys()))
 
         try:
             return team_mapping[int(value)]

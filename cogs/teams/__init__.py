@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from bot import FuryBot
 
 
-TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer]
+TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=False)]
 FRONT_END_TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=True)]
 
 
