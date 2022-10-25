@@ -11,3 +11,4 @@ emoji
 parsedatetime
 python-dateutil
 pytz
+jishaku

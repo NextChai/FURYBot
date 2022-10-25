@@ -23,6 +23,11 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import dotenv
+
+dotenv.load_dotenv()  # pyright: ignore # This is out of my control
+
+
 import asyncio
 import logging
 import os
@@ -30,7 +35,6 @@ from typing import TYPE_CHECKING
 
 import aiohttp
 import discord
-import dotenv
 
 from bot import FuryBot
 
@@ -42,8 +46,6 @@ _log = logging.getLogger(__name__)
 os.environ['JISHAKU_NO_UNDERSCORE'] = 'true'
 os.environ['JISHAKU_NO_DM_TRACEBACK'] = 'true'
 os.environ['JISHAKU_RETAIN'] = 'true'
-
-dotenv.load_dotenv()  # pyright: ignore # This is out of my control
 
 
 async def main() -> None:
