@@ -694,6 +694,26 @@ class TeamNamingView(BaseView):
         await modal.wait()
         await self.team.text_channel.edit(topic=modal.children[0].value)
 
+    @discord.ui.button(label='Change Logo')
+    @_default_button_doc_string
+    async def change_logo(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Change the logo of this team."""
+        modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
+            self.bot, title='Change Team Logo', after=self._change_description_after
+        )
+        modal.add_item(
+            discord.ui.TextInput(
+                label='Update Logo',
+                placeholder='Enter a new logo...',
+                required=False,
+                style=discord.TextStyle.short,
+            )
+        )
+        await interaction.response.send_modal(modal)
+
+        await modal.wait()
+        await self.team.edit(logo=modal.children[0].value)
+
 
 class TeamCaptainsView(BaseView):
     """A view used to manage the captains of a team.

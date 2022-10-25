@@ -32,6 +32,7 @@ from typing_extensions import Self, TypeVarTuple
 from utils import MiniQueryBuilder
 
 if TYPE_CHECKING:
+    from asyncpg import Connection
     from bot import FuryBot
 
     from .scrim import Scrim
@@ -180,6 +181,7 @@ class Team:
     nickname: Optional[str]
     description: Optional[str]
     logo: Optional[str]
+    sub_role_ids: List[int]
 
     @classmethod
     def from_category(cls, category_channel_id: int, /, *, bot: FuryBot) -> Team:
@@ -210,7 +212,7 @@ class Team:
         return team
 
     @classmethod
-    async def from_bot(cls: Type[Self], team_id: int, /, *, bot: FuryBot) -> Self:
+    async def from_connection(cls: Type[Self], data: Dict[str, Any], /, *, bot: FuryBot, connection: Connection) -> Self:
         """|coro|
 
         Fetch the team from the database and return its instance. This will only be called in
@@ -218,22 +220,19 @@ class Team:
 
         Parameters
         ----------
-        team_id: :class:`int`
-            The ID of the team you want to load.
+        data: :class:`dict`
+            The data returned from the database.
         bot: :class:`FuryBot`
             The bot instance.
+        connection: :class:`asyncpg.Connection`
+            The connection to the database.
 
         Returns
         -------
         :class:`Team`
             The fetched team.
         """
-        async with bot.safe_connection() as connection:
-            data = await connection.fetchrow('SELECT * FROM teams.settings WHERE id  $1', team_id)
-            member_data = await connection.fetch('SELECT * FORM teams.members WHERE team_id = $1', team_id)
-
-        if not data:
-            raise Exception(f'No team with id {team_id} was found.')
+        member_data = await connection.fetch('SELECT * FROM teams.members WHERE team_id = $1', data['id'])
 
         members = {entry['id']: TeamMember(bot, **dict(entry)) for entry in member_data or []}
         team = cls(bot, **dict(data), team_members=members)
@@ -316,6 +315,11 @@ class Team:
     def captain_roles(self) -> List[discord.Role]:
         guild = self.guild
         return [role for role_id in self.captain_role_ids if (role := guild.get_role(role_id))]
+
+    @property
+    def sub_roles(self) -> List[discord.Role]:
+        guild = self.guild
+        return [role for role_id in self.sub_role_ids if (role := guild.get_role(role_id))]
 
     def has_channel(self, channel: discord.abc.GuildChannel, /) -> bool:
         return channel.id in [self.category_channel_id, self.text_channel_id, self.voice_channel_id] + self.extra_channel_ids

@@ -193,7 +193,7 @@ class FuryBot(commands.Bot):
         self.team_scrim_cache: Dict[int, Scrim] = {}
 
         super().__init__(
-            command_prefix='fury.',
+            command_prefix=commands.when_mentioned_or('fury.'),
             help_command=None,
             description='A helpful moderation tool',
             intents=discord.Intents.all(),
@@ -275,7 +275,9 @@ class FuryBot(commands.Bot):
         async with self.safe_connection() as connection:
             data = await connection.fetch('SELECT * FROM teams.settings')
 
-            self.team_cache = {entry['id']: Team(self, **dict(entry)) for entry in data}
+            for row in data:
+                team = await Team.from_connection(row, bot=self, connection=connection)
+                self.team_cache[team.id] = team
 
             scrim_records = await connection.fetch('SELECT * FROM teams.scrims')
             self.team_scrim_cache = {entry['id']: Scrim(self, **dict(entry)) for entry in scrim_records}
