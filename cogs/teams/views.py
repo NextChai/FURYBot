@@ -33,13 +33,19 @@ from cogs.teams.scrim.persistent import AwayConfirm, HomeConfirm
 from utils import CHANNEL_EMOJI_MAPPING, AutoRemoveSelect, BaseView, BaseViewKwargs, BasicInputModal, TimeTransformer
 
 from .scrim import ScrimStatus
+from .team import TeamMember
 
 if TYPE_CHECKING:
     from .scrim import Scrim
-    from .team import Team, TeamMember
+    from .team import Team
 
 BV = TypeVar('BV', bound='BaseView')
 ButtonCallback = Callable[[BV, discord.Interaction, discord.ui.Button[BV]], Coroutine[Any, Any, Any]]
+
+
+def clamp(minimum: int, maximum: int) -> int:
+    # Return the minimum if its less than or equal the maximum else the maximum
+    return minimum if minimum <= maximum else maximum
 
 
 def _default_button_doc_string(func: ButtonCallback[BV]) -> ButtonCallback[BV]:
@@ -160,6 +166,12 @@ class TeamMembersView(BaseView):
     async def _manage_member_after(self, select: discord.ui.UserSelect[Self], interaction: discord.Interaction) -> None:
         await interaction.response.defer()
 
+        team_member = self.team.get_member(select.values[0])
+        if not team_member:
+            await interaction.edit_original_response(embed=self.embed, view=self)
+            await interaction.followup.send('This member is not on the team.', ephemeral=True)
+            return
+
         member = cast(discord.Member, select.values[0])
         view = self.create_child(TeamMemberView, member=member, team=self.team)
         await interaction.edit_original_response(embed=view.embed, view=view)
@@ -198,7 +210,9 @@ class TeamMembersView(BaseView):
     async def add_members(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Add members to this team."""
         AutoRemoveSelect(
-            item=discord.ui.UserSelect[Self](max_values=20, placeholder='Select members to add...'),
+            item=discord.ui.UserSelect[Self](
+                max_values=clamp(self.guild.member_count, 25), placeholder='Select members to add...'
+            ),
             parent=self,
             callback=self._manage_member_assignment,
         )
@@ -209,7 +223,9 @@ class TeamMembersView(BaseView):
     async def remove_members(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Remove members from this team."""
         AutoRemoveSelect(
-            item=discord.ui.UserSelect[Self](max_values=20, placeholder='Select members to add...'),
+            item=discord.ui.UserSelect[Self](
+                max_values=clamp(self.guild.member_count, 25), placeholder='Select members to add...'
+            ),
             parent=self,
             callback=functools.partial(self._manage_member_assignment, remove_member=True),
         )
@@ -220,7 +236,9 @@ class TeamMembersView(BaseView):
     async def add_subs(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Add subs to this team."""
         AutoRemoveSelect(
-            item=discord.ui.UserSelect[Self](max_values=20, placeholder='Select members to add...'),
+            item=discord.ui.UserSelect[Self](
+                max_values=clamp(self.guild.member_count, 25), placeholder='Select members to add...'
+            ),
             parent=self,
             callback=functools.partial(self._manage_member_assignment, assign_sub=True),
         )
@@ -231,7 +249,9 @@ class TeamMembersView(BaseView):
     async def remove_subs(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Remove subs from this team."""
         AutoRemoveSelect(
-            item=discord.ui.UserSelect[Self](max_values=20, placeholder='Select members to add...'),
+            item=discord.ui.UserSelect[Self](
+                max_values=clamp(self.guild.member_count, 25), placeholder='Select members to add...'
+            ),
             parent=self,
             callback=functools.partial(self._manage_member_assignment, remove_member=True),
         )
@@ -338,7 +358,9 @@ class ScrimView(BaseView):
     async def remove_confirmation(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Forcefully remove confirmation for a member."""
         AutoRemoveSelect(
-            item=discord.ui.UserSelect[Self](max_values=20, placeholder='Select members to remove confirmation for...'),
+            item=discord.ui.UserSelect[Self](
+                max_values=clamp(self.guild.member_count, 25), placeholder='Select members to remove confirmation for...'
+            ),
             callback=functools.partial(self._manage_member_assignment, add_vote=False),
             parent=self,
         )
@@ -349,7 +371,9 @@ class ScrimView(BaseView):
     async def force_add_confirmation(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Forcefully add confirmation for a member."""
         AutoRemoveSelect(
-            item=discord.ui.UserSelect[Self](max_values=20, placeholder='Select members to remove confirmation for...'),
+            item=discord.ui.UserSelect[Self](
+                max_values=clamp(self.guild.member_count, 25), placeholder='Select members to remove confirmation for...'
+            ),
             callback=self._manage_member_assignment,
             parent=self,
         )
@@ -545,10 +569,19 @@ class TeamChannelsView(BaseView):
     async def _delete_extra_channels_after(self, select: discord.ui.Select[Self], interaction: discord.Interaction) -> None:
         await interaction.response.defer()
 
-        for channel_id in select.values:
-            channel = self.guild.get_channel(int(channel_id))
+        # Get the new channel ids
+        valid_extra_channel_ids = self.team.extra_channel_ids.copy()
+
+        for str_channel_id in select.values:
+            channel_id = int(str_channel_id)
+            if channel_id in valid_extra_channel_ids:
+                valid_extra_channel_ids.remove(channel_id)
+
+            channel = self.guild.get_channel(int(str_channel_id))
             if channel is not None:
                 await channel.delete()
+
+        await self.team.edit(extra_channel_ids=valid_extra_channel_ids)
 
         await interaction.edit_original_response(view=self, embed=self.embed)
 
@@ -575,7 +608,7 @@ class TeamChannelsView(BaseView):
 
         AutoRemoveSelect(
             item=discord.ui.Select[Self](
-                max_values=25,
+                max_values=clamp(len(self.team.extra_channel_ids), 25),
                 placeholder='Select the channels to delete...',
                 options=[
                     discord.SelectOption(
@@ -763,7 +796,11 @@ class TeamCaptainsView(BaseView):
     @_default_button_doc_string
     async def add_captain(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Add a captain role to this team."""
-        AutoRemoveSelect(item=discord.ui.RoleSelect[Self](max_values=20), parent=self, callback=self.handle_captain_action)
+        AutoRemoveSelect(
+            item=discord.ui.RoleSelect[Self](max_values=clamp(len(self.team.captain_roles), 25)),
+            parent=self,
+            callback=self.handle_captain_action,
+        )
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Remove Captains')
@@ -771,7 +808,7 @@ class TeamCaptainsView(BaseView):
     async def remove_captain(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Remove a captain role from this team."""
         AutoRemoveSelect(
-            item=discord.ui.RoleSelect[Self](max_values=20),
+            item=discord.ui.RoleSelect[Self](max_values=clamp(len(self.team.captain_roles), 25)),
             parent=self,
             callback=functools.partial(self.handle_captain_action, add=False),
         )
