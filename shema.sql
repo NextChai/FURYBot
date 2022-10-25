@@ -39,8 +39,6 @@ CREATE TABLE IF NOT EXISTS teams.settings (
     description TEXT,
     logo TEXT,
     captain_role_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
-    sub_role_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
-    -- Roles of subs for this team
     scrim_scheduled_timer_id BIGINT,
     scrim_reminder_timer_id BIGINT,
     scrim_delete_timer_id BIGINT

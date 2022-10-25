@@ -187,7 +187,6 @@ class Team:
     nickname: Optional[str]
     description: Optional[str]
     logo: Optional[str]
-    sub_role_ids: List[int]
 
     def __eq__(self, __o: object) -> bool:
         return isinstance(__o, self.__class__) and self.id == __o.id
@@ -329,11 +328,6 @@ class Team:
     def captain_roles(self) -> List[discord.Role]:
         guild = self.guild
         return [role for role_id in self.captain_role_ids if (role := guild.get_role(role_id))]
-
-    @property
-    def sub_roles(self) -> List[discord.Role]:
-        guild = self.guild
-        return [role for role_id in self.sub_role_ids if (role := guild.get_role(role_id))]
 
     @property
     def display_name(self) -> str:

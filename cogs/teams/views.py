@@ -864,79 +864,6 @@ class TeamCaptainsView(BaseView):
         return await interaction.response.edit_message(view=self)
 
 
-class TeamSubRoleView(BaseView):
-    """A view used to manage the sub roles on a team.
-
-    Parameters
-    ----------
-    team: :class:`.Team`
-        The team to manage the scrims for.
-
-    Attributes
-    ----------
-    team: :class:`.Team`
-        The team to manage the scrims for.
-    """
-
-    def __init__(self, team: Team, *args: Any, **kwargs: Any) -> None:
-        self.team: Team = team
-        super().__init__(*args, **kwargs)
-
-    @property
-    def embed(self) -> discord.Embed:
-        embed = self.bot.Embed(
-            title=f'{self.team.display_name} Sub Roles',
-            description='Use the buttons below to manage team sub roles. This team '
-            f'has **{len(self.team.sub_role_ids)}** sub role(s).',
-        )
-        embed.add_field(
-            name='Current Sub Roles',
-            value='\n'.join(r.mention for r in self.team.sub_roles) or 'This team has no current sub roles.',
-        )
-
-        return embed
-
-    async def handle_sub_role_action(
-        self, select: discord.ui.RoleSelect[Self], interaction: discord.Interaction, *, add: bool = True
-    ) -> None:
-        await interaction.response.defer()
-
-        current_sub_role_ids: List[int] = self.team.sub_role_ids.copy()
-        if add:
-            for role in select.values:
-                current_sub_role_ids.append(role.id)
-        else:
-            for role in select.values:
-                if role.id in current_sub_role_ids:
-                    current_sub_role_ids.remove(role.id)
-
-        await self.team.edit(sub_role_ids=current_sub_role_ids)
-
-        await interaction.edit_original_response(embed=self.embed, view=self)
-
-    @discord.ui.button(label='Add Sub Roles')
-    @_default_button_doc_string
-    async def add_captain(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
-        """Add a captain role to this team."""
-        AutoRemoveSelect(
-            item=discord.ui.RoleSelect[Self](max_values=clamp(len(self.team.captain_roles), 25)),
-            parent=self,
-            callback=self.handle_sub_role_action,
-        )
-        return await interaction.response.edit_message(view=self)
-
-    @discord.ui.button(label='Remove Sub Roles')
-    @_default_button_doc_string
-    async def remove_captain(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
-        """Remove a captain role from this team."""
-        AutoRemoveSelect(
-            item=discord.ui.RoleSelect[Self](max_values=clamp(len(self.team.captain_roles), 25)),
-            parent=self,
-            callback=functools.partial(self.handle_sub_role_action, add=False),
-        )
-        return await interaction.response.edit_message(view=self)
-
-
 class TeamView(BaseView):
     """The main Team View to edit a team."""
 
@@ -967,9 +894,6 @@ class TeamView(BaseView):
 
         embed.add_field(
             name='Captains', value=", ".join(r.mention for r in self.team.captain_roles) or "Team has no captains."
-        )
-        embed.add_field(
-            name='Sub Roles', value=", ".join(r.mention for r in self.team.sub_roles) or "Team has no sub roles."
         )
 
         embed.add_field(
@@ -1024,13 +948,6 @@ class TeamView(BaseView):
     async def captains(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Manage the team\'s captains."""
         view = self.create_child(TeamCaptainsView, self.team)
-        return await interaction.response.edit_message(embed=view.embed, view=view)
-
-    @discord.ui.button(label='Sub Roles')
-    @_default_button_doc_string
-    async def sub_roles(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
-        """Manage the team\'s sub roles."""
-        view = self.create_child(TeamSubRoleView, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
     @discord.ui.button(label='Delete Team', style=discord.ButtonStyle.danger)
