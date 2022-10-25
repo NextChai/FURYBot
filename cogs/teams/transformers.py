@@ -23,7 +23,6 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import dataclasses
 import difflib
 from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Union, cast
 
@@ -38,7 +37,6 @@ if TYPE_CHECKING:
     from .team import Team
 
 
-@dataclasses.dataclass(init=True, repr=True)
 class TeamTransformer(app_commands.Transformer):
     """Represents a transformer that facilitates the selecting of a team.
 
@@ -51,7 +49,8 @@ class TeamTransformer(app_commands.Transformer):
         to select. Defaults to ``False``.
     """
 
-    clamp_teams: bool = dataclasses.field(default=False)
+    def __init__(self, clamp_teams: bool = False) -> None:
+        self.clamp_teams: bool = clamp_teams
 
     async def _get_available_teams(
         self, interaction: discord.Interaction, value: Optional[Union[int, float, str]]
