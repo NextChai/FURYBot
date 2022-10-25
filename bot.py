@@ -51,7 +51,7 @@ from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
 from cogs.teams import Team
-from cogs.teams.scrim import Scrim
+from cogs.teams.scrim import Scrim, ScrimStatus
 from utils import RUNNING_DEVELOPMENT, ErrorHandler, LinkFilter, TimerManager
 
 if TYPE_CHECKING:
@@ -280,7 +280,14 @@ class FuryBot(commands.Bot):
                 self.team_cache[team.id] = team
 
             scrim_records = await connection.fetch('SELECT * FROM teams.scrims')
-            self.team_scrim_cache = {entry['id']: Scrim(self, **dict(entry)) for entry in scrim_records}
+
+            for entry in scrim_records:
+                data = dict(entry)
+                data['status'] = ScrimStatus(data['status'])
+
+                scrim = Scrim(self, **data)
+                scrim.load_persistent_views()
+                self.team_scrim_cache[scrim.id] = scrim
 
     # Events
     async def on_ready(self) -> None:

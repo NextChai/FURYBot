@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, Annotated, TypeAlias
 import discord
 from discord import app_commands
 from discord.ext import commands
-from cogs.teams.scrim.scrim import ScrimStatus
+from cogs.teams.scrim import ScrimStatus
 
 from utils import BaseCog, TimeTransformer
 
@@ -189,6 +189,8 @@ class Teams(BaseCog):
                     content='@everyone, please note this scrim did not start.',
                     allowed_mentions=discord.AllowedMentions(everyone=True),
                 )
+
+            return
 
         scrim_chat = await scrim.create_scrim_chat()
 

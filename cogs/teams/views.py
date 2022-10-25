@@ -32,7 +32,7 @@ from typing_extensions import Self, Unpack
 from cogs.teams.scrim.persistent import AwayConfirm, HomeConfirm
 from utils import CHANNEL_EMOJI_MAPPING, AutoRemoveSelect, BaseView, BaseViewKwargs, BasicInputModal, TimeTransformer
 
-from .scrim import ScrimStatus
+from . import ScrimStatus
 from .team import TeamMember
 
 if TYPE_CHECKING:

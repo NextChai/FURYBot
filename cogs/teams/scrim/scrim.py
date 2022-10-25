@@ -25,8 +25,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
-import enum
-from typing import TYPE_CHECKING, List, Optional, Type, cast
+from typing import TYPE_CHECKING, List, Literal, Optional, Type, cast
 
 import discord
 from typing_extensions import Self
@@ -35,27 +34,13 @@ from discord.utils import MISSING
 
 from utils import MiniQueryBuilder
 
-from .persistent import AwayConfirm, HomeConfirm
+from .persistent import AwayConfirm, HomeConfirm, AwayForceConfirm
+from . import ScrimStatus
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
     from ..team import Team, TeamMember
-
-
-# Persistent views for team scrim confirmation from both
-class ScrimStatus(enum.Enum):
-    """
-    An enum to represent the status of a scrim.
-
-    pending_away: The away team has not yet confirmed the scrim.
-    scheduled: The scrim has been scheduled.
-    pending_host: The scrim is pending confirmation from the host.
-    """
-
-    pending_away = 'pending_away'
-    scheduled = 'scheduled'
-    pending_host = 'pending_host'
 
 
 @dataclasses.dataclass(init=True, repr=True, eq=True)
@@ -172,7 +157,7 @@ class Scrim:
 
         # If the scrim is more than a day out, create a reminder
         scrim_reminder_timer = None
-        if (when - datetime.datetime.utcnow()).days > 1:
+        if (when - discord.utils.utcnow()).days > 1:
             scrim_reminder_timer = await bot.timer_manager.create_timer(
                 when - datetime.timedelta(minutes=30), 'scrim_reminder', scrim_id=scrim.id
             )
@@ -250,6 +235,18 @@ class Scrim:
 
         return cast(discord.TextChannel, self.guild.get_channel(self.scrim_chat_id))
 
+    def load_persistent_views(self) -> None:
+        view = HomeConfirm(self)
+        self.bot.add_view(view, message_id=self.home_message_id)
+
+        if self.away_message_id:
+            view = AwayConfirm(self)
+            self.bot.add_view(view, message_id=self.away_message_id)
+
+        if self.away_confirm_anyways_message_id:
+            view = AwayForceConfirm(self)
+            self.bot.add_view(view, message_id=self.away_confirm_anyways_message_id)
+
     def scheduled_for_formatted(self) -> str:
         """:class:`str`: The time the scrim is scheduled for in a human readable format."""
         return f'{discord.utils.format_dt(self.scheduled_for, "F")} ({discord.utils.format_dt(self.scheduled_for, "R")})'
@@ -324,7 +321,9 @@ class Scrim:
 
         return channel
 
-    async def change_status(self, status: ScrimStatus, /) -> None:
+    async def change_status(
+        self, status: Literal[ScrimStatus.scheduled, ScrimStatus.pending_away, ScrimStatus.pending_host], /
+    ) -> None:
         """|coro|
 
         Change the status of the scrim.
@@ -372,7 +371,7 @@ class Scrim:
         column = 'home_voter_ids' if team_id == self.home_id else 'away_voter_ids'
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                f'UPADTE teams.scrims SET {column} = array_append({column}, $1) WHERE id = $2', member_id, self.id
+                f'UPDATE teams.scrims SET {column} = array_append({column}, $1) WHERE id = $2', member_id, self.id
             )
 
     async def remove_vote(self, member_id: int, team_id: int) -> None:
@@ -408,7 +407,7 @@ class Scrim:
         column = 'home_voter_ids' if team_id == self.home_id else 'away_voter_ids'
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                f'UPADTE teams.scrims SET {column} = array_remove({column}, $1) WHERE id = $2', member_id, self.id
+                f'UPDATE teams.scrims SET {column} = array_remove({column}, $1) WHERE id = $2', member_id, self.id
             )
 
     async def reschedle(self, when: datetime.datetime, *, editor: discord.abc.User) -> None:

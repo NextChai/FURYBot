@@ -23,5 +23,22 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import enum
+
+# Persistent views for team scrim confirmation from both
+class ScrimStatus(enum.Enum):
+    """
+    An enum to represent the status of a scrim.
+
+    pending_away: The away team has not yet confirmed the scrim.
+    scheduled: The scrim has been scheduled.
+    pending_host: The scrim is pending confirmation from the host.
+    """
+
+    pending_away = 'pending_away'
+    scheduled = 'scheduled'
+    pending_host = 'pending_host'
+
+
 from .persistent import *
 from .scrim import *

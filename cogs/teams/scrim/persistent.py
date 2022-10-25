@@ -29,10 +29,12 @@ from typing import TYPE_CHECKING, Optional, TypeAlias, TypeVar, cast
 import discord
 from typing_extensions import Self
 
+from . import ScrimStatus
+
 if TYPE_CHECKING:
     from bot import FuryBot
 
-    from .scrim import Scrim, ScrimStatus
+    from .scrim import Scrim
 
 
 VT = TypeVar('VT', bound='discord.ui.View')
@@ -41,12 +43,15 @@ ButtonType: TypeAlias = discord.ui.Button[VT]
 
 class HomeConfirm(discord.ui.View):
     def __init__(self, scrim: Scrim, /) -> None:
+        super().__init__(timeout=None)
         self.bot: FuryBot = scrim.bot
         self.scrim: Scrim = scrim
 
     @property
     def embed(self) -> discord.Embed:
         scrim = self.scrim
+
+        print(scrim.status, scrim.status == ScrimStatus.pending_host)
 
         if scrim.status is ScrimStatus.pending_host:
             embed = self.bot.Embed(
@@ -127,7 +132,7 @@ class HomeConfirm(discord.ui.View):
 
         return True
 
-    @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green)
+    @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green, custom_id='home-confirm-confirm')
     async def confirm(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
         try:
             await self.scrim.add_vote(interaction.user.id, self.scrim.home_id)
@@ -157,7 +162,7 @@ class HomeConfirm(discord.ui.View):
         async with self.bot.safe_connection() as connection:
             await connection.execute('UPDATE teams.scrims SET away_message_id = $1 WHERE id = $2', message.id, self.scrim.id)
 
-    @discord.ui.button(label='Remove Confirmation')
+    @discord.ui.button(label='Remove Confirmation', custom_id='home-confirm-remove')
     async def remove_confirmation(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
         try:
             await self.scrim.remove_vote(interaction.user.id, self.scrim.home_id)
@@ -171,6 +176,7 @@ class HomeConfirm(discord.ui.View):
 
 class AwayForceConfirm(discord.ui.View):
     def __init__(self, scrim: Scrim, /) -> None:
+        super().__init__(timeout=None)
         self.bot: FuryBot = scrim.bot
         self.scrim: Scrim = scrim
 
@@ -222,7 +228,7 @@ class AwayForceConfirm(discord.ui.View):
 
         return embed
 
-    @discord.ui.button(label='Force Confirm', style=discord.ButtonStyle.success)
+    @discord.ui.button(label='Force Confirm', style=discord.ButtonStyle.success, custom_id='away-force-confirm')
     async def force_confirm(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
         self.scrim.away_confirm_anyways_voter_ids.append(interaction.user.id)
 
@@ -262,6 +268,7 @@ class AwayForceConfirm(discord.ui.View):
 
 class AwayConfirm(discord.ui.View):
     def __init__(self, scrim: Scrim, /) -> None:
+        super().__init__(timeout=None)
         self.bot: FuryBot = scrim.bot
         self.scrim: Scrim = scrim
 
@@ -328,7 +335,7 @@ class AwayConfirm(discord.ui.View):
 
         return True
 
-    @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green)
+    @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green, custom_id='away-confirm-confirm')
     async def confirm(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
         try:
             await self.scrim.add_vote(interaction.user.id, self.scrim.away_id)
@@ -347,7 +354,7 @@ class AwayConfirm(discord.ui.View):
         view = HomeConfirm(self.scrim)
         await home_message.edit(embed=view.embed)
 
-    @discord.ui.button(label='Force Confirm')
+    @discord.ui.button(label='Force Confirm', custom_id='force-confirm-confirm')
     async def force_confirn(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
         if self.scrim.per_team < 2:
             return await interaction.response.send_message(
@@ -390,7 +397,7 @@ class AwayConfirm(discord.ui.View):
                 'UPDATE teams.scrims SET away_confirm_anyways_message_id = $1 WHERE id = $2', message.id, self.scrim.id
             )
 
-    @discord.ui.button(label='Unconfirm')
+    @discord.ui.button(label='Unconfirm', custom_id='away-confirm-unconfirm')
     async def unconfirm(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
         try:
             await self.scrim.remove_vote(interaction.user.id, self.scrim.away_id)
