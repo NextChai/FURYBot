@@ -59,7 +59,7 @@ class ApplicationCommandException(app_commands.AppCommandError):
         super().__init__(*args, **kwargs)
 
 
-class AutocompleteValidationException(ApplicationCommandException, app_commands.TransformerError):
+class AutocompleteValidationException(ApplicationCommandException):
     """An exception raised when validating the input from an autocomplete
     fails.
 
