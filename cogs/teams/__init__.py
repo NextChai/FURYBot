@@ -166,7 +166,7 @@ class Teams(BaseCog):
         if not team_members:
             return await interaction.edit_original_response(content=f'{member.mention} is not on any teams.')
 
-        embed = self.bot.Embed(title=f'{member.display_name} Teams')
+        embed = self.bot.Embed(title=f'{member.display_name} Teams', author=member)
         for team_member in team_members:
             team = team_member.team
 
