@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union, cast
 
 import discord
 from typing_extensions import Self, TypeVarTuple
@@ -334,7 +334,7 @@ class Team:
     def display_name(self) -> str:
         return f'{self.name} {f"({self.nickname})" if self.nickname else ""}'.strip()
 
-    def has_channel(self, channel: discord.abc.GuildChannel, /) -> bool:
+    def has_channel(self, channel: Union[discord.abc.GuildChannel, discord.Thread], /) -> bool:
         return channel.id in [self.category_channel_id, self.text_channel_id, self.voice_channel_id] + self.extra_channel_ids
 
     def get_member(self, member_id: int, /) -> Optional[TeamMember]:

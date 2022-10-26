@@ -23,11 +23,10 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Callable, List, Mapping, Tuple
 
 import discord
 from discord import app_commands
-from fuzzywuzzy import process as fuzzy_process
 
 from utils import AutocompleteValidationException
 
@@ -35,6 +34,10 @@ if TYPE_CHECKING:
     from bot import FuryBot
 
     from .team import Team
+
+    _process_extract: Callable[..., List[Tuple[str, int]]]
+else:
+    from fuzzywuzzy.process import extract as _process_extract
 
 
 class TeamTransformer(app_commands.Transformer):
@@ -52,64 +55,81 @@ class TeamTransformer(app_commands.Transformer):
     def __init__(self, clamp_teams: bool = False) -> None:
         self.clamp_teams: bool = clamp_teams
 
-    async def _get_available_teams(self, interaction: discord.Interaction, value: Optional[str]) -> List[Team]:
-        bot: FuryBot = interaction.client  # pyright: ignore
-        teams = list(bot.team_cache.values())
+    @property
+    def type(self) -> discord.AppCommandOptionType:
+        return discord.AppCommandOptionType.integer
 
-        # If we're clamping, we need to return based upon name.
-        # If we aren't, we can return all available teams based upon a difflib
-        # get close matches result.
-        available_teams: List[Team]
+    def _get_similar_teams(self, interaction: discord.Interaction) -> Mapping[int, Team]:
+        # A helper to get all teams that are similar to the team this command was invoked on.
+        # This will only be called if clamp_teams is True.
+        bot: FuryBot = interaction.client  # type: ignore
+
+        channel = interaction.channel
+        if channel is None or isinstance(channel, discord.PartialMessageable):
+            # dpy couldnt resolve this channel (maybe not in cache?)
+            return {}
+
+        team = discord.utils.find(lambda team: team.has_channel(channel), bot.team_cache.values())
+        if not team:
+            # This command wasnt invoked in a team chat
+            return {}
+
+        # Great, now let's get all similar teams matching the teams name.
+        team_name_parsed = ' '.join(team.name.split()[:-1])  # Turns "Rocket League 1" to "Rocket League"
+
+        return {t.id: t for t in bot.team_cache.values() if team_name_parsed in t.name and t != team}
+
+    async def autocomplete(self, interaction: discord.Interaction, value: str) -> List[app_commands.Choice[int]]:
+        """|coro|
+
+        Transforms the user's input that they're typing to a list of recommended choices based upon
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that was created from the user typing.
+        value: :class:`str`
+            The value that the user is typing.
+        """
+        bot: FuryBot = interaction.client  # type: ignore
+
+        # If we're clamping the teams, we need to get the similar teams to use.
         if self.clamp_teams:
-            # Get the current team and then extract by name.
-            channel = cast(Optional[discord.abc.GuildChannel], interaction.channel)
-            if not channel:
-                return []
-
-            # Get the team based on the channel now
-            invoked_team = discord.utils.find(lambda team: team.has_channel(channel), teams)
-
-            if not invoked_team:
-                return []
-
-            # A team name typically looks like this: Rocket League 3, Team Name <Number>.
-            # Let's split this to get Rocket League, or Team Name.
-            team_name_parsed = ' '.join(invoked_team.name.split()[:-1])
-
-            # Get all teams with similar names now
-            available_teams = [team for team in teams if team.name.startswith(team_name_parsed) and team != invoked_team]
+            similar_teams = self._get_similar_teams(interaction)
         else:
-            available_teams = teams
+            similar_teams = bot.team_cache
 
-        # Nice, sort by name now base on user input
-        if not value:
-            return available_teams[:25]
-        if not available_teams:
-            return []
+        # Great, now let's use this list with fuzzy matching to get more similar teams.
+        team_name_mapping: Mapping[str, Team] = {team.name: team for team in similar_teams.values()}
+        team_names = list(team_name_mapping.keys())
 
-        available_team_mapping = {team.name: team for team in available_teams}
+        # Get the top 10 teams with similar names as to what the user is typing
+        similar: List[Tuple[str, int]] = await bot.wrap(_process_extract, value, team_names, limit=10)
 
-        similar: List[Tuple[str, int]] = await bot.wrap(fuzzy_process.extract, value, list(available_team_mapping.keys()), limit=25)  # type: ignore
-        available_teams = [available_team_mapping[team_name] for team_name, _match_percentage in similar]
+        # Now let's create a list of choices for the user to select from.
+        choices: List[app_commands.Choice[int]] = []
 
-        return available_teams[:25]
+        for (team_name, _) in similar:
+            team = team_name_mapping[team_name]
+            choices.append(app_commands.Choice(name=team.display_name, value=team.id))
 
-    async def autocomplete(
-        self, interaction: discord.Interaction, value: str, /
-    ) -> List[app_commands.Choice[Union[int, float, str]]]:
-        teams = await self._get_available_teams(interaction, value)
-        return [app_commands.Choice(name=team.name, value=str(team.id)) for team in teams]
+        return choices
 
-    async def transform(self, interaction: discord.Interaction, value: Any, /) -> Team:
+    async def transform(self, interaction: discord.Interaction, value: int, /) -> Team:
+        """|coro|
 
-        teams = await self._get_available_teams(interaction, None)
-        team_mapping = {team.id: team for team in teams}
+        Transforms the given users input to a team.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that was created from the user invoking the command.
+        value: :class:`int`
+            The value that the user selected.
+        """
+        bot: FuryBot = interaction.client  # type: ignore
 
         try:
-            return team_mapping[int(value)]
+            return bot.team_cache[value]
         except KeyError:
-            raise AutocompleteValidationException(f"The team you entered was not found. {value}")
-        except ValueError:
-            raise AutocompleteValidationException(f"The team you entered was not a valid team. {value}")
-        except Exception as exc:
-            raise AutocompleteValidationException(f'Unknown value of {value}') from exc
+            raise AutocompleteValidationException('User did not select a valid team.')
