@@ -24,14 +24,14 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Annotated, Callable, Optional, TypeAlias, cast
+from typing import TYPE_CHECKING, Annotated, TypeAlias, List
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from cogs.teams.scrim import ScrimStatus
-from utils import BaseCog, Context, TimeTransformer
+from utils import BaseCog, TimeTransformer
 
 from .scrim import Scrim
 from .team import Team
@@ -40,6 +40,8 @@ from .views import TeamView
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
+    from .team import TeamMember
 
 
 TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=False)]
@@ -142,62 +144,38 @@ class Teams(BaseCog):
             content=f'A scrim for {scrim.scheduled_for_formatted()} has been created against {team.display_name}.'
         )
 
-    @commands.command(name='_team_import', hidden=True)
-    @commands.is_owner()
-    async def team_import(self, ctx: Context) -> discord.Message:
-        text_channel = cast(discord.TextChannel, ctx.channel)
-        category_channel = cast(discord.CategoryChannel, text_channel.category)
+    @team.command(name='get', description='Get the team status of a member.')
+    async def team_get(self, interaction: discord.Interaction, member: discord.Member) -> discord.InteractionMessage:
+        """|coro|
 
-        voice_channel = discord.utils.find(lambda c: isinstance(c, discord.VoiceChannel), category_channel.channels)
-        if not voice_channel:
-            return await ctx.send('No voice channel found.')
+        Allows you to get the team status of a member.
 
-        default_check: Callable[[discord.Message], Optional[bool]] = (
-            lambda message: message.author == ctx.author and message.channel == ctx.channel
-        )
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that triggered this command.
+        member: :class:`discord.Member`
+            The member you want to get the team status of.
+        """
+        await interaction.response.defer()
 
-        # Get the members now
-        await ctx.send('Send members.')
-        member_message: discord.Message = await self.bot.wait_for('message', check=default_check, timeout=None)
-        members = member_message.mentions
+        team_members: List[TeamMember] = [
+            team_member for team in self.bot.team_cache.values() if (team_member := team.get_member(member.id))
+        ]
 
-        # Get the subs
-        await ctx.send('Send subs.')
-        sub_message: discord.Message = await self.bot.wait_for('message', check=default_check, timeout=None)
-        subs = sub_message.mentions
+        if not team_members:
+            return await interaction.edit_original_response(content=f'{member.mention} is not on any teams.')
 
-        # Get the captain role
-        await ctx.send('Send captain roles.')
-        captain_message: discord.Message = await self.bot.wait_for('message', check=default_check, timeout=None)
-        captain_roles = captain_message.role_mentions
+        embed = self.bot.Embed(title=f'{member.display_name} Teams')
+        for team_member in team_members:
+            team = team_member.team
 
-        async with ctx.typing():
-            async with self.bot.safe_connection() as connection:
-                data = await connection.fetchrow(
-                    'INSERT INTO teams.settings(guild_id, category_channel_id, text_channel_id, voice_channel_id, name, captain_role_ids) '
-                    'VALUES($1, $2, $3, $4, $5, $6) '
-                    'RETURNING *',
-                    category_channel.guild.id,
-                    category_channel.id,
-                    text_channel.id,
-                    voice_channel.id,
-                    category_channel.name,
-                    [r.id for r in captain_roles],
-                )
+            embed.add_field(
+                name=team.display_name,
+                value=f'**Team Chat**: {team.text_channel.mention}\n**Is Sub**: {"Is a sub" if team_member.is_sub else "Is not a sub"}',
+            )
 
-                assert data
-
-                team = Team(self.bot, **dict(data), team_members={})
-                self.bot.team_cache[team.id] = team
-
-            for member in members:
-                await team.add_team_member(member.id)
-
-            for sub in subs:
-                await team.add_team_member(sub.id, is_sub=True)
-
-        view = TeamView(team, target=ctx)
-        return await ctx.send(view=view, embed=view.embed)
+        return await interaction.edit_original_response(embed=embed)
 
     @classmethod
     def _create_scrim_cancelled_message(cls, bot: FuryBot, scrim: Scrim) -> discord.Embed:
