@@ -584,7 +584,7 @@ class TeamChannelsView(BaseView):
         embed.add_field(name='Voice Channel', value=self.team.voice_channel.mention)
         embed.add_field(
             name='Extra Channels',
-            value='\n'.join([c.mention for c in self.team.extra_channels] or 'Team has no extra channels.'),
+            value='\n'.join([c.mention for c in self.team.extra_channels]) or 'Team has no extra channels.',
         )
 
         return embed
