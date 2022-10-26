@@ -23,7 +23,6 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import difflib
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union, cast
 
 import discord
@@ -53,9 +52,7 @@ class TeamTransformer(app_commands.Transformer):
     def __init__(self, clamp_teams: bool = False) -> None:
         self.clamp_teams: bool = clamp_teams
 
-    async def _get_available_teams(
-        self, interaction: discord.Interaction, value: Optional[Union[int, float, str]]
-    ) -> List[Team]:
+    async def _get_available_teams(self, interaction: discord.Interaction, value: Optional[str]) -> List[Team]:
         bot: FuryBot = interaction.client  # pyright: ignore
         teams = list(bot.team_cache.values())
 
@@ -85,7 +82,7 @@ class TeamTransformer(app_commands.Transformer):
             available_teams = teams
 
         # Nice, sort by name now base on user input
-        if value == '':
+        if not value:
             return available_teams[:25]
         if not available_teams:
             return []
@@ -98,23 +95,21 @@ class TeamTransformer(app_commands.Transformer):
         return available_teams[:25]
 
     async def autocomplete(
-        self, interaction: discord.Interaction, value: Union[int, float, str], /
+        self, interaction: discord.Interaction, value: str, /
     ) -> List[app_commands.Choice[Union[int, float, str]]]:
         teams = await self._get_available_teams(interaction, value)
         return [app_commands.Choice(name=team.name, value=str(team.id)) for team in teams]
 
     async def transform(self, interaction: discord.Interaction, value: Any, /) -> Team:
-        print(value)
 
         teams = await self._get_available_teams(interaction, None)
         team_mapping = {team.id: team for team in teams}
-        print(list(team_mapping.keys()))
 
         try:
             return team_mapping[int(value)]
-        # except KeyError:
-        #     raise AutocompleteValidationException(f"The team you entered was not found. {value}")
-        # except ValueError:
-        #     raise AutocompleteValidationException(f"The team you entered was not a valid team. {value}")
+        except KeyError:
+            raise AutocompleteValidationException(f"The team you entered was not found. {value}")
+        except ValueError:
+            raise AutocompleteValidationException(f"The team you entered was not a valid team. {value}")
         except Exception as exc:
             raise AutocompleteValidationException(f'Unknown value of {value}') from exc

@@ -51,8 +51,6 @@ class HomeConfirm(discord.ui.View):
     def embed(self) -> discord.Embed:
         scrim = self.scrim
 
-        print(scrim.status, scrim.status == ScrimStatus.pending_host)
-
         if scrim.status is ScrimStatus.pending_host:
             embed = self.bot.Embed(
                 title='Confirm The Scrim',
