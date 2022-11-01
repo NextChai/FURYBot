@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
-from typing import TYPE_CHECKING, List, Literal, Mapping, Optional, Type, cast
+from typing import TYPE_CHECKING, Union, List, Literal, Mapping, Optional, Type, cast
 
 import discord
 from discord.utils import MISSING
@@ -326,10 +326,11 @@ class Scrim:
         await builder(self.bot)
 
     async def create_scrim_chat(self) -> discord.TextChannel:
-        overwrites: Mapping[discord.Member, discord.PermissionOverwrite] = {
+        overwrites: Mapping[Union[discord.Member, discord.Role], discord.PermissionOverwrite] = {
             m.member or await m.fetch_member(): discord.PermissionOverwrite(view_channel=True)
             for m in [*self.away_team.team_members.values(), *self.home_team.team_members.values()]
         }
+        overwrites[self.guild.default_role] = discord.PermissionOverwrite(view_channel=False)
 
         channel = await self.home_team.category_channel.create_text_channel(
             name='scrim-chat',
