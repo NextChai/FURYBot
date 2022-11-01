@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Annotated, TypeAlias, List
+from typing import TYPE_CHECKING, Annotated, Optional, TypeAlias, List
 
 import discord
 from discord import app_commands
@@ -46,6 +46,26 @@ if TYPE_CHECKING:
 
 TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=False)]
 FRONT_END_TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=True)]
+
+
+def _maybe_team(interaction: discord.Interaction, team: Optional[Team]) -> Optional[Team]:
+    if team is not None:
+        return team
+
+    bot: FuryBot = interaction.client  # type: ignore
+
+    channel = interaction.channel
+    if not channel:
+        return None
+
+    category: Optional[discord.CategoryChannel] = getattr(channel, 'category', None)
+    if not category:
+        return None
+
+    try:
+        return Team.from_category(category.id, bot=bot)
+    except Exception:
+        return None
 
 
 class Teams(BaseCog):
@@ -84,7 +104,9 @@ class Teams(BaseCog):
     @team.command(name='manage', description='Manage a team. Assign members, subs, captains, scrims, etc.')
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.describe(team='The team you want to manage.')
-    async def team_manage(self, interaction: discord.Interaction, team: TEAM_TRANSFORM) -> discord.InteractionMessage:
+    async def team_manage(
+        self, interaction: discord.Interaction, team: Optional[TEAM_TRANSFORM]
+    ) -> Optional[discord.InteractionMessage]:
         """|coro|
 
         A command used to manage a team. This will launch an depth view in which you can manage the team.
@@ -97,6 +119,12 @@ class Teams(BaseCog):
         team: :class:`Team`
             The team you want to manage.
         """
+        team = _maybe_team(interaction, team)
+        if team is None:
+            return await interaction.response.send_message(
+                'You must be in a team channel to use this command.', ephemeral=True
+            )
+
         await interaction.response.defer()
 
         view = TeamView(team, target=interaction)
