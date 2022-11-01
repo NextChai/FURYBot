@@ -91,7 +91,7 @@ class HomeConfirm(discord.ui.View):
                     'FuryBot will create a chat for both teams to communicate. In this chat, '
                     f'the home team, **{scrim.home_team.display_name}**, will create the private match for the away team, '
                     f'**{scrim.away_team.display_name}**, to join with. You decide how much and long you want to play. The scrim channel '
-                    'will automatically be deleted after 5 hours.',
+                    'will automatically be deleted after 5 hours. Please note you should use your private team voice chat for communication.',
                     inline=False,
                 )
 
@@ -296,7 +296,7 @@ class AwayConfirm(discord.ui.View):
                 'FuryBot will create a chat for bothho teams to communicate. In this chat, '
                 f'the home team, **{scrim.home_team.display_name}**, will create the private match for the away team, '
                 f'**{scrim.away_team.display_name}**, to join with. You decide how much and long you want to play. The scrim channel '
-                'will automatically be deleted after 5 hours.',
+                'will automatically be deleted after 5 hours. Please note you should use your private team voice chat for communication.',
                 inline=False,
             )
             embed.add_field(name='Confirmed Teammates', value=', '.join(m.mention for m in scrim.away_voters), inline=False)
