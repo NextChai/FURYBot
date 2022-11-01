@@ -184,7 +184,8 @@ class FuryBot(commands.Bot):
         self.pool: PoolType = pool
         self.thread_pool: futures.ThreadPoolExecutor = futures.ThreadPoolExecutor(max_workers=20)
 
-        if os.environ.get('FURY_START_TIMER_MANAGER', 'false').lower() == 'true':
+        _start_timer_manager = os.environ.get('FURY_START_TIMER_MANAGER')
+        if _start_timer_manager is None or _start_timer_manager.lower() in ('true', '1'):
             self.timer_manager: TimerManager = TimerManager(bot=self)
 
         self.link_filter: LinkFilter = LinkFilter(self)
