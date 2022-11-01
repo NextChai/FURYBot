@@ -131,21 +131,25 @@ class HomeConfirm(discord.ui.View):
         return True
 
     @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green, custom_id='home-confirm-confirm')
-    async def confirm(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
+    async def confirm(
+        self, interaction: discord.Interaction, button: ButtonType[Self]
+    ) -> Optional[discord.InteractionMessage]:
         try:
             await self.scrim.add_vote(interaction.user.id, self.scrim.home_id)
         except ValueError:
             return await interaction.response.send_message(content='You have already voted!', ephemeral=True)
 
+        await interaction.response.defer()
+
         if not self.scrim.home_all_voted:
             # NOT all required members have voted, we need to edit the message
             # with the updated view
-            return await interaction.response.edit_message(view=self, embed=self.embed)
+            return await interaction.edit_original_response(view=self, embed=self.embed)
 
         # We need to change the status and update the message,
         # all requied members have voted
         await self.scrim.change_status(ScrimStatus.pending_away)
-        await interaction.response.edit_message(view=None, embed=self.embed)
+        await interaction.edit_original_response(view=None, embed=self.embed)
 
         # Now send to the other team
         channel = self.scrim.away_team.text_channel
@@ -276,8 +280,11 @@ class AwayConfirm(discord.ui.View):
                 f'**{scrim.per_team - len(scrim.away_voter_ids)} vote(s) are needed** before the scrim '
                 'is officially confirmed.',
             )
+            embed.add_field(name='Scrim Date and Time', value=scrim.scheduled_for_formatted(), inline=False)
             embed.add_field(
-                name='Confirmed Teammates', value=', '.join(m.mention for m in scrim.away_voters) or 'No one yet.'
+                name='Confirmed Teammates',
+                value=', '.join(m.mention for m in scrim.away_voters) or 'No one yet.',
+                inline=False,
             )
             embed.add_field(name='Opposing Team:', value=', '.join(m.mention for m in scrim.home_voters))
             return embed
@@ -292,13 +299,13 @@ class AwayConfirm(discord.ui.View):
                 name='How do I Scrim?',
                 value='10 minutes before the scrim is scheduled to begin, '
                 'FuryBot will create a chat for bothho teams to communicate. In this chat, '
-                f'the home team, **{scrim.away_team.display_name}**, will create the private match for the away team, '
-                f'**{scrim.home_team.display_name}**, to join with. You decide how much and long you want to play. The scrim channel '
+                f'the home team, **{scrim.home_team.display_name}**, will create the private match for the away team, '
+                f'**{scrim.away_team.display_name}**, to join with. You decide how much and long you want to play. The scrim channel '
                 'will automatically be deleted after 5 hours.',
                 inline=False,
             )
             embed.add_field(name='Confirmed Teammates', value=', '.join(m.mention for m in scrim.away_voters))
-            embed.add_field(name='Opposing Team:', value=', '.join(m.mention for m in scrim.home_voters))
+            embed.add_field(name='Opposing Team:', value=', '.join(m.mention for m in scrim.home_voters), inline=False)
 
             if (
                 self.scrim.away_confirm_anyways_message_id is not None
@@ -332,19 +339,21 @@ class AwayConfirm(discord.ui.View):
         except ValueError:
             return await interaction.response.send_message(content='You have already voted!', ephemeral=True)
 
+        await interaction.response.defer()
+
         if self.scrim.away_all_voted:
             # All members have voted, change the status
             await self.scrim.change_status(ScrimStatus.scheduled)
 
             # We need to update our local message with NO view
-            await interaction.response.edit_message(view=None, embed=self.embed)
+            await interaction.edit_original_response(view=None, embed=self.embed)
         else:
-            await interaction.response.edit_message(embed=self.embed, view=self)
+            await interaction.edit_original_response(embed=self.embed, view=self)
 
         # And update the other message from the home team's chat:
         home_message = await self.scrim.home_message()
         view = HomeConfirm(self.scrim)
-        await home_message.edit(embed=view.embed)
+        await home_message.edit(embed=view.embed, view=None)
 
     @discord.ui.button(label='Force Confirm', custom_id='force-confirm-confirm')
     async def force_confirn(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
