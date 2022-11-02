@@ -172,7 +172,7 @@ class HumanTime:
         if ctx.accuracy == parsedatetime.pdtContext.ACU_HALFDAY:  # type: ignore
             dt = dt.replace(day=now.day + 1)
 
-        dt = dt.replace(tzinfo=datetime.timezone.utc)
+        dt = dt.replace(tzinfo=datetime.timezone.utc) + EST_OFFSET
 
         if begin in (0, 1):
             if begin == 0:
@@ -246,9 +246,7 @@ class TimeTransformer(app_commands.Transformer):
         if not transformed.remaining:
             raise BadArgument('Expected remaining argument after time! For example, "5 minutes for washing dishes"')
 
-        return TransformedTime(
-            dt=transformed.dt + EST_OFFSET, now=transformed._now, arg=transformed.remaining, default=self.default
-        )
+        return TransformedTime(dt=transformed.dt, now=transformed._now, arg=transformed.remaining, default=self.default)
 
     async def autocomplete(self, interaction: discord.Interaction, value: str, /) -> List[app_commands.Choice[str]]:
         """|coro|
