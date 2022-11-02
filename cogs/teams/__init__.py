@@ -31,7 +31,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from cogs.teams.scrim import ScrimStatus
-from utils import BaseCog, TimeTransformer, TransformedTime
+from utils import BaseCog, TimeTransformer
 
 from .scrim import Scrim
 from .team import Team
@@ -140,7 +140,7 @@ class Teams(BaseCog):
         self,
         interaction: discord.Interaction,
         team: FRONT_END_TEAM_TRANSFORM,
-        when: Annotated[TransformedTime, TimeTransformer('n/a')],
+        when: Annotated[TimeTransformer, TimeTransformer('n/a')],
         per_team: app_commands.Range[int, 2, 10],
     ) -> discord.InteractionMessage:
         """|coro|
@@ -158,6 +158,7 @@ class Teams(BaseCog):
         """
         assert isinstance(interaction.channel, (discord.abc.GuildChannel, discord.Thread))
         assert interaction.channel.category
+        assert when.dt
 
         await interaction.response.defer(ephemeral=True)
 

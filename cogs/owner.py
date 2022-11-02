@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 import discord
 from discord import app_commands
 
-from utils import BaseCog, TimeTransformer, TransformedTime
+from utils import BaseCog, TimeTransformer
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -39,7 +39,7 @@ class Owner(BaseCog):
     @app_commands.default_permissions(manage_members=True)
     @app_commands.describe(value='The value to convert to a time.')
     async def time_transform(
-        self, interaction: discord.Interaction, value: app_commands.Transform[TransformedTime, TimeTransformer('n/a')]
+        self, interaction: discord.Interaction, value: app_commands.Transform[TimeTransformer, TimeTransformer('n/a')]
     ) -> None:
         """|coro|
 
@@ -50,6 +50,8 @@ class Owner(BaseCog):
         value: :class:`str`
             The value to convert to a time.
         """
+        assert value.dt
+
         embed = self.bot.Embed(
             title='Transformed Time',
             description=f'{discord.utils.format_dt(value.dt, "F")} ({discord.utils.format_dt(value.dt, "R")})',

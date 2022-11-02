@@ -23,46 +23,49 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import dataclasses
 import datetime
 import re
-from typing import Any, List, Optional, Tuple, Type, Union
+from typing import Any, Optional, Tuple, Type, TypeVar
 
 import discord
 import parsedatetime
+import pytz
 from dateutil.relativedelta import relativedelta
 from discord import app_commands
 from typing_extensions import Self
 
 from .errors import BadArgument
 
-__all__: Tuple[str, ...] = ('ShortTime', 'HumanTime', 'TransformedTime', 'TimeTransformer')
+# Monkey patch mins and secs into the units
+units: Any = parsedatetime.pdtLocales['en_US'].units  # type: ignore
+units['minutes'].append('mins')
+units['seconds'].append('secs')
 
-EST_OFFSET = datetime.timedelta(hours=4)
+STT = TypeVar('STT', bound='ShortTime')
+HTT = TypeVar('HTT', bound='HumanTime')
+TT = TypeVar('TT', bound='Time')
 
-
-def _clamp_est(dt: datetime.datetime) -> datetime.datetime:
-    # Clamps UTC to EST time by subtracting 4 hours
-    return dt - EST_OFFSET
+__all__: Tuple[str, ...] = (
+    'ShortTime',
+    'HumanTime',
+    'Time',
+    'TimeTransformer',
+)
 
 
 class ShortTime:
     """Represents a shortimte transformer. This will use parsedatetime alongside a compiled
     regex to format time. Such as `1d 6h`, etc.
 
-    Please note you shouldn't create an instance of this class, use :meth:`from_argument` instead.
-
-    Attributes
+    Parameters
     ----------
     argument: :class:`str`
         The argument to convert.
-    dt: :class:`datetime.datetime`
-        The transformed datetime object.
-    remaining: :class:`str`
-        The remaining string after parsing.
+    now: Optional[:class:`datetime.datetime`]
+        The current time. Defaults to :class:`datetime.datetime.now`.
     """
 
-    __slots__: Tuple[str, ...] = ('argument', 'dt', 'remaining', '_now')
+    __slots__: Tuple[str, ...] = ('dt',)
 
     compiled = re.compile(
         """(?:(?P<years>[0-9])(?:years?|y))?             # e.g. 2y
@@ -76,231 +79,251 @@ class ShortTime:
         re.VERBOSE,
     )
 
-    def __init__(
-        self, argument: str, dt: datetime.datetime, /, *, now: datetime.datetime, remaining: Optional[str] = None
-    ) -> None:
-        self.argument: str = argument
-        self.dt: datetime.datetime = dt
-        self.remaining: Optional[str] = remaining
-        self._now: datetime.datetime = now
-
-    @classmethod
-    def from_argument(
-        cls: Type[Self], argument: str, /, *, now: Optional[datetime.datetime] = None, default: Optional[str] = None
-    ) -> Self:
-        """Transform the given argument into a :class:`ShortTime` object.
-
-        Parameters
-        ----------
-        argument: :class:`str`
-            The argument to convert.
-        now: Optional[:class:`datetime.datetime`]
-            The datetime to use as the base. Defaults to :func:`datetime.datetime.utcnow`.
-        default: Optional[:class:`str`]
-            The default time to use if the argument is empty.
-        """
-        match = cls.compiled.fullmatch(argument)
+    def __init__(self, argument: str) -> None:
+        match = self.compiled.fullmatch(argument)
         if match is None or not match.group(0):
             raise BadArgument('invalid time provided')
 
         data = {k: int(v) for k, v in match.groupdict(default=0).items()}
-        remaining = argument[match.end() :].strip()
+        now = datetime.datetime.now(pytz.timezone('US/Eastern'))
 
-        now = now or datetime.datetime.utcnow()
-        dt = _clamp_est(now + relativedelta(**data))
+        dt = now + relativedelta(**data)
+        self.dt = dt.replace(tzinfo=datetime.timezone.utc)
 
-        return cls(argument, dt, now=now, remaining=remaining or default)
+    @classmethod
+    async def convert(cls: Type[STT], interaction: discord.Interaction, argument: str) -> STT:
+        """|coro|
 
-    @property
-    def is_past(self) -> bool:
-        """:class:`bool`: Whether the time is in the past."""
-        return self.dt < self._now
+        A method used to transform the given argument to a :class:`ShortTime` object.
+
+        Parameters
+        ----------
+        ctx: :class:`Context`
+            The context of the command.
+        argument: :class:`str`
+            The argument to transform.
+
+        Returns
+        -------
+        :class:`ShortTime`
+            The transformed argument.
+        """
+        return cls(argument)
 
 
 class HumanTime:
-    """Represents a human time transformer. This will parse human given strings
-    to datetime objects using parsedatetime.
-
-    Please note you shouldn't create an instance of this class, use :meth:`from_argument` instead.
-
-    Attributes
-    ----------
-    argument: :class:`str`
-        The argument that was converted.
-    dt: :class:`datetime.datetime`
-        The datetime object that was created.
-    remaining: Optional[:class:`str`]
-        The remaining string that was not parsed.
-    """
-
-    calendar: Any = parsedatetime.Calendar(version=2)  # 2 for VERSION_CONTEXT_STYLE
-
-    def __init__(
-        self, argument: str, dt: datetime.datetime, /, *, now: datetime.datetime, remaining: Optional[str] = None
-    ) -> None:
-        self.argument: str = argument
-        self.dt: datetime.datetime = dt
-        self.remaining: Optional[str] = remaining
-        self._now: datetime.datetime = now
-
-    @classmethod
-    def from_argument(
-        cls: Type[Self], argument: str, /, *, now: Optional[datetime.datetime] = None, default: Optional[str] = None
-    ) -> Self:
-        """Transform the given argument into a :class:`HumanTime` object.
-
-        Parameters
-        ----------
-        argument: :class:`str`
-            The argument to convert.
-        now: Optional[:class:`datetime.datetime`]
-            The datetime to use as the base. Defaults to :func:`datetime.datetime.utcnow`.
-        default: Optional[:class:`str`]
-            The default time to use if the argument is empty.
-        """
-        now = now or datetime.datetime.utcnow()
-        elements = cls.calendar.nlp(argument, sourceTime=now)
-        if elements is None or len(elements) == 0:
-            raise BadArgument('Invalid time provided, try e.g. "tomorrow" or "3 days".')
-
-        dt, ctx, begin, end, _ = elements[0]
-
-        if not ctx.hasDateOrTime:
-            raise BadArgument('Invalid time provided, try e.g. "tomorrow" or "3 days".')
-
-        if begin not in (0, 1) and end != len(argument):
-            raise BadArgument('I\'m so sorry but I didn\'t understand this time!')
-
-        if not ctx.hasTime:
-            dt = dt.replace(hour=now.hour, minute=now.minute, second=now.second, microsecond=now.microsecond)
-
-        if ctx.accuracy == parsedatetime.pdtContext.ACU_HALFDAY:  # type: ignore
-            dt = dt.replace(day=now.day + 1)
-
-        dt = _clamp_est(dt)
-
-        if begin in (0, 1):
-            if begin == 0:
-                remaining = argument[end + 1 :].lstrip(' ,.!')
-            else:
-                remaining = argument[end:].lstrip(' ,.!')
-        elif len(argument) == end:
-            remaining = argument[:begin].strip()
-        else:
-            raise BadArgument('I didn\'t understand this, try again!')
-
-        return cls(argument, dt, now=now, remaining=remaining or default)
-
-    @property
-    def is_past(self) -> bool:
-        """:class:`bool`: Whether the time is in the past."""
-        return self.dt < self._now
-
-
-@dataclasses.dataclass(init=True, repr=True)
-class TransformedTime:
-    """Represents the object returned when the :class:`TimeTransformer` class
-    has transformed a given argument.
-
-    Attributes
-    ----------
-    dt: :class:`datetime.datetime`
-        The datetime object that was created.
-    now: :class:`datetime.datetime`
-        The current time, in utc format.
-    arg: :class:`str`
-        The remaining string that was not parsed. This could
-        be the default depending on the transformer used.
-    default: Optional[:class:`str`]
-        The default arg to use if not provided.
-    """
-
-    dt: datetime.datetime
-    now: datetime.datetime
-    arg: str
-    default: Optional[str]
-
-    @property
-    def is_unique_arg(self) -> bool:
-        """:class:`bool`: Whether the :attr:`arg` was written by the user or not."""
-        return self.arg != self.default
-
-
-class TimeTransformer(app_commands.Transformer):
-    """Represents a time transformer. This will parse human given strings
-    into datetime objects using parsedatetime and regex depending on the
-    user input.
+    """Represents a human readable time transformer. This will use parsedatetime to attempt
+    and transform given input to a :class:`datetime.datetime` object.
 
     Parameters
     ----------
-    default: Optional[:class:`str`]
-        The default argument to add if the user does not provide one.
-    past: :class:`bool`
-        Whether to allow past times or not. This defaults to ``False``.
+    argument: :class:`str`
+        The argument to transform.
+    now: Optional[:class:`datetime.datetime`]
+        The current time. Defaults to :class:`datetime.datetime.now`.
+
+    Attributes
+    ----------
+    dt: :class:`datetime.datetime`
+        The datetime object that was created from the argument.
     """
 
-    def __init__(self, default: Optional[str] = None, /, *, past: bool = False) -> None:
-        self.default: Optional[str] = default
-        self.past: bool = past
-        self.past: bool = past
+    __slots__: Tuple[str, ...] = ('dt', '_past')
 
-    async def _transform_time(self, transformed: Union[ShortTime, HumanTime]) -> TransformedTime:
-        if not self.past and transformed.is_past:
-            raise BadArgument('This time is in the past!')
+    calendar: Any = parsedatetime.Calendar(version=parsedatetime.VERSION_CONTEXT_STYLE)  # type: ignore
 
-        if not transformed.remaining:
-            raise BadArgument('Expected remaining argument after time! For example, "5 minutes for washing dishes"')
+    def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None) -> None:
+        now = now or datetime.datetime.utcnow()
+        dt, status = self.calendar.parseDT(argument, sourceTime=now)
+        if not status.hasDateOrTime:
+            raise BadArgument('invalid time provided, try e.g. "tomorrow" or "3 days"', tzinfo=pytz.timezone('US/Eastern'))
 
-        return TransformedTime(dt=transformed.dt, now=transformed._now, arg=transformed.remaining, default=self.default)
+        if not status.hasTime:
+            # replace it with the current time
+            dt = dt.replace(hour=now.hour, minute=now.minute, second=now.second, microsecond=now.microsecond)
 
-    async def autocomplete(self, interaction: discord.Interaction, value: str, /) -> List[app_commands.Choice[str]]:
+        self.dt: datetime.datetime = dt.replace(tzinfo=datetime.timezone.utc)
+        self._past = dt < now
+
+    @classmethod
+    async def transform(cls: Type[HTT], interaction: discord.Interaction, argument: str) -> HTT:
         """|coro|
 
-        Gives the user a blanket list of time choices to use.
+        A method used to convert the given argument to a :class:`HumanTime` object.
 
         Parameters
         ----------
-        interaction: :class:`discord.Interaction`
-            The interaction created from the autocomplete.
-        value: :class:`str`
-            The value of the argument.
+        ctx: :class:`Context`
+            The context of the command.
+        argument: :class:`str`
+            The argument to convert.
 
         Returns
         -------
-        List[:class:`discord.app_commands.Choice`]
-            A list of choices to use.
+        :class:`HumanTime`
+            The converted argument.
         """
-        default_choices = ['30 minutes', '1 hour', '12 hours', 'tomorrow', 'two days', '1 week']
-        return [app_commands.Choice(name=choice.title(), value=choice) for choice in default_choices]
+        return cls(argument, now=interaction.created_at)
 
-    async def transform(self, interaction: discord.Interaction, value: str, /) -> TransformedTime:
-        """|coro|
 
-        Transforms the given value to a :class:`TransformedTime` object.
+class Time(HumanTime):
+    """Represents a base time transformer. This transformer will try and convert
+    using :class:`ShortTime` and fallback to :class:`HumanTime` if it fails.
 
-        Parameters
-        ----------
-        interaction: :class:`discord.Interaction`
-            The interaction created from the command being invoked.
-        value: :class:`str`
-            The value of the argument.
+    This inherits :class:`HumanTime`.
 
-        Returns
-        -------
-        :class:`TransformedTime`
-            The transformed time object.
+    Parameters
+    ----------
+    argument: :class:`str`
+        The argument to convert.
+    now: Optional[:class:`datetime.datetime`]
+        The current time. Defaults to :class:`datetime.datetime.now`.
 
-        Raises
-        ------
-        BadArgument
-            The time provided was invalid.
-        """
+    Attributes
+    ----------
+    dt: :class:`datetime.datetime`
+        The datetime object that was created from the argument.
+    """
+
+    __slots__: Tuple[str, ...] = ()
+
+    def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None) -> None:
         try:
-            transformed = ShortTime.from_argument(value, now=interaction.created_at, default=self.default)
-        except BadArgument:
-            pass
+            o = ShortTime(argument)
+        except Exception:
+            super().__init__(argument)
         else:
-            return await self._transform_time(transformed)
+            self.dt: datetime.datetime = o.dt
+            self._past = False
 
-        transformed = HumanTime.from_argument(value, now=interaction.created_at, default=self.default)
-        return await self._transform_time(transformed)
+
+class TimeTransformer(app_commands.Transformer):
+    """Represents a user friendly time transformer.
+
+    Attributes
+    ----------
+    default: Optional[:class:`str`]
+        An optional default value to use if the argument is not provided.
+    dt: Optional[:class:`datetime.datetime`]
+        The datetime object that was created from the argument.
+    arg: Optional[:class:`str`]
+        The argument that was provided.
+
+    """
+
+    __slots__: Tuple[str, ...] = (
+        'converter',
+        'dt',
+        'arg',
+        'default',
+    )
+
+    def __init__(
+        self,
+        default: Optional[str] = None,
+    ) -> None:
+        self.dt: Optional[datetime.datetime] = None
+        self.arg: Optional[str] = None
+        self.default: Optional[str] = default
+
+    async def _check_constraints(self, interaction: discord.Interaction, now: datetime.datetime, remaining: str) -> Self:
+        """|coro|
+
+        A coroutine to ensure that the given inputs are not in the past or missing arguments.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction of the command.
+        now: :class:`datetime.datetime`
+            The current time.
+        remaining: :class:`str`
+            The remaining arguments.
+        """
+        assert self.dt is not None
+
+        if self.dt < now:
+            raise BadArgument('This time is in the past.')
+
+        if not remaining and not self.default:
+            raise BadArgument('Missing argument after the time.')
+
+        self.arg = remaining or self.default
+        return self
+
+    async def transform(self, interaction: discord.Interaction, value: Any) -> Self:
+        """|coro|
+
+        Transform the user\'s argument into a :class:`TimeTransformer` object.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction of the command.
+        value: Any
+            The value to transform.
+
+        Returns
+        -------
+        :class:`TimeTransformer`
+            The transformed value.
+        """
+        result = self.__class__(default=self.default)
+
+        calendar = HumanTime.calendar
+        regex = ShortTime.compiled
+
+        now = interaction.created_at
+
+        match = regex.match(value)
+        if match is not None and match.group(0):
+            data = {k: int(v) for k, v in match.groupdict(default=0).items()}
+            remaining = value[match.end() :].strip()
+            result.dt = now + relativedelta(**data)
+            return await result._check_constraints(interaction, now, remaining)
+
+        if value.endswith('from now'):
+            value = value[:-8].strip()
+
+        if value[0:2] == 'me':
+            # starts with "me to", "me in", or "me at "
+            if value[0:6] in ('me to ', 'me in ', 'me at '):
+                value = value[6:]
+
+        elements = calendar.nlp(value, sourceTime=now)
+        if elements is None or len(elements) == 0:
+            raise BadArgument('Invalid time provided, try e.g. "tomorrow" or "3 days".')
+
+        dt, status, begin, end, _ = elements[0]
+
+        if not status.hasDateOrTime:
+            raise BadArgument('Invalid time provided, try e.g. "tomorrow" or "3 days".')
+
+        if begin not in (0, 1) and end != len(value):
+            raise BadArgument('I\'m so sorry but I didn\'t understand this time!')
+
+        if not status.hasTime:
+            dt = dt.replace(hour=now.hour, minute=now.minute, second=now.second, microsecond=now.microsecond)
+
+        if status.accuracy == parsedatetime.pdtContext.ACU_HALFDAY:  # type: ignore
+            dt = dt.replace(day=now.day + 1)
+
+        result.dt = dt.replace(tzinfo=datetime.timezone.utc)
+
+        if begin in (0, 1):
+            if begin == 1:
+                if value[0] != '"':
+                    raise BadArgument('Expected quote before time input...')
+
+                if not (end < len(value) and value[end] == '"'):
+                    raise BadArgument('If the time is quoted, you must unquote it.')
+
+                remaining = value[end + 1 :].lstrip(' ,.!')
+            else:
+                remaining = value[end:].lstrip(' ,.!')
+        elif len(value) == end:
+            remaining = value[:begin].strip()
+        else:
+            raise BadArgument('I\'m so sorry but I didn\'t understand this time!')
+
+        return await result._check_constraints(interaction, now, remaining)
