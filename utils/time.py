@@ -41,6 +41,11 @@ __all__: Tuple[str, ...] = ('ShortTime', 'HumanTime', 'TransformedTime', 'TimeTr
 EST_OFFSET = datetime.timedelta(hours=4)
 
 
+def _clamp_est(dt: datetime.datetime) -> datetime.datetime:
+    # Clamps UTC to EST time by subtracting 4 hours
+    return dt - EST_OFFSET
+
+
 class ShortTime:
     """Represents a shortimte transformer. This will use parsedatetime alongside a compiled
     regex to format time. Such as `1d 6h`, etc.
@@ -102,7 +107,7 @@ class ShortTime:
         remaining = argument[match.end() :].strip()
 
         now = now or datetime.datetime.utcnow()
-        dt = now + relativedelta(**data)
+        dt = _clamp_est(now + relativedelta(**data))
 
         return cls(argument, dt, now=now, remaining=remaining or default)
 
@@ -172,7 +177,7 @@ class HumanTime:
         if ctx.accuracy == parsedatetime.pdtContext.ACU_HALFDAY:  # type: ignore
             dt = dt.replace(day=now.day + 1)
 
-        dt = dt.replace(tzinfo=datetime.timezone.utc)
+        dt = _clamp_est(dt.replace(tzinfo=datetime.timezone.utc))
 
         if begin in (0, 1):
             if begin == 0:
@@ -246,9 +251,7 @@ class TimeTransformer(app_commands.Transformer):
         if not transformed.remaining:
             raise BadArgument('Expected remaining argument after time! For example, "5 minutes for washing dishes"')
 
-        return TransformedTime(
-            dt=transformed.dt + EST_OFFSET, now=transformed._now, arg=transformed.remaining, default=self.default
-        )
+        return TransformedTime(dt=transformed.dt, now=transformed._now, arg=transformed.remaining, default=self.default)
 
     async def autocomplete(self, interaction: discord.Interaction, value: str, /) -> List[app_commands.Choice[str]]:
         """|coro|
