@@ -32,8 +32,6 @@ from typing_extensions import Self, TypeVarTuple
 from utils import MiniQueryBuilder
 
 if TYPE_CHECKING:
-    from asyncpg import Connection, Record
-
     from bot import FuryBot
 
     from .scrim import Scrim
@@ -224,8 +222,13 @@ class Team:
         return team
 
     @classmethod
-    async def from_connection(
-        cls: Type[Self], data: Dict[str, Any], /, *, bot: FuryBot, connection: Connection[Record]
+    async def from_record(
+        cls: Type[Self],
+        data: Dict[str, Any],
+        member_data: List[Dict[str, Any]],
+        /,
+        *,
+        bot: FuryBot,
     ) -> Self:
         """|coro|
 
@@ -235,6 +238,8 @@ class Team:
         Parameters
         ----------
         data: :class:`dict`
+            The data returned from the database.
+        member_data: List[:class:`dict`]
             The data returned from the database.
         bot: :class:`FuryBot`
             The bot instance.
@@ -246,8 +251,6 @@ class Team:
         :class:`Team`
             The fetched team.
         """
-        member_data = await connection.fetch('SELECT * FROM teams.members WHERE team_id = $1', data['id'])
-
         members = {entry['member_id']: TeamMember(bot, **dict(entry)) for entry in member_data or []}
         team = cls(bot, **dict(data), team_members=members)
         bot.team_cache[team.id] = team

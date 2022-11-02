@@ -35,6 +35,7 @@ from typing import (
     Callable,
     Coroutine,
     Dict,
+    List,
     Literal,
     Optional,
     ParamSpec,
@@ -274,21 +275,27 @@ class FuryBot(commands.Bot):
             await self.load_extension(extension)
 
         async with self.safe_connection() as connection:
-            data = await connection.fetch('SELECT * FROM teams.settings')
-
-            for row in data:
-                team = await Team.from_connection(dict(row), bot=self, connection=connection)
-                self.team_cache[team.id] = team
+            team_data = await connection.fetch('SELECT * FROM teams.settings')
+            team_members_data = await connection.fetch('SELECT * FROM teams.members')
 
             scrim_records = await connection.fetch('SELECT * FROM teams.scrims')
 
-            for entry in scrim_records:
-                data = dict(entry)
-                data['status'] = ScrimStatus(data['status'])
+        team_member_mapping: Dict[int, List[Dict[Any, Any]]] = {}
+        for entry in team_members_data:
+            team_member_mapping.setdefault(entry['team_id'], []).append(dict(entry))
 
-                scrim = Scrim(self, **data)
-                scrim.load_persistent_views()
-                self.team_scrim_cache[scrim.id] = scrim
+        for row in team_data:
+            members = team_member_mapping.get(row['id'], [])
+            team = await Team.from_record(dict(row), members, bot=self)
+            self.team_cache[team.id] = team
+
+        for entry in scrim_records:
+            data = dict(entry)
+            data['status'] = ScrimStatus(data['status'])
+
+            scrim = Scrim(self, **data)
+            scrim.load_persistent_views()
+            self.team_scrim_cache[scrim.id] = scrim
 
     # Events
     async def on_ready(self) -> None:
