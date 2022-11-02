@@ -13,7 +13,7 @@ import re
 import time
 import warnings
 
-from .context import pdtContext, pdtContextStack
+from .context import pdtContext as pdtContext, pdtContextStack
 from .pdt_locales import get_icu, load_locale, locales as _locales
 from .warns import pdt20DeprecationWarning
 
