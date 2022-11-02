@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
-from typing import TYPE_CHECKING, Union, List, Literal, Mapping, Optional, Type, cast
+from typing import TYPE_CHECKING, List, Literal, Mapping, Optional, Type, Union, cast
 
 import discord
 from discord.utils import MISSING

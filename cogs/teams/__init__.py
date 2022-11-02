@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Annotated, Optional, TypeAlias, List
+from typing import TYPE_CHECKING, Annotated, List, Optional, TypeAlias
 
 import discord
 from discord import app_commands
