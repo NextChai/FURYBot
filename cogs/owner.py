@@ -23,48 +23,40 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import discord
-from discord.ext import commands
+from discord import app_commands
 
-from utils import BaseCog, Context
+from utils import BaseCog, TimeTransformer, TransformedTime
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
 
 class Owner(BaseCog):
-    async def cog_check(self, ctx: Context) -> bool:
-        return await self.bot.is_owner(ctx.author)
+    @app_commands.command()
+    @app_commands.default_permissions(manage_members=True)
+    @app_commands.describe(value='The value to convert to a time.')
+    async def time_transform(
+        self, interaction: discord.Interaction, value: app_commands.Transform[TransformedTime, TimeTransformer('n/a')]
+    ) -> None:
+        """|coro|
 
-    @commands.group(name='profanity', description='Manage the profanity filter.', invoke_without_command=True)
-    async def profanity(self, ctx: Context) -> Optional[discord.Message]:
-        if ctx.invoked_subcommand:
-            return
+        Transforms the given time input to a human readable format. This is to test the time transformer.
 
-        return await ctx.send('No subcommand sent.')
+        Parameters
+        ----------
+        value: :class:`str`
+            The value to convert to a time.
+        """
+        embed = self.bot.Embed(
+            title='Transformed Time',
+            description=f'{discord.utils.format_dt(value.dt, "F")} ({discord.utils.format_dt(value.dt, "R")})',
+        )
+        embed.add_field(name='Argument', value=value.arg)
 
-    @profanity.command(name='remove', description='Remove a profane word.')
-    async def profanity_remove(self, ctx: Context, *, word: str) -> discord.Message:
-        async with self.bot.safe_connection() as connection:
-            data = await connection.execute('DELETE FROM profane_words WHERE word = $1', word)
-
-        return await ctx.send(data)
-
-    @profanity.command(name='add', description='Add a profane word.')
-    async def profanity_add(self, ctx: Context, *, word: str) -> discord.Message:
-        async with self.bot.safe_connection() as connection:
-            data = await connection.execute(
-                "INSERT INTO profane_words(word) VALUES ($1) ON CONFLICT (word) DO NOTHING", word
-            )
-
-        return await ctx.send(data)
-
-    @profanity.command(name='reload', description='Reload the word filter.')
-    async def profanity_reload(self, ctx: Context) -> None:
-        self.bot.profanity_filter.clear()
-        await ctx.message.add_reaction('👍')
+        return await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot: FuryBot):

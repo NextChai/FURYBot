@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
-from typing import Optional, Tuple, Type, Any, Union
+from typing import Optional, Tuple, Type, Any, Union, List
 from typing_extensions import Self
 import re
 from dateutil.relativedelta import relativedelta
@@ -253,7 +253,48 @@ class TimeTransformer(app_commands.Transformer):
 
         return TransformedTime(dt=transformed.dt, now=transformed._now, arg=transformed.remaining, default=self.default)
 
+    async def autocomplete(self, interaction: discord.Interaction, value: str, /) -> List[app_commands.Choice[str]]:
+        """|coro|
+
+        Gives the user a blanket list of time choices to use.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction created from the autocomplete.
+        value: :class:`str`
+            The value of the argument.
+
+        Returns
+        -------
+        List[:class:`discord.app_commands.Choice`]
+            A list of choices to use.
+        """
+        default_choices = ['30 minutes', '1 hour', '12 hours', 'tomorrow', 'two days', '1 week']
+        return [app_commands.Choice(name=choice.title(), value=choice) for choice in default_choices]
+
     async def transform(self, interaction: discord.Interaction, value: str, /) -> TransformedTime:
+        """|coro|
+
+        Transforms the given value to a :class:`TransformedTime` object.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction created from the command being invoked.
+        value: :class:`str`
+            The value of the argument.
+
+        Returns
+        -------
+        :class:`TransformedTime`
+            The transformed time object.
+
+        Raises
+        ------
+        BadArgument
+            The time provided was invalid.
+        """
         try:
             transformed = ShortTime.from_argument(value, now=interaction.created_at, default=self.default)
         except BadArgument:
