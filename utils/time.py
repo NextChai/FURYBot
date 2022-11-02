@@ -177,7 +177,7 @@ class HumanTime:
         if ctx.accuracy == parsedatetime.pdtContext.ACU_HALFDAY:  # type: ignore
             dt = dt.replace(day=now.day + 1)
 
-        dt = _clamp_est(dt.replace(tzinfo=datetime.timezone.utc))
+        dt = _clamp_est(dt)
 
         if begin in (0, 1):
             if begin == 0:
