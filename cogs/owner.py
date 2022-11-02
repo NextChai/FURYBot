@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 
 class Owner(BaseCog):
-    @app_commands.command()
+    @app_commands.command(description='Transform some time.')
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.describe(value='The value to convert to a time.')
     async def time_transform(
