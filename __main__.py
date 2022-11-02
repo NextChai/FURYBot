@@ -66,7 +66,10 @@ async def main() -> None:
         return _log.warning('Failed to create an instance of FuryBot.', exc_info=exc)
 
     async with bot, pool, session:
-        await bot.start(os.environ['TOKEN'])
+        try:
+            await bot.start(os.environ['TOKEN'])
+        except Exception as exc:
+            return _log.warning('Failed to start client.', exc_info=exc)
 
 
 asyncio.run(main())
