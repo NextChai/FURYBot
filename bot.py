@@ -280,6 +280,8 @@ class FuryBot(commands.Bot):
 
             scrim_records = await connection.fetch('SELECT * FROM teams.scrims')
 
+        _log.info('Released connection')
+
         team_member_mapping: Dict[int, List[Dict[Any, Any]]] = {}
         for entry in team_members_data:
             team_member_mapping.setdefault(entry['team_id'], []).append(dict(entry))
