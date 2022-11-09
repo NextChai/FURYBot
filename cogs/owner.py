@@ -23,12 +23,15 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import sys
+import importlib
+from typing import TYPE_CHECKING, Dict, Optional, List
 
 import discord
 from discord import app_commands
+from discord.ext import commands
 
-from utils import BaseCog, TimeTransformer
+from utils import BaseCog, TimeTransformer, Context
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -59,6 +62,37 @@ class Owner(BaseCog):
         embed.add_field(name='Argument', value=value.arg)
 
         return await interaction.response.send_message(embed=embed)
+
+    @commands.command(name='reload')
+    @commands.is_owner()
+    async def _reload(self, ctx: Context, *extensions: str) -> discord.Message:
+        statuses: Dict[str, Optional[Exception]] = {}
+        for extension in extensions:
+            if extension in self.bot.extensions:
+                try:
+                    await self.bot.reload_extension(extension)
+                    statuses[extension] = None
+                except Exception as exc:
+                    statuses[extension] = exc
+            else:
+
+                try:
+                    sys.modules[extension] = importlib.reload(sys.modules[extension])
+                    statuses[extension] = None
+                except Exception as exc:
+                    statuses[extension] = exc
+
+        response: List[str] = []
+        for extension, exception in statuses.items():
+            if exception is not None:
+                if self.bot.error_handler:
+                    await self.bot.error_handler.log_error(exception, origin=ctx, event_name=self._reload.qualified_name)
+
+                response.append(f'`{extension}`: Failed to reload: **{exception}**')
+            else:
+                response.append(f'`{extension}`: Reloaded successfully.')
+
+        return await ctx.send('\n'.join(response))
 
 
 async def setup(bot: FuryBot):
