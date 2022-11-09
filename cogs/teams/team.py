@@ -379,6 +379,9 @@ class Team:
         member = team_member.member or await team_member.fetch_member()
         await category.set_permissions(member, view_channel=True)
 
+        await self.text_channel.edit(sync_permissions=True)
+        await self.voice_channel.edit(sync_permissions=True)
+
         return team_member
 
     async def remove_team_member(self, team_member: TeamMember, /) -> None:
@@ -397,6 +400,9 @@ class Team:
         overwrites = category.overwrites
         overwrites.pop(member, None)
         await category.edit(overwrites=overwrites)
+
+        await self.text_channel.edit(sync_permissions=True)
+        await self.voice_channel.edit(sync_permissions=True)
 
         # Update the object
         self.team_members.pop(team_member.member_id, None)
