@@ -229,7 +229,7 @@ class TeamMembersView(BaseView):
         """Remove members from this team."""
         AutoRemoveSelect(
             item=discord.ui.UserSelect[Self](
-                max_values=clamp(self.guild.member_count, 25), placeholder='Select members to add...'
+                max_values=clamp(self.guild.member_count, 25), placeholder='Select members to remove...'
             ),
             parent=self,
             callback=functools.partial(self._manage_member_assignment, remove_member=True),
@@ -242,7 +242,7 @@ class TeamMembersView(BaseView):
         """Add subs to this team."""
         AutoRemoveSelect(
             item=discord.ui.UserSelect[Self](
-                max_values=clamp(self.guild.member_count, 25), placeholder='Select members to add...'
+                max_values=clamp(self.guild.member_count, 25), placeholder='Select a subs to add...'
             ),
             parent=self,
             callback=functools.partial(self._manage_member_assignment, assign_sub=True),
@@ -255,7 +255,7 @@ class TeamMembersView(BaseView):
         """Remove subs from this team."""
         AutoRemoveSelect(
             item=discord.ui.UserSelect[Self](
-                max_values=clamp(self.guild.member_count, 25), placeholder='Select members to add...'
+                max_values=clamp(self.guild.member_count, 25), placeholder='Select subs to remove...'
             ),
             parent=self,
             callback=functools.partial(self._manage_member_assignment, remove_member=True),
