@@ -27,7 +27,7 @@ from typing_extensions import Self
 
 import discord
 
-from utils import BaseCog, IMAGE_REQUEST_CHANNEL_ID, IMAGE_NOTIFICATIONS_ROLE_ID
+from utils import BaseCog, IMAGE_REQUEST_CHANNEL_ID, IMAGE_NOTIFICATIONS_ROLE_ID, BaseModal
 
 from discord import app_commands
 
@@ -54,7 +54,7 @@ class ImageRequest:
         return f"ImageRequest(requester={self.requester!r}, attachment={self.attachment!r}, channel={self.channel!r}, message={self.message!r})"
 
 
-class DeniedImageReason(discord.ui.Modal):
+class DeniedImageReason(BaseModal):
     reason: discord.ui.TextInput[Self] = discord.ui.TextInput(
         label='Deny Reason',
         style=discord.TextStyle.long,
@@ -63,7 +63,7 @@ class DeniedImageReason(discord.ui.Modal):
     )
 
     def __init__(self, bot: FuryBot, parent: ApproveOrDenyImage, request: ImageRequest) -> None:
-        super().__init__()
+        super().__init__(bot)
 
         self.bot: FuryBot = bot
         self.parent: ApproveOrDenyImage = parent
@@ -189,7 +189,13 @@ class ImageRequests(BaseCog):
         if not channel or not role:
             return await interaction.edit_original_response(content='Unable to find the image request channel!')
 
-        message_obj = await channel.send(view=view, embed=view.embed, content=role.mention, file=file, allowed_mentions=discord.AllowedMentions(roles=[role]))
+        message_obj = await channel.send(
+            view=view,
+            embed=view.embed,
+            content=role.mention,
+            file=file,
+            allowed_mentions=discord.AllowedMentions(roles=[role]),
+        )
 
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
