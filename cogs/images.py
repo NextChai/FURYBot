@@ -174,3 +174,7 @@ class ImageRequests(BaseCog):
             content=f'I\'ve submitted the request for this attachment to be uploaded. You will be notified if it gets approved '
             'or denied.'
         )
+
+
+async def setup(bot: FuryBot) -> None:
+    await bot.add_cog(ImageRequests(bot))

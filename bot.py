@@ -81,6 +81,7 @@ else:
         'cogs.owner',
         'cogs.events.tracking',
         'cogs.teams',
+        'cogs.images',
     )
 
 
