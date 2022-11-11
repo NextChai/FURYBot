@@ -168,6 +168,13 @@ class ImageRequests(BaseCog):
 
         await interaction.response.defer(ephemeral=True)
 
+        try:
+            file = await attachment.to_file(description=f'An upload by a {interaction.user.id}')
+        except discord.HTTPException:
+            return await interaction.edit_original_response(
+                content='I was unable to download this attachment. Please try with a different one or contact a moderator.'
+            )
+
         # Build a request
         request = ImageRequest(
             requester=interaction.user, attachment=attachment, channel=interaction.channel, message=message
@@ -180,7 +187,7 @@ class ImageRequests(BaseCog):
         if not channel or not role:
             return await interaction.edit_original_response(content='Unable to find the image request channel!')
 
-        message_obj = await channel.send(view=view, embed=view.embed, content=role.mention)
+        message_obj = await channel.send(view=view, embed=view.embed, content=role.mention, file=file)
 
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
