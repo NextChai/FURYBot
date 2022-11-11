@@ -173,6 +173,7 @@ class ApproveOrDenyImage(discord.ui.View):
 
 class ImageRequests(BaseCog):
     @app_commands.command(name='attachment-request', description='Request to have an attachment uploaded for you.')
+    @app_commands.default_permissions(attach_files=True)
     @app_commands.rename(channel_id='channel-id')
     @app_commands.describe(
         attachment='The attachment you want to upload.',
@@ -188,10 +189,10 @@ class ImageRequests(BaseCog):
     ) -> Optional[discord.InteractionMessage]:
         assert isinstance(interaction.user, discord.Member)
 
-        if interaction.guild:
-            return await interaction.response.send_message('This command can only be used in DMs.', ephemeral=True)
-
-        guild = cast(discord.Guild, self.bot.get_guild(FURY_GUILD))
+        if interaction.guild and interaction.guild.id == FURY_GUILD:
+            guild = interaction.guild
+        else:
+            guild = cast(discord.Guild, self.bot.get_guild(FURY_GUILD))
 
         if not channel_id.isdigit():
             return await interaction.response.send_message('The channel ID must be a number.')
