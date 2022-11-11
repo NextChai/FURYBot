@@ -84,6 +84,7 @@ else:
         'cogs.events.tracking',
         'cogs.teams',
         'cogs.images',
+        'cogs.moderation',
     )
 
 

@@ -22,6 +22,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Optional, cast
 from typing_extensions import Self
 
@@ -30,6 +31,8 @@ import discord
 from utils import BaseCog, IMAGE_REQUEST_CHANNEL_ID, IMAGE_NOTIFICATIONS_ROLE_ID, BaseModal
 
 from discord import app_commands
+
+from utils.constants import FURY_GUILD
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -170,15 +173,34 @@ class ApproveOrDenyImage(discord.ui.View):
 
 class ImageRequests(BaseCog):
     @app_commands.command(name='attachment-request', description='Request to have an attachment uploaded for you.')
-    @app_commands.guild_only()
+    @app_commands.rename(channel_id='channel-id')
+    @app_commands.describe(
+        attachment='The attachment you want to upload.',
+        channel_id='The ID of the channel you want the upload to send to.',
+        message='An optional message to send with the upload.',
+    )
     async def attachment_request(
-        self, interaction: discord.Interaction, attachment: discord.Attachment, message: Optional[str] = None
-    ) -> discord.InteractionMessage:
+        self,
+        interaction: discord.Interaction,
+        attachment: discord.Attachment,
+        channel_id: str,
+        message: Optional[str] = None,
+    ) -> Optional[discord.InteractionMessage]:
         assert isinstance(interaction.user, discord.Member)
-        assert isinstance(interaction.channel, discord.abc.Messageable)
-        assert interaction.guild
 
-        await interaction.response.defer(ephemeral=True)
+        if interaction.guild:
+            return await interaction.response.send_message('This command can only be used in DMs.', ephemeral=True)
+
+        guild = cast(discord.Guild, self.bot.get_guild(FURY_GUILD))
+
+        if not channel_id.isdigit():
+            return await interaction.response.send_message('The channel ID must be a number.')
+
+        sender_channel = cast(discord.abc.Messageable, guild.get_channel(int(channel_id)))
+        if not sender_channel:
+            return await interaction.response.send_message('The channel ID is invalid.')
+
+        await interaction.response.defer()
 
         try:
             file = await attachment.to_file(description=f'An upload by a {interaction.user.id}')
@@ -188,14 +210,13 @@ class ImageRequests(BaseCog):
             )
 
         # Build a request
-        request = ImageRequest(
-            requester=interaction.user, attachment=attachment, channel=interaction.channel, message=message
-        )
+        request = ImageRequest(requester=interaction.user, attachment=attachment, channel=sender_channel, message=message)
         view = ApproveOrDenyImage(self.bot, request)
 
         # Send the request to the channel
-        channel = cast(discord.TextChannel, interaction.guild.get_channel(IMAGE_REQUEST_CHANNEL_ID))
-        role = interaction.guild.get_role(IMAGE_NOTIFICATIONS_ROLE_ID)
+        guild = cast(discord.Guild, self.bot.get_guild(FURY_GUILD))
+        channel = cast(discord.TextChannel, guild.get_channel(IMAGE_REQUEST_CHANNEL_ID))
+        role = guild.get_role(IMAGE_NOTIFICATIONS_ROLE_ID)
         if not channel or not role:
             return await interaction.edit_original_response(content='Unable to find the image request channel!')
 
@@ -214,8 +235,8 @@ class ImageRequests(BaseCog):
                 'RETURNING *',
                 attachment.to_dict(),
                 interaction.user.id,
-                interaction.guild.id,
-                interaction.channel.id,
+                guild.id,
+                sender_channel.id,  # type: ignore
                 message_obj.id,
                 message,
             )
