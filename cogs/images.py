@@ -70,10 +70,16 @@ class DeniedImageReason(BaseModal):
         self.request: ImageRequest = request
 
     async def on_submit(self, interaction: discord.Interaction, /) -> None:
+        user = self.request.requester
+
+        embed = self.bot.Embed(
+            title='Image has been denied.',
+            description=f'This image upload from {user.mention} has been denied by a moderator, {interaction.user.mention}.',
+            author=user,
+        )
         await interaction.response.edit_message(embed=self.parent.embed, view=None)
 
         # Send the reason to the user :blobpain:
-        user = self.request.requester
         embed = self.bot.Embed(
             title='Upload Request Denied.',
             description=f'Your image upload request has been denied by a moderator, {interaction.user.mention}',
@@ -148,7 +154,14 @@ class ApproveOrDenyImage(discord.ui.View):
                 self.request.id,
             )
 
-        await interaction.edit_original_response(embed=self.embed, view=None)
+        embed = self.bot.Embed(
+            title='Image Approved',
+            description=f'This image uploaded by {request.requester.mention} has been approved by a moderator, {interaction.user.mention}',
+            author=request.requester,
+            timestamp=interaction.created_at,
+        )
+
+        await interaction.edit_original_response(embed=embed, view=None)
         await interaction.followup.send('This image has been approved.', ephemeral=True)
 
     @discord.ui.button(label='Deny', style=discord.ButtonStyle.red)
