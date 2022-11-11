@@ -253,6 +253,17 @@ class ImageRequests(BaseCog):
         channel_id: str,
         message: Optional[str] = None,
     ) -> Optional[discord.InteractionMessage]:
+        """Allows a member to request an attachment to be uploaded for them.
+
+        Parameters
+        ----------
+        attachment: :class:`discord.Attachment`
+            The attachment to upload.
+        channel_id: :class:`str`
+            The ID of the channel to send the attachment to.
+        message: Optional[:class:`str`]
+            An optional message to send with the attachment.
+        """
         # Both a moderator and a normal person can use this command.
         # Only mods can use it in a guild, and all others must use
         # it in DMS.
