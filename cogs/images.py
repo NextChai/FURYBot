@@ -187,8 +187,6 @@ class ImageRequests(BaseCog):
         channel_id: str,
         message: Optional[str] = None,
     ) -> Optional[discord.InteractionMessage]:
-        assert isinstance(interaction.user, discord.Member)
-
         if interaction.guild and interaction.guild.id == FURY_GUILD:
             guild = interaction.guild
         else:
@@ -210,8 +208,11 @@ class ImageRequests(BaseCog):
                 content='I was unable to download this attachment. Please try with a different one or contact a moderator.'
             )
 
-        # Build a request
-        request = ImageRequest(requester=interaction.user, attachment=attachment, channel=sender_channel, message=message)
+        member = interaction.user
+        if not isinstance(member, discord.Member):
+            member = guild.get_member(member.id) or await guild.fetch_member(member.id)
+
+        request = ImageRequest(requester=member, attachment=attachment, channel=sender_channel, message=message)
         view = ApproveOrDenyImage(self.bot, request)
 
         # Send the request to the channel
