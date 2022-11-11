@@ -100,5 +100,6 @@ CREATE TABLE IF NOT EXISTS image_requests (
     channel_id BIGINT,
     message_id BIGINT,
     -- For the persistent view, can be None
-    message TEXT -- The message the user attached to the upload
+    message TEXT,
+    -- The message the user attached to the upload
 );

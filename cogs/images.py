@@ -22,7 +22,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
-from typing import TYPE_CHECKING, NamedTuple, Optional, cast
+from typing import TYPE_CHECKING, Optional, cast
 from typing_extensions import Self
 
 import discord
@@ -35,11 +35,23 @@ if TYPE_CHECKING:
     from bot import FuryBot
 
 
-class ImageRequest(NamedTuple):
-    requester: discord.Member
-    attachment: discord.Attachment
-    channel: discord.abc.Messageable
-    message: Optional[str]
+class ImageRequest:
+    def __init__(
+        self,
+        requester: discord.Member,
+        attachment: discord.Attachment,
+        channel: discord.abc.Messageable,
+        message: Optional[str],
+        id: Optional[int] = None,
+    ) -> None:
+        self.requester: discord.Member = requester
+        self.attachment: discord.Attachment = attachment
+        self.channel: discord.abc.Messageable = channel
+        self.message: Optional[str] = message
+        self.id: Optional[int] = id
+
+    def __repr__(self) -> str:
+        return f"ImageRequest(requester={self.requester!r}, attachment={self.attachment!r}, channel={self.channel!r}, message={self.message!r})"
 
 
 class DeniedImageReason(discord.ui.Modal):
@@ -75,6 +87,12 @@ class DeniedImageReason(discord.ui.Modal):
             pass
 
         await interaction.followup.send('This image has been denied.', ephemeral=True)
+
+        async with self.bot.safe_connection() as connection:
+            await connection.execute(
+                'DELETE FROM image_requests WHERE id = $1',
+                self.request.id,
+            )
 
 
 class ApproveOrDenyImage(discord.ui.View):
@@ -122,6 +140,12 @@ class ApproveOrDenyImage(discord.ui.View):
 
         await request.channel.send(file=file, content=content)
 
+        async with self.bot.safe_connection() as connection:
+            await connection.execute(
+                'DELETE FROM image_requests WHERE id = $1',
+                self.request.id,
+            )
+
         await interaction.edit_original_response(embed=self.embed, view=None)
         await interaction.followup.send('This image has been approved.', ephemeral=True)
 
@@ -159,9 +183,10 @@ class ImageRequests(BaseCog):
         message_obj = await channel.send(view=view, embed=view.embed, content=role.mention)
 
         async with self.bot.safe_connection() as connection:
-            await connection.execute(
+            data = await connection.fetchrow(
                 'INSERT INTO image_requests(attachment_payload, requester_id, guild_id, channel_id, message_id, message) '
-                'VALUES ($1, $2, $3, $4, $5, $6)',
+                'VALUES ($1, $2, $3, $4, $5, $6) '
+                'RETURNING *',
                 attachment.to_dict(),
                 interaction.user.id,
                 interaction.guild.id,
@@ -169,6 +194,9 @@ class ImageRequests(BaseCog):
                 message_obj.id,
                 message,
             )
+            assert data
+
+            request.id = data['id']
 
         return await interaction.edit_original_response(
             content=f'I\'ve submitted the request for this attachment to be uploaded. You will be notified if it gets approved '

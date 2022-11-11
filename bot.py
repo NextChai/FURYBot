@@ -44,6 +44,7 @@ from typing import (
     TypeAlias,
     TypeVar,
     Union,
+    cast,
 )
 
 import asyncpg
@@ -53,6 +54,7 @@ from typing_extensions import Concatenate, Self
 
 from cogs.teams import Team
 from cogs.teams.scrim import Scrim, ScrimStatus
+from cogs.images import ApproveOrDenyImage, ImageRequest
 from utils import RUNNING_DEVELOPMENT, ErrorHandler, LinkFilter, TimerManager
 
 if TYPE_CHECKING:
@@ -270,6 +272,28 @@ class FuryBot(commands.Bot):
 
         return embed
 
+    async def _load_image_request(self, data: asyncpg.Record) -> None:
+        await self.wait_until_ready()
+
+        guild = self.get_guild(data['guild_id'])
+        if not guild:
+            return
+
+        channel = cast(Optional[discord.abc.Messageable], guild.get_channel(data['channel_id']))
+        if not channel:
+            return
+
+        request = ImageRequest(
+            requester=await guild.fetch_member(data['requester_id']),
+            attachment=discord.Attachment(data=data['attachment'], state=self._connection),
+            channel=channel,
+            message=data['message'],
+            id=data['id'],
+        )
+
+        view = ApproveOrDenyImage(self, request)
+        self.add_view(view, message_id=data['message_id'])
+
     # Hooks
     async def setup_hook(self) -> None:
         for extension in initial_extensions:
@@ -280,6 +304,8 @@ class FuryBot(commands.Bot):
             team_members_data = await connection.fetch('SELECT * FROM teams.members')
 
             scrim_records = await connection.fetch('SELECT * FROM teams.scrims')
+
+            image_requests = await connection.fetch('SELECT * FROM image_requests')
 
         team_member_mapping: Dict[int, List[Dict[Any, Any]]] = {}
         for entry in team_members_data:
@@ -297,6 +323,9 @@ class FuryBot(commands.Bot):
             scrim = Scrim(self, **data)
             scrim.load_persistent_views()
             self.team_scrim_cache[scrim.id] = scrim
+
+        for request in image_requests:
+            self.create_task(self._load_image_request(request))
 
     # Events
     async def on_ready(self) -> None:
