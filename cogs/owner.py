@@ -41,6 +41,7 @@ class Owner(BaseCog):
     @app_commands.command(description='Transform some time.')
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.describe(value='The value to convert to a time.')
+    @app_commands.guild_only()
     async def time_transform(
         self, interaction: discord.Interaction, value: app_commands.Transform[TimeTransformer, TimeTransformer('n/a')]
     ) -> None:
