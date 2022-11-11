@@ -230,7 +230,9 @@ class ApproveOrDenyImage(discord.ui.View):
         await interaction.edit_original_response(embed=embed)
 
     @discord.ui.button(label='Deny', style=discord.ButtonStyle.red)
+    @default_button_doc_string
     async def deny(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Deny the image request by sending a message to the requester with the information and deleting the request from the database."""
         modal = DeniedImageReason(self.bot, self, self.request)
         return await interaction.response.send_modal(modal)
 
