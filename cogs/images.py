@@ -171,7 +171,6 @@ class ApproveOrDenyImage(discord.ui.View):
 class ImageRequests(BaseCog):
     @app_commands.command(name='attachment-request', description='Request to have an attachment uploaded for you.')
     @app_commands.guild_only()
-    @app_commands.default_permissions(moderate_members=True)
     async def attachment_request(
         self, interaction: discord.Interaction, attachment: discord.Attachment, message: Optional[str] = None
     ) -> discord.InteractionMessage:
