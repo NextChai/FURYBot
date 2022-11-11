@@ -91,3 +91,14 @@ CREATE TABLE IF NOT EXISTS timer_storage(
     created TIMESTAMP,
     expires TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS image_requests (
+    id BIGSERIAL PRIMARY KEY,
+    attachment_payload JSONB,
+    requester_id BIGINT,
+    guild_id BIGINT,
+    channel_id BIGINT,
+    message_id BIGINT,
+    -- For the persistent view, can be None
+    message TEXT -- The message the user attached to the upload
+);
