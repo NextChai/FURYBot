@@ -87,14 +87,14 @@ class Notifier(BaseCog):
 
     async def _fetch_and_send_members(self, guild: discord.Guild, moderators: List[int]) -> List[discord.Member]:
         embed = self.bot.Embed(
-            title='Oh no!',
+            title='Dms are on!',
             description=f'Your DM\'s are not turned off in the {guild.name} server. Please '
             'do this or one of the coaches will be reaching out to you soon.\n\n'
             'You can follow the gif below to do this, you may need to click on it to '
             'load properly.',
         )
-        embed.set_image(
-            url='https://cdn.discordapp.com/attachments/881935961972436992/1017087615641587722/2022-09-07_10-52-33_online-video-cutter.com.gif'
+        embed.add_field(
+            name='I turned on DMs to upload images?', value='That\'s ok! Just be sure to turn them back off again.'
         )
 
         members: List[discord.Member] = []
