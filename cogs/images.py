@@ -63,7 +63,7 @@ class DeniedImageReason(BaseModal):
     )
 
     def __init__(self, bot: FuryBot, parent: ApproveOrDenyImage, request: ImageRequest) -> None:
-        super().__init__(bot)
+        super().__init__(bot, title='Deny an Upload')
 
         self.bot: FuryBot = bot
         self.parent: ApproveOrDenyImage = parent
