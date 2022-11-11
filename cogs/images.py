@@ -23,12 +23,12 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, Optional, cast, Union
 from typing_extensions import Self
 
 import discord
 
-from utils import BaseCog, IMAGE_REQUEST_CHANNEL_ID, IMAGE_NOTIFICATIONS_ROLE_ID, BaseModal
+from utils import default_button_doc_string, BaseCog, IMAGE_REQUEST_CHANNEL_ID, IMAGE_NOTIFICATIONS_ROLE_ID, BaseModal
 
 from discord import app_commands
 
@@ -39,17 +39,40 @@ if TYPE_CHECKING:
 
 
 class ImageRequest:
+    """Represents an image request so that it can be used in child views easier.
+
+    .. container:: operations
+
+        .. describe:: repr(x)
+
+            Returns the representation of the image request.
+
+    Parameters
+    Attributes
+    ----------
+    requester: :class:`discord.Member`
+        The member who requested the image.
+    attachment: :class:`discord.Attachment`
+        The attachment that was requested to be uploaded.
+    channel: Union[:class:`discord.TextChannel`, :class:`discord.VoiceChannel`, :class:`discord.Thread`]
+        The channel that the image should be sent to.
+    message: Optional[:class:`str`]
+        A custom message to be sent with the image.
+    id: Optional[:class:`int`]
+        The ID of the image request. This shouldn't be None unless the database hasn't been inserted into yet.
+    """
+
     def __init__(
         self,
         requester: discord.Member,
         attachment: discord.Attachment,
-        channel: discord.abc.Messageable,
+        channel: Union[discord.TextChannel, discord.VoiceChannel, discord.Thread],
         message: Optional[str],
         id: Optional[int] = None,
     ) -> None:
         self.requester: discord.Member = requester
         self.attachment: discord.Attachment = attachment
-        self.channel: discord.abc.Messageable = channel
+        self.channel: Union[discord.TextChannel, discord.VoiceChannel, discord.Thread] = channel
         self.message: Optional[str] = message
         self.id: Optional[int] = id
 
@@ -58,6 +81,19 @@ class ImageRequest:
 
 
 class DeniedImageReason(BaseModal):
+    """A modal representing the moderator supplying the reason for denying an image.
+
+    Parameters
+    Attributes
+    ----------
+    bot: :class:`FuryBot`
+        The bot instance.
+    parent: :class:`ApproveOrDenyImage`
+        The parent view.
+    request: :class:`ImageRequest`
+        The image request that is being denied.
+    """
+
     reason: discord.ui.TextInput[Self] = discord.ui.TextInput(
         label='Deny Reason',
         style=discord.TextStyle.long,
@@ -73,6 +109,16 @@ class DeniedImageReason(BaseModal):
         self.request: ImageRequest = request
 
     async def on_submit(self, interaction: discord.Interaction, /) -> None:
+        """|coro|
+
+        Called when the modal has been submitted. This will deny the image request by sending a message to the requester
+        with the information and deleting the request from the database.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that was created from submitting the modal.
+        """
         user = self.request.requester
 
         embed = self.bot.Embed(
@@ -81,6 +127,7 @@ class DeniedImageReason(BaseModal):
             author=user,
         )
         embed.add_field(name='Deny Reason', value=self.reason.value)
+        embed.add_field(name='Channel to Send In', value=self.request.channel.mention)
         await interaction.response.edit_message(embed=embed, view=None)
 
         # Send the reason to the user :blobpain:
@@ -104,6 +151,17 @@ class DeniedImageReason(BaseModal):
 
 
 class ApproveOrDenyImage(discord.ui.View):
+    """A view representing the moderator approving or denying an image.
+
+    Parameters
+    Attributes
+    ----------
+    bot: :class:`FuryBot`
+        The bot instance.
+    request: :class:`ImageRequest`
+        The image request that is being approved or denied.
+    """
+
     def __init__(self, bot: FuryBot, request: ImageRequest) -> None:
         super().__init__(timeout=None)
 
@@ -112,23 +170,35 @@ class ApproveOrDenyImage(discord.ui.View):
 
     @property
     def embed(self) -> discord.Embed:
+        """:class:`discord.Embed`: The embed representing the image request."""
         embed = self.bot.Embed(
             title=f'Image requested by {self.request.requester.display_name}', author=self.request.requester
         )
         embed.add_field(
             name='Additional Message', value=self.request.message or "No message has been attached with this upload."
         )
+        embed.add_field(name='Channel to Send in', value=self.request.channel.mention)
 
         return embed
 
     @discord.ui.button(label='Approve', style=discord.ButtonStyle.green)
+    @default_button_doc_string
     async def approve(
         self, interaction: discord.Interaction, button: discord.ui.Button[Self]
     ) -> Optional[discord.InteractionMessage]:
+        """Approves the image request by sending the image to the channel and deleting the request from the database."""
         await interaction.response.defer()
 
-        # Try and download the attachment as a file so we can send it that way
         request = self.request
+        embed = self.bot.Embed(
+            title='Image Approved',
+            description=f'This image uploaded by {request.requester.mention} has been approved by a moderator, {interaction.user.mention}',
+            author=request.requester,
+            timestamp=interaction.created_at,
+        )
+        await interaction.edit_original_response(embed=embed, view=None)
+
+        # Try and download the attachment as a file so we can send it that way
         try:
             file = await request.attachment.to_file(
                 filename=f'file-upload-{request.requester.id}-{request.attachment.filename}'
@@ -146,7 +216,7 @@ class ApproveOrDenyImage(discord.ui.View):
         if request.message:
             content += f' Message: {request.message}'
 
-        await request.channel.send(
+        message = await request.channel.send(
             file=file, content=content, allowed_mentions=discord.AllowedMentions(users=[request.requester])
         )
 
@@ -156,14 +226,8 @@ class ApproveOrDenyImage(discord.ui.View):
                 self.request.id,
             )
 
-        embed = self.bot.Embed(
-            title='Image Approved',
-            description=f'This image uploaded by {request.requester.mention} has been approved by a moderator, {interaction.user.mention}',
-            author=request.requester,
-            timestamp=interaction.created_at,
-        )
-
-        await interaction.edit_original_response(embed=embed, view=None)
+        embed.add_field(name='Message Posted', value=f'[Jump to message]({message.jump_url})')
+        await interaction.edit_original_response(embed=embed)
 
     @discord.ui.button(label='Deny', style=discord.ButtonStyle.red)
     async def deny(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
@@ -187,39 +251,54 @@ class ImageRequests(BaseCog):
         channel_id: str,
         message: Optional[str] = None,
     ) -> Optional[discord.InteractionMessage]:
+        # Both a moderator and a normal person can use this command.
+        # Only mods can use it in a guild, and all others must use
+        # it in DMS.
         if interaction.guild and interaction.guild.id == FURY_GUILD:
+            # We're in a guild and its the correct one
             guild = interaction.guild
         else:
+            # We're not in a guild OR its the incorrect guild, update
             guild = cast(discord.Guild, self.bot.get_guild(FURY_GUILD))
 
         if not channel_id.isdigit():
+            # The value passed isnt correct for a channel
             return await interaction.response.send_message('The channel ID must be a number.')
 
-        sender_channel = cast(discord.abc.Messageable, guild.get_channel(int(channel_id)))
+        sender_channel = cast(
+            Union[discord.TextChannel, discord.VoiceChannel, discord.Thread], guild.get_channel(int(channel_id))
+        )
         if not sender_channel:
+            # The channel doesnt exist
             return await interaction.response.send_message('The channel ID is invalid.')
 
+        # Defer because this could take a minute
         await interaction.response.defer()
 
         try:
             file = await attachment.to_file(description=f'An upload by a {interaction.user.id}')
         except discord.HTTPException:
+            # We weren't able to download the file
             return await interaction.edit_original_response(
                 content='I was unable to download this attachment. Please try with a different one or contact a moderator.'
             )
 
         member = interaction.user
         if not isinstance(member, discord.Member):
+            # If the command is invoked in DMS, we won't have a member.
+            # This is useful for when we want to display the user's name
+            # in an embed (with nickname)
             member = guild.get_member(member.id) or await guild.fetch_member(member.id)
 
+        # Create our request and view
         request = ImageRequest(requester=member, attachment=attachment, channel=sender_channel, message=message)
         view = ApproveOrDenyImage(self.bot, request)
 
         # Send the request to the channel
-        guild = cast(discord.Guild, self.bot.get_guild(FURY_GUILD))
         channel = cast(discord.TextChannel, guild.get_channel(IMAGE_REQUEST_CHANNEL_ID))
         role = guild.get_role(IMAGE_NOTIFICATIONS_ROLE_ID)
         if not channel or not role:
+            # Something's veery wrong
             return await interaction.edit_original_response(content='Unable to find the image request channel!')
 
         message_obj = await channel.send(
@@ -230,6 +309,7 @@ class ImageRequests(BaseCog):
             allowed_mentions=discord.AllowedMentions(roles=[role]),
         )
 
+        # Insert into the DB now
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
                 'INSERT INTO image_requests(attachment_payload, requester_id, guild_id, channel_id, message_id, message) '
@@ -238,7 +318,7 @@ class ImageRequests(BaseCog):
                 attachment.to_dict(),
                 interaction.user.id,
                 guild.id,
-                sender_channel.id,  # type: ignore
+                sender_channel.id,
                 message_obj.id,
                 message,
             )
@@ -246,6 +326,7 @@ class ImageRequests(BaseCog):
 
             request.id = data['id']
 
+        # And alert the user of the request
         return await interaction.edit_original_response(
             content=f'I\'ve submitted the request for this attachment to be uploaded. You will be notified if it gets approved '
             'or denied.'

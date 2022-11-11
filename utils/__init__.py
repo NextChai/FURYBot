@@ -24,6 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING, Callable, Any, Coroutine, TypeVar
 
 from .cog import *
 from .constants import *
@@ -37,6 +38,12 @@ from .timers import *
 from .types import *
 from .ui_kit import *
 
+if TYPE_CHECKING:
+    import discord
+
+    BV = TypeVar('BV', bound='discord.ui.View')
+    ButtonCallback = Callable[[BV, discord.Interaction, discord.ui.Button[BV]], Coroutine[Any, Any, Any]]
+
 
 def _parse_environ_boolean(key: str) -> bool:
     val = os.environ.get(key)
@@ -47,3 +54,20 @@ def _parse_environ_boolean(key: str) -> bool:
 
 
 RUNNING_DEVELOPMENT: bool = _parse_environ_boolean('RUN_DEVELOPMENT')
+
+
+def default_button_doc_string(func: ButtonCallback[BV]) -> ButtonCallback[BV]:
+    default_doc = """
+    |coro|
+    
+    {doc}
+    
+    Parameters
+    ----------
+    interaction: :class:`discord.Interaction`
+        The interaction that triggered this button.
+    button: :class:`discord.ui.Button`
+        The button that was clicked.
+    """
+    func.__doc__ = default_doc.format(doc=func.__doc__ or '')
+    return func

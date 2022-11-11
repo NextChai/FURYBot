@@ -24,13 +24,21 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, List, Optional, TypeVar, cast
+from typing import TYPE_CHECKING, Any, List, Optional, cast
 
 import discord
 from typing_extensions import Self, Unpack
 
 from cogs.teams.scrim.persistent import AwayConfirm, HomeConfirm
-from utils import CHANNEL_EMOJI_MAPPING, AutoRemoveSelect, BaseView, BaseViewKwargs, BasicInputModal, TimeTransformer
+from utils import (
+    CHANNEL_EMOJI_MAPPING,
+    AutoRemoveSelect,
+    BaseView,
+    BaseViewKwargs,
+    BasicInputModal,
+    TimeTransformer,
+    default_button_doc_string,
+)
 
 from . import ScrimStatus
 from .team import TeamMember
@@ -38,9 +46,6 @@ from .team import TeamMember
 if TYPE_CHECKING:
     from .scrim import Scrim
     from .team import Team
-
-BV = TypeVar('BV', bound='BaseView')
-ButtonCallback = Callable[[BV, discord.Interaction, discord.ui.Button[BV]], Coroutine[Any, Any, Any]]
 
 
 def clamp(minimum: Optional[int], maximum: int) -> int:
@@ -53,23 +58,6 @@ def clamp(minimum: Optional[int], maximum: int) -> int:
     # Return the minimum if its less than or equal the maximum else the maximum.
     # If the minimum is 0 though, return 1 in replace of it.
     return minimum if minimum <= maximum else maximum
-
-
-def _default_button_doc_string(func: ButtonCallback[BV]) -> ButtonCallback[BV]:
-    default_doc = """
-    |coro|
-    
-    {doc}
-    
-    Parameters
-    ----------
-    interaction: :class:`discord.Interaction`
-        The interaction that triggered this button.
-    button: :class:`discord.ui.Button`
-        The button that was clicked.
-    """
-    func.__doc__ = default_doc.format(doc=func.__doc__ or '')
-    return func
 
 
 class TeamMemberView(BaseView):
@@ -104,7 +92,7 @@ class TeamMemberView(BaseView):
         return embed
 
     @discord.ui.button(label='Toggle Role')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def toggle_role(
         self, interaction: discord.Interaction, button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
@@ -118,7 +106,7 @@ class TeamMemberView(BaseView):
         return await interaction.edit_original_response(embed=self.embed, view=self)
 
     @discord.ui.button(label='Remove Member')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def remove_member(
         self, interaction: discord.Interaction, button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
@@ -204,14 +192,14 @@ class TeamMembersView(BaseView):
         await interaction.edit_original_response(embed=self.embed, view=self)
 
     @discord.ui.button(label='Manage Member')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def manage_member(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Manage this member on the team. You can remove them from it and demote them to a sub."""
         AutoRemoveSelect(item=discord.ui.UserSelect[Self](), parent=self, callback=self._manage_member_after)
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Add Members')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def add_members(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Add members to this team."""
         AutoRemoveSelect(
@@ -224,7 +212,7 @@ class TeamMembersView(BaseView):
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Remove Members')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def remove_members(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Remove members from this team."""
         AutoRemoveSelect(
@@ -237,7 +225,7 @@ class TeamMembersView(BaseView):
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Add Subs')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def add_subs(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Add subs to this team."""
         AutoRemoveSelect(
@@ -250,7 +238,7 @@ class TeamMembersView(BaseView):
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Remove Subs')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def remove_subs(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Remove subs from this team."""
         AutoRemoveSelect(
@@ -386,7 +374,7 @@ class ScrimView(BaseView):
         await interaction.edit_original_response(embed=self.embed, view=self)
 
     @discord.ui.button(label='Reschedule')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def reschedule_scrim(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Reschedule this scrim to a later date."""
         # If this scrim has already started, we can't reschedule it
@@ -402,7 +390,7 @@ class ScrimView(BaseView):
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label='Remove Confirmation')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def remove_confirmation(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Forcefully remove confirmation for a member."""
         AutoRemoveSelect(
@@ -415,7 +403,7 @@ class ScrimView(BaseView):
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Force Add Confirmation')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def force_add_confirmation(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Forcefully add confirmation for a member."""
         AutoRemoveSelect(
@@ -428,7 +416,7 @@ class ScrimView(BaseView):
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Force Schedule Scrim')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def force_schedule_scrim(
         self, interaction: discord.Interaction, button: discord.ui.Button[Self]
     ) -> Optional[discord.InteractionMessage]:
@@ -456,7 +444,7 @@ class ScrimView(BaseView):
         return await interaction.edit_original_response(embed=self.embed, view=self)
 
     @discord.ui.button(label='Cancel Scrim', style=discord.ButtonStyle.danger)
-    @_default_button_doc_string
+    @default_button_doc_string
     async def cancel_scrim(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Force cancel the scrim and remove it from the database."""
         await interaction.response.defer()
@@ -528,7 +516,7 @@ class TeamScrimsView(BaseView):
         return await interaction.response.edit_message(view=view, embed=view.embed)
 
     @discord.ui.button(label='Select a Scrim')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def manage_a_scrim(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Allows the user to select a scrim to manage."""
         if not self.team.scrims:
@@ -632,7 +620,7 @@ class TeamChannelsView(BaseView):
         await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Create Extra Channel')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def create_extra_channel(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Allows the user to create an extra channel for the team."""
         modal: BasicInputModal[discord.ui.TextInput[Any], discord.ui.TextInput[Any]] = BasicInputModal(
@@ -646,7 +634,7 @@ class TeamChannelsView(BaseView):
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label='Delete Extra Channels')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def delete_extra_channel(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Allows the user to delete an extra channel for the team."""
         if not self.team.extra_channels:
@@ -733,7 +721,7 @@ class TeamNamingView(BaseView):
         await self._perform_after('logo', modal, interaction)
 
     @discord.ui.button(label='Rename')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def rename(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Rename this team."""
         modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
@@ -743,7 +731,7 @@ class TeamNamingView(BaseView):
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label='Change Nickname')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def change_nickname(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Change the nickname of this team."""
         modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
@@ -757,7 +745,7 @@ class TeamNamingView(BaseView):
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label='Change Description')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def change_description(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Change the description of this team."""
         modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
@@ -778,7 +766,7 @@ class TeamNamingView(BaseView):
         await self.team.text_channel.edit(topic=modal.children[0].value)
 
     @discord.ui.button(label='Change Logo')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def change_logo(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Change the logo of this team."""
         modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
@@ -842,7 +830,7 @@ class TeamCaptainsView(BaseView):
         await interaction.edit_original_response(embed=self.embed, view=self)
 
     @discord.ui.button(label='Add Captains')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def add_captain(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Add a captain role to this team."""
         AutoRemoveSelect(
@@ -853,7 +841,7 @@ class TeamCaptainsView(BaseView):
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Remove Captains')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def remove_captain(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Remove a captain role from this team."""
         AutoRemoveSelect(
@@ -916,42 +904,42 @@ class TeamView(BaseView):
         return await interaction.response.edit_message(content='This team has been deleted.', view=None, embed=None)
 
     @discord.ui.button(label='Customization')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def customization(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Launches the customization view for this team to rename it, change description, etc."""
         view = self.create_child(TeamNamingView, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
     @discord.ui.button(label='Channels')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def channels(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Launches a view to manage the team\'s extra channels."""
         view = self.create_child(TeamChannelsView, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
     @discord.ui.button(label='Scrims')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def scrims(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Launches a view to manage the team\'s scrims."""
         view = self.create_child(TeamScrimsView, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
     @discord.ui.button(label='Members')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def members(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Manage the team\'s members."""
         view = self.create_child(TeamMembersView, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
     @discord.ui.button(label='Captains')
-    @_default_button_doc_string
+    @default_button_doc_string
     async def captains(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Manage the team\'s captains."""
         view = self.create_child(TeamCaptainsView, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
     @discord.ui.button(label='Delete Team', style=discord.ButtonStyle.danger)
-    @_default_button_doc_string
+    @default_button_doc_string
     async def delete(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Delete this team."""
         modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
