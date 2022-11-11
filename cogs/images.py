@@ -138,7 +138,9 @@ class ApproveOrDenyImage(discord.ui.View):
         if request.message:
             content += f' Message: {request.message}'
 
-        await request.channel.send(file=file, content=content)
+        await request.channel.send(
+            file=file, content=content, allowed_mentions=discord.AllowedMentions(users=[request.requester])
+        )
 
         async with self.bot.safe_connection() as connection:
             await connection.execute(
@@ -187,7 +189,7 @@ class ImageRequests(BaseCog):
         if not channel or not role:
             return await interaction.edit_original_response(content='Unable to find the image request channel!')
 
-        message_obj = await channel.send(view=view, embed=view.embed, content=role.mention, file=file)
+        message_obj = await channel.send(view=view, embed=view.embed, content=role.mention, file=file, allowed_mentions=discord.AllowedMentions(roles=[role]))
 
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
