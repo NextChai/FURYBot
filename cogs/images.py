@@ -92,8 +92,6 @@ class DeniedImageReason(BaseModal):
         except discord.Forbidden:
             pass
 
-        await interaction.followup.send('This image has been denied.', ephemeral=True)
-
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 'DELETE FROM image_requests WHERE id = $1',
@@ -162,7 +160,6 @@ class ApproveOrDenyImage(discord.ui.View):
         )
 
         await interaction.edit_original_response(embed=embed, view=None)
-        await interaction.followup.send('This image has been approved.', ephemeral=True)
 
     @discord.ui.button(label='Deny', style=discord.ButtonStyle.red)
     async def deny(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
