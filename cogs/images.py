@@ -77,7 +77,8 @@ class DeniedImageReason(BaseModal):
             description=f'This image upload from {user.mention} has been denied by a moderator, {interaction.user.mention}.',
             author=user,
         )
-        await interaction.response.edit_message(embed=self.parent.embed, view=None)
+        embed.add_field(name='Deny Reason', value=self.reason.value)
+        await interaction.response.edit_message(embed=embed, view=None)
 
         # Send the reason to the user :blobpain:
         embed = self.bot.Embed(
