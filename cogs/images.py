@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 class ImageRequest(NamedTuple):
     requester: discord.Member
     attachment: discord.Attachment
-    channel: discord.abc.MessageableChannel
+    channel: discord.abc.Messageable
     message: Optional[str]
 
 
@@ -139,7 +139,7 @@ class ImageRequests(BaseCog):
         self, interaction: discord.Interaction, attachment: discord.Attachment, message: Optional[str] = None
     ) -> discord.InteractionMessage:
         assert isinstance(interaction.user, discord.Member)
-        assert isinstance(interaction.channel, discord.abc.MessageableChannel)
+        assert isinstance(interaction.channel, discord.abc.Messageable)
         assert interaction.guild
 
         await interaction.response.defer(ephemeral=True)
