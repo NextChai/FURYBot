@@ -181,15 +181,9 @@ class ApproveOrDenyImage(discord.ui.View):
 
         return embed
 
-    @discord.ui.button(label='Approve', style=discord.ButtonStyle.green)
-    @default_button_doc_string
-    async def approve(
-        self, interaction: discord.Interaction, button: discord.ui.Button[Self]
-    ) -> Optional[discord.InteractionMessage]:
-        """Approves the image request by sending the image to the channel and deleting the request from the database."""
-        await interaction.response.defer()
-
+    async def _approve(self, interaction: discord.Interaction) -> Optional[discord.InteractionMessage]:
         request = self.request
+
         embed = self.bot.Embed(
             title='Image Approved',
             description=f'This image uploaded by {request.requester.mention} has been approved by a moderator, {interaction.user.mention}',
@@ -228,6 +222,23 @@ class ApproveOrDenyImage(discord.ui.View):
 
         embed.add_field(name='Message Posted', value=f'[Jump to message]({message.jump_url})')
         await interaction.edit_original_response(embed=embed)
+
+    @discord.ui.button(label='Approve', style=discord.ButtonStyle.green)
+    @default_button_doc_string
+    async def approve(
+        self, interaction: discord.Interaction, button: discord.ui.Button[Self]
+    ) -> Optional[discord.InteractionMessage]:
+        """Approves the image request by sending the image to the channel and deleting the request from the database."""
+        await interaction.response.defer()
+
+        await self._approve(interaction)
+
+    @discord.ui.button(label='Approve Without Message', style=discord.ButtonStyle.gray)
+    async def approve_without_message(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        await interaction.response.defer()
+
+        self.request.message = None
+        await self._approve(interaction)
 
     @discord.ui.button(label='Deny', style=discord.ButtonStyle.red)
     @default_button_doc_string
