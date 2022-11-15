@@ -235,7 +235,12 @@ class ApproveOrDenyImage(discord.ui.View):
         await self._approve(interaction)
 
     @discord.ui.button(label='Approve Without Message', style=discord.ButtonStyle.gray)
+    @default_button_doc_string
     async def approve_without_message(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Approves the image request by sending the image to the channel and deleting the request from the database. This
+        will not send the message that was attached to the request. This comes in handy when the user has passed a message that
+        is specific to the mods and shouldn't be shared with the rest of the server.
+        """
         await interaction.response.defer()
 
         self.request.message = None
