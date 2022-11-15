@@ -190,6 +190,7 @@ class ApproveOrDenyImage(discord.ui.View):
             author=request.requester,
             timestamp=interaction.created_at,
         )
+        embed.add_field(name='Channel to Send In', value=request.channel.mention)
         await interaction.edit_original_response(embed=embed, view=None)
 
         # Try and download the attachment as a file so we can send it that way
