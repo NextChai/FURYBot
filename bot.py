@@ -280,7 +280,7 @@ class FuryBot(commands.Bot):
         if not guild:
             return
 
-        channel = cast(Optional[discord.abc.Messageable], guild.get_channel(data['channel_id']))
+        channel = cast(Optional[Union[discord.TextChannel, discord.VoiceChannel, discord.Thread]], guild.get_channel(data['channel_id']))
         if not channel:
             return
 
