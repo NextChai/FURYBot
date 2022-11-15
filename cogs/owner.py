@@ -66,11 +66,25 @@ class Owner(BaseCog):
 
     @commands.command(name='reload')
     @commands.is_owner()
-    async def _reload(self, ctx: Context, *extensions: str) -> discord.Message:
+    async def _reload(self, ctx: Context, force_importlib: bool = False, *extensions: str) -> discord.Message:
+        """Reload the given extensions.
+
+        Parameters
+        ----------
+        force_importlib: :class:`bool`
+            Whether to force the use of importlib to reload extensions
+            that are also bot extensions. This will be used to refresh
+            any classes in the module before loading the extension.
+        *extensions: :class:`str`
+            The extensions to reload.
+        """
         statuses: Dict[str, Optional[Exception]] = {}
         for extension in extensions:
             if extension in self.bot.extensions:
                 try:
+                    if force_importlib:
+                        sys.modules[extension] = importlib.reload(sys.modules[extension])
+
                     await self.bot.reload_extension(extension)
                     statuses[extension] = None
                 except Exception as exc:
