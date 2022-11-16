@@ -343,6 +343,28 @@ class Team:
     def get_member(self, member_id: int, /) -> Optional[TeamMember]:
         return self.team_members.get(member_id)
 
+    async def sync(self) -> None:
+        """|coro|
+
+        Syncs the team's channels with the data in the team.
+        """
+        overwrites: Dict[Union[discord.Role, discord.Member], discord.PermissionOverwrite] = {}
+
+        for member in self.team_members.values():
+            discord_member = member.member or await member.fetch_member()
+            overwrites[discord_member] = discord.PermissionOverwrite(view_channel=True)
+
+        for role in self.captain_roles:
+            overwrites[role] = discord.PermissionOverwrite(view_channel=True)
+
+        await self.category_channel.edit(overwrites=overwrites)
+
+        await self.text_channel.edit(sync_permissions=True)
+        await self.voice_channel.edit(sync_permissions=True)
+
+        for channel in self.extra_channels:
+            await channel._edit({'sync_permissions': True}, reason='Syncing team channels.')
+
     async def add_team_member(self, member_id: int, is_sub: bool = False) -> TeamMember:
         """|coro|
 

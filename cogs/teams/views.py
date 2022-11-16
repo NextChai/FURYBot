@@ -657,6 +657,14 @@ class TeamChannelsView(BaseView):
 
         return await interaction.response.edit_message(view=self)
 
+    @discord.ui.button(label='Sync Channels')
+    @default_button_doc_string
+    async def sync_channels(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Syncs the channels for the team."""
+        await interaction.response.defer()
+        await self.team.sync()
+        await interaction.edit_original_response(embed=self.embed)
+
 
 class TeamNamingView(BaseView):
     """A view used to manage naming and renaming a team.
