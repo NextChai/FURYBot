@@ -348,7 +348,9 @@ class Team:
 
         Syncs the team's channels with the data in the team.
         """
-        overwrites: Dict[Union[discord.Role, discord.Member], discord.PermissionOverwrite] = {}
+        overwrites: Dict[Union[discord.Role, discord.Member], discord.PermissionOverwrite] = {
+            self.guild.default_role: discord.PermissionOverwrite(read_messages=False)
+        }
 
         for member in self.team_members.values():
             discord_member = member.member or await member.fetch_member()
