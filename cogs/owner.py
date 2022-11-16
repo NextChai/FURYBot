@@ -66,7 +66,7 @@ class Owner(BaseCog):
 
     @commands.command(name='reload')
     @commands.is_owner()
-    async def _reload(self, ctx: Context, force_importlib: bool = False, *extensions: str) -> discord.Message:
+    async def _reload(self, ctx: Context, force_importlib: Optional[bool] = False, *extensions: str) -> discord.Message:
         """Reload the given extensions.
 
         Parameters
