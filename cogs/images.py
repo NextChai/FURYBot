@@ -296,7 +296,8 @@ class ImageRequests(BaseCog):
             return await interaction.response.send_message('The channel ID must be a number.')
 
         sender_channel = cast(
-            Union[discord.TextChannel, discord.VoiceChannel, discord.Thread], guild.get_channel(int(channel_id))
+            Union[discord.TextChannel, discord.VoiceChannel, discord.Thread],
+            guild.get_channel(int(channel_id)) or guild.get_thread(int(channel_id)),
         )
         if not sender_channel:
             # The channel doesnt exist
