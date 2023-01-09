@@ -23,7 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, cast, Union
+from typing import TYPE_CHECKING, Optional, cast
 from typing_extensions import Self
 
 import discord
@@ -36,6 +36,13 @@ from utils.constants import FURY_GUILD
 
 if TYPE_CHECKING:
     from bot import FuryBot
+    from .teams.team import Team
+
+    from discord.interactions import InteractionChannel
+
+
+def mention_interaction_channel(channel: InteractionChannel) -> str:
+    return f'<#{channel.id}>'
 
 
 class ImageRequest:
@@ -66,18 +73,18 @@ class ImageRequest:
         self,
         requester: discord.Member,
         attachment: discord.Attachment,
-        channel: Union[discord.TextChannel, discord.VoiceChannel, discord.Thread],
+        channel: InteractionChannel,
         message: Optional[str],
         id: Optional[int] = None,
     ) -> None:
         self.requester: discord.Member = requester
         self.attachment: discord.Attachment = attachment
-        self.channel: Union[discord.TextChannel, discord.VoiceChannel, discord.Thread] = channel
+        self.channel: InteractionChannel = channel
         self.message: Optional[str] = message
         self.id: Optional[int] = id
 
     def __repr__(self) -> str:
-        return f"ImageRequest(requester={self.requester!r}, attachment={self.attachment!r}, channel={self.channel!r}, message={self.message!r})"
+        return f"<ImageRequest requester={self.requester!r}, attachment={self.attachment!r}, channel={self.channel!r}, message={self.message!r}>"
 
 
 class DeniedImageReason(BaseModal):
@@ -127,7 +134,7 @@ class DeniedImageReason(BaseModal):
             author=user,
         )
         embed.add_field(name='Deny Reason', value=self.reason.value)
-        embed.add_field(name='Channel to Send In', value=self.request.channel.mention)
+        embed.add_field(name='Channel to Send In', value=mention_interaction_channel(self.request.channel))
         await interaction.response.edit_message(embed=embed, view=None)
 
         # Send the reason to the user :blobpain:
@@ -177,7 +184,18 @@ class ApproveOrDenyImage(discord.ui.View):
         embed.add_field(
             name='Additional Message', value=self.request.message or "No message has been attached with this upload."
         )
-        embed.add_field(name='Channel to Send in', value=self.request.channel.mention)
+        embed.add_field(name='Channel to Send in', value=mention_interaction_channel(self.request.channel))
+
+        # If this request is to a team channel, include the team that it's requested to
+        team_maybe: Optional[Team] = None
+        for team in self.bot.team_cache.values():
+            if team.has_channel(self.request.channel):
+                team_maybe = team
+
+        if team_maybe is not None:
+            embed.add_field(
+                name='Posting to Team', value=f'This attachment will be posted to the `{team_maybe.display_name}` team.'
+            )
 
         return embed
 
@@ -190,7 +208,7 @@ class ApproveOrDenyImage(discord.ui.View):
             author=request.requester,
             timestamp=interaction.created_at,
         )
-        embed.add_field(name='Channel to Send In', value=request.channel.mention)
+        embed.add_field(name='Channel to Send In', value=mention_interaction_channel(self.request.channel))
         await interaction.edit_original_response(embed=embed, view=None)
 
         # Try and download the attachment as a file so we can send it that way
@@ -211,10 +229,14 @@ class ApproveOrDenyImage(discord.ui.View):
         if request.message:
             content += f' Message: {request.message}'
 
+        # as of right now interaction.channel includes StageChannel, ForumChannel, and CategoryChannel - it can not resolve to this though.
+        assert not isinstance(request.channel, (discord.StageChannel, discord.ForumChannel, discord.CategoryChannel))
+
         message = await request.channel.send(
             file=file, content=content, allowed_mentions=discord.AllowedMentions(users=[request.requester])
         )
 
+        # This information is no longer needed in the DB, we can remove it.
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 'DELETE FROM image_requests WHERE id = $1',
@@ -267,7 +289,6 @@ class ImageRequests(BaseCog):
         self,
         interaction: discord.Interaction,
         attachment: discord.Attachment,
-        channel_id: str,
         message: Optional[str] = None,
     ) -> Optional[discord.InteractionMessage]:
         """Allows a member to request an attachment to be uploaded for them.
@@ -288,23 +309,18 @@ class ImageRequests(BaseCog):
             # We're in a guild and its the correct one
             guild = interaction.guild
         else:
-            # We're not in a guild OR its the incorrect guild, update
-            guild = cast(discord.Guild, self.bot.get_guild(FURY_GUILD))
+            # We're not in a guild OR its the incorrect guild. We need to yell at the user
+            return await interaction.response.send_message("You must be in the FURY guild to use command.", ephemeral=True)
 
-        if not channel_id.isdigit():
-            # The value passed isnt correct for a channel
-            return await interaction.response.send_message('The channel ID must be a number.')
-
-        sender_channel = cast(
-            Union[discord.TextChannel, discord.VoiceChannel, discord.Thread],
-            guild.get_channel(int(channel_id)) or guild.get_thread(int(channel_id)),
-        )
+        sender_channel = interaction.channel
         if not sender_channel:
-            # The channel doesnt exist
-            return await interaction.response.send_message('The channel ID is invalid.')
+            # Dpy has issues resolving this channel
+            return await interaction.response.send_message(
+                'I was unable to resolve this channel. If the issue persists, please reach out for help.', ephemeral=True
+            )
 
         # Defer because this could take a minute
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         try:
             file = await attachment.to_file(description=f'An upload by a {interaction.user.id}')
