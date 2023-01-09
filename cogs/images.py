@@ -279,10 +279,8 @@ class ApproveOrDenyImage(discord.ui.View):
 class ImageRequests(BaseCog):
     @app_commands.command(name='attachment-request', description='Request to have an attachment uploaded for you.')
     @app_commands.default_permissions(attach_files=True)
-    @app_commands.rename(channel_id='channel-id')
     @app_commands.describe(
         attachment='The attachment you want to upload.',
-        channel_id='The ID of the channel you want the upload to send to.',
         message='An optional message to send with the upload.',
     )
     async def attachment_request(
