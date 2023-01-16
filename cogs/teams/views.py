@@ -778,7 +778,7 @@ class TeamNamingView(BaseView):
     async def change_logo(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Change the logo of this team."""
         modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
-            self.bot, title='Change Team Logo', after=self._change_description_after
+            self.bot, title='Change Team Logo', after=self._change_logo_after
         )
         modal.add_item(
             discord.ui.TextInput(
