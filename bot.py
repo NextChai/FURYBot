@@ -85,7 +85,7 @@ else:
         'cogs.owner',
         'cogs.events.tracking',
         'cogs.teams',
-        # 'cogs.teams.practices',
+        'cogs.teams.practices',
         'cogs.images',
         'cogs.moderation',
     )
