@@ -25,8 +25,6 @@ from .errors import *
 from .persistent import *
 from .practice import *
 
-from typing import TYPE_CHECKING
-
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -34,8 +32,7 @@ from discord import app_commands
 from utils import BaseCog
 from ..team import Team
 
-if TYPE_CHECKING:
-    from bot import FuryBot
+from bot import FuryBot
 
 
 class PracticeCog(BaseCog):
