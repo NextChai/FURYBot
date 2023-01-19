@@ -30,7 +30,7 @@ import discord
 from typing_extensions import Self, TypeVarTuple
 
 from utils import MiniQueryBuilder
-from .practices.practice import PracticeStatus
+from .practices import PracticeStatus
 
 if TYPE_CHECKING:
     import asyncpg
