@@ -53,6 +53,8 @@ from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
 from cogs.teams import Team
+from cogs.teams.practices.persistent import PracticeView
+from cogs.teams.practices.practice import Practice, PracticeStatus
 from cogs.teams.scrim import Scrim, ScrimStatus
 from cogs.images import ApproveOrDenyImage, ImageRequest
 from utils import RUNNING_DEVELOPMENT, ErrorHandler, LinkFilter, TimerManager
@@ -144,7 +146,7 @@ class DbContextManager:
         return await self.__aenter__()
 
     async def release(self) -> None:
-        return await self.__aexit__(None, None, None)
+        await self.__aexit__(None, None, None)
 
     async def __aenter__(self) -> ConnectionType:
         self._connection = connection = await self._pool.acquire(timeout=self.timeout)  # type: ignore
@@ -197,6 +199,7 @@ class FuryBot(commands.Bot):
 
         self.team_cache: Dict[int, Team] = {}
         self.team_scrim_cache: Dict[int, Scrim] = {}
+        self.team_practice_cache: Dict[int, Practice] = {}
 
         super().__init__(
             command_prefix=commands.when_mentioned_or('fury.'),
@@ -235,7 +238,10 @@ class FuryBot(commands.Bot):
             if old_init is not None:
                 await old_init(con)
 
-        return await asyncpg.create_pool(uri, init=init, **kwargs)
+        pool = await asyncpg.create_pool(uri, init=init, **kwargs)
+        assert pool
+
+        return pool
 
     @staticmethod
     def Embed(
@@ -280,7 +286,9 @@ class FuryBot(commands.Bot):
         if not guild:
             return
 
-        channel = cast(Optional[Union[discord.TextChannel, discord.VoiceChannel, discord.Thread]], guild.get_channel(data['channel_id']))
+        channel = cast(
+            Optional[Union[discord.TextChannel, discord.VoiceChannel, discord.Thread]], guild.get_channel(data['channel_id'])
+        )
         if not channel:
             return
 
@@ -308,6 +316,9 @@ class FuryBot(commands.Bot):
 
             image_requests = await connection.fetch('SELECT * FROM image_requests')
 
+            practice_data = await connection.fetch("SELECT * FROM teams.practice")
+            practice_attending_data = await connection.fetch("SELECT * FROM teams.practice_attending")
+
         team_member_mapping: Dict[int, List[Dict[Any, Any]]] = {}
         for entry in team_members_data:
             team_member_mapping.setdefault(entry['team_id'], []).append(dict(entry))
@@ -327,6 +338,18 @@ class FuryBot(commands.Bot):
 
         for request in image_requests:
             self.create_task(self._load_image_request(request))
+
+        for entry in practice_data:
+            # Get all attending practice data for this team
+            attending = [dict(a) for a in practice_attending_data if a['practice_id'] == entry['id']]
+
+            practice = Practice(bot=self, team=self.team_cache[entry['team_id']], data=dict(entry), attending=attending)
+            self.team_practice_cache[practice.id] = practice
+
+            # Only if the practice is ongoing do we need to load a view
+            if practice.status is PracticeStatus.ongoing:
+                view = PracticeView(practice)
+                self.add_view(view, message_id=practice.message_id)
 
     # Events
     async def on_ready(self) -> None:

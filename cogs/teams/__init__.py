@@ -37,6 +37,7 @@ from .scrim import Scrim
 from .team import Team
 from .transformers import TeamTransformer
 from .views import TeamView
+from .practices import TeamPractices
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -314,4 +315,5 @@ class Teams(BaseCog):
 
 
 async def setup(bot: FuryBot) -> None:
-    return await bot.add_cog(Teams(bot))
+    await bot.add_cog(Teams(bot))
+    await bot.add_cog(TeamPractices(bot))

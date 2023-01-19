@@ -89,12 +89,7 @@ class Notifier(BaseCog):
         embed = self.bot.Embed(
             title='Dms are on!',
             description=f'Your DM\'s are not turned off in the {guild.name} server. Please '
-            'do this or one of the coaches will be reaching out to you soon.\n\n'
-            'You can follow the gif below to do this, you may need to click on it to '
-            'load properly.',
-        )
-        embed.add_field(
-            name='I turned on DMs to upload images?', value='That\'s ok! Just be sure to turn them back off again.'
+            'do this or one of the coaches will be reaching out to you soon.',
         )
 
         members: List[discord.Member] = []

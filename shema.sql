@@ -74,6 +74,26 @@ CREATE TABLE IF NOT EXISTS teams.scrims (
     scrim_delete_timer_id BIGINT
 );
 
+CREATE TYPE practice_status AS ENUM ('ongoing', 'completed');
+
+CREATE TABLE IF NOT EXISTS teams.practice (
+    id SERIAL PRIMARY KEY,
+    team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
+    guild_id BIGINT,
+    status practice_status, -- Ongoing or completed. You can not have more than one ongoing practice session.
+    initiated_at TIMESTAMP WITH TIME ZONE, -- When the practice session was initiated
+    ended_at TIMESTAMP WITH TIME ZONE, -- When the practice session was ended (Can be None)
+    initiated_by_id BIGINT, -- The user that initiated the team pracitce session
+    message_id BIGINT -- The message ID the practice session peristed view is on.
+);
+
+CREATE TABLE IF NOT EXISTS teams.practice_attending (
+    practice_id INTEGER REFERENCES teams.practice(id) ON DELETE CASCADE,
+    member_id BIGINT,
+    joined_at TIMESTAMP WITH TIME ZONE, -- When the member joined the practice session
+    left_at TIMESTAMP WITH TIME ZONE -- When the member left the practice session (Can be None)    
+);
+
 CREATE TABLE IF NOT EXISTS timers(
     id BIGSERIAL PRIMARY KEY,
     precise BOOLEAN DEFAULT TRUE,

@@ -30,11 +30,14 @@ import discord
 from typing_extensions import Self, TypeVarTuple
 
 from utils import MiniQueryBuilder
+from .practices.practice import PracticeStatus
 
 if TYPE_CHECKING:
+    import asyncpg
     from bot import FuryBot
 
     from .scrim import Scrim
+    from .practices.practice import Practice
 
 Ts = TypeVarTuple("Ts")
 
@@ -329,6 +332,14 @@ class Team:
         return [scrim for scrim in self.bot.team_scrim_cache.values() if self in (scrim.home_team, scrim.away_team)]
 
     @property
+    def practices(self) -> List[Practice]:
+        return [practice for practice in self.bot.team_practice_cache.values() if practice.team == self]
+
+    @property
+    def ongoing_practice(self) -> Optional[Practice]:
+        return discord.utils.find(lambda practice: practice.status is PracticeStatus.ongoing, self.practices)
+
+    @property
     def captain_roles(self) -> List[discord.Role]:
         guild = self.guild
         return [role for role_id in self.captain_role_ids if (role := guild.get_role(role_id))]
@@ -342,6 +353,30 @@ class Team:
 
     def get_member(self, member_id: int, /) -> Optional[TeamMember]:
         return self.team_members.get(member_id)
+
+    async def fetch_practice_rank(self, *, connection: Optional[asyncpg.Connection[asyncpg.Record]] = None) -> int:
+        """|coro|
+
+        Fetches the rank of this team in the practice leaderboard.
+
+        Parameters
+        ----------
+        connection: Optional[:class:`asyncpg.Connection`]
+            The connection to the database.
+
+        Returns
+        -------
+        :class:`int`
+            The rank of the team in the practice leaderboard.
+        """
+
+        query = "WITH ranked_teams AS (SELECT team_id, SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) AS total_practice_time,"
+        "RANK() OVER (ORDER BY SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) DESC) AS rank"
+        "FROM teams.practice GROUP BY team_id) SELECT rank FROM ranked_teams WHERE team_id = $1;"
+        if connection is not None:
+            return await connection.fetchval(query, self.id)
+
+        return await self.bot.pool.fetchval(query, self.id)
 
     async def sync(self) -> None:
         """|coro|

@@ -45,12 +45,33 @@ STT = TypeVar('STT', bound='ShortTime')
 HTT = TypeVar('HTT', bound='HumanTime')
 TT = TypeVar('TT', bound='Time')
 
-__all__: Tuple[str, ...] = (
-    'ShortTime',
-    'HumanTime',
-    'Time',
-    'TimeTransformer',
+__all__: Tuple[str, ...] = ('ShortTime', 'HumanTime', 'Time', 'TimeTransformer', 'human_timedelta')
+
+
+intervals = (
+    ('week', 60 * 60 * 24 * 7),
+    ('day', 60 * 60 * 24),
+    ('hour', 60 * 60),
+    ('minute', 60),
+    ('second', 1),
 )
+
+
+def human_timedelta(seconds: float) -> str:
+    """
+    Turns seconds into human readable time.
+    """
+    message = ''
+
+    for name, amount in intervals:
+        n, seconds = divmod(seconds, amount)
+
+        if n == 0:
+            continue
+
+        message += f'{n} {name + "s" * (n != 1)} '
+
+    return message.strip()
 
 
 class ShortTime:
