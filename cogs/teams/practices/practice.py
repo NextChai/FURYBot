@@ -167,7 +167,7 @@ class Practice:
                 total_time += practice_time
 
                 # Let's check if this practice was within the last 7 days.
-                if (datetime.datetime.utcnow() - l_initiated_at).days <= 7:
+                if (discord.utils.utcnow() - l_initiated_at).days <= 7:
                     weekly_time += practice_time
 
         stats.append(f"**Weekly Time**: {human_timedelta(weekly_time)}")
