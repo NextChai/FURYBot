@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS teams.practice_member_history(
     id BIGSERIAL PRIMARY KEY,
     joined_at TIMESTAMP WITH TIME ZONE,
     left_at TIMESTAMP WITH TIME ZONE, -- Can be none
+    practice_id INTEGER REFERENCES teams.practice(id) ON DELETE CASCADE,
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     channel_id BIGINT,
     guild_id BIGINT
