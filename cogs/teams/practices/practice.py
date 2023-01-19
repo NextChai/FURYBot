@@ -183,12 +183,13 @@ class PracticeMember(Guildable, TeamMemberable, Teamable):
         async with self._history_lock:
             async with self.practice.bot.safe_connection() as connection:
                 practice_member_history_data = await connection.fetchrow(
-                    "INSERT INTO teams.practice_member_history(joined_at, team_id, channel_id, guild_id, practice_id) VALUES($1, $2, $3, $4, $5) RETURNING *",
+                    "INSERT INTO teams.practice_member_history(joined_at, team_id, channel_id, guild_id, practice_id, member_id) VALUES($1, $2, $3, $4, $5, $6) RETURNING *",
                     when,
                     self.practice.team_id,
                     self.practice.channel_id,
                     self.practice.guild_id,
-                    self.practice.id
+                    self.practice.id,
+                    self.member_id,
                 )
                 assert practice_member_history_data
 
