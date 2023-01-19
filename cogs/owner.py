@@ -23,15 +23,15 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import sys
 import importlib
-from typing import TYPE_CHECKING, Dict, Optional, List
+import sys
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils import BaseCog, TimeTransformer, Context
+from utils import BaseCog, Context, TimeTransformer
 
 if TYPE_CHECKING:
     from bot import FuryBot

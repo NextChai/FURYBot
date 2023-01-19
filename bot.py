@@ -52,12 +52,11 @@ import discord
 from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
+from cogs.images import ApproveOrDenyImage, ImageRequest
 from cogs.teams import Team
 
-# from cogs.teams.practices.persistent import PracticeView
-# from cogs.teams.practices.practice import Practice, PracticeStatus
+from cogs.teams.practices import Practice
 from cogs.teams.scrim import Scrim, ScrimStatus
-from cogs.images import ApproveOrDenyImage, ImageRequest
 from utils import RUNNING_DEVELOPMENT, ErrorHandler, LinkFilter, TimerManager
 
 if TYPE_CHECKING:
@@ -86,6 +85,7 @@ else:
         'cogs.owner',
         'cogs.events.tracking',
         'cogs.teams',
+        'cogs.teams.practices',
         'cogs.images',
         'cogs.moderation',
     )
@@ -200,7 +200,7 @@ class FuryBot(commands.Bot):
 
         self.team_cache: Dict[int, Team] = {}
         self.team_scrim_cache: Dict[int, Scrim] = {}
-        # self.team_practice_cache: Dict[int, Practice] = {}
+        self.team_practice_cache: Dict[int, Practice] = {}
 
         super().__init__(
             command_prefix=commands.when_mentioned_or('fury.'),
@@ -317,8 +317,9 @@ class FuryBot(commands.Bot):
 
             image_requests = await connection.fetch('SELECT * FROM image_requests')
 
-            # practice_data = await connection.fetch("SELECT * FROM teams.practice")
-            # practice_attending_data = await connection.fetch("SELECT * FROM teams.practice_attending")
+            practice_data = await connection.fetch("SELECT * FROM teams.practice")
+            practice_member_data = await connection.fetch("SELECT * FROM teams.practice_member")
+            practice_member_history_data = await connection.fetch("SELECT * FROM teams.practice_member_history")
 
         team_member_mapping: Dict[int, List[Dict[Any, Any]]] = {}
         for entry in team_members_data:
@@ -340,18 +341,33 @@ class FuryBot(commands.Bot):
         for request in image_requests:
             self.create_task(self._load_image_request(request))
 
-        # for entry in practice_data:
-        #     # Get all attending practice data for this team
-        #     attending = [dict(a) for a in practice_attending_data if a['practice_id'] == entry['id']]
+        # mapping of practice id to member id to practice member data
+        practice_member_data_sorted: Dict[int, Dict[int, Dict[Any, Any]]] = {}
 
-    #
-    #     practice = Practice(bot=self, team=self.team_cache[entry['team_id']], data=dict(entry), attending=attending)
-    #     self.team_practice_cache[practice.id] = practice
-    #
-    #     # Only if the practice is ongoing do we need to load a view
-    #     if practice.status is PracticeStatus.ongoing:
-    #         view = PracticeView(practice)
-    #         self.add_view(view, message_id=practice.message_id)
+        # maping of practice id to member id to list of practice member history data
+        practice_member_history_data_sorted: Dict[int, Dict[int, List[Dict[Any, Any]]]] = {}
+
+        for entry in practice_member_data:
+            practice_member_data_sorted.setdefault(entry['practice_id'], {})[entry['member_id']] = dict(entry)
+
+        for entry in practice_member_history_data:
+            practice_member_history_data_sorted.setdefault(entry['practice_id'], {}).setdefault(
+                entry['member_id'], []
+            ).append(dict(entry))
+
+        for entry in practice_data:
+            # We need to create a practice from this
+            practice = Practice(bot=self, data=dict(entry))
+
+            # Add our members
+            members = practice_member_data_sorted.get(practice.id, {})
+            for practice_member_data in members.values():
+                member = practice._add_member(practice_member_data)
+
+                # Let's get the history for this member now
+                practice_history = practice_member_history_data_sorted.get(practice.id, {}).get(member.id, [])
+                for element in practice_history:
+                    member._add_history(element)
 
     # Events
     async def on_ready(self) -> None:

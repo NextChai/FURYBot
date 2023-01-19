@@ -24,21 +24,20 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, cast
-from typing_extensions import Self
 
 import discord
-
-from utils import default_button_doc_string, BaseCog, IMAGE_REQUEST_CHANNEL_ID, IMAGE_NOTIFICATIONS_ROLE_ID, BaseModal
-
 from discord import app_commands
+from typing_extensions import Self
 
+from utils import IMAGE_NOTIFICATIONS_ROLE_ID, IMAGE_REQUEST_CHANNEL_ID, BaseCog, BaseModal, default_button_doc_string
 from utils.constants import FURY_GUILD
 
 if TYPE_CHECKING:
-    from bot import FuryBot
-    from .teams.team import Team
-
     from discord.interactions import InteractionChannel
+
+    from bot import FuryBot
+
+    from .teams.team import Team
 
 
 def mention_interaction_channel(channel: InteractionChannel) -> str:

@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from bot import FuryBot
 
     from .scrim import Scrim
+    from .practices import Practice
 
 Ts = TypeVarTuple("Ts")
 
@@ -328,13 +329,13 @@ class Team:
         """List[:class:`Scrim`]: A list of all scrims this team has."""
         return [scrim for scrim in self.bot.team_scrim_cache.values() if self in (scrim.home_team, scrim.away_team)]
 
-    # @property
-    # def practices(self) -> List[Practice]:
-    #     return [practice for practice in self.bot.team_practice_cache.values() if practice.team == self]
-    #
-    # @property
-    # def ongoing_practice(self) -> Optional[Practice]:
-    #     return discord.utils.find(lambda practice: practice.ongoing, self.practices)
+    @property
+    def practices(self) -> List[Practice]:
+        return [practice for practice in self.bot.team_practice_cache.values() if practice.team == self]    
+    
+    @property
+    def ongoing_practice(self) -> Optional[Practice]:
+        return discord.utils.find(lambda practice: practice.ongoing, self.practices)
 
     @property
     def captain_roles(self) -> List[discord.Role]:

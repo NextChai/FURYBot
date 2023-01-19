@@ -23,52 +23,45 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import os
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, TypeVar
-
-from .bases import *
-from .cog import *
-from .constants import *
-from .context import *
-from .error_handler import *
-from .errors import *
-from .link import *
-from .query import *
-from .time import *
-from .timers import *
-from .types import *
-from .ui_kit import *
+from typing import TYPE_CHECKING, Optional, Protocol, Tuple
 
 if TYPE_CHECKING:
     import discord
 
-    BV = TypeVar('BV', bound='discord.ui.View')
-    ButtonCallback = Callable[[BV, discord.Interaction, discord.ui.Button[BV]], Coroutine[Any, Any, Any]]
+    from bot import FuryBot
+
+    from ..cogs.teams.team import Team, TeamMember
+
+__all__: Tuple[str, ...] = ('Guildable', 'Teamable', 'Botable', 'TeamMemberable')
 
 
-def _parse_environ_boolean(key: str) -> bool:
-    val = os.environ.get(key)
-    if val is None:
-        return False
-
-    return val.lower() in ("true", "1")
+class Botable(Protocol):
+    def _get_bot(self) -> FuryBot:
+        ...
 
 
-RUNNING_DEVELOPMENT: bool = _parse_environ_boolean('RUN_DEVELOPMENT')
+class Guildable(Botable, Protocol):
+    def _get_guild_id(self) -> int:
+        ...
+
+    @property
+    def guild(self) -> Optional[discord.Guild]:
+        return self._get_bot().get_guild(self._get_guild_id())
 
 
-def default_button_doc_string(func: ButtonCallback[BV]) -> ButtonCallback[BV]:
-    default_doc = """
-    |coro|
-    
-    {doc}
-    
-    Parameters
-    ----------
-    interaction: :class:`discord.Interaction`
-        The interaction that triggered this button.
-    button: :class:`discord.ui.Button`
-        The button that was clicked.
-    """
-    func.__doc__ = default_doc.format(doc=func.__doc__ or '')
-    return func
+class Teamable(Botable, Protocol):
+    def _get_team_id(self) -> int:
+        ...
+
+    @property
+    def team(self) -> Team:
+        return self._get_bot().team_cache[self._get_team_id()]
+
+
+class TeamMemberable(Teamable, Protocol):
+    def _get_member_id(self) -> int:
+        ...
+
+    @property
+    def team_member(self) -> Optional[TeamMember]:
+        return self.team.get_member(self._get_member_id())
