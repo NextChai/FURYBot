@@ -370,7 +370,7 @@ class Team:
         """
 
         query = "WITH ranked_teams AS (SELECT team_id, SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) AS total_practice_time,"
-        "RANK() OVER (ORDER BY SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) DESC) AS rank"
+        "RANK() OVER (ORDER BY SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) DESC) AS rank "
         "FROM teams.practice GROUP BY team_id) SELECT rank FROM ranked_teams WHERE team_id = $1;"
         if connection is not None:
             return await connection.fetchval(query, self.id)
