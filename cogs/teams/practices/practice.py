@@ -456,7 +456,7 @@ class Practice(Guildable, Teamable):
 
         if not team_member.attending:
             # This member just joined the voice channel and left but isn't attending, ignore them.
-            return
+            raise MemberNotAttendingPractice(f'The member {member.id} is not attending practice {self.id}.')
 
         # Remember that members are removed from the cache when they leave, they're simply updated
         await team_member.handle_leave(when=when)

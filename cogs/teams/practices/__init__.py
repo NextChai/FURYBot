@@ -144,7 +144,7 @@ class PracticeCog(BaseCog):
             # This member joined an ongoing practice.
             try:
                 return await practice.handle_member_join(member=member)
-            except MemberNotOnTeam:
+            except (MemberNotOnTeam, MemberNotAttendingPractice):
                 return
 
         elif before.channel is not None and after.channel is None:  # The member left a voice channel.
@@ -166,7 +166,7 @@ class PracticeCog(BaseCog):
 
             try:
                 return await practice.handle_member_leave(member=member)
-            except (MemberNotOnTeam, MemberNotInPractice):
+            except (MemberNotOnTeam, MemberNotInPractice, MemberNotAttendingPractice):
                 return
 
 
