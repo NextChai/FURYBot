@@ -163,8 +163,8 @@ class Practice:
                 view=None,
                 embed=self.bot.Embed(
                     title="Invalid Practice Not Recorded",
-                    description="This practice was too short to be recorded. Practices need to be at "
-                    "least 10 minutes long.",
+                    description=f"This practice created by <@{self.initiated_by_id}> was too short to be recorded. "
+                    "Practices need to be at least 10 minutes long.",
                 ),
             )
 
