@@ -91,25 +91,6 @@ class Practice:
             inline=False,
         )
 
-        # Let's also add a field to members who've attended but aren't currently in the voice channel.
-        voice_channel_member_ids = [member.id for member in self.team.voice_channel.members]
-        left_members = [
-            member for member in self.attending_members.values() if member.member_id not in voice_channel_member_ids
-        ]
-        if left_members:
-            # Let's get a delta of how long they've been in the voice channel.
-            formatted = [
-                f'{member.mention}: Attended for {human_timedelta((member.left_at - member.joined_at).total_seconds())}'
-                for member in left_members
-                if member.left_at
-            ]
-
-            embed.add_field(
-                name='Members Who\'ve Left The Voice Practice:',
-                value='\n'.join(formatted),
-                inline=False,
-            )
-
         embed.add_field(
             name='How Do I Attend?',
             value='**To attend your team practice, simply press the "Attending" button below while in your '
