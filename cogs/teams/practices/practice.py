@@ -126,6 +126,7 @@ class Practice:
     async def handle_practice_end(self, ended_at: datetime.datetime, connection: asyncpg.Connection[asyncpg.Record]) -> None:
         # Let's update the team practice status to be completed.
         self.ended_at = ended_at
+        self.status = PracticeStatus.completed
         await self.bot.pool.execute(
             'UPDATE teams.practice SET status = $1 WHERE id = $2',
             PracticeStatus.completed.value,
