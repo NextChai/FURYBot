@@ -152,7 +152,7 @@ class Practice:
 
         stats: List[str] = []
 
-        total_time_today = self.initiated_at - ended_at
+        total_time_today = ended_at - self.initiated_at
         stats.append(f"**This session**: {human_timedelta(total_time_today.total_seconds())}")
 
         # Let's get the weekly time and total time.
