@@ -368,14 +368,14 @@ class Team:
         :class:`int`
             The rank of the team in the practice leaderboard.
         """
-
-        query = "WITH ranked_teams AS (SELECT team_id, SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) AS total_practice_time,"
-        "RANK() OVER (ORDER BY SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) DESC) AS rank "
-        "FROM teams.practice GROUP BY team_id) SELECT rank FROM ranked_teams WHERE team_id = $1;"
-        if connection is not None:
-            return await connection.fetchval(query, self.id)
-
-        return await self.bot.pool.fetchval(query, self.id)
+        awaitable = connection or self.bot.pool
+        rank = await awaitable.fetchval(
+            "WITH ranked_teams AS (SELECT team_id, SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) AS total_practice_time,"
+            "RANK() OVER (ORDER BY SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) DESC) AS rank "
+            "FROM teams.practice GROUP BY team_id) SELECT rank FROM ranked_teams WHERE team_id = $1;",
+            72,
+        )
+        return rank
 
     async def sync(self) -> None:
         """|coro|
