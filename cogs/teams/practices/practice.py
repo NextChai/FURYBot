@@ -107,6 +107,10 @@ class Practice:
 
         return embed
 
+    @property
+    def ongoing(self) -> bool:
+        return self.status is PracticeStatus.ongoing
+
     async def handle_attending_member_join(self, member: discord.Member, joined_at: datetime.datetime) -> None:
         data = await self.bot.pool.fetchrow(
             'INSERT INTO teams.practice_attending(practice_id, member_id, joined_at) VALUES($1, $2, $3) RETURNING *',

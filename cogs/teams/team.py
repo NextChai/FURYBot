@@ -30,7 +30,6 @@ import discord
 from typing_extensions import Self, TypeVarTuple
 
 from utils import MiniQueryBuilder
-from .practices import PracticeStatus
 
 if TYPE_CHECKING:
     import asyncpg
@@ -337,7 +336,7 @@ class Team:
 
     @property
     def ongoing_practice(self) -> Optional[Practice]:
-        return discord.utils.find(lambda practice: practice.status is PracticeStatus.ongoing, self.practices)
+        return discord.utils.find(lambda practice: practice.ongoing, self.practices)
 
     @property
     def captain_roles(self) -> List[discord.Role]:
