@@ -153,7 +153,7 @@ class Practice:
         stats: List[str] = []
 
         total_time_today = self.initiated_at - ended_at
-        stats.append(f"**Time Today**: {human_timedelta(total_time_today.total_seconds())}")
+        stats.append(f"**This session**: {human_timedelta(total_time_today.total_seconds())}")
 
         # Let's get the weekly time and total time.
         weekly_time = 0
@@ -163,7 +163,7 @@ class Practice:
             l_ended_at = l_practice.ended_at
 
             if l_initiated_at and l_ended_at:
-                practice_time = (l_initiated_at - l_ended_at).total_seconds()
+                practice_time = (l_ended_at - l_initiated_at).total_seconds()
                 total_time += practice_time
 
                 # Let's check if this practice was within the last 7 days.
@@ -173,7 +173,7 @@ class Practice:
         stats.append(f"**Weekly Time**: {human_timedelta(weekly_time)}")
         stats.append(f"**Total Time**: {human_timedelta(total_time)}")
 
-        embed.add_field(name="Time Spent Practicing:", value='\n'.join(stats))
+        embed.add_field(name="Time Spent Practicing:", value='\n'.join(stats), inline=False)
 
         # Let's compare this team's total practice time to other teams and get a rank for them.
         rank = await self.team.fetch_practice_rank(connection=connection)
@@ -182,6 +182,7 @@ class Practice:
             name='Practice Time Rank',
             value=f'Out of all the other teams, this team is ranked **#{rank}** out of **{len(self.bot.team_cache)}** teams '
             'for total practice time.',
+            inline=False,
         )
 
         # Let's get the average time spent practicing per day.
@@ -189,6 +190,7 @@ class Practice:
         embed.add_field(
             name='Average Time Spent Practicing Per Day',
             value=f'This team has spent an average of **{human_timedelta(average_time)}** per day practicing.',
+            inline=False,
         )
 
         await message.reply(
