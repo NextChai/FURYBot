@@ -30,9 +30,10 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import BaseCog
-from .checks import invoker_in_team_channel_vc, invoker_on_team, is_invoked_in_team_chat
-from .practice import AttendingMember, Practice, PracticeStatus
-from .persistent import PracticeView
+
+from .practice import *
+from .checks import *
+from .persistent import *
 from ..team import Team
 
 if TYPE_CHECKING:
