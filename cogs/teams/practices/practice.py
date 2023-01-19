@@ -50,7 +50,7 @@ class AttendingMember:
         self.practice: Practice = practice
 
         self.member_id: int = data['member_id']
-        self.initiated_at: datetime.datetime = data['joined_at']
+        self.joined_at: datetime.datetime = data['joined_at']
         self.left_at: Optional[datetime.datetime] = data['left_at']
 
     @property
@@ -91,6 +91,25 @@ class Practice:
             inline=False,
         )
 
+        # Let's also add a field to members who've attended but aren't currently in the voice channel.
+        voice_channel_member_ids = [member.id for member in self.team.voice_channel.members]
+        left_members = [
+            member for member in self.attending_members.values() if member.member_id not in voice_channel_member_ids
+        ]
+        if left_members:
+            # Let's get a delta of how long they've been in the voice channel.
+            formatted = [
+                f'{member.mention}: Attended for {human_timedelta((member.left_at - member.joined_at).total_seconds())}'
+                for member in left_members
+                if member.left_at
+            ]
+
+            embed.add_field(
+                name='Members Who\'ve Left The Voice Practice:',
+                value='\n'.join(formatted),
+                inline=False,
+            )
+
         embed.add_field(
             name='How Do I Attend?',
             value='**To attend your team practice, simply press the "Attending" button below while in your '
@@ -124,6 +143,18 @@ class Practice:
         self.attending_members[attending_member.member_id] = attending_member
 
     async def handle_practice_end(self, ended_at: datetime.datetime, connection: asyncpg.Connection[asyncpg.Record]) -> None:
+        # It's safe to say that if this practice lasted under 10 minutes it's not worth recording. This means we'll just
+        # delete it from the database and not track it for logs.
+        total_time_today = ended_at - self.initiated_at
+        if total_time_today < datetime.timedelta(minutes=10):
+            await connection.execute(
+                'DELETE FROM teams.practice WHERE id = $1',
+                self.id,
+            )
+            # and remove it from the bot's cache
+            self.bot.team_practice_cache.pop(self.id, None)
+            return
+
         # Let's update the team practice status to be completed.
         self.ended_at = ended_at
         self.status = PracticeStatus.completed
@@ -153,7 +184,6 @@ class Practice:
 
         stats: List[str] = []
 
-        total_time_today = ended_at - self.initiated_at
         stats.append(f"**This session**: {human_timedelta(total_time_today.total_seconds())}")
 
         # Let's get the weekly time and total time.
