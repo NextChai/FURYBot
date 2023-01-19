@@ -21,6 +21,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+from __future__ import annotations
+
 from .errors import *
 from .persistent import *
 from .practice import *
@@ -48,7 +50,7 @@ class PracticeCog(BaseCog):
     )
 
     @practice.command(name='start', description='Start a practice for your team.')
-    async def practice_start(self, interaction: discord.Interaction) -> None:
+    async def practice_start(self, interaction: discord.Interaction[FuryBot]) -> None:
         # Let's check to make sure this is a team channel first.
         channel = interaction.channel
         assert channel
