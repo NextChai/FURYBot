@@ -99,7 +99,7 @@ class TeamPractices(BaseCog):
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
                 """INSERT INTO teams.practice(
-                    team_id, guild_id, practice_status, initiated_at, initiated_by_id, message_id
+                    team_id, guild_id, status, initiated_at, initiated_by_id, message_id
                 ) VALUES (
                     $1, $2, $3, $4, $5, $6
                 )    
