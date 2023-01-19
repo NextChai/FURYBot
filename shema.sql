@@ -81,8 +81,8 @@ CREATE TABLE IF NOT EXISTS teams.practice (
     started_at TIMESTAMP WITH TIME ZONE,
     ended_at TIMESTAMP WITH TIME ZONE, -- Can be None
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
-    channel_id INTEGER REFERENCES teams.settings(voice_channel_id),
-    guild_id INTEGER REFERENCES teams.settings(guild_id), 
+    channel_id BIGINT,
+    guild_id BIGINT, 
     status practice_status,
     started_by_id BIGINT,
     message_id BIGINT
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS teams.practice (
 CREATE TABLE IF NOT EXISTS teams.practice_member (
     id BIGSERIAL PRIMARY KEY,
     member_id BIGINT,
-    practice_id INTEGER REFERENCES teams.practice(id) ON DELETE CASCADE
+    practice_id INTEGER REFERENCES teams.practice(id) ON DELETE CASCADE,
     attending BOOLEAN DEFAULT TRUE,
     reason TEXT -- Can be None, will be not None if attending is False
 );
@@ -101,8 +101,8 @@ CREATE TABLE IF NOT EXISTS teams.practice_member_history(
     joined_at TIMESTAMP WITH TIME ZONE,
     left_at TIMESTAMP WITH TIME ZONE, -- Can be none
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
-    channel_id INTEGER REFERENCES teams.settings(voice_channel_id),
-    guild_id INTEGER REFERENCES teams.settings(guild_id),
+    channel_id BIGINT,
+    guild_id BIGINT
 );
 
 CREATE TABLE IF NOT EXISTS timers(
