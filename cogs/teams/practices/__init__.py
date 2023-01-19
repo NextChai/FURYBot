@@ -56,7 +56,7 @@ class TeamPractices(BaseCog):
         default_permissions=discord.Permissions(moderate_members=True),
     )
 
-    @practice.command(name='practice', description='Start a team practice.')
+    @practice.command(name='start', description='Start a team practice.')
     @app_commands.guild_only()
     async def practice_start(self, interaction: discord.Interaction[FuryBot]) -> Optional[discord.InteractionMessage]:
         await interaction.response.defer(ephemeral=True)
