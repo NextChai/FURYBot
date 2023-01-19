@@ -142,6 +142,10 @@ class Practice:
         attending_member = AttendingMember(practice=self, data=dict(data))
         self.attending_members[attending_member.member_id] = attending_member
 
+        # And we need to update our message with the new attending member.
+        message = await self.team.text_channel.fetch_message(self.message_id)
+        await message.edit(embed=self.embed)
+
     async def handle_practice_end(self, ended_at: datetime.datetime, connection: asyncpg.Connection[asyncpg.Record]) -> None:
         # It's safe to say that if this practice lasted under 10 minutes it's not worth recording. This means we'll just
         # delete it from the database and not track it for logs.
