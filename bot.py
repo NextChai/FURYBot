@@ -342,33 +342,32 @@ class FuryBot(commands.Bot):
             self.create_task(self._load_image_request(request))
 
         # mapping of practice id to member id to practice member data
-        # practice_member_data_sorted: Dict[int, Dict[int, Dict[Any, Any]]] = {}
+        practice_member_data_sorted: Dict[int, Dict[int, Dict[Any, Any]]] = {}
 
-    #
-    # # maping of practice id to member id to list of practice member history data
-    # practice_member_history_data_sorted: Dict[int, Dict[int, List[Dict[Any, Any]]]] = {}
-    #
-    # for entry in practice_member_data:
-    #     practice_member_data_sorted.setdefault(entry['practice_id'], {})[entry['member_id']] = dict(entry)
-    #
-    # for entry in practice_member_history_data:
-    #     practice_member_history_data_sorted.setdefault(entry['practice_id'], {}).setdefault(
-    #         entry['member_id'], []
-    #     ).append(dict(entry))
-    #
-    # for entry in practice_data:
-    #     # We need to create a practice from this
-    #     practice = Practice(bot=self, data=dict(entry))
-    #
-    #     # Add our members
-    #     members = practice_member_data_sorted.get(practice.id, {})
-    #     for practice_member_data in members.values():
-    #         member = practice._add_member(practice_member_data)
-    #
-    #         # Let's get the history for this member now
-    #         practice_history = practice_member_history_data_sorted.get(practice.id, {}).get(member.id, [])
-    #         for element in practice_history:
-    #             member._add_history(element)
+        # maping of practice id to member id to list of practice member history data
+        practice_member_history_data_sorted: Dict[int, Dict[int, List[Dict[Any, Any]]]] = {}
+
+        for entry in practice_member_data:
+            practice_member_data_sorted.setdefault(entry['practice_id'], {})[entry['member_id']] = dict(entry)
+
+        for entry in practice_member_history_data:
+            practice_member_history_data_sorted.setdefault(entry['practice_id'], {}).setdefault(
+                entry['member_id'], []
+            ).append(dict(entry))
+
+        for entry in practice_data:
+            # We need to create a practice from this
+            practice = Practice(bot=self, data=dict(entry))
+
+            # Add our members
+            members = practice_member_data_sorted.get(practice.id, {})
+            for practice_member_data in members.values():
+                member = practice._add_member(practice_member_data)
+
+                # Let's get the history for this member now
+                practice_history = practice_member_history_data_sorted.get(practice.id, {}).get(member.id, [])
+                for element in practice_history:
+                    member._add_history(element)
 
     # Events
     async def on_ready(self) -> None:
