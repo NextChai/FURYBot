@@ -110,6 +110,9 @@ class PracticeCog(BaseCog):
 
         practice = Practice(bot=self.bot, data=dict(practice_data))
 
+        # Add this practice to the bot so we can access it later
+        self.bot.team_practice_cache[practice.id] = practice
+
         await practice.handle_member_join(member=member, when=interaction.created_at)
         await interaction.edit_original_response(content="A new practice has been created.")
 
