@@ -39,6 +39,7 @@ __all__: Tuple[str, ...] = ('PracticeView',)
 class PracticeView(discord.ui.View):
     def __init__(self, practice: Practice):
         self.practice: Practice = practice
+        super().__init__(timeout=None)
 
     async def interaction_check(self, interaction: discord.Interaction[FuryBot], /) -> Optional[bool]:
         # Let's check to see if this member is already in the attending list.
@@ -51,7 +52,7 @@ class PracticeView(discord.ui.View):
 
         return True
 
-    @discord.ui.button(label='Attending')
+    @discord.ui.button(label='Attending', custom_id='practice-view-attending', style=discord.ButtonStyle.green)
     async def attending(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         # We're going to create a mock attending member so we can respond within 3 seconds before the database query.
         await interaction.response.defer()
