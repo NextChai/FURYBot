@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import discord
 
@@ -36,6 +36,8 @@ if TYPE_CHECKING:
 
     from bot import FuryBot
     from ..team import Team
+
+__all__: Tuple[str, ...] = ('PracticeStatus', 'AttendingMember', 'Practice')
 
 
 class PracticeStatus(Enum):

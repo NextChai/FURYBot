@@ -23,7 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Tuple
 from typing_extensions import Self
 
 import discord
@@ -32,6 +32,8 @@ if TYPE_CHECKING:
     from bot import FuryBot
 
     from .practice import Practice
+
+__all__: Tuple[str, ...] = ('PracticeView',)
 
 
 class PracticeView(discord.ui.View):
