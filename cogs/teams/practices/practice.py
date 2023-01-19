@@ -153,6 +153,17 @@ class Practice:
             )
             # and remove it from the bot's cache
             self.bot.team_practice_cache.pop(self.id, None)
+
+            message = await self.team.text_channel.fetch_message(self.message_id)
+            await message.edit(
+                view=None,
+                embed=self.bot.Embed(
+                    title="Invalid Practice Not Recorded",
+                    description="This practice was too short to be recorded. Practices need to be at "
+                    "least 10 minutes long.",
+                ),
+            )
+
             return
 
         # Let's update the team practice status to be completed.
