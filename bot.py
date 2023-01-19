@@ -53,8 +53,9 @@ from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
 from cogs.teams import Team
-from cogs.teams.practices.persistent import PracticeView
-from cogs.teams.practices.practice import Practice, PracticeStatus
+
+# from cogs.teams.practices.persistent import PracticeView
+# from cogs.teams.practices.practice import Practice, PracticeStatus
 from cogs.teams.scrim import Scrim, ScrimStatus
 from cogs.images import ApproveOrDenyImage, ImageRequest
 from utils import RUNNING_DEVELOPMENT, ErrorHandler, LinkFilter, TimerManager
@@ -199,7 +200,7 @@ class FuryBot(commands.Bot):
 
         self.team_cache: Dict[int, Team] = {}
         self.team_scrim_cache: Dict[int, Scrim] = {}
-        self.team_practice_cache: Dict[int, Practice] = {}
+        # self.team_practice_cache: Dict[int, Practice] = {}
 
         super().__init__(
             command_prefix=commands.when_mentioned_or('fury.'),
@@ -316,8 +317,8 @@ class FuryBot(commands.Bot):
 
             image_requests = await connection.fetch('SELECT * FROM image_requests')
 
-            practice_data = await connection.fetch("SELECT * FROM teams.practice")
-            practice_attending_data = await connection.fetch("SELECT * FROM teams.practice_attending")
+            # practice_data = await connection.fetch("SELECT * FROM teams.practice")
+            # practice_attending_data = await connection.fetch("SELECT * FROM teams.practice_attending")
 
         team_member_mapping: Dict[int, List[Dict[Any, Any]]] = {}
         for entry in team_members_data:
@@ -339,17 +340,18 @@ class FuryBot(commands.Bot):
         for request in image_requests:
             self.create_task(self._load_image_request(request))
 
-        for entry in practice_data:
-            # Get all attending practice data for this team
-            attending = [dict(a) for a in practice_attending_data if a['practice_id'] == entry['id']]
+        # for entry in practice_data:
+        #     # Get all attending practice data for this team
+        #     attending = [dict(a) for a in practice_attending_data if a['practice_id'] == entry['id']]
 
-            practice = Practice(bot=self, team=self.team_cache[entry['team_id']], data=dict(entry), attending=attending)
-            self.team_practice_cache[practice.id] = practice
-
-            # Only if the practice is ongoing do we need to load a view
-            if practice.status is PracticeStatus.ongoing:
-                view = PracticeView(practice)
-                self.add_view(view, message_id=practice.message_id)
+    #
+    #     practice = Practice(bot=self, team=self.team_cache[entry['team_id']], data=dict(entry), attending=attending)
+    #     self.team_practice_cache[practice.id] = practice
+    #
+    #     # Only if the practice is ongoing do we need to load a view
+    #     if practice.status is PracticeStatus.ongoing:
+    #         view = PracticeView(practice)
+    #         self.add_view(view, message_id=practice.message_id)
 
     # Events
     async def on_ready(self) -> None:

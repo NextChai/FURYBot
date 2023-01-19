@@ -32,11 +32,9 @@ from typing_extensions import Self, TypeVarTuple
 from utils import MiniQueryBuilder
 
 if TYPE_CHECKING:
-    import asyncpg
     from bot import FuryBot
 
     from .scrim import Scrim
-    from .practices.practice import Practice
 
 Ts = TypeVarTuple("Ts")
 
@@ -330,13 +328,13 @@ class Team:
         """List[:class:`Scrim`]: A list of all scrims this team has."""
         return [scrim for scrim in self.bot.team_scrim_cache.values() if self in (scrim.home_team, scrim.away_team)]
 
-    @property
-    def practices(self) -> List[Practice]:
-        return [practice for practice in self.bot.team_practice_cache.values() if practice.team == self]
-
-    @property
-    def ongoing_practice(self) -> Optional[Practice]:
-        return discord.utils.find(lambda practice: practice.ongoing, self.practices)
+    # @property
+    # def practices(self) -> List[Practice]:
+    #     return [practice for practice in self.bot.team_practice_cache.values() if practice.team == self]
+    #
+    # @property
+    # def ongoing_practice(self) -> Optional[Practice]:
+    #     return discord.utils.find(lambda practice: practice.ongoing, self.practices)
 
     @property
     def captain_roles(self) -> List[discord.Role]:
@@ -353,29 +351,29 @@ class Team:
     def get_member(self, member_id: int, /) -> Optional[TeamMember]:
         return self.team_members.get(member_id)
 
-    async def fetch_practice_rank(self, *, connection: Optional[asyncpg.Connection[asyncpg.Record]] = None) -> int:
-        """|coro|
-
-        Fetches the rank of this team in the practice leaderboard.
-
-        Parameters
-        ----------
-        connection: Optional[:class:`asyncpg.Connection`]
-            The connection to the database.
-
-        Returns
-        -------
-        :class:`int`
-            The rank of the team in the practice leaderboard.
-        """
-        awaitable = connection or self.bot.pool
-        rank = await awaitable.fetchval(
-            "WITH ranked_teams AS (SELECT team_id, SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) AS total_practice_time,"
-            "RANK() OVER (ORDER BY SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) DESC) AS rank "
-            "FROM teams.practice GROUP BY team_id) SELECT rank FROM ranked_teams WHERE team_id = $1;",
-            72,
-        )
-        return rank
+    # async def fetch_practice_rank(self, *, connection: Optional[asyncpg.Connection[asyncpg.Record]] = None) -> int:
+    #     """|coro|
+    #
+    #     Fetches the rank of this team in the practice leaderboard.
+    #
+    #     Parameters
+    #     ----------
+    #     connection: Optional[:class:`asyncpg.Connection`]
+    #         The connection to the database.
+    #
+    #     Returns
+    #     -------
+    #     :class:`int`
+    #         The rank of the team in the practice leaderboard.
+    #     """
+    #     awaitable = connection or self.bot.pool
+    #     rank = await awaitable.fetchval(
+    #         "WITH ranked_teams AS (SELECT team_id, SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) AS total_practice_time,"
+    #         "RANK() OVER (ORDER BY SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) DESC) AS rank "
+    #         "FROM teams.practice GROUP BY team_id) SELECT rank FROM ranked_teams WHERE team_id = $1;",
+    #         72,
+    #     )
+    #     return rank
 
     async def sync(self) -> None:
         """|coro|
