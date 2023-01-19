@@ -25,6 +25,8 @@ from .errors import *
 from .persistent import *
 from .practice import *
 
+from typing import TYPE_CHECKING
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -32,7 +34,8 @@ from discord import app_commands
 from utils import BaseCog
 from ..team import Team
 
-from bot import FuryBot
+if TYPE_CHECKING:
+    from bot import FuryBot
 
 
 class PracticeCog(BaseCog):
@@ -45,7 +48,7 @@ class PracticeCog(BaseCog):
     )
 
     @practice.command(name='start', description='Start a practice for your team.')
-    async def practice_start(self, interaction: discord.Interaction[FuryBot]) -> None:
+    async def practice_start(self, interaction: discord.Interaction) -> None:
         # Let's check to make sure this is a team channel first.
         channel = interaction.channel
         assert channel
