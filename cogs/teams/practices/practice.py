@@ -304,7 +304,7 @@ class Practice(Guildable, Teamable):
     def started_by(self) -> PracticeMember:
         member = self.get_member(self.started_by_id)
         return cast(PracticeMember, member)
-    
+
     @property
     def ongoing(self) -> bool:
         return self.status is PracticeStatus.ongoing
@@ -460,4 +460,12 @@ class Practice(Guildable, Teamable):
         """
         # NOTE: Impl
         # NOTE: Keep track of members who DIDN't show up.
-        raise NotImplementedError
+
+        # Edit this in the DB and edit our status
+        self.status = PracticeStatus.completed
+        async with self.bot.safe_connection() as connection:
+            await connection.execute(
+                "UPDATE teams.practice SET status = $1 WHERE id = $2",
+                self.status.value,
+                self.id,
+            )
