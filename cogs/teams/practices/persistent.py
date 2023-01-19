@@ -50,6 +50,17 @@ class PracticeView(discord.ui.View):
         if not self.practice.team.get_member(interaction.user.id):
             return await interaction.response.send_message("You are not on this team.", ephemeral=True)
 
+        member = interaction.user
+        if not isinstance(member, discord.Member):
+            return False
+
+        voice = member.voice
+        if not voice or not voice.channel:
+            return await interaction.response.send_message("You are not your teams voice channel.", ephemeral=True)
+
+        if voice.channel != self.practice.team.voice_channel:
+            return await interaction.response.send_message("You are not in your teams voice channel.", ephemeral=True)
+
         return True
 
     @discord.ui.button(label='Attending', custom_id='practice-view-attending', style=discord.ButtonStyle.green)
