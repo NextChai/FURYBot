@@ -102,7 +102,7 @@ class PracticeCog(BaseCog):
                 team.id,
                 connected_channel.id,
                 connected_channel.guild.id,
-                PracticeStatus.ongoing,
+                PracticeStatus.ongoing.value,
                 interaction.user.id,
                 message.id,
             )
