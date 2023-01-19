@@ -124,7 +124,7 @@ class PracticeView(discord.ui.View):
         message = await self.practice.team.text_channel.fetch_message(message_id)
         await message.edit(view=self, embed=self.embed)
 
-    @discord.ui.button(label="I Can\'t Attend", style=discord.ButtonStyle.red)
+    @discord.ui.button(label="I Can\'t Attend", style=discord.ButtonStyle.red, custom_id='unable-to-attend')
     async def handle_unable_to_attend(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> None:
