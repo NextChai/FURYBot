@@ -34,7 +34,7 @@ import discord
 from utils.bases import Guildable, Teamable, TeamMemberable
 
 from ..errors import MemberNotOnTeam
-from .errors import MemberNotInPractice, MemberAlreadyInPractice
+from .errors import *
 from .persistent import PracticeView
 
 if TYPE_CHECKING:
@@ -138,13 +138,19 @@ class PracticeMember(Guildable, TeamMemberable, Teamable):
         self._history.remove(history)
 
     @property
-    def current_history(self) -> PracticeMemberHistory:
+    def current_history(self) -> Optional[PracticeMemberHistory]:
         """:class:`PracticeMemberHistory`: Returns the current history element for this member."""
+        if not self._history:
+            return None
+
         return self._history[-1]
 
     @property
     def is_practicing(self) -> bool:
         current_history = self.current_history
+        if current_history is None:
+            return False
+
         return current_history.left_at is None
 
     @property
@@ -217,6 +223,7 @@ class PracticeMember(Guildable, TeamMemberable, Teamable):
 
         async with self._history_lock:
             current_history = self.current_history
+            assert current_history  # This can't get called unless this is not None
 
             async with self.practice.bot.safe_connection() as connection:
                 await connection.execute(
@@ -413,6 +420,12 @@ class Practice(Guildable, Teamable):
                 assert practice_member_data
 
             attending_member = self._add_member(dict(practice_member_data))
+        else:
+            # Check if they manually selected not attending.
+            if not attending_member.attending:
+                # They just joined the voice channel, let's ignore them
+                # TODO: Maybe edit this?
+                raise MemberNotAttendingPractice(f'The member {member.id} is not attending practice {self.id}.')
 
         # Let's handle this member joining the practice session. This will create a new history element
         # for the member so we have updated cache.
@@ -440,6 +453,10 @@ class Practice(Guildable, Teamable):
         if team_member is None:
             _log.debug("Member %s is not in the practice session, can not handle leave.", member.id)
             raise MemberNotInPractice(f'The member {member.id} is not in the practice session.')
+
+        if not team_member.attending:
+            # This member just joined the voice channel and left but isn't attending, ignore them.
+            return
 
         # Remember that members are removed from the cache when they leave, they're simply updated
         await team_member.handle_leave(when=when)
@@ -471,3 +488,8 @@ class Practice(Guildable, Teamable):
                 self.status.value,
                 self.id,
             )
+
+        _log.debug("Practice %s has ended.", self.id)
+
+        message = await self.team.text_channel.fetch_message(self.message_id)
+        await message.reply("This practice has ended.")

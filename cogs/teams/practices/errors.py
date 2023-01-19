@@ -34,3 +34,10 @@ class MemberAlreadyInPractice(Exception):
     """Exception raised when a member is already in a practice session."""
 
     pass
+
+
+class MemberNotAttendingPractice(Exception):
+    """Exception raised when a member is not attending a practice session but joins the voice channel during
+    one."""
+
+    pass

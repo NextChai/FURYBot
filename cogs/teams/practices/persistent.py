@@ -69,6 +69,8 @@ class PracticeView(discord.ui.View):
 
     @property
     def embed(self) -> discord.Embed:
+        # NOTE: Add a conditional here for if the practice is completed.
+
         team = self.practice.team
         started_by = self.practice.started_by
 
