@@ -341,7 +341,7 @@ class Practice(Guildable, Teamable):
             raise MemberNotOnTeam(f'The member {member.id} is not on the team {self.team_id}, can not join practice.')
 
         attending_member = self.get_member(member.id)
-        if attending_member is None:
+        if attending_member is not None:
             # This member has not joined the practice session yet, let's create a new practice member.
             _log.debug("Member %s is already attending.", member.id)
             raise MemberAlreadyInPractice(f'The member {member.id} is already attending practice {self.id}.')
