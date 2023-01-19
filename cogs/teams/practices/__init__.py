@@ -101,6 +101,7 @@ class PracticeCog(BaseCog):
                 interaction.created_at,
                 team.id,
                 connected_channel.id,
+                connected_channel.guild.id,
                 PracticeStatus.ongoing,
                 interaction.user.id,
                 message.id,
