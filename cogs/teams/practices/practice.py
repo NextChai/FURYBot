@@ -563,10 +563,18 @@ class Practice(Guildable, Teamable):
                 inline=False,
             )
 
+        missing_members = self.missing_members
+        if missing_members:
+            missing_members_mentions = ', '.join([m.mention for m in missing_members])
+            embed.add_field(
+                name='Missing Members',
+                value=f'The following did not go to the practice and did not mark themselves as excused: {missing_members_mentions}',
+            )
+
         ranking = await self.team.fetch_practice_rank()
         embed.add_field(
             name='Practice Time Rank',
-            value=f'Out of {len(self.bot.team_cache)} teams, your team is ranked **#{ranking}** in practice time.',
+            value=f'Out of {len(self.bot.team_cache)} teams, this team is ranked **#{ranking}** in practice time.',
             inline=False,
         )
 
