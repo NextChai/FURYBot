@@ -107,6 +107,15 @@ CREATE TABLE IF NOT EXISTS teams.practice_member_history(
     guild_id BIGINT
 );
 
+CREATE TABLE IF NOT EXISTS teams.practice_leaderboards(
+    id BIGSERIAL PRIMARY KEY,
+    channel_id BIGINT UNIQUE,
+    guild_id BIGINT UNIQUE,
+    message_id BIGINT,
+    top_team_id INTEGER REFERENCES teams.settings(id),
+    role_id BIGINT,
+)
+
 CREATE TABLE IF NOT EXISTS timers(
     id BIGSERIAL PRIMARY KEY,
     precise BOOLEAN DEFAULT TRUE,

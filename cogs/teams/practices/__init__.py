@@ -28,6 +28,7 @@ import logging
 from .errors import *
 from .persistent import *
 from .practice import *
+from .leaderboard import *
 
 from typing import TYPE_CHECKING
 
@@ -45,7 +46,7 @@ _log = logging.getLogger(__name__)
 _log.setLevel(logging.DEBUG)
 
 
-class PracticeCog(BaseCog):
+class PracticeCog(PracticeLeaderboardCog, BaseCog):
 
     practice = app_commands.Group(
         name='practice',
