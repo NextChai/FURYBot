@@ -74,6 +74,9 @@ class TeamMember:
     def __ne__(self, __o: object) -> bool:
         return not self.__eq__(__o)
 
+    def __hash__(self) -> int:
+        return hash(self.member_id)
+
     @property
     def team(self) -> Team:
         """:class:`Team`: The team that this member is on."""

@@ -130,6 +130,9 @@ class PracticeMember(Guildable, TeamMemberable, Teamable):
     def __ne__(self, __o: object) -> bool:
         return not self.__eq__(__o)
 
+    def __hash__(self) -> int:
+        return hash(self.member_id)
+
     def _get_guild_id(self) -> int:
         return self.practice.guild_id
 
