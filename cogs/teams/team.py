@@ -431,7 +431,9 @@ class Team:
                 continue
 
             practice_time = practice.get_total_practice_time()
-            assert practice_time
+            if not practice_time:  # This should never happen
+                continue
+
             total_time += practice_time
 
             for member in practice.members:

@@ -367,6 +367,8 @@ class FuryBot(commands.Bot):
                 # Iterate through history and call _add_history on the member
                 for history_entry in history:
                     member._add_history(history_entry)
+                    
+            self.team_practice_cache[practice.id] = practice
 
     # Events
     async def on_ready(self) -> None:
