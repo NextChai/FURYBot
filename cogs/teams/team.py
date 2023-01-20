@@ -383,7 +383,7 @@ class Team:
         )
         SELECT team_id, rank() OVER (ORDER BY total_time DESC) as ranking
         FROM team_time
-        WHERE team_id = 72;
+        WHERE team_id = $1;
         """
 
         awaitable = connection or self.bot.pool
