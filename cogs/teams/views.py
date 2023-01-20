@@ -218,7 +218,7 @@ class TeamMemberView(BaseView):
         assert team_member
 
         view = self.create_child(TeamMemberPracticeStatisticsView, team_member, self.member)
-        await interaction.response.send_message(view=view, embed=view.embed)
+        await interaction.response.edit_message(view=view, embed=view.embed)
 
 
 class TeamMembersView(BaseView):
