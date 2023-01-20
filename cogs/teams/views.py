@@ -901,13 +901,13 @@ class TeamPracticeMemberView(BaseView):
             total_time = (
                 f'**Total Time:** {human_timedelta((history.left_at - history.joined_at).total_seconds())}'
                 if history.left_at
-                else f'**Practicing for:** {human_timedelta((discord.utils.utcnow() - history.joined_at).total_seconds())}'
+                else f'**Practicing For:** {human_timedelta((discord.utils.utcnow() - history.joined_at).total_seconds())}'
             )
 
             embed.add_field(
                 name=f'VC History #{count}',
                 value=f'**Joined At**: {discord.utils.format_dt(history.joined_at, "T")} ({discord.utils.format_dt(history.joined_at, "R")})\n'
-                f'**Left At: {left_at or "Member is still in this practice..."}\n'
+                f'**Left At**: {left_at or "Member is still in this practice..."}\n'
                 f'{total_time}',
                 inline=False,
             )
@@ -924,7 +924,9 @@ class TeamPracticeView(BaseView):
     def embed(self) -> discord.Embed:
         embed = self.bot.Embed(
             title="Practice Information",
-            description=f'- **Started At**: {self.practice.format_start_time()}\n'
+            description='Below is some inforamtion for the given practice. Use the buttons below to view stats about '
+            'specific members who attended this practice.\n'
+            f'- **Started At**: {self.practice.format_start_time()}\n'
             f'- **Ended At**: {self.practice.format_end_time() or "This practice is in progres..."}\n',
         )
 
