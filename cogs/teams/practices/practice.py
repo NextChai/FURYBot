@@ -506,10 +506,6 @@ class Practice(Guildable, Teamable):
         Ends the practice and marks it as completed. This will send the stats embed
         to the team channel and mention the captain(s) of the team.
         """
-        # NOTE: Impl
-        # NOTE: Keep track of members who DIDN't show up.
-
-        # Edit this in the DB and edit our status
         self.status = PracticeStatus.completed
         self.ended_at = discord.utils.utcnow()
         async with self.bot.safe_connection() as connection:
