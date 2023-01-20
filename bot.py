@@ -275,6 +275,9 @@ class FuryBot(commands.Bot):
             title=title, description=description, url=url, color=color, colour=colour, type=type, timestamp=timestamp
         )
 
+        if not colour and not color:
+            embed.colour = discord.Colour.from_str('0x4EDBFC')
+
         if author:
             embed.set_author(name=author.name, icon_url=author.display_avatar.url)
 
