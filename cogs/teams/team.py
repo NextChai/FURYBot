@@ -357,6 +357,22 @@ class Team:
     def display_name(self) -> str:
         return f'{self.name} {f"({self.nickname})" if self.nickname else ""}'.strip()
 
+    def embed(
+        self,
+        *,
+        title: Optional[Any] = None,
+        url: Optional[Any] = None,
+        description: Optional[Any] = None,
+        author: Optional[Union[discord.User, discord.Member]] = None,
+    ) -> discord.Embed:
+        embed = self.bot.Embed(title=title, description=description, url=url, author=author)
+
+        if author is None:
+            embed.set_thumbnail(url=self.logo)
+            embed.set_author(name=self.display_name, icon_url=self.logo, url=self.logo)
+
+        return embed
+
     def has_channel(self, channel: Union[discord.abc.GuildChannel, discord.Thread, discord.PartialMessageable], /) -> bool:
         return channel.id in [self.category_channel_id, self.text_channel_id, self.voice_channel_id] + self.extra_channel_ids
 
