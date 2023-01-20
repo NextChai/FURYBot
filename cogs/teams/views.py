@@ -102,11 +102,9 @@ class TeamMemberPracticeStatisticsView(BaseView):
 
         # Get the current streak of attended practices
         current_streak = 0
-        biggest_streak = 0
         for practice in sorted(team.practices, key=lambda p: p.started_at, reverse=True):
             member = practice.get_member(self.discord_member.id)
             if member is None:
-                biggest_streak = max(current_streak, biggest_streak)
                 current_streak = 0
                 continue
 
@@ -141,7 +139,7 @@ class TeamMemberPracticeStatisticsView(BaseView):
             inline=False,
         )
 
-        embed.add_field(name='Streaks', value=f'**Current Streak**: {current_streak}\n**Biggest Streak**: {biggest_streak}')
+        embed.add_field(name='Streaks', value=f'**Current Streak**: {current_streak}\n')
 
         last_attended_fmt = (
             last_attended

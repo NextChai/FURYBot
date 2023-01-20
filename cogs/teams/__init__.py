@@ -85,7 +85,9 @@ class Teams(BaseCog):
         super().__init__(bot=bot)
 
         context_menu = app_commands.ContextMenu(
-            name='Team Get', callback=self.team_get_context_menu, type=discord.AppCommandType.user
+            name='Team Get',
+            callback=self.team_get_context_menu,
+            type=discord.AppCommandType.user,
         )
         self.bot.tree.add_command(context_menu)
 
