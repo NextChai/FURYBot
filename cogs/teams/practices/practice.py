@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 import discord
 
 from utils.bases import Guildable, Teamable, TeamMemberable
+from utils.time import human_timedelta
 
 from ..errors import MemberNotOnTeam
 from .errors import *
@@ -43,6 +44,7 @@ if TYPE_CHECKING:
     from ..team import Team
 
 _log = logging.getLogger(__name__)
+logging.getLogger(__name__).setLevel(logging.DEBUG)  # A temporary placeholder until everything is done.
 
 
 class PracticeMemberHistory(Guildable, TeamMemberable, Teamable):
@@ -117,6 +119,17 @@ class PracticeMember(Guildable, TeamMemberable, Teamable):
         self._history: List[PracticeMemberHistory] = []
         self._history_lock: asyncio.Lock = asyncio.Lock()  # Don't want to be creating and removing history at the same time.
 
+    def __eq__(self, __o: object) -> bool:
+        try:
+            o_member_id = getattr(__o, 'member_id')
+        except AttributeError:
+            return False
+
+        return self.member_id == o_member_id
+
+    def __ne__(self, __o: object) -> bool:
+        return not self.__eq__(__o)
+
     def _get_guild_id(self) -> int:
         return self.practice.guild_id
 
@@ -157,14 +170,14 @@ class PracticeMember(Guildable, TeamMemberable, Teamable):
     def mention(self) -> str:
         return f'<@{self.member_id}>'
 
-    def get_total_practice_time(self) -> float:
+    def get_total_practice_time(self) -> datetime.timedelta:
         """:class:`float`: Returns the total time the member has spent in the voice channel for this practice."""
-        total_time = 0
+        total_time: datetime.timedelta = datetime.timedelta()
         for history in self._history:
             if history.left_at is None:
                 continue
 
-            total_time += (history.left_at - history.joined_at).total_seconds()
+            total_time += history.left_at - history.joined_at
 
         return total_time
 
@@ -324,6 +337,18 @@ class Practice(Guildable, Teamable):
     def format_start_time(self) -> str:
         return f'{discord.utils.format_dt(self.started_at, "F")} ({discord.utils.format_dt(self.started_at, "R")})'
 
+    def format_end_time(self) -> Optional[str]:
+        if not self.ended_at:
+            return None
+
+        return f'{discord.utils.format_dt(self.ended_at, "F")} ({discord.utils.format_dt(self.ended_at, "R")})'
+
+    def get_total_practice_time(self) -> Optional[datetime.timedelta]:
+        if not self.ended_at:
+            return None
+
+        return self.ended_at - self.started_at
+
     # Methods for managing members that join and leave the voice channel for the given practice session.
     async def handle_member_unable_to_join(self, *, member: discord.Member, reason: str) -> PracticeMember:
         """|coro|
@@ -482,14 +507,51 @@ class Practice(Guildable, Teamable):
 
         # Edit this in the DB and edit our status
         self.status = PracticeStatus.completed
+        self.ended_at = discord.utils.utcnow()
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                "UPDATE teams.practice SET status = $1 WHERE id = $2",
+                "UPDATE teams.practice SET status = $1 AND ended_at = $2 WHERE id = $3",
                 self.status.value,
+                self.ended_at,
                 self.id,
             )
 
         _log.debug("Practice %s has ended.", self.id)
 
+        embed = self.bot.Embed(
+            title=f'{self.team.display_name} Practice Ended.',
+            description=f'This practice started by {self.started_by.mention} at {self.format_start_time()} '
+            f'concluded at {self.format_end_time()}.',
+        )
+
+        practice_members_formatted = '\n'.join(
+            [
+                f'{m.mention}: {human_timedelta(m.get_total_practice_time().total_seconds())}'
+                for m in self.members
+                if m.attending
+            ]
+        )
+        excused_members_fornmatted = ', '.join([m.mention for m in self.members if not m.attending])
+
+        embed.add_field(
+            name='Attended Members',
+            value=f'{len(practice_members_formatted)} members attended this practice session.\n{practice_members_formatted}',
+            inline=False,
+        )
+
+        if excused_members_fornmatted:
+            embed.add_field(
+                name='Excused Members',
+                value=f'The following members could not make it to this practice session: {excused_members_fornmatted}',
+                inline=False,
+            )
+
+        ranking = await self.team.fetch_practice_rank()
+        embed.add_field(
+            name='Practice Time Rank',
+            value=f'Out of {len(self.bot.team_cache)} teams, your team is ranked **#{ranking}** in practice time.',
+            inline=False,
+        )
+
         message = await self.team.text_channel.fetch_message(self.message_id)
-        await message.reply("This practice has ended.")
+        await message.reply(embed=embed)

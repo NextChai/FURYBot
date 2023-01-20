@@ -152,7 +152,7 @@ class TeamMembersView(BaseView):
                 "\n".join(member_metadata) or 'Team has no members.'
             ),
         )
-        embed.set_author(name=self.team.name, icon_url=self.team.logo)
+        embed.set_author(name=self.team.display_name, icon_url=self.team.logo)
 
         return embed
 
@@ -301,7 +301,7 @@ class ScrimView(BaseView):
                 name='Scrim In Progress', value=f'This scrim is **currently in progress**.{addition}', inline=False
             )
 
-        embed.set_author(name=self.scrim.home_team.name, icon_url=self.scrim.home_team.logo)
+        embed.set_author(name=self.scrim.home_team.display_name, icon_url=self.scrim.home_team.logo)
 
         embed.set_footer(text=f'Scrim ID: {self.scrim.id}')
         return embed
@@ -495,14 +495,14 @@ class TeamScrimsView(BaseView):
             )
 
         embed.description = (
-            f'**{self.team.name}** has {len(self.team.scrims)} scrims total, '
+            f'**{self.team.display_name}** has {len(self.team.scrims)} scrims total, '
             f'**{hosted_scrims}** of which they are hosting.'
         )
 
         if hosted_scrims == 0:
             embed.add_field(name='No Scrims', value='This team has no scrims.')
 
-        embed.set_author(name=self.team.name, icon_url=self.team.logo)
+        embed.set_author(name=self.team.display_name, icon_url=self.team.logo)
 
         return embed
 
@@ -565,7 +565,7 @@ class TeamChannelsView(BaseView):
     def embed(self) -> discord.Embed:
         """discord.Embed: The embed for this view."""
         embed = self.bot.Embed(title=f'{self.team.display_name} Channels.')
-        embed.set_author(name=self.team.name, icon_url=self.team.logo)
+        embed.set_author(name=self.team.display_name, icon_url=self.team.logo)
 
         embed.add_field(name='Category Channel', value=self.team.category_channel.mention)
         embed.add_field(name='Text Channel', value=self.team.text_channel.mention)
@@ -691,7 +691,7 @@ class TeamNamingView(BaseView):
         embed = self.bot.Embed(
             title=f'{self.team.display_name} Customization', description=self.team.description or 'Team has no description.'
         )
-        embed.set_author(name=self.team.name, icon_url=self.team.logo, url=self.team.logo)
+        embed.set_author(name=self.team.display_name, icon_url=self.team.logo, url=self.team.logo)
         embed.add_field(name='Team Nickname', value=self.team.nickname or 'Team has no nickname.', inline=False)
         embed.add_field(
             name='Team Logo', value=f'[Click here for logo.]({self.team.logo}).' or 'Team has no logo.', inline=False
@@ -875,7 +875,7 @@ class TeamView(BaseView):
             description=self.team.description or 'Team has no description.',
         )
 
-        embed.set_author(name=self.team.name, icon_url=self.team.logo)
+        embed.set_author(name=self.team.display_name, icon_url=self.team.logo)
 
         embed.add_field(
             name='Members',

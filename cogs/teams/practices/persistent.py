@@ -28,9 +28,13 @@ from typing_extensions import Self
 
 import discord
 
+from utils.time import human_timedelta
+
 if TYPE_CHECKING:
     from bot import FuryBot
     from .practice import Practice, PracticeMember
+    from ..team import TeamMember
+    from .practice import PracticeMember
 
 
 class UnabletoAttendModal(discord.ui.Modal):
@@ -68,8 +72,50 @@ class PracticeView(discord.ui.View):
         super().__init__(timeout=None)
 
     @property
+    def _practice_done_embed(self) -> discord.Embed:
+        team = self.practice.team
+        started_by = self.practice.started_by
+
+        practice_members: List[PracticeMember] = self.practice.members
+        attending_member_mentions: List[str] = [member.mention for member in practice_members if member.attending]
+        excused_member_mentions: List[str] = [member.mention for member in practice_members if not member.attending]
+
+        team_members: List[TeamMember] = team.members
+        members_unattended_mentions: List[str] = [member.mention for member in team_members if member not in practice_members]  # type: ignore
+
+        embed = self.practice.bot.Embed(
+            title=f'{team.display_name} Practice.',
+            description=f'A practice started by {started_by.mention} on {self.practice.format_start_time()} is currently in progress has come to an end.',
+        )
+
+        # Show the members that attended the practice.
+        embed.add_field(
+            name='Members Attended',
+            value='\n'.join(attending_member_mentions),
+            inline=False,
+        )
+
+        if excused_member_mentions:
+            embed.add_field(name='Excused Members', value='\n'.join(excused_member_mentions), inline=False)
+
+        if members_unattended_mentions:
+            embed.add_field(name='Members Unattended', value='\n'.join(members_unattended_mentions), inline=False)
+
+        total_time = self.practice.get_total_practice_time()
+        assert total_time
+
+        embed.add_field(
+            name='Total Practice Time',
+            value=f'In total, **todays practice was {human_timedelta(total_time.total_seconds())}**. More stats have been posted '
+            'in the practice completed message.',
+        )
+
+        return embed
+
+    @property
     def embed(self) -> discord.Embed:
-        # NOTE: Add a conditional here for if the practice is completed.
+        if not self.practice.ongoing:
+            return self._practice_done_embed
 
         team = self.practice.team
         started_by = self.practice.started_by

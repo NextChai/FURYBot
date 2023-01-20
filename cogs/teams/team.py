@@ -23,19 +23,23 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+from collections import Counter
 import dataclasses
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union, cast
+import datetime
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union, cast
 
 import discord
 from typing_extensions import Self, TypeVarTuple
 
 from utils import MiniQueryBuilder
+from utils.time import human_timedelta
 
 if TYPE_CHECKING:
+    import asyncpg
     from bot import FuryBot
 
     from .scrim import Scrim
-    from .practices import Practice
+    from .practices import Practice, PracticeMember
 
 Ts = TypeVarTuple("Ts")
 
@@ -302,6 +306,10 @@ class Team:
         return cast(discord.Guild, self.bot.get_guild(self.guild_id))
 
     @property
+    def members(self) -> List[TeamMember]:
+        return list(self.team_members.values())
+
+    @property
     def text_channel(self) -> discord.TextChannel:
         """:class:`discord.TextChannel`: The text channel this team is bound to."""
         guild = self.guild
@@ -331,8 +339,8 @@ class Team:
 
     @property
     def practices(self) -> List[Practice]:
-        return [practice for practice in self.bot.team_practice_cache.values() if practice.team == self]    
-    
+        return [practice for practice in self.bot.team_practice_cache.values() if practice.team == self]
+
     @property
     def ongoing_practice(self) -> Optional[Practice]:
         return discord.utils.find(lambda practice: practice.ongoing, self.practices)
@@ -352,29 +360,124 @@ class Team:
     def get_member(self, member_id: int, /) -> Optional[TeamMember]:
         return self.team_members.get(member_id)
 
-    # async def fetch_practice_rank(self, *, connection: Optional[asyncpg.Connection[asyncpg.Record]] = None) -> int:
-    #     """|coro|
-    #
-    #     Fetches the rank of this team in the practice leaderboard.
-    #
-    #     Parameters
-    #     ----------
-    #     connection: Optional[:class:`asyncpg.Connection`]
-    #         The connection to the database.
-    #
-    #     Returns
-    #     -------
-    #     :class:`int`
-    #         The rank of the team in the practice leaderboard.
-    #     """
-    #     awaitable = connection or self.bot.pool
-    #     rank = await awaitable.fetchval(
-    #         "WITH ranked_teams AS (SELECT team_id, SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) AS total_practice_time,"
-    #         "RANK() OVER (ORDER BY SUM(EXTRACT(EPOCH FROM COALESCE(ended_at, NOW()) - initiated_at)) DESC) AS rank "
-    #         "FROM teams.practice GROUP BY team_id) SELECT rank FROM ranked_teams WHERE team_id = $1;",
-    #         72,
-    #     )
-    #     return rank
+    async def fetch_practice_rank(self, *, connection: Optional[asyncpg.Connection[asyncpg.Record]] = None) -> int:
+        """|coro|
+
+        Fetches the rank of this team in the practice leaderboard.
+
+        Parameters
+        ----------
+        connection: Optional[:class:`asyncpg.Connection`]
+            The connection to the database.
+
+        Returns
+        -------
+        :class:`int`
+            The rank of the team in the practice leaderboard.
+        """
+        query = """
+        WITH team_time AS (
+            SELECT team_id, SUM(EXTRACT(EPOCH FROM (COALESCE(ended_at, NOW()) - started_at))) as total_time
+            FROM teams.practice
+            GROUP BY team_id
+        )
+        SELECT team_id, rank() OVER (ORDER BY total_time DESC) as ranking
+        FROM team_time
+        WHERE team_id = 72;
+        """
+
+        awaitable = connection or self.bot.pool
+        rank = await awaitable.fetchrow(query, self.id)
+        assert rank
+
+        return rank['ranking']
+
+    async def fetch_practice_statistical_embed(self) -> discord.Embed:
+        """|coro|
+
+        Builds and returns an embed containing the statistics for this team's practices.
+
+        Returns
+        -------
+        :class:`discord.Embed`
+            The embed containing the statistics for this team's practices.
+        """
+        embed = self.bot.Embed(
+            title=f'{self.display_name} Practice Statistics',
+            description='Below are the statistics for this team\'s practices. If you wish to see the statistics for a specific '
+            'person you can right click on their name, hover over "Apps", and select "Practice Statistics".',
+        )
+        embed.set_thumbnail(url=self.logo)
+        embed.set_author(name=self.display_name, icon_url=self.logo)
+        embed.set_footer(text=self.id)
+
+        ranking = await self.fetch_practice_rank()
+        embed.add_field(
+            name='Practice Time Rank',
+            value=f'Out of {len(self.bot.team_cache)} teams, {self.display_name} is ranked #{ranking} in practice time.',
+            inline=False,
+        )
+
+        practices = self.practices
+        total_time: datetime.timedelta = datetime.timedelta()
+        member_times: Dict[PracticeMember, datetime.timedelta] = {}
+        member_missing_practice_count: Counter[TeamMember] = Counter()
+
+        for practice in practices:
+            if practice.ongoing:  # Don't count ongoing practices
+                continue
+
+            practice_time = practice.get_total_practice_time()
+            assert practice_time
+            total_time += practice_time
+
+            for member in practice.members:
+                # Setdefault wont let us use += so we have to do this
+                if member not in member_times:
+                    member_times[member] = member.get_total_practice_time()
+                else:
+                    member_times[member] += member.get_total_practice_time()
+
+            missing_members = [member for member in self.members if member not in practice.members]  # type: ignore
+            for member in missing_members:
+                member_missing_practice_count[member] += 1
+
+        embed.add_field(
+            name='Total Practice Time',
+            value=f'{self.display_name} has practiced for a total of {human_timedelta(total_time.total_seconds())}.',
+            inline=False,
+        )
+
+        sorted_member_times: List[Tuple[PracticeMember, datetime.timedelta]] = sorted(
+            member_times.items(), key=lambda item: item[1], reverse=True
+        )
+
+        top_member = sorted_member_times[0]
+        top_member_seconds = top_member[1].total_seconds()
+
+        additional = ''
+        if len(sorted_member_times) >= 2:
+            second_member = sorted_member_times[1]
+            seconds_lead = top_member_seconds - second_member[1].total_seconds()
+            additional += f' They\'re followed by {second_member[0].mention}, leading by {human_timedelta(seconds_lead)} of practice time.'
+
+        embed.add_field(
+            name='Top Practice Time',
+            value='The member with the most practice time is '
+            f'{top_member[0].mention} with {human_timedelta(top_member_seconds)}.{additional}',
+            inline=False,
+        )
+
+        # Rank the members that have missed the most practices (show the top 3)
+        highest_missers = member_missing_practice_count.most_common(3)
+        embed.add_field(
+            name="Members with the most missed practices",
+            value='\n'.join(f'{member.mention}: {count}' for member, count in highest_missers)
+            or 'No members have missed any practices.',
+            inline=False,
+        )
+
+        return embed
 
     async def sync(self) -> None:
         """|coro|
