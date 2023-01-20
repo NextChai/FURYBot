@@ -1026,7 +1026,7 @@ class TeamPracticesView(BaseView):
 
         embed.add_field(
             name='Average Practice Time',
-            value=f'Per practice, this team has an average of **{human_timedelta(average_time)}**',
+            value=f'Per practice, this team has an average of **{human_timedelta(average_time)}** total.',
             inline=False,
         )
 
@@ -1092,6 +1092,11 @@ class TeamPracticesView(BaseView):
             callback=self._manage_practice_after,
         )
         return await interaction.response.edit_message(view=self)
+    
+    @discord.ui.button(label='View Statistial Data')
+    async def view_stats(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        embed = await self.team.fetch_practice_statistical_embed()
+        return await interaction.response.edit_message(embed=embed)
 
 
 class TeamView(BaseView):
