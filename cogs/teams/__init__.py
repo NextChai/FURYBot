@@ -71,7 +71,7 @@ def _maybe_team(interaction: discord.Interaction, team: Optional[Team]) -> Optio
 
 class Teams(BaseCog):
     """A cog to manage teams and allow teams to create scrims and find subs."""
-
+    
     team = app_commands.Group(
         name='team',
         description='Create and manage teams.',
@@ -81,6 +81,17 @@ class Teams(BaseCog):
 
     scrim = app_commands.Group(name='scrim', description='Create and manage scrims.', guild_only=True)
 
+    def __init__(self, bot: FuryBot) -> None:
+        super().__init__(bot=bot)
+
+        context_menu = app_commands.ContextMenu(
+            name='Team Get', callback=self.team_get_context_menu, type=discord.AppCommandType.user
+        )
+        self.bot.tree.add_command(context_menu)
+
+    async def cog_unload(self) -> None:
+        self.bot.tree.remove_command('Team Get', type=discord.AppCommandType.user)
+    
     @team.command(name='create', description='Create a team.')
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.describe(name='The name of the team.')
@@ -173,19 +184,7 @@ class Teams(BaseCog):
             content=f'A scrim for {scrim.scheduled_for_formatted()} has been created against {team.display_name}.'
         )
 
-    @team.command(name='get', description='Get the team status of a member.')
-    async def team_get(self, interaction: discord.Interaction, member: discord.Member) -> discord.InteractionMessage:
-        """|coro|
-
-        Allows you to get the team status of a member.
-
-        Parameters
-        ----------
-        interaction: :class:`discord.Interaction`
-            The interaction that triggered this command.
-        member: :class:`discord.Member`
-            The member you want to get the team status of.
-        """
+    async def _team_get_func(self, interaction: discord.Interaction, member: discord.Member) -> discord.InteractionMessage:
         await interaction.response.defer()
 
         team_members: List[TeamMember] = [
@@ -205,6 +204,26 @@ class Teams(BaseCog):
             )
 
         return await interaction.edit_original_response(embed=embed)
+
+    @team.command(name='get', description='Get the team status of a member.')
+    async def team_get(self, interaction: discord.Interaction, member: discord.Member) -> discord.InteractionMessage:
+        """|coro|
+
+        Allows you to get the team status of a member.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that triggered this command.
+        member: :class:`discord.Member`
+            The member you want to get the team status of.
+        """
+        return await self._team_get_func(interaction, member)
+
+    async def team_get_context_menu(
+        self, interaction: discord.Interaction, member: discord.Member
+    ) -> discord.InteractionMessage:
+        return await self._team_get_func(interaction, member)
 
     @classmethod
     def _create_scrim_cancelled_message(cls, bot: FuryBot, scrim: Scrim) -> discord.Embed:
