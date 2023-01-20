@@ -510,7 +510,7 @@ class Practice(Guildable, Teamable):
         self.ended_at = discord.utils.utcnow()
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                "UPDATE teams.practice SET status = $1 AND ended_at = $2 WHERE id = $3",
+                "UPDATE teams.practice SET status = $1, ended_at = $2 WHERE id = $3",
                 self.status.value,
                 self.ended_at,
                 self.id,
