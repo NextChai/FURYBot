@@ -542,17 +542,13 @@ class Practice(Guildable, Teamable):
         )
 
         practice_members_formatted = '\n'.join(
-            [
-                f'{m.mention}: {human_timedelta(m.get_total_practice_time().total_seconds())}'
-                for m in self.members
-                if m.attending
-            ]
+            [f'{m.mention}: {human_timedelta(m.get_total_practice_time().total_seconds())}' for m in self.attending_members]
         )
-        excused_members_fornmatted = ', '.join([m.mention for m in self.members if not m.attending])
+        excused_members_fornmatted = ', '.join([m.mention for m in self.excused_members])
 
         embed.add_field(
             name='Attended Members',
-            value=f'{len([m for m in self.members if m.attending])} members attended this practice session.\n{practice_members_formatted}',
+            value=f'{len(self.attending_members)} members attended this practice session.\n{practice_members_formatted}',
             inline=False,
         )
 
