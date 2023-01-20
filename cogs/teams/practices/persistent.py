@@ -27,6 +27,8 @@ from typing import TYPE_CHECKING, Optional, List
 from typing_extensions import Self
 
 import discord
+from cogs.teams.errors import MemberNotOnTeam
+from cogs.teams.practices.errors import MemberAlreadyInPractice
 
 from utils.time import human_timedelta
 
@@ -58,11 +60,20 @@ class UnabletoAttendModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction[FuryBot], /) -> None:
         # We need to create a new attending member entry and provide the reason
-        await interaction.response.send_message(
-            "Thanks for letting me know, I\'ve made a mark on your record.", ephemeral=True
-        )
+        await interaction.response.defer()
 
-        await self.practice.handle_member_unable_to_join(member=self.member, reason=self.reason.value)
+        try:
+            await self.practice.handle_member_unable_to_join(member=self.member, reason=self.reason.value)
+        except MemberNotOnTeam:
+            return await interaction.followup.send('Hey! You aren\'t on this team, you can\'t do this!', ephemeral=True)
+        except MemberAlreadyInPractice:
+            return await interaction.followup.send(
+                'Hey! You are already registered to be in this practice. '
+                'If you can\'t attend leave your teams voice channel and it\'ll be marked accordingly.',
+                ephemeral=True,
+            )
+
+        await interaction.followup.send("Thanks for letting me know, I\'ve made a mark on your record.", ephemeral=True)
 
 
 class PracticeView(discord.ui.View):
