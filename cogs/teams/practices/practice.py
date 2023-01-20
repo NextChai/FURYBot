@@ -535,7 +535,7 @@ class Practice(Guildable, Teamable):
 
         embed.add_field(
             name='Attended Members',
-            value=f'{len(practice_members_formatted)} members attended this practice session.\n{practice_members_formatted}',
+            value=f'{len([m for m in self.members if m.attending])} members attended this practice session.\n{practice_members_formatted}',
             inline=False,
         )
 
