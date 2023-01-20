@@ -42,7 +42,8 @@ class UnabletoAttendModal(discord.ui.Modal):
         label='Why Can\'t You Attend?',
         style=discord.TextStyle.long,
         custom_id="reason-to-not-attend",
-        placeholder="Enter why you can\'t attend here.",
+        placeholder="Enter why you can\'t attend here. This will not be shared with any of your "
+        "team members, just the captains and coaches.",
         required=True,
     )
 

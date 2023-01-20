@@ -881,20 +881,25 @@ class TeamView(BaseView):
             name='Members',
             value=", ".join([m.mention for m in self.team.team_members.values() if m.is_sub is False])
             or "Team has no members.",
+            inline=False,
         )
         embed.add_field(
             name='Subs',
             value=", ".join([m.mention for m in self.team.team_members.values() if m.is_sub])
             or "Team has no dedicated subs.",
+            inline=False,
         )
 
         embed.add_field(
-            name='Captains', value=", ".join(r.mention for r in self.team.captain_roles) or "Team has no captains."
+            name='Captains',
+            value=", ".join(r.mention for r in self.team.captain_roles) or "Team has no captains.",
+            inline=False,
         )
 
         embed.add_field(
             name='Channels',
             value=", ".join(c.mention for c in [self.team.text_channel, self.team.voice_channel, *self.team.extra_channels]),
+            inline=False,
         )
 
         embed.set_footer(text=f'Team ID: {self.team.id}')
