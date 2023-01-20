@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import pytz
 import functools
+import datetime
 from typing import TYPE_CHECKING, Any, List, Optional, cast
 
 import discord
@@ -63,6 +64,93 @@ def clamp(minimum: Optional[int], maximum: int) -> int:
     # Return the minimum if its less than or equal the maximum else the maximum.
     # If the minimum is 0 though, return 1 in replace of it.
     return minimum if minimum <= maximum else maximum
+
+
+class TeamMemberPracticeStatisticsView(BaseView):
+    """"""
+
+    def __init__(self, member: TeamMember, discord_member: discord.Member, *args: Any, **kwargs: Any) -> None:
+        self.member: TeamMember = member
+        self.discord_member: discord.Member = discord_member
+        super().__init__(*args, **kwargs)
+
+    @property
+    def embed(self) -> discord.Embed:
+        team = self.member.team
+        embed = team.bot.Embed(title=f"{self.discord_member.display_name} Practice Statistics")
+
+        # Get the: total time, total amount, total started, absences
+        total, absences, started_by = 0, 0, 0
+        total_time: datetime.timedelta = datetime.timedelta()
+        last_attended: Optional[Practice] = None
+        for practice in team.practices:
+            member = practice.get_member(self.discord_member.id)
+            if member is None:
+                absences += 1
+                continue
+
+            total += 1
+            total_time += member.get_total_practice_time()
+
+            if practice.started_by == member:
+                started_by += 1
+
+            if last_attended is None:
+                last_attended = practice
+            elif last_attended.started_at < practice.started_at:
+                last_attended = practice
+
+        # Get the current streak of attended practices
+        current_streak = 0
+        biggest_streak = 0
+        for practice in sorted(team.practices, key=lambda p: p.started_at, reverse=True):
+            member = practice.get_member(self.discord_member.id)
+            if member is None:
+                biggest_streak = max(current_streak, biggest_streak)
+                current_streak = 0
+                continue
+
+            current_streak += 1
+
+        total_team_practices = len(team.practices)
+        percentage_of_attended_practices = (total / total_team_practices) * 100
+
+        embed.add_field(
+            name='Attended Practices',
+            value=f'**Count**: {total}\n**Percentage**: {percentage_of_attended_practices:.2f}%',
+            inline=False,
+        )
+
+        percentage_of_absences = (absences / total_team_practices) * 100
+        embed.add_field(
+            name='Absences',
+            value=f'**Absences**: {absences}\n**Percentage**: {percentage_of_absences:.2f}%',
+            inline=False,
+        )
+
+        started_by_percentage = (started_by / total) * 100
+        embed.add_field(
+            name='Started Practices',
+            value=f'**Total**: {started_by}\n**Percentage**: {started_by_percentage:.2f}%',
+            inline=False,
+        )
+
+        embed.add_field(
+            name='Practice Time',
+            value=f'**Total**: {human_timedelta(total_time.total_seconds())}\n**Average**: {human_timedelta(total_time.total_seconds() / total)}',
+            inline=False,
+        )
+
+        embed.add_field(name='Streaks', value=f'**Current Streak**: {current_streak}\n**Biggest Streak**: {biggest_streak}')
+
+        last_attended_fmt = (
+            last_attended
+            and f'**Started At**: {last_attended.format_start_time()}\n**Ended At**: {last_attended.format_end_time()}'
+            or 'Has never attended a practice.'
+        )
+        embed.add_field(name='Last Attended Practice', value=last_attended_fmt, inline=False)
+
+        return embed
 
 
 class TeamMemberView(BaseView):
@@ -123,6 +211,16 @@ class TeamMemberView(BaseView):
 
         view = TeamMembersView(self.team, target=interaction)
         return await interaction.edit_original_response(embed=view.embed, view=view)
+
+    @discord.ui.button(label='View Practice Statistics')
+    @default_button_doc_string
+    async def view_practice_statistics(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """View the practice statistics for this member."""
+        team_member = self.team.get_member(self.member.id)
+        assert team_member
+
+        view = self.create_child(TeamMemberPracticeStatisticsView, team_member, self.member)
+        await interaction.response.send_message(view=view, embed=view.embed)
 
 
 class TeamMembersView(BaseView):
