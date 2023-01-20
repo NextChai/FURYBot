@@ -362,7 +362,7 @@ class Team:
 
     def get_member(self, member_id: int, /) -> Optional[TeamMember]:
         return self.team_members.get(member_id)
-    
+
     def get_practice_streak(self) -> int:
         streak = 0
         for i, practice in enumerate(self.practices):
@@ -382,7 +382,7 @@ class Team:
                 streak += 1
             else:
                 streak = 0
-                
+
         return streak
 
     def get_total_practice_time(self) -> datetime.timedelta:
@@ -408,7 +408,7 @@ class Team:
                 continue
 
             for member in practice.members:
-                team_member = self.members[member.member_id]
+                team_member = self.team_members[member.member_id]
                 # Setdefault wont let us use += so we have to do this
                 if team_member not in member_times:
                     member_times[team_member] = member.get_total_practice_time()
