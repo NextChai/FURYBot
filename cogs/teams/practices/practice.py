@@ -521,7 +521,7 @@ class Practice(Guildable, Teamable):
 
         embed = self.bot.Embed(
             title=f'{self.team.display_name} Practice Ended.',
-            description=f'This practice started by {self.started_by.mention} has come to an end.\n '
+            description=f'This practice started by {self.started_by.mention} has come to an end.\n\n'
             f'- **Started At**: {self.format_start_time()}\n'
             f'- **Ended At**: {self.format_end_time()}\n',
         )
