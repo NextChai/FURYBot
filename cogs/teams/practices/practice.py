@@ -534,7 +534,7 @@ class Practice(Guildable, Teamable):
 
         _log.debug("Practice %s has ended.", self.id)
 
-        embed = self.bot.Embed(
+        embed = self.team.embed(
             title=f'{self.team.display_name} Practice Ended.',
             description=f'This practice started by {self.started_by.mention} has come to an end.\n\n'
             f'- **Started At**: {self.format_start_time()}\n'

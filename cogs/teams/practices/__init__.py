@@ -88,7 +88,7 @@ class PracticeCog(BaseCog):
 
         await interaction.response.defer(ephemeral=True)
 
-        embed = self.bot.Embed(
+        embed = team.embed(
             title="Creating Practice...",
             description="Please wait while we create your practice.",
         )

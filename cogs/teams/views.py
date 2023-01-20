@@ -77,7 +77,7 @@ class TeamMemberPracticeStatisticsView(BaseView):
     @property
     def embed(self) -> discord.Embed:
         team = self.member.team
-        embed = team.bot.Embed(title=f"{self.discord_member.display_name} Practice Statistics")
+        embed = team.embed(title=f"{self.discord_member.display_name} Practice Statistics")
 
         # Get the: total time, total amount, total started, absences
         total, absences, started_by = 0, 0, 0
@@ -173,7 +173,7 @@ class TeamMemberView(BaseView):
     @property
     def embed(self) -> discord.Embed:
         """:class:`discord.Embed`: The embed for this view."""
-        embed = self.bot.Embed(title=f'Manage Team {self.team.display_name} Member.')
+        embed = self.team.embed(title=f'Manage Team {self.team.display_name} Member.')
 
         embed.set_author(name=self.member.display_name, icon_url=self.member.display_avatar.url)
 
@@ -247,7 +247,7 @@ class TeamMembersView(BaseView):
         for member in self.team.team_members.values():
             member_metadata.append(f'{member.mention}: {"**Is a sub.**" if member.is_sub else "**On the main roster.**"}')
 
-        embed = self.bot.Embed(
+        embed = self.team.embed(
             title=f'Team {self.team.display_name} Members',
             description='Use the buttons below to manage team members.\n\n{}'.format(
                 "\n".join(member_metadata) or 'Team has no members.'
@@ -378,7 +378,7 @@ class ScrimView(BaseView):
     @property
     def embed(self) -> discord.Embed:
         """:class:`discord.Embed`: The embed for this view."""
-        embed = self.bot.Embed(
+        embed = self.team.embed(
             title='Team Scrim Information',
             description=f'This scrim was originally scheduled for {self.scrim.scheduled_for_formatted()}. This scrim is currently **{self.scrim.status.value.replace("_", " ").title()}**.',
         )
@@ -579,7 +579,7 @@ class TeamScrimsView(BaseView):
     @property
     def embed(self) -> discord.Embed:
         """:class:`discord.Embed`: The embed for this view."""
-        embed = self.bot.Embed(title=f"{self.team.display_name}'s Scrims")
+        embed = self.team.embed(title=f"{self.team.display_name}'s Scrims")
 
         hosted_scrims: int = 0
         for scrim in self.team.scrims:
@@ -665,7 +665,7 @@ class TeamChannelsView(BaseView):
     @property
     def embed(self) -> discord.Embed:
         """discord.Embed: The embed for this view."""
-        embed = self.bot.Embed(title=f'{self.team.display_name} Channels.')
+        embed = self.team.embed(title=f'{self.team.display_name} Channels.')
         embed.set_author(name=self.team.display_name, icon_url=self.team.logo)
 
         embed.add_field(name='Category Channel', value=self.team.category_channel.mention)
@@ -789,7 +789,7 @@ class TeamNamingView(BaseView):
     @property
     def embed(self) -> discord.Embed:
         """The embed for this view."""
-        embed = self.bot.Embed(
+        embed = self.team.embed(
             title=f'{self.team.display_name} Customization', description=self.team.description or 'Team has no description.'
         )
         embed.set_author(name=self.team.display_name, icon_url=self.team.logo, url=self.team.logo)
@@ -912,7 +912,7 @@ class TeamCaptainsView(BaseView):
 
     @property
     def embed(self) -> discord.Embed:
-        embed = self.bot.Embed(
+        embed = self.team.embed(
             title=f'{self.team.display_name} Captains',
             description='Use the buttons below to manage team captain roles. This team '
             f'has **{len(self.team.captain_role_ids)}** captain(s).',
@@ -973,7 +973,7 @@ class TeamPracticeMemberView(BaseView):
     def embed(self) -> discord.Embed:
         practice = self.member.practice
 
-        embed = practice.bot.Embed(
+        embed = practice.team.embed(
             title=f'{self.discord_member.display_name} Practice Information',
             description=f'**Practice Started At**: {practice.format_start_time()}\n'
             f'**Practice Ended At**: {practice.format_end_time() or "This practice is in progress..."}\n',
@@ -1021,7 +1021,7 @@ class TeamPracticeView(BaseView):
 
     @property
     def embed(self) -> discord.Embed:
-        embed = self.bot.Embed(
+        embed = self.practice.team.embed(
             title="Practice Information",
             description='Below is some inforamtion for the given practice. Use the buttons below to view stats about '
             'specific members who attended this practice.\n'
@@ -1112,7 +1112,7 @@ class TeamPracticesView(BaseView):
     @property
     def embed(self) -> discord.Embed:
 
-        embed = self.bot.Embed(
+        embed = self.team.embed(
             title=f"{self.team.display_name} Practices.",
             description=f"This team has had **{len(self.team.practices)}** practices in total.",
         )
@@ -1203,7 +1203,7 @@ class TeamView(BaseView):
     @property
     def embed(self) -> discord.Embed:
         """The embed for this view."""
-        embed = self.bot.Embed(
+        embed = self.team.embed(
             title=self.team.display_name,
             description=self.team.description or 'Team has no description.',
         )

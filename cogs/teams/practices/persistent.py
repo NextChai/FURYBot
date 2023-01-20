@@ -90,7 +90,7 @@ class PracticeView(discord.ui.View):
         excused_member_mentions: List[str] = [member.mention for member in self.practice.excused_members]
         members_unattended_mentions: List[str] = [member.mention for member in self.practice.missing_members]
 
-        embed = self.practice.bot.Embed(
+        embed = self.practice.team.embed(
             title=f'{team.display_name} Practice.',
             description=f'A practice started by {started_by.mention} on {self.practice.format_start_time()} is currently in progress has come to an end.',
         )
@@ -127,7 +127,7 @@ class PracticeView(discord.ui.View):
         team = self.practice.team
         started_by = self.practice.started_by
 
-        embed = self.practice.bot.Embed(
+        embed = team.embed(
             title=f'{team.display_name} Practice.',
             description=f'A practice started by {started_by.mention} on {self.practice.format_start_time()} '
             'is currently in progress.',
