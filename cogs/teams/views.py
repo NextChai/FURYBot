@@ -1014,45 +1014,38 @@ class TeamPracticesView(BaseView):
         # Get the average number of members per practice
         # Get the average total time in a practice.
         average_number_of_members = sum(len(p.members) for p in self.team.practices) / len(self.team.practices)
-        average_time = sum(
-            [prac_time.total_seconds() for p in self.team.practices if (prac_time := p.get_total_practice_time())]
-        ) / len(self.team.practices)
+        average_time = self.team.get_total_practice_time() / len(self.team.practices)
 
         embed.add_field(
             name='Average Number of Members',
-            value=f'Per practice, this team has an average of **{average_number_of_members:.2f}** members.',
-            inline=False,
+            value=f'**{average_number_of_members:.2f}** members.',
         )
 
         embed.add_field(
             name='Average Practice Time',
-            value=f'Per practice, this team has an average of **{human_timedelta(average_time)}** total.',
-            inline=False,
+            value=f'**{human_timedelta(average_time.total_seconds())}** total.',
         )
 
         # The total number of practices done "in a row". The longest streak of practices (a streak breaks if there is 8 days without a practice)
-        streak = 0
-        for i, practice in enumerate(self.team.practices):
-            if i == 0:
-                continue
-
-            ended_at = practice.ended_at
-            if ended_at is None:  # This practice is still going, we'll include it.
-                streak += 1
-                continue
-
-            previous_ended_at = self.team.practices[i - 1].ended_at
-            if previous_ended_at is None:  # This should't happen but if it does, we'll just skip it.
-                continue
-
-            if (ended_at - previous_ended_at).days < 8:
-                streak += 1
-            else:
-                streak = 0
-
+        streak = self.team.get_practice_streak()
         embed.add_field(
             name="Longest Practice Streak",
-            value=f"Longest practice streak of **{streak}** practices (8 days without a practice breaks the streak).",
+            value=f"**{streak}** practices (8 days without a practice breaks the streak).",
+        )
+
+        ranked_members = self.team.rank_member_practice_times()
+        embed.add_field(
+            name="Top Practice Times",
+            value='\n'.join(
+                f'{member.mention}: {human_timedelta(time.total_seconds())}' for (member, time) in ranked_members[:5]
+            ),
+            inline=False,
+        )
+
+        absent_members = self.team.rank_member_absences()
+        embed.add_field(
+            name="Top Absences",
+            value='\n'.join(f'{member.mention}: {absences}' for (member, absences) in absent_members[:5]),
             inline=False,
         )
 
@@ -1092,11 +1085,6 @@ class TeamPracticesView(BaseView):
             callback=self._manage_practice_after,
         )
         return await interaction.response.edit_message(view=self)
-    
-    @discord.ui.button(label='View Statistial Data')
-    async def view_stats(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
-        embed = await self.team.fetch_practice_statistical_embed()
-        return await interaction.response.edit_message(embed=embed)
 
 
 class TeamView(BaseView):

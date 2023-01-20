@@ -362,6 +362,71 @@ class Team:
 
     def get_member(self, member_id: int, /) -> Optional[TeamMember]:
         return self.team_members.get(member_id)
+    
+    def get_practice_streak(self) -> int:
+        streak = 0
+        for i, practice in enumerate(self.practices):
+            if i == 0:
+                continue
+
+            ended_at = practice.ended_at
+            if ended_at is None:  # This practice is still going, we'll include it.
+                streak += 1
+                continue
+
+            previous_ended_at = self.practices[i - 1].ended_at
+            if previous_ended_at is None:  # This should't happen but if it does, we'll just skip it.
+                continue
+
+            if (ended_at - previous_ended_at).days < 8:
+                streak += 1
+            else:
+                streak = 0
+                
+        return streak
+
+    def get_total_practice_time(self) -> datetime.timedelta:
+        total_time = datetime.timedelta()
+
+        for practice in self.practices:
+            prac_time = practice.get_total_practice_time()
+            if prac_time is not None:
+                total_time += prac_time
+
+        return total_time
+
+    def rank_member_practice_times(self) -> List[Tuple[TeamMember, datetime.timedelta]]:
+        """"""
+        member_times: Dict[TeamMember, datetime.timedelta] = {}
+
+        for practice in self.practices:
+            if practice.ongoing:  # Don't count ongoing practices
+                continue
+
+            practice_time = practice.get_total_practice_time()
+            if not practice_time:  # This should never happen
+                continue
+
+            for member in practice.members:
+                team_member = self.members[member.member_id]
+                # Setdefault wont let us use += so we have to do this
+                if team_member not in member_times:
+                    member_times[team_member] = member.get_total_practice_time()
+                else:
+                    member_times[team_member] += member.get_total_practice_time()
+
+        return sorted(member_times.items(), key=lambda item: item[1], reverse=True)
+
+    def rank_member_absences(self) -> List[Tuple[TeamMember, int]]:
+        """"""
+        member_absences: Counter[TeamMember] = Counter()
+
+        for practice in self.practices:
+
+            for member in practice.missing_members:
+                member_absences[member] += 1
+
+        return member_absences.most_common()
 
     async def fetch_practice_rank(self, *, connection: Optional[asyncpg.Connection[asyncpg.Record]] = None) -> int:
         """|coro|
@@ -394,96 +459,6 @@ class Team:
         assert rank
 
         return rank['ranking']
-
-    async def fetch_practice_statistical_embed(self) -> discord.Embed:
-        """|coro|
-
-        Builds and returns an embed containing the statistics for this team's practices.
-
-        Returns
-        -------
-        :class:`discord.Embed`
-            The embed containing the statistics for this team's practices.
-        """
-        embed = self.bot.Embed(
-            title=f'{self.display_name} Practice Statistics',
-            description='Below are the statistics for this team\'s practices. If you wish to see the statistics for a specific '
-            'person you can right click on their name, hover over "Apps", and select "Practice Statistics".',
-        )
-        embed.set_thumbnail(url=self.logo)
-        embed.set_author(name=self.display_name, icon_url=self.logo)
-        embed.set_footer(text=self.id)
-
-        ranking = await self.fetch_practice_rank()
-        embed.add_field(
-            name='Practice Time Rank',
-            value=f'Out of {len(self.bot.team_cache)} teams, this team is **ranked #{ranking} in practice time**.',
-            inline=False,
-        )
-
-        practices = self.practices
-        total_time: datetime.timedelta = datetime.timedelta()
-        member_times: Dict[PracticeMember, datetime.timedelta] = {}
-        member_missing_practice_count: Counter[TeamMember] = Counter()
-
-        for practice in practices:
-            if practice.ongoing:  # Don't count ongoing practices
-                continue
-
-            practice_time = practice.get_total_practice_time()
-            if not practice_time:  # This should never happen
-                continue
-
-            total_time += practice_time
-
-            for member in practice.members:
-                # Setdefault wont let us use += so we have to do this
-                if member not in member_times:
-                    member_times[member] = member.get_total_practice_time()
-                else:
-                    member_times[member] += member.get_total_practice_time()
-
-            missing_members = [member for member in self.members if member not in practice.members]  # type: ignore
-            for member in missing_members:
-                member_missing_practice_count[member] += 1
-
-        embed.add_field(
-            name='Total Practice Time',
-            value=f'This team has practiced for a **total of {human_timedelta(total_time.total_seconds())}**.',
-            inline=False,
-        )
-
-        sorted_member_times: List[Tuple[PracticeMember, datetime.timedelta]] = sorted(
-            member_times.items(), key=lambda item: item[1], reverse=True
-        )
-
-        top_member = sorted_member_times[0]
-        top_member_seconds = top_member[1].total_seconds()
-
-        additional = ''
-        if len(sorted_member_times) >= 2:
-            second_member = sorted_member_times[1]
-            seconds_lead = top_member_seconds - second_member[1].total_seconds()
-            additional += f' They\'re followed by {second_member[0].mention}, leading by {human_timedelta(seconds_lead)} of practice time.'
-
-        embed.add_field(
-            name='Top Practice Times',
-            value='\n'.join(
-                f'{element[0].mention}: {human_timedelta(element[1].total_seconds())}' for element in sorted_member_times[:5]
-            ),
-            inline=False,
-        )
-
-        # Rank the members that have missed the most practices (show the top 3)
-        highest_missers = member_missing_practice_count.most_common(3)
-        embed.add_field(
-            name="Members With The Most Missed Practices",
-            value='\n'.join(f'{member.mention}: {count}' for member, count in highest_missers)
-            or 'No members have missed any practices.',
-            inline=False,
-        )
-
-        return embed
 
     async def sync(self) -> None:
         """|coro|
