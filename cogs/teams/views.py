@@ -961,6 +961,12 @@ class TeamPracticeView(BaseView):
             )
 
         await interaction.response.defer()
+
+        # Because we're manually ending this, we need to edit all members currently in the practice so that they have
+        # a left_at time.
+        for member in self.practice.members:
+            await member.handle_leave(when=interaction.created_at)
+
         await self.practice.end()
 
         assert interaction.message
