@@ -450,6 +450,7 @@ class Practice(Guildable, Teamable):
             if not attending_member.attending:
                 # They just joined the voice channel, let's ignore them
                 # TODO: Maybe edit this?
+                _log.debug("Member %s is not attending practice. ignoring them.", member.id)
                 raise MemberNotAttendingPractice(f'The member {member.id} is not attending practice {self.id}.')
 
         # Let's handle this member joining the practice session. This will create a new history element
