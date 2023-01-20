@@ -122,7 +122,8 @@ class PracticeView(discord.ui.View):
 
         embed = self.practice.bot.Embed(
             title=f'{team.display_name} Practice.',
-            description=f'A practice started by {started_by.mention} on {self.practice.format_start_time()} is currently in progress.',
+            description=f'A practice started by {started_by.mention} on {self.practice.format_start_time()} '
+            'is currently in progress.',
         )
 
         embed.add_field(name='Voice Channel', value=self.practice.team.voice_channel.mention, inline=False)

@@ -476,7 +476,7 @@ class Team:
         # Rank the members that have missed the most practices (show the top 3)
         highest_missers = member_missing_practice_count.most_common(3)
         embed.add_field(
-            name="Members with the most missed practices",
+            name="Members With The Most Missed Practices",
             value='\n'.join(f'{member.mention}: {count}' for member, count in highest_missers)
             or 'No members have missed any practices.',
             inline=False,
