@@ -44,7 +44,7 @@ if TYPE_CHECKING:
     from ..team import Team
 
 _log = logging.getLogger(__name__)
-logging.getLogger(__name__).setLevel(logging.DEBUG)  # A temporary placeholder until everything is done.
+_log.setLevel(logging.DEBUG)  # A temporary placeholder until everything is done.
 
 
 class PracticeMemberHistory(Guildable, TeamMemberable, Teamable):

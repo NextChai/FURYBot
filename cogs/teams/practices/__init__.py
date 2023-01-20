@@ -23,6 +23,8 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import logging
+
 from .errors import *
 from .persistent import *
 from .practice import *
@@ -38,6 +40,9 @@ from ..team import Team
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
+_log = logging.getLogger(__name__)
+_log.setLevel(logging.DEBUG)
 
 
 class PracticeCog(BaseCog):
@@ -124,25 +129,30 @@ class PracticeCog(BaseCog):
             return
 
         if before.channel is None and after.channel is not None:
+            _log.debug('Member %s has joined a voice channel', member.id)
             # The member joined a voice channel
             joined_channel = after.channel
             category: Optional[discord.CategoryChannel] = joined_channel.category
 
             if category is None:
+                _log.debug('The channel %s is not in a category', joined_channel.id)
                 return
 
             try:
                 team = Team.from_category(category.id, bot=self.bot)
             except Exception:
+                _log.debug('The channel %s is not in a team category', joined_channel.id)
                 return
 
             # Check if this team has an ongoing practice
             practice = team.ongoing_practice
             if practice is None:
+                _log.debug('No ongoing team practice found for team %s', team.id)
                 return
 
             # This member joined an ongoing practice.
             try:
+                _log.debug("handling member join for %s")
                 return await practice.handle_member_join(member=member)
             except (MemberNotOnTeam, MemberNotAttendingPractice):
                 return
