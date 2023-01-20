@@ -467,9 +467,10 @@ class Team:
             additional += f' They\'re followed by {second_member[0].mention}, leading by {human_timedelta(seconds_lead)} of practice time.'
 
         embed.add_field(
-            name='Top Practice Time',
-            value='The member with the most practice time is '
-            f'{top_member[0].mention} with {human_timedelta(top_member_seconds)}.{additional}',
+            name='Top Practice Times',
+            value='\n'.join(
+                f'{element[0].mention}: {human_timedelta(element[1].total_seconds())}' for element in sorted_member_times[:5]
+            ),
             inline=False,
         )
 
