@@ -41,7 +41,7 @@ from .persistent import PracticeView
 if TYPE_CHECKING:
     from bot import FuryBot
 
-    from ..team import Team
+    from ..team import Team, TeamMember
 
 _log = logging.getLogger(__name__)
 _log.setLevel(logging.DEBUG)  # A temporary placeholder until everything is done.
@@ -160,6 +160,10 @@ class PracticeMember(Guildable, TeamMemberable, Teamable):
             return None
 
         return self._history[-1]
+
+    @property
+    def history(self) -> List[PracticeMemberHistory]:
+        return self._history
 
     @property
     def is_practicing(self) -> bool:
@@ -324,6 +328,18 @@ class Practice(Guildable, Teamable):
     @property
     def members(self) -> List[PracticeMember]:
         return list(self._members.values())
+
+    @property
+    def attending_members(self) -> List[PracticeMember]:
+        return [m for m in self.members if m.attending]
+
+    @property
+    def excused_members(self) -> List[PracticeMember]:
+        return [m for m in self.members if not m.attending]
+
+    @property
+    def missing_members(self) -> List[TeamMember]:
+        return [m for m in self.team.members if m.member_id not in self._members]
 
     @property
     def started_by(self) -> PracticeMember:

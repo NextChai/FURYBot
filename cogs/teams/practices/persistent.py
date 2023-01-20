@@ -33,7 +33,6 @@ from utils.time import human_timedelta
 if TYPE_CHECKING:
     from bot import FuryBot
     from .practice import Practice, PracticeMember
-    from ..team import TeamMember
     from .practice import PracticeMember
 
 
@@ -77,12 +76,9 @@ class PracticeView(discord.ui.View):
         team = self.practice.team
         started_by = self.practice.started_by
 
-        practice_members: List[PracticeMember] = self.practice.members
-        attending_member_mentions: List[str] = [member.mention for member in practice_members if member.attending]
-        excused_member_mentions: List[str] = [member.mention for member in practice_members if not member.attending]
-
-        team_members: List[TeamMember] = team.members
-        members_unattended_mentions: List[str] = [member.mention for member in team_members if member not in practice_members]  # type: ignore
+        attending_member_mentions: List[str] = [member.mention for member in self.practice.attending_members]
+        excused_member_mentions: List[str] = [member.mention for member in self.practice.excused_members]
+        members_unattended_mentions: List[str] = [member.mention for member in self.practice.missing_members]
 
         embed = self.practice.bot.Embed(
             title=f'{team.display_name} Practice.',

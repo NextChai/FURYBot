@@ -38,6 +38,7 @@ from utils import (
     BasicInputModal,
     TimeTransformer,
     default_button_doc_string,
+    human_timedelta,
 )
 
 from . import ScrimStatus
@@ -46,6 +47,7 @@ from .team import TeamMember
 if TYPE_CHECKING:
     from .scrim import Scrim
     from .team import Team
+    from .practices import Practice, PracticeMember
 
 
 def clamp(minimum: Optional[int], maximum: int) -> int:
@@ -860,6 +862,236 @@ class TeamCaptainsView(BaseView):
         return await interaction.response.edit_message(view=self)
 
 
+class TeamPracticeMemberView(BaseView):
+    """A view to manage a practice member"""
+
+    def __init__(self, member: PracticeMember, discord_member: discord.Member, *args: Any, **kwargs: Any) -> None:
+        self.member: PracticeMember = member
+        self.discord_member: discord.Member = discord_member
+        super().__init__(*args, **kwargs)
+
+    @property
+    def embed(self) -> discord.Embed:
+        practice = self.member.practice
+
+        embed = practice.bot.Embed(
+            title=f'{self.discord_member.display_name} Practice Information',
+            description=f'**Practice Started At**: {practice.format_start_time()}\n'
+            f'**Practice Ended At**: {practice.format_end_time() or "This practice is in progress..."}\n',
+        )
+
+        if not self.member.attending:
+            embed.add_field(
+                name='Not Attending',
+                value=f'This member has marked themselves as not attending this practice.\n**Reason**: {self.member.reason}',
+            )
+
+        total_time = sum(total_time.total_seconds() for history in self.member.history if (total_time := history.total_time))
+        embed.add_field(
+            name='Total Time Practicing This Session',
+            value=f'In this session, this member has spent **{human_timedelta(total_time)}** practicing.',
+        )
+
+        for count, history in enumerate(self.member.history, start=1):
+
+            left_at = (
+                history.left_at
+                and f'{discord.utils.format_dt(history.left_at, "T")} ({discord.utils.format_dt(history.left_at, "R")})'
+            )
+            total_time = (
+                f'**Total Time:** {human_timedelta((history.left_at - history.joined_at).total_seconds())}'
+                if history.left_at
+                else f'**Practicing for:** {human_timedelta((discord.utils.utcnow() - history.joined_at).total_seconds())}'
+            )
+
+            embed.add_field(
+                name=f'VC History #{count}',
+                value=f'**Joined At**: {discord.utils.format_dt(history.joined_at, "T")} ({discord.utils.format_dt(history.joined_at, "R")})\n'
+                f'**Left At: {left_at or "Member is still in this practice..."}\n'
+                f'{total_time}',
+                inline=False,
+            )
+
+        return embed
+
+
+class TeamPracticeView(BaseView):
+    def __init__(self, practice: Practice, *args: Any, **kwargs: Any) -> None:
+        self.practice: Practice = practice
+        super().__init__(*args, **kwargs)
+
+    @property
+    def embed(self) -> discord.Embed:
+        embed = self.bot.Embed(
+            title="Practice Information",
+            description=f'- **Started At**: {self.practice.format_start_time()}\n'
+            f'- **Ended At**: {self.practice.format_end_time() or "This practice is in progres..."}\n',
+        )
+
+        attending_member_mentions: List[str] = [member.mention for member in self.practice.attending_members]
+        excused_member_mentions: List[str] = [member.mention for member in self.practice.excused_members]
+        members_unattended_mentions: List[str] = [member.mention for member in self.practice.missing_members]
+
+        embed.add_field(
+            name='Members Attended',
+            value='\n'.join(attending_member_mentions),
+            inline=False,
+        )
+
+        if excused_member_mentions:
+            embed.add_field(name='Excused Members', value='\n'.join(excused_member_mentions), inline=False)
+
+        if members_unattended_mentions:
+            embed.add_field(name='Members Unattended', value='\n'.join(members_unattended_mentions), inline=False)
+
+        return embed
+
+    @discord.ui.button(label="End Practice")
+    @default_button_doc_string
+    async def end_practice(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Ends the practice."""
+        if not self.practice.ongoing:
+            return await interaction.response.send_message(
+                "This practice is not ongoing, you cannot end a practice that has already ended.", ephemeral=True
+            )
+
+        await interaction.response.defer()
+        await self.practice.end()
+
+        assert interaction.message
+        await interaction.message.edit(embed=self.embed, view=self)
+
+    async def _manage_practice_members_after(
+        self, select: discord.ui.UserSelect[Self], interaction: discord.Interaction
+    ) -> None:
+        selected: discord.Member = cast(discord.Member, select.values[0])  # This is in a guild so it'll resolve to Member
+
+        if self.practice.team.get_member(selected.id) is None:
+            await interaction.response.edit_message(view=self, embed=self.embed)
+            return await interaction.followup.send(
+                f'{selected.mention} is not on this team, there\'s nothing to edit.', ephemeral=True
+            )
+
+        practice_member = self.practice.get_member(selected.id)
+        if practice_member is None:
+            await interaction.response.edit_message(view=self, embed=self.embed)
+            return await interaction.followup.send(
+                f'{selected.mention} is not in this practice, there\'s nothing to edit.', ephemeral=True
+            )
+
+        view = self.create_child(TeamPracticeMemberView, practice_member, selected)
+        return await interaction.response.edit_message(view=view, embed=view.embed)
+
+    @discord.ui.button(label="Manage Practice Members")
+    @default_button_doc_string
+    async def manage_practice_members(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Manage a specific member in this practice."""
+        AutoRemoveSelect(
+            item=discord.ui.UserSelect[Self](placeholder="Select a member to manage...", max_values=1),
+            parent=self,
+            callback=self._manage_practice_members_after,
+        )
+        return await interaction.response.edit_message(view=self)
+
+
+class TeamPracticesView(BaseView):
+    """"""
+
+    def __init__(self, team: Team, *args: Any, **kwargs: Any) -> None:
+        self.team: Team = team
+        super().__init__(*args, **kwargs)
+
+    @property
+    def embed(self) -> discord.Embed:
+
+        embed = self.bot.Embed(
+            title=f"{self.team.display_name} Practices.",
+            description=f"This team has had **{len(self.team.practices)}** practices in total.",
+        )
+
+        # Get the average number of members per practice
+        # Get the average total time in a practice.
+        average_number_of_members = sum(len(p.members) for p in self.team.practices) / len(self.team.practices)
+        average_time = sum(
+            [prac_time.total_seconds() for p in self.team.practices if (prac_time := p.get_total_practice_time())]
+        ) / len(self.team.practices)
+
+        embed.add_field(
+            name='Average Number of Members',
+            value=f'Per practice, this team has an average of **{average_number_of_members:.2f}** members.',
+            inline=False,
+        )
+
+        embed.add_field(
+            name='Average Practice Time',
+            value=f'Per practice, this team has an average of **{human_timedelta(average_time)}**',
+            inline=False,
+        )
+
+        # The total number of practices done "in a row". The longest streak of practices (a streak breaks if there is 8 days without a practice)
+        streak = 0
+        for i, practice in enumerate(self.team.practices):
+            if i == 0:
+                continue
+
+            ended_at = practice.ended_at
+            if ended_at is None:  # This practice is still going, we'll include it.
+                streak += 1
+                continue
+
+            previous_ended_at = self.team.practices[i - 1].ended_at
+            if previous_ended_at is None:  # This should't happen but if it does, we'll just skip it.
+                continue
+
+            if (ended_at - previous_ended_at).days < 8:
+                streak += 1
+            else:
+                streak = 0
+
+        embed.add_field(
+            name="Longest Practice Streak",
+            value=f"Longest practice streak of **{streak}** practices (8 days without a practice breaks the streak).",
+            inline=False,
+        )
+
+        return embed
+
+    async def _manage_practice_after(self, select: discord.ui.Select[Self], interaction: discord.Interaction) -> None:
+        practice_id = int(select.values[0])
+        practice = discord.utils.get(self.team.practices, id=practice_id)
+        if not practice:
+            await interaction.response.edit_message(view=self, embed=self.embed)
+            return await interaction.followup.send("That practice doesn't exist anymore.", ephemeral=True)
+
+        view = self.create_child(TeamPracticeView, practice)
+        return await interaction.response.edit_message(view=view, embed=view.embed)
+
+    @discord.ui.button(label="Manage Practice")
+    @default_button_doc_string
+    async def manage_practice(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Manage a specific practice."""
+        # A strftime string to turn a datetime into "Month Day, Hour:Minute AM/PM"
+        date_format = '%B %d, %I:%M %p'
+
+        select: discord.ui.Select[Self] = discord.ui.Select(
+            options=[
+                discord.SelectOption(
+                    label=practice.ended_at and practice.ended_at.strftime(date_format) or 'In Progress...',
+                    value=str(practice.id),
+                )
+                for practice in self.team.practices[:20]
+            ],
+            placeholder='Select a practice to manage...',
+        )
+
+        AutoRemoveSelect(
+            item=select,
+            parent=self,
+            callback=self._manage_practice_after,
+        )
+        return await interaction.response.edit_message(view=self)
+
+
 class TeamView(BaseView):
     """The main Team View to edit a team."""
 
@@ -949,6 +1181,13 @@ class TeamView(BaseView):
     async def captains(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Manage the team\'s captains."""
         view = self.create_child(TeamCaptainsView, self.team)
+        return await interaction.response.edit_message(embed=view.embed, view=view)
+
+    @discord.ui.button(label='Practices')
+    @default_button_doc_string
+    async def practices(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Manage the team\'s practices."""
+        view = self.create_child(TeamPracticesView, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
     @discord.ui.button(label='Delete Team', style=discord.ButtonStyle.danger)
