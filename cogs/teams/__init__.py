@@ -71,7 +71,7 @@ def _maybe_team(interaction: discord.Interaction, team: Optional[Team]) -> Optio
 
 class Teams(BaseCog):
     """A cog to manage teams and allow teams to create scrims and find subs."""
-    
+
     team = app_commands.Group(
         name='team',
         description='Create and manage teams.',
@@ -91,7 +91,7 @@ class Teams(BaseCog):
 
     async def cog_unload(self) -> None:
         self.bot.tree.remove_command('Team Get', type=discord.AppCommandType.user)
-    
+
     @team.command(name='create', description='Create a team.')
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.describe(name='The name of the team.')
@@ -201,6 +201,7 @@ class Teams(BaseCog):
             embed.add_field(
                 name=team.display_name,
                 value=f'**Team Chat**: {team.text_channel.mention}\n**Is Sub**: {"Is a sub" if team_member.is_sub else "Is not a sub"}',
+                inline=False,
             )
 
         return await interaction.edit_original_response(embed=embed)
