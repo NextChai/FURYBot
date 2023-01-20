@@ -341,16 +341,16 @@ class FuryBot(commands.Bot):
         for request in image_requests:
             self.create_task(self._load_image_request(request))
 
-        # Sort the member data to be {member_id: {practice_id: data}}
+        # Sort the member data to be {practice_id: {member_id: data}} because we can have more than one member per practice
         practice_member_mapping: Dict[int, Dict[int, Dict[Any, Any]]] = {}
         for entry in practice_member_data:
-            practice_member_mapping.setdefault(entry['member_id'], {})[entry['practice_id']] = dict(entry)
+            practice_member_mapping.setdefault(entry['practice_id'], {})[entry['member_id']] = dict(entry)
 
-        # Sort the member history data to be {member_id: {practice_id: List[data]}} because we an have more than one
+        # Sort the member history data to be {practice_id: {member_id: List[data]}} because we an have more than one
         # history entry per member per practice
         practice_member_history_mapping: Dict[int, Dict[int, List[Dict[Any, Any]]]] = {}
         for entry in practice_member_history_data:
-            practice_member_history_mapping.setdefault(entry['member_id'], {}).setdefault(entry['practice_id'], []).append(
+            practice_member_history_mapping.setdefault(entry['practice_id'], {}).setdefault(entry['member_id'], []).append(
                 dict(entry)
             )
 
@@ -358,16 +358,14 @@ class FuryBot(commands.Bot):
             # We need to create a practice from this
             practice = Practice(bot=self, data=dict(entry))
 
-            # Go through the practice member data and add it to the practice
-            for member_id, member_data in practice_member_mapping.get(practice.id, {}).items():
-                # Get the history for this member
-                history = practice_member_history_mapping.get(member_id, {}).get(practice.id, [])
-                member = practice._add_member(member_data)
+            member_data = practice_member_mapping.get(practice.id, {})
+            for _member_id, data in member_data.items():
+                member = practice._add_member(dict(data))
 
-                # Iterate through history and call _add_history on the member
-                for history_entry in history:
-                    member._add_history(history_entry)
-                    
+                member_practice_history = practice_member_history_mapping.get(practice.id, {}).get(member.id, [])
+                for history_entry in member_practice_history:
+                    member._add_history(dict(history_entry))
+
             self.team_practice_cache[practice.id] = practice
 
     # Events
