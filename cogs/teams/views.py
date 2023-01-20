@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import pytz
 import functools
 from typing import TYPE_CHECKING, Any, List, Optional, cast
 
@@ -48,6 +49,8 @@ if TYPE_CHECKING:
     from .scrim import Scrim
     from .team import Team
     from .practices import Practice, PracticeMember
+
+EST = pytz.timezone("Us/Eastern")
 
 
 def clamp(minimum: Optional[int], maximum: int) -> int:
@@ -1017,13 +1020,11 @@ class TeamPracticesView(BaseView):
         average_time = self.team.get_total_practice_time() / len(self.team.practices)
 
         embed.add_field(
-            name='Average Number of Members',
-            value=f'**{average_number_of_members:.2f}** members.',
+            name='Average Number of Members', value=f'**{average_number_of_members:.2f}** members.', inline=False
         )
 
         embed.add_field(
-            name='Average Practice Time',
-            value=f'**{human_timedelta(average_time.total_seconds())}** total.',
+            name='Average Practice Time', value=f'**{human_timedelta(average_time.total_seconds())}** total.', inline=False
         )
 
         # The total number of practices done "in a row". The longest streak of practices (a streak breaks if there is 8 days without a practice)
@@ -1031,11 +1032,12 @@ class TeamPracticesView(BaseView):
         embed.add_field(
             name="Longest Practice Streak",
             value=f"**{streak}** practices (8 days without a practice breaks the streak).",
+            inline=False,
         )
 
         ranked_members = self.team.rank_member_practice_times()
         embed.add_field(
-            name="Top Practice Times",
+            name="Top 5 Practice Times",
             value='\n'.join(
                 f'{member.mention}: {human_timedelta(time.total_seconds())}' for (member, time) in ranked_members[:5]
             ),
@@ -1044,7 +1046,7 @@ class TeamPracticesView(BaseView):
 
         absent_members = self.team.rank_member_absences()
         embed.add_field(
-            name="Top Absences",
+            name="Top 5 Absences",
             value='\n'.join(f'{member.mention}: {absences}' for (member, absences) in absent_members[:5]),
             inline=False,
         )
@@ -1068,14 +1070,15 @@ class TeamPracticesView(BaseView):
         # A strftime string to turn a datetime into "Month Day, Hour:Minute AM/PM"
         date_format = '%B %d, %I:%M %p'
 
+        options: List[discord.SelectOption] = []
+        for practice in self.team.practices[:20]:
+            # Practice.ended_at is in UTC, we need to convert it to EST to display it properly.
+            # We also need to convert it to a datetime object to use strftime.
+            ended_at = practice.ended_at and practice.ended_at.astimezone(tz=EST).strftime(date_format) or 'In Progress...'
+            options.append(discord.SelectOption(label=ended_at, value=str(practice.id)))
+
         select: discord.ui.Select[Self] = discord.ui.Select(
-            options=[
-                discord.SelectOption(
-                    label=practice.ended_at and practice.ended_at.strftime(date_format) or 'In Progress...',
-                    value=str(practice.id),
-                )
-                for practice in self.team.practices[:20]
-            ],
+            options=options,
             placeholder='Select a practice to manage...',
         )
 
