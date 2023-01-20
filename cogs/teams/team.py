@@ -408,7 +408,10 @@ class Team:
                 continue
 
             for member in practice.members:
-                team_member = self.team_members[member.member_id]
+                team_member = self.get_member(member.member_id)
+                if team_member is None:
+                    continue
+
                 # Setdefault wont let us use += so we have to do this
                 if team_member not in member_times:
                     member_times[team_member] = member.get_total_practice_time()
