@@ -417,7 +417,7 @@ class Team:
         ranking = await self.fetch_practice_rank()
         embed.add_field(
             name='Practice Time Rank',
-            value=f'Out of {len(self.bot.team_cache)} teams, {self.display_name} is ranked #{ranking} in practice time.',
+            value=f'Out of {len(self.bot.team_cache)} teams, this team is **ranked #{ranking} in practice time**.',
             inline=False,
         )
 
@@ -449,7 +449,7 @@ class Team:
 
         embed.add_field(
             name='Total Practice Time',
-            value=f'{self.display_name} has practiced for a total of {human_timedelta(total_time.total_seconds())}.',
+            value=f'This team has practiced for a **total of {human_timedelta(total_time.total_seconds())}**.',
             inline=False,
         )
 

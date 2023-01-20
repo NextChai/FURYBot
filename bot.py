@@ -362,7 +362,7 @@ class FuryBot(commands.Bot):
             for _member_id, data in member_data.items():
                 member = practice._add_member(dict(data))
 
-                member_practice_history = practice_member_history_mapping.get(practice.id, {}).get(member.id, [])
+                member_practice_history = practice_member_history_mapping.get(practice.id, {}).get(member.member_id, [])
                 for history_entry in member_practice_history:
                     member._add_history(dict(history_entry))
 
