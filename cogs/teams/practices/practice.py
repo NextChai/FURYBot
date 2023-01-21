@@ -350,6 +350,13 @@ class Practice(Guildable, Teamable):
     def ongoing(self) -> bool:
         return self.status is PracticeStatus.ongoing
 
+    @property
+    def duration(self) -> Optional[datetime.timedelta]:
+        if not self.ended_at:
+            return None
+
+        return self.ended_at - self.started_at
+
     def get_member(self, member_id: int) -> Optional[PracticeMember]:
         return self._members.get(member_id)
 

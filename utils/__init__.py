@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Iterable, TypeVar
 
 from .bases import *
 from .cog import *
@@ -72,3 +72,30 @@ def default_button_doc_string(func: ButtonCallback[BV]) -> ButtonCallback[BV]:
     """
     func.__doc__ = default_doc.format(doc=func.__doc__ or '')
     return func
+
+def human_join(iterable: Iterable[Any], /, *, last: str = 'and', delimiter: str = ',') -> str:
+    """Joins an iterable of strings into a human readable string.
+
+    Parameters
+    ----------
+    iterable: Iterable[:class:`str`]
+        The iterable of strings to join.
+    last: :class:`str`
+        The word to use to join the last two items.
+    delimiter: :class:`str`
+        The delimiter to use to join all other items.
+
+    Returns
+    -------
+    :class:`str`
+        The human readable string.
+    """
+    items = list(iterable)
+    if len(items) == 0:
+        return ''
+    elif len(items) == 1:
+        return items[0]
+    elif len(items) == 2:
+        return f'{items[0]} {last} {items[1]}'
+    else:
+        return f'{delimiter.join(items[:-1])}, {last} {items[-1]}'
