@@ -22,12 +22,13 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
+import asyncio
 
 import datetime
 import dataclasses
 
 import logging
-from typing import TYPE_CHECKING, Dict, Optional, cast, List, Tuple
+from typing import TYPE_CHECKING, Any, Coroutine, Dict, Optional, cast, List, Tuple
 
 import discord
 from discord import app_commands
@@ -82,7 +83,19 @@ class PracticeLeaderboard(Guildable):
 
         return await channel.fetch_message(self.message_id)
 
-    async def update_top_team(self, team: Team) -> None:
+    async def change_top_team(self, team: Team) -> None:
+        role = self.role
+        if role is None:
+            # NOTE: Add exception raising here / auto removing leaderboard
+            return
+
+        futures: List[Coroutine[Any, Any, None]] = []
+        if self.top_team_id:
+            previous_top_team = self.bot.team_cache[self.top_team_id]
+            for team_member in previous_top_team.members:
+                member = team_member.member or await team_member.fetch_member()
+                futures.append(member.remove_roles(role, reason='Team member booted off leaderboard.'))
+
         self.top_team_id = team.id
         async with self.bot.safe_connection() as connection:
             await connection.execute(
@@ -90,6 +103,13 @@ class PracticeLeaderboard(Guildable):
                 team.id,
                 self.id,
             )
+
+        # Add roles onto new team
+        for team_member in team.members:
+            member = team_member.member or await team_member.fetch_member()
+            futures.append(member.add_roles(role, reason='Team member booted off leaderboard.'))
+
+        await asyncio.gather(*futures)
 
 
 class PracticeLeaderboardCog(BaseCog):
@@ -119,54 +139,6 @@ class PracticeLeaderboardCog(BaseCog):
 
     async def cog_unload(self) -> None:
         self.update_leaderboards.stop()
-
-    @practice_leaderboard.command(name='create', description='Create a practice leaderboard in a new channel.')
-    async def practice_leaderboard_create(
-        self, interaction: discord.Interaction, channel: discord.TextChannel, role: discord.Role
-    ) -> None:
-        assert interaction.guild is not None
-
-        current_leaderboards = self.leaderboard_cache.get(interaction.guild.id, [])
-        if channel.id in current_leaderboards:
-            return await interaction.response.send_message('This channel is already a practice leaderboard.', ephemeral=True)
-
-        teams = [team for team in self.bot.team_cache.values() if team.guild == interaction.guild]
-        if not teams:
-            return await interaction.response.send_message('There are no teams in this guild.', ephemeral=True)
-
-        top_ten_teams = sorted(teams, key=lambda team: team.get_total_practice_time(), reverse=True)[:10]
-        top_team = top_ten_teams[0]
-
-        await interaction.response.defer(ephemeral=True)
-
-        embed = self.bot.Embed(title='Building...')
-        message = await channel.send(embed=embed)
-
-        async with self.bot.safe_connection() as connection:
-            data = await connection.fetchrow(
-                'INSERT INTO teams.practice_leaderboards (guild_id, channel_id, message_id, role_id, top_team_id) '
-                'VALUES ($1, $2, $3, $4) RETURNING *;',
-                interaction.guild.id,
-                channel.id,
-                message.id,
-                role.id,
-                top_team.id,
-            )
-            assert data
-
-        leaderboard = PracticeLeaderboard(bot=self.bot, **dict(data))
-        self.leaderboard_cache.setdefault(interaction.guild.id, {})[leaderboard.id] = leaderboard
-
-        embed = self.create_leaderboard_embed(interaction.guild, leaderboard)
-        await message.edit(embed=embed)
-
-        for member in top_team.members:
-            discord_member = member.member or await member.fetch_member()
-            await discord_member.add_roles(role, reason='Top team on practice leaderboard.')
-
-        await interaction.edit_original_response(
-            content=f'Successfully created a practice leaderboard in <#{channel.mention}>.'
-        )
 
     def create_leaderboard_embed(self, guild: discord.Guild, leaderboard: PracticeLeaderboard) -> Optional[discord.Embed]:
         teams = [team for team in self.bot.team_cache.values() if team.guild == guild]
@@ -231,7 +203,29 @@ class PracticeLeaderboardCog(BaseCog):
 
     @tasks.loop(seconds=60)
     async def update_leaderboards(self) -> None:
-        ...
+        for guild_id, leaderboards in self.leaderboard_cache.items():
+            guild = self.bot.get_guild(guild_id)
+            if not guild:
+                return None
+
+            for leaderboard in leaderboards.values():
+                # We need to get the top team for the given guild
+                teams = [team for team in self.bot.team_cache.values() if team.guild == guild]
+                top_ten_teams = sorted(teams, key=lambda team: team.get_total_practice_time(), reverse=True)[:10]
+                top_team = top_ten_teams[0]
+
+                if top_team.id == leaderboard.top_team_id:
+                    # Nothing to do
+                    return
+
+                await leaderboard.change_top_team(top_team)
+
+                message = await leaderboard.fetch_message()
+                if message is None:
+                    return
+
+                embed = self.create_leaderboard_embed(guild, leaderboard)
+                await message.edit(embed=embed)
 
     @update_leaderboards.before_loop
     async def before_update_leaderboards(self) -> None:
