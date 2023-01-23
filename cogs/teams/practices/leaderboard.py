@@ -111,6 +111,14 @@ class PracticeLeaderboard(Guildable):
 
         await asyncio.gather(*futures)
 
+    async def delete(self) -> None:
+        async with self.bot.safe_connection() as connection:
+            await connection.execute('DELETE FROM teams.practice_leaderboards WHERE id = $1;', self.id)
+
+        message = await self.fetch_message()
+        if message is not None:
+            await message.delete()
+
 
 class PracticeLeaderboardCog(BaseCog):
     practice_leaderboard = app_commands.Group(
@@ -146,11 +154,19 @@ class PracticeLeaderboardCog(BaseCog):
         role='The role to ping when a team is on top of the leaderboard.',
     )
     async def practcie_leaderboard_create(
-        self, interaction: discord.Interaction, channel: discord.TextChannel, role: discord.Role
+        self, interaction: discord.Interaction, role: discord.Role, channel: Optional[discord.TextChannel]
     ) -> discord.InteractionMessage:
         assert interaction.guild
 
         await interaction.response.defer(ephemeral=True)
+
+        if channel is None:
+            if not isinstance(interaction.channel, discord.TextChannel):
+                return await interaction.edit_original_response(
+                    content='You need to use this command in a text channel or specify a channel.',
+                )
+
+            channel = interaction.channel
 
         guild_leaderboards = self.leaderboard_cache.get(interaction.guild.id)
         if guild_leaderboards is not None:
@@ -197,6 +213,36 @@ class PracticeLeaderboardCog(BaseCog):
         return await interaction.edit_original_response(
             content='Successfully created leaderboard! It automatically updates every 60 seconds.',
         )
+
+    @practice_leaderboard.command(name='delete', description='Delete a practice leaderboard.')
+    @app_commands.describe(
+        channel='The channel the leaderboard should be deleted from.',
+    )
+    async def practcie_leaderboard_delete(
+        self, interaction: discord.Interaction, channel: Optional[discord.TextChannel]
+    ) -> discord.InteractionMessage:
+        assert interaction.guild
+
+        await interaction.response.defer(ephemeral=True)
+
+        if channel is None:
+            if not isinstance(interaction.channel, discord.TextChannel):
+                return await interaction.edit_original_response(
+                    content='You need to use this command in a text channel or specify a channel.',
+                )
+
+            channel = interaction.channel
+
+        existing_leaderboard = self.leaderboard_cache.get(interaction.guild.id, {}).get(channel.id)
+        if existing_leaderboard is None:
+            return await interaction.edit_original_response(
+                content='Hey! There\'s no leaderboard in that channel!',
+            )
+
+        await existing_leaderboard.delete()
+        self.leaderboard_cache[interaction.guild.id].pop(channel.id)
+
+        return await interaction.edit_original_response(content='Successfully deleted leaderboard!')
 
     def create_leaderboard_embed(self, guild: discord.Guild, leaderboard: PracticeLeaderboard) -> Optional[discord.Embed]:
         teams = [team for team in self.bot.team_cache.values() if team.guild == guild]
