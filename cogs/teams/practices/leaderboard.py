@@ -251,18 +251,19 @@ class PracticeLeaderboardCog(BaseCog):
 
                 up_and_coming_teams[team] = up_and_coming_teams.get(team, datetime.timedelta()) + duration
 
-        sorted_teams: List[Tuple[Team, datetime.timedelta]] = sorted(
-            up_and_coming_teams.items(), key=lambda item: item[1], reverse=True
-        )[:10]
+        if up_and_coming_teams:
+            sorted_teams: List[Tuple[Team, datetime.timedelta]] = sorted(
+                up_and_coming_teams.items(), key=lambda item: item[1], reverse=True
+            )[:10]
 
-        embed.add_field(
-            name='Up and Coming Teams',
-            value='\n'.join(
-                f'{count}. **{team.display_name}**, {human_timedelta(duration.total_seconds())} in the past two days!'
-                for count, (team, duration) in enumerate(sorted_teams, start=1)
-            ),
-            inline=False,
-        )
+            embed.add_field(
+                name='Up and Coming Teams',
+                value='\n'.join(
+                    f'{count}. **{team.display_name}**, {human_timedelta(duration.total_seconds())} in the past two days!'
+                    for count, (team, duration) in enumerate(sorted_teams, start=1)
+                ),
+                inline=False,
+            )
 
         return embed
 
