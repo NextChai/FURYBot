@@ -113,8 +113,8 @@ CREATE TABLE IF NOT EXISTS teams.practice_leaderboards(
     guild_id BIGINT UNIQUE,
     message_id BIGINT,
     top_team_id INTEGER REFERENCES teams.settings(id),
-    role_id BIGINT,
-)
+    role_id BIGINT
+);
 
 CREATE TABLE IF NOT EXISTS timers(
     id BIGSERIAL PRIMARY KEY,
