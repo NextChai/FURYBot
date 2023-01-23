@@ -47,7 +47,7 @@ _log.setLevel(logging.DEBUG)
 
 
 # class PracticeCog(PracticeLeaderboardCog, BaseCog):
-class PracticeCog(PracticeLeaderboardCog, BaseCog):
+class PracticeCog(BaseCog):
 
     practice = app_commands.Group(
         name='practice',
