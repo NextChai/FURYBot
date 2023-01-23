@@ -29,6 +29,7 @@ import logging
 import os
 import time
 from concurrent import futures
+import traceback
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -310,7 +311,10 @@ class FuryBot(commands.Bot):
     # Hooks
     async def setup_hook(self) -> None:
         for extension in initial_extensions:
-            await self.load_extension(extension)
+            try:
+                await self.load_extension(extension)
+            except:
+                traceback.print_exc()
 
         async with self.safe_connection() as connection:
             team_data = await connection.fetch('SELECT * FROM teams.settings')
