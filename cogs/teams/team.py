@@ -32,14 +32,13 @@ import discord
 from typing_extensions import Self, TypeVarTuple
 
 from utils import MiniQueryBuilder
-from utils.time import human_timedelta
 
 if TYPE_CHECKING:
     import asyncpg
     from bot import FuryBot
 
     from .scrim import Scrim
-    from .practices import Practice, PracticeMember
+    from .practices import Practice
 
 Ts = TypeVarTuple("Ts")
 
