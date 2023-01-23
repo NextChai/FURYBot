@@ -219,6 +219,7 @@ class PracticeLeaderboardCog(BaseCog):
             name='Top Team',
             value=f'{member_mentions}, great work! For your efforts, you\'ve been rewarded with the '
             f'<@&{leaderboard.role_id}> role! This role will be reassigned if your team loses the #1 spot, so hold on tight!',
+            inline=False,
         )
 
         embed.add_field(
@@ -227,6 +228,7 @@ class PracticeLeaderboardCog(BaseCog):
                 f'{count}. **{team.display_name}**, {human_timedelta(team.get_total_practice_time().total_seconds())}'
                 for count, team in enumerate(top_ten_teams, start=1)
             ),
+            inline=False,
         )
 
         # We need to get the up and coming teams. These are the teams that have the most amount of pracice time

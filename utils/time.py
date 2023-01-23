@@ -61,6 +61,9 @@ def human_timedelta(seconds: float) -> str:
     """
     Turns seconds into human readable time.
     """
+    if seconds == 0:
+        return 'No time.'
+
     message = ''
 
     for name, amount in intervals:
