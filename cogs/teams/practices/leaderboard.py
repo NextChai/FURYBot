@@ -22,8 +22,8 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
-import asyncio
 
+import asyncio
 import datetime
 import dataclasses
 
@@ -38,6 +38,7 @@ from utils import BaseCog, Guildable, human_join
 from utils.time import human_timedelta
 
 _log = logging.getLogger(__name__)
+_log.setLevel(logging.DEBUG)
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -318,6 +319,7 @@ class PracticeLeaderboardCog(BaseCog):
         for guild_id, leaderboards in self.leaderboard_cache.items():
             guild = self.bot.get_guild(guild_id)
             if not guild:
+                _log.debug('Ignoring guild %s in update leaderboard.', guild_id)
                 return None
 
             for leaderboard in leaderboards.values():
@@ -328,16 +330,20 @@ class PracticeLeaderboardCog(BaseCog):
 
                 if top_team.id == leaderboard.top_team_id:
                     # Nothing to do
+                    _log.debug("No change in top team for guild %s, skipping.", guild_id)
                     return
 
                 await leaderboard.change_top_team(top_team)
 
                 message = await leaderboard.fetch_message()
                 if message is None:
+                    _log.debug('Unable to fetch message from leaderboard %s, skipping.', leaderboard.id)
                     return
 
                 embed = self.create_leaderboard_embed(guild, leaderboard)
                 await message.edit(embed=embed)
+
+                _log.debug('Updated leaderboard %s for guild %s.', leaderboard.id, guild_id)
 
     @update_leaderboards.before_loop
     async def before_update_leaderboards(self) -> None:
