@@ -297,6 +297,10 @@ class FuryBot(commands.Bot):
         if not channel:
             return
 
+        attachment_data = data.get('attachment')
+        if attachment_data is None:
+            return
+
         request = ImageRequest(
             requester=await guild.fetch_member(data['requester_id']),
             attachment=discord.Attachment(data=data['attachment'], state=self._connection),
