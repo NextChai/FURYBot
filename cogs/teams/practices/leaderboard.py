@@ -204,7 +204,11 @@ class PracticeLeaderboardCog(BaseCog):
             return None
 
         # we need to rank the teams by their total practice time.
-        top_ten_teams = sorted(teams, key=lambda team: team.get_total_practice_time(), reverse=True)[:10]
+        top_ten_teams = [
+            t
+            for t in sorted(teams, key=lambda team: team.get_total_practice_time(), reverse=True)
+            if t.get_total_practice_time() > datetime.timedelta(seconds=0)
+        ][:10]
         top_team = top_ten_teams[0]
 
         embed = top_team.embed(
@@ -257,6 +261,7 @@ class PracticeLeaderboardCog(BaseCog):
                 f'{count}. **{team.display_name}**, {human_timedelta(duration.total_seconds())} in the past two days!'
                 for count, (team, duration) in enumerate(sorted_teams, start=1)
             ),
+            inline=False,
         )
 
         return embed
