@@ -23,15 +23,15 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import logging
 import asyncio
 import datetime
 import enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
+import logging
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
 
 import discord
 
-from utils.bases import Guildable, Teamable, TeamMemberable
+from utils.bases import Teamable, TeamMemberable
 from utils.time import human_timedelta
 
 from ..errors import MemberNotOnTeam
@@ -43,11 +43,13 @@ if TYPE_CHECKING:
 
     from ..team import Team, TeamMember
 
+__all__: Tuple[str, ...] = ('Practice', 'PracticeMember', 'PracticeMemberHistory', 'PracticeStatus')
+
 _log = logging.getLogger(__name__)
 _log.setLevel(logging.DEBUG)  # A temporary placeholder until everything is done.
 
 
-class PracticeMemberHistory(Guildable, TeamMemberable, Teamable):
+class PracticeMemberHistory(TeamMemberable, Teamable):
     """Represents the join leave history for the given practice member. A member can join
     and leave a voice channel more than once during a given practice session. This means we need
     to keep track of a complete history.
@@ -92,7 +94,7 @@ class PracticeMemberHistory(Guildable, TeamMemberable, Teamable):
         return self.left_at - self.joined_at
 
 
-class PracticeMember(Guildable, TeamMemberable, Teamable):
+class PracticeMember(TeamMemberable, Teamable):
     """Represents a member that is attending or not attending a practice session.
     A member can be attending or not attending a practice session. If they mark themselves as
     not attending, they will have a reason why.
@@ -266,7 +268,7 @@ class PracticeStatus(enum.Enum):
     completed = 'completed'
 
 
-class Practice(Guildable, Teamable):
+class Practice(Teamable):
     """Represents a practice for a given team.
 
     A practice can have up to N members and needs to be in a voice channel. The member that starts a practice
@@ -323,7 +325,7 @@ class Practice(Guildable, Teamable):
 
     @property
     def team(self) -> Team:
-        return self.bot.team_cache[self.team_id]
+        return cast(Team, self.bot.get_team(self.team_id, self.guild_id))
 
     @property
     def members(self) -> List[PracticeMember]:
@@ -577,7 +579,7 @@ class Practice(Guildable, Teamable):
         ranking = await self.team.fetch_practice_rank()
         embed.add_field(
             name='Practice Time Rank',
-            value=f'Out of {len(self.bot.team_cache)} teams, this team is ranked **#{ranking}** in practice time.',
+            value=f'Out of {len(self.bot.get_teams(self.guild_id))} teams, this team is ranked **#{ranking}** in practice time.',
             inline=False,
         )
 

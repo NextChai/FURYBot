@@ -24,11 +24,10 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import asyncio
-import datetime
 import dataclasses
-
+import datetime
 import logging
-from typing import TYPE_CHECKING, Any, Coroutine, Dict, Optional, cast, List, Tuple
+from typing import TYPE_CHECKING, Any, Coroutine, Dict, List, Optional, Tuple, cast
 
 import discord
 from discord import app_commands
@@ -37,12 +36,15 @@ from discord.ext import tasks
 from utils import BaseCog, Guildable, human_join
 from utils.time import human_timedelta
 
-_log = logging.getLogger(__name__)
-_log.setLevel(logging.DEBUG)
-
 if TYPE_CHECKING:
     from bot import FuryBot
+
     from ..team import Team
+
+__all__: Tuple[str, ...] = ('PracticeLeaderboard', 'PracticeLeaderboardCog')
+
+_log = logging.getLogger(__name__)
+_log.setLevel(logging.DEBUG)
 
 
 @dataclasses.dataclass(init=True, kw_only=True)
@@ -136,11 +138,11 @@ class PracticeLeaderboard(Guildable):
 
         futures: List[Coroutine[Any, Any, None]] = []
 
-        previous_top_team = self.bot.team_cache[self.top_team_id]
-
-        for team_member in previous_top_team.members:
-            member = team_member.member or await team_member.fetch_member()
-            futures.append(member.remove_roles(role, reason='Team member booted off leaderboard.'))
+        previous_top_team = self.bot.get_team(self.top_team_id, team.guild_id)
+        if previous_top_team:
+            for team_member in previous_top_team.members:
+                member = team_member.member or await team_member.fetch_member()
+                futures.append(member.remove_roles(role, reason='Team member booted off leaderboard.'))
 
         self.top_team_id = team.id
         async with self.bot.safe_connection() as connection:
@@ -226,7 +228,7 @@ class PracticeLeaderboardCog(BaseCog):
                     content="Hey! There's already a leaderboard in that channel!",
                 )
 
-        teams = [team for team in self.bot.team_cache.values() if team.guild == interaction.guild]
+        teams = self.bot.get_teams(interaction.guild.id)
         if not teams:
             return await interaction.edit_original_response(
                 content='Hey! There are no teams in this server!',
@@ -295,7 +297,7 @@ class PracticeLeaderboardCog(BaseCog):
         return await interaction.edit_original_response(content='Successfully deleted leaderboard!')
 
     def create_leaderboard_embed(self, guild: discord.Guild, leaderboard: PracticeLeaderboard) -> Optional[discord.Embed]:
-        teams = [team for team in self.bot.team_cache.values() if team.guild == guild]
+        teams = self.bot.get_teams(guild.id)
         if not teams:
             return None
 
@@ -373,7 +375,7 @@ class PracticeLeaderboardCog(BaseCog):
 
             for leaderboard in leaderboards.values():
                 # We need to get the top team for the given guild
-                teams = [team for team in self.bot.team_cache.values() if team.guild == guild]
+                teams = self.bot.get_teams(guild_id)
                 top_ten_teams = sorted(teams, key=lambda team: team.get_total_practice_time(), reverse=True)[:10]
                 top_team = top_ten_teams[0]
 

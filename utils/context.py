@@ -23,9 +23,8 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Tuple, TypeAlias, Union
+from typing import TYPE_CHECKING, Tuple, TypeAlias
 
-import discord
 from discord.ext import commands
 
 if TYPE_CHECKING:

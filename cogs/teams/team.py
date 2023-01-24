@@ -23,24 +23,23 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from collections import Counter
 import dataclasses
 import datetime
+from collections import Counter
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union, cast
 
 import discord
-from typing_extensions import Self, TypeVarTuple
+from typing_extensions import Self
 
 from utils import MiniQueryBuilder
 
 if TYPE_CHECKING:
     import asyncpg
+
     from bot import FuryBot
 
-    from .scrim import Scrim
     from .practices import Practice
-
-Ts = TypeVarTuple("Ts")
+    from .scrim import Scrim
 
 MISSING = discord.utils.MISSING
 
@@ -58,6 +57,8 @@ class TeamMember:
         The team ID.
     member_id: :class:`int`
         The member ID.
+    guild_id: :class:`int`
+        The ID of the guild that this team member is in.
     is_sub: :class:`bool`
         Whether the member is a sub or not.
     """
@@ -65,6 +66,7 @@ class TeamMember:
     bot: FuryBot
     team_id: int
     member_id: int
+    guild_id: int
     is_sub: Optional[bool] = dataclasses.field(default=None)
 
     def __eq__(self, __o: object) -> bool:
@@ -79,7 +81,7 @@ class TeamMember:
     @property
     def team(self) -> Team:
         """:class:`Team`: The team that this member is on."""
-        return self.bot.team_cache[self.team_id]
+        return cast(Team, self.bot.get_team(self.team_id, self.guild_id))
 
     @property
     def member(self) -> Optional[discord.Member]:
@@ -201,14 +203,16 @@ class Team:
         return not self.__eq__(__o)
 
     @classmethod
-    def from_category(cls, category_channel_id: int, /, *, bot: FuryBot) -> Team:
+    def from_channel(cls, channel_id: int, guild_id: int, /, *, bot: FuryBot) -> Team:
         """
-        Get a team from its category id.
+        Get a team from one of its channel ids.
 
         Parameters
         ----------
-        category_channel_id: :class:`int`
-            The category channel ID.
+        channel_id: :class:`int`
+            The ID of the channel to use to fetch.
+        guild_id: :class:`int`
+            The ID of the guild this team is in.
         bot: :class:`FuryBot`
             The bot instance.
 
@@ -220,13 +224,17 @@ class Team:
         Raises
         -------
         Exception
-            A team belonging to the category was not found.
+            A team belonging to the channel was not found.
         """
-        team = discord.utils.get(bot.team_cache.values(), category_channel_id=category_channel_id)
-        if team is None:
-            raise Exception('No team with that category exists.')
+        teams = bot.get_teams(guild_id)
+        if teams is []:
+            raise Exception('No team with that channel exists.')
 
-        return team
+        for team in teams:
+            if team.has_channel(channel_id):
+                return team
+
+        raise Exception('No team with that channel exists.')
 
     @classmethod
     async def from_record(
@@ -260,7 +268,7 @@ class Team:
         """
         members = {entry['member_id']: TeamMember(bot, **dict(entry)) for entry in member_data or []}
         team = cls(bot, **dict(data), team_members=members)
-        bot.team_cache[team.id] = team
+        bot.add_team(team)
 
         return team
 
@@ -298,7 +306,7 @@ class Team:
             assert data
 
         team = cls(bot, **dict(data), team_members={})
-        bot.team_cache[team.id] = team
+        bot.add_team(team)
 
         return team
 
@@ -337,11 +345,11 @@ class Team:
     @property
     def scrims(self) -> List[Scrim]:
         """List[:class:`Scrim`]: A list of all scrims this team has."""
-        return [scrim for scrim in self.bot.team_scrim_cache.values() if self in (scrim.home_team, scrim.away_team)]
+        return self.bot.get_scrims_for(self.id, self.guild_id)
 
     @property
     def practices(self) -> List[Practice]:
-        return [practice for practice in self.bot.team_practice_cache.values() if practice.team == self]
+        return self.bot.get_practices_for(self.id, self.guild_id)
 
     @property
     def ongoing_practice(self) -> Optional[Practice]:
@@ -374,8 +382,8 @@ class Team:
 
         return embed
 
-    def has_channel(self, channel: Union[discord.abc.GuildChannel, discord.Thread, discord.PartialMessageable], /) -> bool:
-        return channel.id in [self.category_channel_id, self.text_channel_id, self.voice_channel_id] + self.extra_channel_ids
+    def has_channel(self, channel_id: int, /) -> bool:
+        return channel_id in [self.category_channel_id, self.text_channel_id, self.voice_channel_id] + self.extra_channel_ids
 
     def get_member(self, member_id: int, /) -> Optional[TeamMember]:
         return self.team_members.get(member_id)

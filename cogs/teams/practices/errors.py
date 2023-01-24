@@ -23,6 +23,14 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+from typing import Tuple
+
+__all__: Tuple[str, ...] = (
+    'MemberNotInPractice',
+    'MemberAlreadyInPractice',
+    'MemberNotAttendingPractice',
+)
+
 
 class MemberNotInPractice(Exception):
     """Exception raised when a member is not in a practice session."""

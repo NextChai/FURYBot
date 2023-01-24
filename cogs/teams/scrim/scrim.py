@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
-from typing import TYPE_CHECKING, List, Literal, Mapping, Optional, Type, Union, cast
+from typing import TYPE_CHECKING, List, Literal, Mapping, Optional, Tuple, Type, Union, cast
 
 import discord
 from discord.utils import MISSING
@@ -40,6 +40,8 @@ if TYPE_CHECKING:
     from bot import FuryBot
 
     from ..team import Team, TeamMember
+
+__all__: Tuple[str, ...] = ('Scrim',)
 
 
 @dataclasses.dataclass(init=True, repr=True, eq=True)
@@ -149,13 +151,15 @@ class Scrim:
             )
             await scrim.edit(home_message_id=message.id)
 
-        scrim_scheduled_timer = await bot.timer_manager.create_timer(when, 'scrim_scheduled', scrim_id=scrim.id)
+        scrim_scheduled_timer = await bot.timer_manager.create_timer(
+            when, 'scrim_scheduled', scrim_id=scrim.id, guild_id=home_team.guild_id
+        )
 
         # If the scrim is more than a day out, create a reminder
         scrim_reminder_timer = None
         if (when - discord.utils.utcnow()).days > 1:
             scrim_reminder_timer = await bot.timer_manager.create_timer(
-                when - datetime.timedelta(minutes=30), 'scrim_reminder', scrim_id=scrim.id
+                when - datetime.timedelta(minutes=30), 'scrim_reminder', scrim_id=scrim.id, guild_id=home_team.guild_id
             )
 
         await scrim.edit(
@@ -163,18 +167,18 @@ class Scrim:
             scrim_reminder_timer_id=scrim_reminder_timer and scrim_reminder_timer.id,
         )
 
-        bot.team_scrim_cache[scrim.id] = scrim
+        bot.add_scrim(scrim)
         return scrim
 
     @property
     def home_team(self) -> Team:
         """:class:`Team`: The home team."""
-        return self.bot.team_cache[self.home_id]
+        return cast(Team, self.bot.get_team(self.home_id, self.guild_id))
 
     @property
     def away_team(self) -> Team:
         """:class:`Team`: The away team."""
-        return self.bot.team_cache[self.away_id]
+        return cast(Team, self.bot.get_team(self.away_id, self.guild_id))
 
     @property
     def guild(self) -> discord.Guild:
@@ -470,7 +474,7 @@ class Scrim:
         # Just in case the bot was waiting on one of these timers, restart the timer loop
         self.bot.timer_manager.restart_task()
 
-        self.bot.team_scrim_cache.pop(self.id, None)
+        self.bot.remove_scrim(self.id, self.guild_id)
 
         embed = self.bot.Embed(
             title='Scrim Cancelled',

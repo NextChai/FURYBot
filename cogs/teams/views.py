@@ -23,12 +23,12 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import pytz
-import functools
 import datetime
+import functools
 from typing import TYPE_CHECKING, Any, List, Optional, cast
 
 import discord
+import pytz
 from typing_extensions import Self, Unpack
 
 from cogs.teams.scrim.persistent import AwayConfirm, HomeConfirm
@@ -47,9 +47,9 @@ from . import ScrimStatus
 from .team import TeamMember
 
 if TYPE_CHECKING:
+    from .practices import Practice, PracticeMember
     from .scrim import Scrim
     from .team import Team
-    from .practices import Practice, PracticeMember
 
 EST = pytz.timezone("Us/Eastern")
 

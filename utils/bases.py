@@ -23,7 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Protocol, Tuple
+from typing import TYPE_CHECKING, Optional, Protocol, Tuple, cast
 
 if TYPE_CHECKING:
     import discord
@@ -49,13 +49,13 @@ class Guildable(Botable, Protocol):
         return self._get_bot().get_guild(self._get_guild_id())
 
 
-class Teamable(Botable, Protocol):
+class Teamable(Botable, Guildable, Protocol):
     def _get_team_id(self) -> int:
         ...
 
     @property
     def team(self) -> Team:
-        return self._get_bot().team_cache[self._get_team_id()]
+        return cast(Team, self._get_bot().get_team(self._get_team_id(), self._get_guild_id()))
 
 
 class TeamMemberable(Teamable, Protocol):

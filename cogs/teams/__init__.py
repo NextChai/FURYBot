@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Annotated, List, Optional, TypeAlias
+from typing import TYPE_CHECKING, Annotated, List, Optional, Tuple, TypeAlias
 
 import discord
 from discord import app_commands
@@ -44,12 +44,15 @@ if TYPE_CHECKING:
 
     from .team import TeamMember
 
+__all__: Tuple[str, ...] = ('Teams',)
 
 TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=False)]
 FRONT_END_TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=True)]
 
 
 def _maybe_team(interaction: discord.Interaction, team: Optional[Team]) -> Optional[Team]:
+    assert interaction.guild
+
     if team is not None:
         return team
 
@@ -64,7 +67,7 @@ def _maybe_team(interaction: discord.Interaction, team: Optional[Team]) -> Optio
         return None
 
     try:
-        return Team.from_category(category.id, bot=bot)
+        return Team.from_channel(category.id, interaction.guild.id, bot=bot)
     except Exception:
         return None
 
@@ -172,11 +175,12 @@ class Teams(BaseCog):
         """
         assert isinstance(interaction.channel, (discord.abc.GuildChannel, discord.Thread))
         assert interaction.channel.category
+        assert interaction.guild
         assert when.dt
 
         await interaction.response.defer(ephemeral=True)
 
-        home_team = Team.from_category(interaction.channel.category.id, bot=self.bot)
+        home_team = Team.from_channel(interaction.channel.category.id, interaction.guild.id, bot=self.bot)
 
         scrim = await Scrim.create(
             when.dt, home_team=home_team, away_team=team, per_team=per_team, creator_id=interaction.user.id, bot=self.bot
@@ -187,10 +191,12 @@ class Teams(BaseCog):
         )
 
     async def _team_get_func(self, interaction: discord.Interaction, member: discord.Member) -> discord.InteractionMessage:
+        assert interaction.guild
+
         await interaction.response.defer()
 
         team_members: List[TeamMember] = [
-            team_member for team in self.bot.team_cache.values() if (team_member := team.get_member(member.id))
+            team_member for team in self.bot.get_teams(interaction.guild.id) if (team_member := team.get_member(member.id))
         ]
 
         if not team_members:
@@ -249,8 +255,8 @@ class Teams(BaseCog):
 
     # Timer listeners for scrim
     @commands.Cog.listener('on_scrim_scheduled_timer_complete')
-    async def on_scrim_scheduled_timer_complete(self, *, scrim_id: int) -> None:
-        scrim = self.bot.team_scrim_cache.get(scrim_id)
+    async def on_scrim_scheduled_timer_complete(self, *, scrim_id: int, guild_id: int) -> None:
+        scrim = self.bot.get_scrim(scrim_id, guild_id)
         if scrim is None:
             return
 
@@ -290,13 +296,13 @@ class Teams(BaseCog):
 
         # Create a timer to delete this channel in 4 hours and delete the scrim.
         scrim_delete_timer = await self.bot.timer_manager.create_timer(
-            discord.utils.utcnow() + datetime.timedelta(hours=4), 'scrim_delete', scrim_id=scrim_id
+            discord.utils.utcnow() + datetime.timedelta(hours=4), 'scrim_delete', scrim_id=scrim_id, guild_id=guild_id
         )
         await scrim.edit(scrim_delete_timer_id=scrim_delete_timer.id)
 
-    @commands.Cog.listener()
-    async def on_scrim_delete_timer_complete(self, *, scrim_id: int) -> None:
-        scrim = self.bot.team_scrim_cache.pop(scrim_id, None)
+    @commands.Cog.listener('on_scrim_delete_timer_complete')
+    async def on_scrim_delete_timer_complete(self, *, scrim_id: int, guild_id: int) -> None:
+        scrim = self.bot.remove_scrim(scrim_id, guild_id)
         if not scrim:
             return
 
@@ -310,8 +316,8 @@ class Teams(BaseCog):
             await connection.execute('DELETE FROM teams.scrims WHERE id = $1', scrim.id)
 
     @commands.Cog.listener()
-    async def on_scrim_reminder_timer_complete(self, *, scrim_id: int) -> None:
-        scrim = self.bot.team_scrim_cache.get(scrim_id)
+    async def on_scrim_reminder_timer_complete(self, *, scrim_id: int, guild_id: int) -> None:
+        scrim = self.bot.get_scrim(scrim_id, guild_id)
         if not scrim:
             return
 

@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import dotenv
 
-dotenv.load_dotenv()  # pyright: ignore # This is out of my control
+dotenv.load_dotenv()
 
 
 import asyncio

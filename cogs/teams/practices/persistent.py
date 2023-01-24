@@ -23,19 +23,21 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, List
-from typing_extensions import Self
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import discord
+from typing_extensions import Self
+
 from cogs.teams.errors import MemberNotOnTeam
 from cogs.teams.practices.errors import MemberAlreadyInPractice
-
 from utils.time import human_timedelta
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
     from .practice import Practice, PracticeMember
-    from .practice import PracticeMember
+
+__all__: Tuple[str, ...] = ('PracticeView', 'UnabletoAttendModal')
 
 
 class UnabletoAttendModal(discord.ui.Modal):

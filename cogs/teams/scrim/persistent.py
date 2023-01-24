@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Optional, TypeAlias, TypeVar, cast
+from typing import TYPE_CHECKING, Optional, Tuple, TypeAlias, TypeVar, cast
 
 import discord
 from typing_extensions import Self
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
     from .scrim import Scrim
 
+__all__: Tuple[str, ...] = ('HomeConfirm', 'AwayForceConfirm', 'AwayConfirm')
 
 VT = TypeVar('VT', bound='discord.ui.View')
 ButtonType: TypeAlias = discord.ui.Button[VT]

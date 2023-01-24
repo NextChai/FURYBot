@@ -28,8 +28,8 @@ import functools
 import logging
 import os
 import time
-from concurrent import futures
 import traceback
+from concurrent import futures
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -55,7 +55,6 @@ from typing_extensions import Concatenate, Self
 
 from cogs.images import ApproveOrDenyImage, ImageRequest
 from cogs.teams import Team
-
 from cogs.teams.practices import Practice
 from cogs.teams.scrim import Scrim, ScrimStatus
 from utils import RUNNING_DEVELOPMENT, ErrorHandler, LinkFilter, TimerManager
@@ -199,9 +198,14 @@ class FuryBot(commands.Bot):
 
         self.link_filter: LinkFilter = LinkFilter(self)
 
-        self.team_cache: Dict[int, Team] = {}
-        self.team_scrim_cache: Dict[int, Scrim] = {}
-        self.team_practice_cache: Dict[int, Practice] = {}
+        # Mapping[guild_id, Mapping[team_id, Team]]
+        self._team_cache: Dict[int, Dict[int, Team]] = {}
+
+        # Mapping[guild_id, Mapping[scrim_id, Scrim]
+        self._team_scrim_cache: Dict[int, Dict[int, Scrim]] = {}
+
+        # Mapping[guild_id, Mapping[team_id, Mapping[practice_id, Practice]]]
+        self._team_practice_cache: Dict[int, Dict[int, Dict[int, Practice]]] = {}
 
         super().__init__(
             command_prefix=commands.when_mentioned_or('fury.'),
@@ -258,7 +262,7 @@ class FuryBot(commands.Bot):
         author: Optional[Union[discord.User, discord.Member]] = None,
     ) -> discord.Embed:
         """Get an instance of the bot's global :class:`discord.Embed` with the default
-        bot's color, "Craig yellow".
+        bot's color, "FurBot blue".
 
         The parameters are the same as :class:`discord.Embed` except for one additional one.
 
@@ -339,7 +343,7 @@ class FuryBot(commands.Bot):
         for row in team_data:
             members = team_member_mapping.get(row['id'], [])
             team = await Team.from_record(dict(row), members, bot=self)
-            self.team_cache[team.id] = team
+            self._team_cache.setdefault(team.guild_id, {})[team.id] = team
 
         for entry in scrim_records:
             data = dict(entry)
@@ -347,7 +351,7 @@ class FuryBot(commands.Bot):
 
             scrim = Scrim(self, **data)
             scrim.load_persistent_views()
-            self.team_scrim_cache[scrim.id] = scrim
+            self._team_scrim_cache.setdefault(scrim.guild_id, {})[scrim.id] = scrim
 
         for request in image_requests:
             self.create_task(self._load_image_request(request))
@@ -370,14 +374,68 @@ class FuryBot(commands.Bot):
             practice = Practice(bot=self, data=dict(entry))
 
             member_data = practice_member_mapping.get(practice.id, {})
-            for _member_id, data in member_data.items():
+            for data in member_data.values():
                 member = practice._add_member(dict(data))
 
                 member_practice_history = practice_member_history_mapping.get(practice.id, {}).get(member.member_id, [])
                 for history_entry in member_practice_history:
                     member._add_history(dict(history_entry))
 
-            self.team_practice_cache[practice.id] = practice
+            self._team_practice_cache.setdefault(practice.guild_id, {}).setdefault(practice.team_id, {})[
+                practice.id
+            ] = practice
+
+    # Team management
+    def get_teams(self, guild_id: int, /) -> List[Team]:
+        return list(self._team_cache.get(guild_id, {}).values())
+
+    def get_team(self, team_id: int, guild_id: int, /) -> Optional[Team]:
+        return self._team_cache.get(guild_id, {}).get(team_id)
+
+    def add_team(self, team: Team, /) -> None:
+        self._team_cache.setdefault(team.guild_id, {})[team.id] = team
+
+    def remove_team(self, team_id: int, guild_id: int, /) -> Optional[Team]:
+        return self._team_cache.get(guild_id, {}).pop(team_id, None)
+
+    # Scrim Management
+    def get_scrim(self, scrim_id: int, guild_id: int, /) -> Optional[Scrim]:
+        return self._team_scrim_cache.get(guild_id, {}).get(scrim_id)
+
+    def add_scrim(self, scrim: Scrim, /) -> None:
+        self._team_scrim_cache.setdefault(scrim.guild_id, {})[scrim.id] = scrim
+
+    def remove_scrim(self, scrim_id: int, guild_id: int, /) -> Optional[Scrim]:
+        return self._team_scrim_cache.get(guild_id, {}).pop(scrim_id, None)
+
+    def get_scrims_for(self, team_id: int, guild_id: int, /) -> List[Scrim]:
+        guild_scrims = self._team_scrim_cache.get(guild_id)
+        if guild_scrims is None:
+            return []
+
+        scrims: List[Scrim] = []
+        for scrim in guild_scrims.values():
+            if team_id in {scrim.home_id, scrim.away_id}:
+                scrims.append(scrim)
+
+        return scrims
+
+    # Practice Management
+    def get_practice(self, practice_id: int, team_id: int, guild_id: int, /) -> Optional[Practice]:
+        return self._team_practice_cache.get(guild_id, {}).get(team_id, {}).get(practice_id)
+
+    def add_practice(self, practice: Practice) -> None:
+        self._team_practice_cache.setdefault(practice.guild_id, {}).setdefault(practice.team_id, {})[practice.id] = practice
+
+    def remove_practice(self, practice_id: int, team_id: int, guild_id: int, /) -> Optional[Practice]:
+        return self._team_practice_cache.get(guild_id, {}).get(team_id, {}).pop(practice_id, None)
+
+    def get_practices_for(self, team_id: int, guild_id: int, /) -> List[Practice]:
+        guild_practices = self._team_practice_cache.get(guild_id)
+        if guild_practices is None:
+            return []
+
+        return list(guild_practices.get(team_id, {}).values())
 
     # Events
     async def on_ready(self) -> None:

@@ -24,23 +24,25 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import logging
-
-from .errors import *
-from .persistent import *
-from .practice import *
-from .leaderboard import *
-
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple, Optional
 
 import discord
-from discord.ext import commands
 from discord import app_commands
+from discord.ext import commands
 
 from utils import BaseCog
+
 from ..team import Team
+from ..errors import MemberNotOnTeam
+from .errors import *
+from .leaderboard import *
+from .persistent import *
+from .practice import *
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
+__all__: Tuple[str, ...] = ('PracticeCog',)
 
 _log = logging.getLogger(__name__)
 _log.setLevel(logging.DEBUG)
@@ -68,6 +70,8 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
         Start a new practice within a team channel. This command can only be used in a team channel by a member
         on a team.
         """
+        assert interaction.guild
+
         # Let's check to make sure this is a team channel first.
         channel = interaction.channel
         assert channel
@@ -81,7 +85,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
 
         # Let's try and get a team now
         try:
-            team = Team.from_category(category.id, bot=self.bot)
+            team = Team.from_channel(category.id, interaction.guild.id, bot=self.bot)
         except Exception:
             return await interaction.response.send_message('You must use this command in a team channel.', ephemeral=True)
 
@@ -128,7 +132,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
         practice = Practice(bot=self.bot, data=dict(practice_data))
 
         # Add this practice to the bot so we can access it later
-        self.bot.team_practice_cache[practice.id] = practice
+        self.bot.add_practice(practice)
 
         # Add all members in the voice channel already
         for member in connected_channel.members:
@@ -171,7 +175,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
                 return
 
             try:
-                team = Team.from_category(category.id, bot=self.bot)
+                team = Team.from_channel(category.id, member.guild.id, bot=self.bot)
             except Exception:
                 _log.debug('The channel %s is not in a team category', joined_channel.id)
                 return
@@ -197,7 +201,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
                 return
 
             try:
-                team = Team.from_category(category.id, bot=self.bot)
+                team = Team.from_channel(category.id, member.guild.id, bot=self.bot)
             except Exception:
                 return
 

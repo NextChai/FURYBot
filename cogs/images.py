@@ -37,8 +37,6 @@ if TYPE_CHECKING:
 
     from bot import FuryBot
 
-    from .teams.team import Team
-
 
 def mention_interaction_channel(channel: InteractionChannel) -> str:
     return f'<#{channel.id}>'
@@ -184,17 +182,6 @@ class ApproveOrDenyImage(discord.ui.View):
             name='Additional Message', value=self.request.message or "No message has been attached with this upload."
         )
         embed.add_field(name='Channel to Send in', value=mention_interaction_channel(self.request.channel))
-
-        # If this request is to a team channel, include the team that it's requested to
-        team_maybe: Optional[Team] = None
-        for team in self.bot.team_cache.values():
-            if team.has_channel(self.request.channel):
-                team_maybe = team
-
-        if team_maybe is not None:
-            embed.add_field(
-                name='Posting to Team', value=f'This attachment will be posted to the `{team_maybe.display_name}` team.'
-            )
 
         return embed
 

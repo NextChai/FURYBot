@@ -59,7 +59,7 @@ class TeamTransformer(app_commands.Transformer):
     def type(self) -> discord.AppCommandOptionType:
         return discord.AppCommandOptionType.integer
 
-    def _get_similar_teams(self, interaction: discord.Interaction) -> Mapping[int, Team]:
+    def _get_similar_teams(self, interaction: discord.Interaction) -> List[Team]:
         # A helper to get all teams that are similar to the team this command was invoked on.
         # This will only be called if clamp_teams is True.
         bot: FuryBot = interaction.client  # type: ignore
@@ -67,17 +67,23 @@ class TeamTransformer(app_commands.Transformer):
         channel = interaction.channel
         if channel is None or isinstance(channel, discord.PartialMessageable):
             # dpy couldnt resolve this channel (maybe not in cache?)
-            return {}
+            return []
 
-        team = discord.utils.find(lambda team: team.has_channel(channel), bot.team_cache.values())
+        guild = channel.guild
+        if guild is None:
+            # This command can't be used in DMS
+            return []
+
+        guild_teams = bot.get_teams(guild.id)
+        team = discord.utils.find(lambda team: team.has_channel(channel.id), guild_teams)
         if not team:
             # This command wasnt invoked in a team chat
-            return {}
+            return []
 
         # Great, now let's get all similar teams matching the teams name.
         team_name_parsed = ' '.join(team.name.split()[:-1])  # Turns "Rocket League 1" to "Rocket League"
 
-        return {t.id: t for t in bot.team_cache.values() if team_name_parsed in t.name and t != team}
+        return [t for t in guild_teams if team_name_parsed in t.name and t != team]
 
     async def autocomplete(self, interaction: discord.Interaction, value: str) -> List[app_commands.Choice[int]]:
         """|coro|
@@ -91,16 +97,21 @@ class TeamTransformer(app_commands.Transformer):
         value: :class:`str`
             The value that the user is typing.
         """
+        guild = interaction.guild
+        if guild is None:
+            # This command can't be used in DMS
+            return []
+
         bot: FuryBot = interaction.client  # type: ignore
 
         # If we're clamping the teams, we need to get the similar teams to use.
         if self.clamp_teams:
             similar_teams = self._get_similar_teams(interaction)
         else:
-            similar_teams = bot.team_cache
+            similar_teams = bot.get_teams(guild.id)
 
         # Great, now let's use this list with fuzzy matching to get more similar teams.
-        team_name_mapping: Mapping[str, Team] = {team.name: team for team in similar_teams.values()}
+        team_name_mapping: Mapping[str, Team] = {team.name: team for team in similar_teams}
         team_names = list(team_name_mapping.keys())
 
         # Get the top 10 teams with similar names as to what the user is typing
@@ -127,9 +138,14 @@ class TeamTransformer(app_commands.Transformer):
         value: :class:`int`
             The value that the user selected.
         """
+        guild = interaction.guild
+        if not guild:
+            raise AutocompleteValidationException('This command can only be used in a server.')
+
         bot: FuryBot = interaction.client  # type: ignore
 
-        try:
-            return bot.team_cache[value]
-        except KeyError:
+        team = bot.get_team(value, guild.id)
+        if team is None:
             raise AutocompleteValidationException('User did not select a valid team.')
+
+        return team
