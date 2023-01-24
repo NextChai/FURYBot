@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import importlib
 import sys
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import discord
 from discord import app_commands
@@ -66,7 +66,7 @@ class Owner(BaseCog):
 
     @commands.command(name='reload')
     @commands.is_owner()
-    async def _reload(self, ctx: Context, force_importlib: Optional[bool] = False, *extensions: str) -> discord.Message:
+    async def _reload(self, ctx: Context, force_importlib: bool = False, *extensions: str) -> discord.Message:
         """Reload the given extensions.
 
         Parameters
@@ -78,29 +78,37 @@ class Owner(BaseCog):
         *extensions: :class:`str`
             The extensions to reload.
         """
-        statuses: Dict[str, Optional[Exception]] = {}
+        statuses: Dict[str, Optional[Union[str, Exception]]] = {}
         for extension in extensions:
             if extension in self.bot.extensions:
-                try:
-                    if force_importlib:
-                        sys.modules[extension] = importlib.reload(sys.modules[extension])
+                if force_importlib:
+                    try:
+                        importlib.reload(sys.modules[extension])
+                    except KeyError:
+                        statuses[extension] = f'`{extension}` is not a module.'
+                        continue
 
+                try:
                     await self.bot.reload_extension(extension)
-                    statuses[extension] = None
                 except Exception as exc:
+                    # NOTE: Any exceptions raised get pased to the EH, so it's fine to catch them all.
                     statuses[extension] = exc
+                    continue
+
+                statuses[extension] = None
             else:
 
                 try:
-                    sys.modules[extension] = importlib.reload(sys.modules[extension])
+                    importlib.reload(sys.modules[extension])
                     statuses[extension] = None
                 except Exception as exc:
+                    # NOTE: Any exceptions raised get pased to the EH, so it's fine to catch them all.
                     statuses[extension] = exc
 
         response: List[str] = []
         for extension, exception in statuses.items():
             if exception is not None:
-                if self.bot.error_handler:
+                if self.bot.error_handler and isinstance(exception, Exception):
                     await self.bot.error_handler.log_error(exception, origin=ctx, event_name=self._reload.qualified_name)
 
                 response.append(f'`{extension}`: Failed to reload: **{exception}**')
