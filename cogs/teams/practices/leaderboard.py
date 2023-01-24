@@ -47,11 +47,34 @@ if TYPE_CHECKING:
 
 @dataclasses.dataclass(init=True, kw_only=True)
 class PracticeLeaderboard(Guildable):
+    """Represents a practice leaderboard for a specific guild.
+
+    A guild can have multiple practice leaderboards, each in a different channel.
+
+    Parameters
+    Attributes
+    ----------
+    id: :class:`int`
+        The ID of the leaderboard.
+    channel_id: :class:`int`
+        The ID of the channel this leaderboard is in.
+    guild_id: :class:`int`
+        The ID of the guild this leaderboard is in.
+    message_id: :class:`int`
+        The ID of the message this leaderboard is bound to. This is used to update the leaderboard.
+    top_team_id: :class:`int`
+        The ID of the team that is currently on top of the leaderboard.
+    role_id: :class:`int`
+        Th ID of the role assigned to the members of the current top team.
+    bot: :class:`FuryBot`
+        The bot instance.
+    """
+
     id: int
     channel_id: int
     guild_id: int
     message_id: int
-    top_team_id: Optional[int]
+    top_team_id: int
     role_id: int
     bot: FuryBot
 
@@ -63,6 +86,7 @@ class PracticeLeaderboard(Guildable):
 
     @property
     def channel(self) -> Optional[discord.TextChannel]:
+        """Optional[:class:`discord.TextChannel`]: The channel this leaderboard is in."""
         guild = self.guild
         if guild is None:
             return None
@@ -71,6 +95,7 @@ class PracticeLeaderboard(Guildable):
 
     @property
     def role(self) -> Optional[discord.Role]:
+        """Optional[:class:`discord.Role`]: The role assigned to the members of the current top team."""
         guild = self.guild
         if guild is None:
             return None
@@ -78,6 +103,16 @@ class PracticeLeaderboard(Guildable):
         return cast(Optional[discord.Role], guild.get_role(self.role_id))
 
     async def fetch_message(self) -> Optional[discord.Message]:
+        """|coro|
+
+        A helper method used to fetch the message this leaderboard is bound to.
+
+        Returns
+        -------
+        Optional[:class:`discord.Message`]
+            The message this leaderboard is bound to. ``None`` if the channel this leaderboard
+            is in is not found.
+        """
         channel = self.channel
         if channel is None:
             return None
@@ -85,17 +120,27 @@ class PracticeLeaderboard(Guildable):
         return await channel.fetch_message(self.message_id)
 
     async def change_top_team(self, team: Team) -> None:
+        """|coro|
+
+        Changes the current top team to another one and manages the roles of the members.
+
+        Parameters
+        ----------
+        team: :class:`Team`
+            The team to change the top team to.
+        """
         role = self.role
         if role is None:
             # NOTE: Add exception raising here / auto removing leaderboard
             return
 
         futures: List[Coroutine[Any, Any, None]] = []
-        if self.top_team_id:
-            previous_top_team = self.bot.team_cache[self.top_team_id]
-            for team_member in previous_top_team.members:
-                member = team_member.member or await team_member.fetch_member()
-                futures.append(member.remove_roles(role, reason='Team member booted off leaderboard.'))
+
+        previous_top_team = self.bot.team_cache[self.top_team_id]
+
+        for team_member in previous_top_team.members:
+            member = team_member.member or await team_member.fetch_member()
+            futures.append(member.remove_roles(role, reason='Team member booted off leaderboard.'))
 
         self.top_team_id = team.id
         async with self.bot.safe_connection() as connection:
@@ -113,6 +158,10 @@ class PracticeLeaderboard(Guildable):
         await asyncio.gather(*futures)
 
     async def delete(self) -> None:
+        """|coro|
+
+        Delete the leaderboard from the database and the message it is bound to.
+        """
         async with self.bot.safe_connection() as connection:
             await connection.execute('DELETE FROM teams.practice_leaderboards WHERE id = $1;', self.id)
 

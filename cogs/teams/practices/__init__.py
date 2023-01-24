@@ -47,6 +47,12 @@ _log.setLevel(logging.DEBUG)
 
 
 class PracticeCog(PracticeLeaderboardCog, BaseCog):
+    """Represents the main practice cog. This cog manages the creation of practices, as well
+    as the creation of the practice leaderboard.
+
+    The practice leaderboard commands are found in the :class:`.PracticeLeaderboardCog` class
+    that this class inherits from.
+    """
 
     practice = app_commands.Group(
         name='practice',
@@ -57,6 +63,11 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
 
     @practice.command(name='start', description='Start a practice for your team.')
     async def practice_start(self, interaction: discord.Interaction[FuryBot]) -> None:
+        """|coro|
+
+        Start a new practice within a team channel. This command can only be used in a team channel by a member
+        on a team.
+        """
         # Let's check to make sure this is a team channel first.
         channel = interaction.channel
         assert channel
@@ -119,13 +130,33 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
         # Add this practice to the bot so we can access it later
         self.bot.team_practice_cache[practice.id] = practice
 
-        await practice.handle_member_join(member=member, when=interaction.created_at)
+        # Add all members in the voice channel already
+        for member in connected_channel.members:
+            team_member = team.get_member(member.id)
+            if team_member is None:
+                continue
+
+            await practice.handle_member_join(member=member, when=interaction.created_at)
+
         await interaction.edit_original_response(content="A new practice has been created.")
 
     @commands.Cog.listener('on_voice_state_update')
     async def on_voice_state_update(
         self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
     ) -> Optional[PracticeMember]:
+        """|coro|
+
+        A listener to keep track of when members join and leave a practice.
+
+        Parameters
+        ---------
+        member: :class:`discord.Member`
+            The member that joined or left a voice channel.
+        before: :class:`discord.VoiceState`
+            The voice state before the member joined or left a voice channel.
+        after: :class:`discord.VoiceState`
+            The voice state after the member joined or left a voice channel.
+        """
         if before.channel == after.channel:
             return
 
