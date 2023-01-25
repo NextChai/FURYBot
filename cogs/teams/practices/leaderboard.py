@@ -119,7 +119,10 @@ class PracticeLeaderboard(Guildable):
         if channel is None:
             return None
 
-        return await channel.fetch_message(self.message_id)
+        try:
+            return await channel.fetch_message(self.message_id)
+        except discord.NotFound:
+            return None
 
     async def change_top_team(self, team: Team) -> None:
         """|coro|
