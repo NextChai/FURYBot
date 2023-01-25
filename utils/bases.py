@@ -49,7 +49,7 @@ class Guildable(Botable, Protocol):
         return self._get_bot().get_guild(self._get_guild_id())
 
 
-class Teamable(Botable, Guildable, Protocol):
+class Teamable(Guildable, Protocol):
     def _get_team_id(self) -> int:
         ...
 
