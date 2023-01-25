@@ -26,9 +26,6 @@ from __future__ import annotations
 import enum
 from typing import Tuple
 
-from .persistent import *
-from .scrim import *
-
 __all__: Tuple[str, ...] = ('ScrimStatus',)
 
 # Persistent views for team scrim confirmation from both
@@ -44,3 +41,7 @@ class ScrimStatus(enum.Enum):
     pending_away = 'pending_away'
     scheduled = 'scheduled'
     pending_host = 'pending_host'
+
+
+from .persistent import *
+from .scrim import *
