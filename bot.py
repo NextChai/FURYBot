@@ -88,6 +88,7 @@ else:
         'cogs.teams.practices',
         'cogs.images',
         'cogs.moderation',
+        'cogs.fun',
     )
 
 
