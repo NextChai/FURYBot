@@ -382,10 +382,12 @@ class PracticeLeaderboardCog(BaseCog):
                 top_ten_teams = sorted(teams, key=lambda team: team.get_total_practice_time(), reverse=True)[:10]
                 top_team = top_ten_teams[0]
 
-                if top_team.id == leaderboard.top_team_id:
+                if top_team.id != leaderboard.top_team_id:
                     # Nothing to do
-                    _log.debug("No change in top team for guild %s, skipping.", guild_id)
+                    _log.debug("Change in top team for guild %s.", guild_id)
                     await leaderboard.change_top_team(top_team)
+
+                _log.debug('Updating message for leaderboard %s for guild %s.', leaderboard.id, guild_id)
 
                 message = await leaderboard.fetch_message()
                 if message is None:
