@@ -305,6 +305,9 @@ class Practice(Teamable):
 
         self._members: Dict[int, PracticeMember] = {}
 
+    def __hash__(self) -> int:
+        return hash(self.id)
+
     def _get_guild_id(self) -> int:
         return self.guild_id
 
