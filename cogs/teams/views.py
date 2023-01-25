@@ -592,7 +592,7 @@ class TeamScrimsView(BaseView):
                 f'**Away Team Confirmed**: {", ".join([m.mention for m in scrim.away_voters]) or "No away votes."}\n',
             )
 
-        embed.description = f'**{len(self.team.scrims)} scrims total, ' f'**{hosted_scrims}** of which they are hosting.'
+        embed.description = f'**{len(self.team.scrims)}** scrims total, **{hosted_scrims}** of which they are hosting.'
 
         if hosted_scrims == 0:
             embed.add_field(name='No Scrims', value='This team has no scrims.')
