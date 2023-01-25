@@ -325,7 +325,9 @@ class Practice(Teamable):
 
     @property
     def team(self) -> Team:
-        return cast(Team, self.bot.get_team(self.team_id, self.guild_id))
+        team = self.bot.get_team(self.team_id, self.guild_id)
+        assert team
+        return team
 
     @property
     def members(self) -> List[PracticeMember]:
