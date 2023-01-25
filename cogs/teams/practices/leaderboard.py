@@ -368,7 +368,7 @@ class PracticeLeaderboardCog(BaseCog):
 
         return embed
 
-    @tasks.loop(seconds=60)
+    @tasks.loop(minutes=7)
     async def update_leaderboards(self) -> None:
         for guild_id, leaderboards in self.leaderboard_cache.items():
             guild = self.bot.get_guild(guild_id)
@@ -385,9 +385,7 @@ class PracticeLeaderboardCog(BaseCog):
                 if top_team.id == leaderboard.top_team_id:
                     # Nothing to do
                     _log.debug("No change in top team for guild %s, skipping.", guild_id)
-                    return
-
-                await leaderboard.change_top_team(top_team)
+                    await leaderboard.change_top_team(top_team)
 
                 message = await leaderboard.fetch_message()
                 if message is None:
