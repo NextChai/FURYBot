@@ -368,7 +368,7 @@ class PracticeLeaderboardCog(BaseCog):
 
         return embed
 
-    @tasks.loop(minutes=7)
+    @tasks.loop(minutes=10)
     async def update_leaderboards(self) -> None:
         for guild_id, leaderboards in self.leaderboard_cache.items():
             guild = self.bot.get_guild(guild_id)
