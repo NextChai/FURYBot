@@ -204,6 +204,9 @@ class Team:
     def __ne__(self, __o: object) -> bool:
         return not self.__eq__(__o)
 
+    def __hash__(self) -> int:
+        return hash(self.id)
+
     @classmethod
     def from_channel(cls, channel_id: int, guild_id: int, /, *, bot: FuryBot) -> Team:
         """
