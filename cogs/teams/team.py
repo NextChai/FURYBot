@@ -266,7 +266,9 @@ class Team:
         :class:`Team`
             The fetched team.
         """
-        members = {entry['member_id']: TeamMember(bot, **dict(entry)) for entry in member_data or []}
+        members = {
+            entry['member_id']: TeamMember(bot, guild_id=data['guild_id'], **dict(entry)) for entry in member_data or []
+        }
         team = cls(bot, **dict(data), team_members=members)
         bot.add_team(team)
 
@@ -539,7 +541,7 @@ class Team:
             )
 
         assert member_record
-        team_member = TeamMember(self.bot, **dict(member_record))
+        team_member = TeamMember(self.bot, guild_id=self.guild_id, **dict(member_record))
 
         self.team_members[team_member.member_id] = team_member
 
