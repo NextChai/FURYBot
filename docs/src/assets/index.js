@@ -6,6 +6,7 @@ import close from './close.svg';
 import menu_black from './menu_black.svg';
 import close_black from './close_black.svg';
 import mobile_interface from './mobile_interface.svg';
+import pc from './pc.svg';
 
 
 export {
@@ -16,5 +17,6 @@ export {
     close,
     menu_black,
     close_black,
-    mobile_interface
+    mobile_interface,
+    pc
 }

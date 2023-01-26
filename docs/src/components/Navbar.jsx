@@ -58,7 +58,7 @@ const Navbar = () => {
                 {/* button for theme toggling */}
                 <li className="font-poppins font-normal cursor-pointer text-[16px] text-light-text dark:text-dark-text rounded-md border-2 border-black dark:border-white bg-light-bg dark:bg-dark-bg">
                     <button className="px-4 py-3 flex space-x-12" onClick={handleThemeSwitch}>
-                        Dark Mode
+                        Toggle Dark Mode
                     </button>
                 </li>
 
