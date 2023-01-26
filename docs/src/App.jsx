@@ -1,9 +1,15 @@
-import React from 'react'
+import React from 'react';
+import { Navbar } from './components';
+import styles from "./style";
 
 const App = () => {
   return (
-    <div>
-      <h1 className='text-orange-800'>Hello!</h1>
+    <div className="w-full overflow-hidden">
+      <div className={`${styles.paddingX} ${styles.flexCenter}`}>
+        <div className={`${styles.boxWidth}`}>
+          <Navbar />
+        </div>
+      </div>
     </div>
   )
 }
