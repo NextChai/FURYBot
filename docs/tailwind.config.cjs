@@ -11,6 +11,7 @@ module.exports = {
       colors: {
         primary: "#00040f",
         dimWhite: "rgba(255, 255, 255, 0.7)",
+        fury: "#4EDBFC",
         light: {
           text: "#1a1a1a",
           text_hover: "#525252",
