@@ -1,14 +1,24 @@
 /** @type {import('tailwindcss').Config} */
+
+const colors = require('tailwindcss/colors')
+
 module.exports = {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
+  darkMode: "class",
   mode: "jit",
   theme: {
     extend: {
       colors: {
         primary: "#00040f",
-        secondary: "#00f6ff",
         dimWhite: "rgba(255, 255, 255, 0.7)",
-        dimBlue: "rgba(9, 151, 124, 0.1)",
+        light: {
+          text: "#737373",
+          bg: "#f5f5f5"
+        },
+        dark: {
+          text: "#e5e5e5",
+          bg: "#1a1a1a"
+        }
       },
       fontFamily: {
         poppins: ["Poppins", "sans-serif"],
