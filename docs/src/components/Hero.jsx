@@ -4,7 +4,7 @@ import styles from "../style";
 
 const Hero = () => {
     return (
-        <div className='w-full bg-light-ws_bg dark:bg-dark-ws_bg'>
+        <div className='w-full bg-light-ws_bg dark:bg-dark-ws_bg '>
             {/* Holds the bot description and supporting image */}
             <div className={`${styles.flexCenter} ${styles.paddingY}`}>
                 <div>
@@ -16,7 +16,7 @@ const Hero = () => {
 
             {/* Holds supporting cards under the main caption. */}
             <div className={`w-full flex flex-wrap md:flex-nowrap space-x-6 ${styles.paddingX} ${styles.paddingY}`}>
-                <div className="flex-auto border-solid border-2 rounded-md drop-shadow-md py-5">
+                <div className="flex-auto border-solid border-2 rounded-md drop-shadow-md shadow-lg py-5 dark:bg-dark-bg bg-light-bg">
                     <h1 className='font-poppins font-semibold text-light-text dark:text-dark-text text-lg text-center'>
                         School Discord Server Management
                     </h1>
@@ -28,7 +28,7 @@ const Hero = () => {
                     </p>
                 </div>
 
-                <div className="flex-auto border-solid border-2  rounded-md drop-shadow-md py-5">
+                <div className="flex-auto border-solid border-2  rounded-md drop-shadow-md shadow-lg py-5 dark:bg-dark-bg bg-light-bg">
                     <h1 className='font-poppins font-semibold text-light-text dark:text-dark-text text-lg text-center'>
                         Team Managament
                     </h1>
@@ -40,7 +40,7 @@ const Hero = () => {
                     </p>
                 </div>
 
-                <div className="flex-auto border-solid border-2 rounded-md drop-shadow-md py-5">
+                <div className="flex-auto border-solid border-2 rounded-md drop-shadow-md shadow-lg py-5 dark:bg-dark-bg bg-light-bg">
                     <h1 className='font-poppins font-semibold text-light-text dark:text-dark-text text-lg text-center'>
                         Member Moderation
                     </h1>

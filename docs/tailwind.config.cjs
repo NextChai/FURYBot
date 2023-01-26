@@ -15,7 +15,7 @@ module.exports = {
           text: "#1a1a1a",
           text_hover: "#525252",
           bg: "#f5f5f5",
-          ws_bg: "#f5f5f5"
+          ws_bg: "#f0eded"
         },
         dark: {
           text: "#e5e5e5",

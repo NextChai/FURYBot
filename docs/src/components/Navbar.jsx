@@ -31,20 +31,18 @@ const Navbar = () => {
     }
 
     return (
-        <nav className="w-full flex py-6 justify-between items-center navbar">
+        <nav className="w-full flex py-6 justify-between items-center navbar bg-light-bg dark:bg-dark-bg">
             {/* FuryBot Logo */}
             <div className="pl-5">
                 <img src={fb_logo} alt="Fury-Bot Logo" className="w-[50px] h-[50px] rounded-full drop-shadow-lg" />
             </div>
 
             {/* Navigation Links for desktop (hidden for mobile) */}
-
-
             <ul className="list-none sm:flex hidden justify-end items-center flex-1 space-x-5" >
                 {navLinks.map((nav, _index) => (
                     <li
                         key={nav.id}
-                        className="font-poppins font-normal cursor-pointer text-[16px] text-light-text dark:text-dark-text rounded-md bg-light-bg dark:bg-dark-bg border-solid border-2 border-black dark:border-white"
+                        className="font-poppins font-normal cursor-pointer text-[16px] text-light-text dark:text-dark-text rounded-md bg-light-bg dark:bg-dark-bg border-solid border-2 drop-shadow-md dark:shadow-lg dark:shadow-dark-ws_bg"
                     >
                         <button className="px-4 py-3 flex space-x-2">
                             <a href={`${nav.url}`}>{nav.title}</a>
@@ -56,7 +54,7 @@ const Navbar = () => {
                 ))}
 
                 {/* button for theme toggling */}
-                <li className="font-poppins font-normal cursor-pointer text-[16px] text-light-text dark:text-dark-text rounded-md border-2 border-black dark:border-white bg-light-bg dark:bg-dark-bg">
+                <li className="font-poppins font-normal cursor-pointer text-[16px] text-light-text dark:text-dark-text rounded-md bg-light-bg dark:bg-dark-bg border-solid border-2 drop-shadow-md dark:shadow-lg dark:shadow-dark-ws_bg">
                     <button className="px-4 py-3 flex space-x-12" onClick={handleThemeSwitch}>
                         Toggle Dark Mode
                     </button>
