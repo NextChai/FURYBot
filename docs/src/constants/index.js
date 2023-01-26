@@ -1,16 +1,22 @@
-import { github_logo } from "../assets";
+import { github_logo, github_logo_white } from "../assets";
 
-export const githubNavLinks = [
+export const navLinks = [
     {
         id: "github",
         title: "Github",
         url: "https://github.com/NextChai/Fury-Bot",
-        icon: github_logo
+        icon: {
+            dark: github_logo_white,
+            light: github_logo
+        }
     },
     {
         id: "creator",
         title: "The Creator",
         url: "https://github.com/NextChai",
-        icon: github_logo
+        icon: {
+            dark: github_logo_white,
+            light: github_logo
+        }
     }
 ];

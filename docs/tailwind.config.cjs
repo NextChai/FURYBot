@@ -12,12 +12,16 @@ module.exports = {
         primary: "#00040f",
         dimWhite: "rgba(255, 255, 255, 0.7)",
         light: {
-          text: "#737373",
-          bg: "#f5f5f5"
+          text: "#1a1a1a",
+          text_hover: "#525252",
+          bg: "#f5f5f5",
+          ws_bg: "#f5f5f5"
         },
         dark: {
           text: "#e5e5e5",
-          bg: "#1a1a1a"
+          bg: "#262626",
+          text_hover: "#f5f5f5",
+          ws_bg: "#121212"
         }
       },
       fontFamily: {
