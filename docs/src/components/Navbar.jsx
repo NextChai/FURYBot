@@ -18,7 +18,7 @@ const Navbar = () => {
 
 
             {/* Navigation Links for desktop (hidden for mobile) */}
-            <ul className="list-none sm:flex hidden justify-end items-center flex-1 space-x-5" >
+            <ul className="list-none sm:flex hidden justify-end items-center flex-1 space-x-5 pr-5" >
                 <li className="font-poppins font-normal cursor-pointer text-[16px] text-white-medium rounded-md bg-discord-gray shadow-lg">
                     {/* Links to the documentation */}
                     <Link to="/docs" className="px-4 py-3 flex space-x-2">Docs</Link>
