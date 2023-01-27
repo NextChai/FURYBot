@@ -19,12 +19,7 @@ module.exports = {
         "white-light": "#fafafc",
         "white-medium": "#f2f2f4",
         "white-dark": "#ebeaef",
-        light: {
-          text: "#1a1a1a",
-          text_hover: "#525252",
-          bg: "#f5f5f5",
-          ws_bg: "#f0eded"
-        },
+        "discord-gray": "#36393F"
       },
       fontFamily: {
         poppins: ["Poppins", "sans-serif"],
