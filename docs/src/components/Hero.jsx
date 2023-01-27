@@ -16,7 +16,7 @@ const Hero = () => {
 
             {/* Holds supporting cards under the main caption. */}
             <div className={`w-full flex flex-wrap md:flex-nowrap space-x-6 ${styles.paddingX} ${styles.paddingY}`}>
-                <div className="flex-auto rounded-md drop-shadow-md hover:drop-shadow-xl py-5 bg-discord-gray hover:scale-110 transition ease-in-out delay-150 duration-300">
+                <div className="flex-auto rounded-md drop-shadow-md hover:drop-shadow-xl py-5 bg-discord-gray">
                     <h1 className='font-poppins font-semibold text-lg text-center text-fury'>
                         School Discord Server Management
                     </h1>
@@ -28,7 +28,7 @@ const Hero = () => {
                     </p>
                 </div>
 
-                <div className="flex-auto rounded-md drop-shadow-md hover:drop-shadow-xl shadow-lg py-5 bg-discord-gray hover:scale-110 transition ease-in-out delay-150 duration-300">
+                <div className="flex-auto rounded-md drop-shadow-md hover:drop-shadow-xl shadow-lg py-5 bg-discord-gray">
                     <h1 className='font-poppins font-semibold text-lg text-center text-fury'>
                         Team Managament
                     </h1>
@@ -40,7 +40,7 @@ const Hero = () => {
                     </p>
                 </div>
 
-                <div className="flex-auto rounded-md drop-shadow-md hover:drop-shadow-xl shadow-lg py-5 bg-discord-gray hover:scale-110 transition ease-in-out delay-150 duration-300">
+                <div className="flex-auto rounded-md drop-shadow-md hover:drop-shadow-xl shadow-lg py-5 bg-discord-gray">
                     <h1 className='font-poppins font-semibold text-lg text-center text-fury'>
                         Member Moderation
                     </h1>
