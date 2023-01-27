@@ -31,7 +31,7 @@ const Navbar = () => {
     }
 
     return (
-        <nav className="w-full flex py-6 justify-between items-center navbar bg-light-bg dark:bg-dark-bg">
+        <nav className="w-full flex py-6 justify-between items-center navbar">
             {/* FuryBot Logo */}
             <div className="pl-5">
                 <img src={fb_logo} alt="Fury-Bot Logo" className="w-[50px] h-[50px] rounded-full drop-shadow-lg" />
@@ -42,7 +42,7 @@ const Navbar = () => {
                 {navLinks.map((nav, _index) => (
                     <li
                         key={nav.id}
-                        className="font-poppins font-normal cursor-pointer text-[16px] text-light-text dark:text-dark-text rounded-md bg-light-bg dark:bg-dark-bg border-solid border-2 drop-shadow-md dark:shadow-lg dark:shadow-dark-ws_bg"
+                        className="font-poppins font-normal cursor-pointer text-[16px] text-light-text dark:text-white-medium rounded-md bg-light-bg dark:bg-gray-medium shadow-lg"
                     >
                         <button className="px-4 py-3 flex space-x-2">
                             <a href={`${nav.url}`}>{nav.title}</a>
@@ -54,7 +54,7 @@ const Navbar = () => {
                 ))}
 
                 {/* button for theme toggling */}
-                <li className="font-poppins font-normal cursor-pointer text-[16px] text-light-text dark:text-dark-text rounded-md bg-light-bg dark:bg-dark-bg border-solid border-2 drop-shadow-md dark:shadow-lg dark:shadow-dark-ws_bg">
+                <li className="font-poppins font-normal cursor-pointer text-[16px] text-light-text dark:text-white-medium rounded-md bg-light-bg dark:bg-gray-medium shadow-lg">
                     <button className="px-4 py-3 flex space-x-12" onClick={handleThemeSwitch}>
                         Toggle Dark Mode
                     </button>
@@ -72,13 +72,13 @@ const Navbar = () => {
                 />
 
                 <div
-                    className={`${!toggle ? "hidden" : "flex"} p-6 bg-light-bg dark:bg-dark-bg border-2 border-dark-bg dark:border-light-bg absolute top-20 right-0 mx-4 my-2 min-w-[140px] rounded-xl sidebar`}
+                    className={`${!toggle ? "hidden" : "flex"} p-6 bg-light-bg border-2 dark:border-light-bg absolute top-20 right-0 mx-4 my-2 min-w-[140px] rounded-xl sidebar`}
                 >
                     <ul className="list-none flex justify-end items-start flex-1 flex-col">
                         {navLinks.map((nav, _index) => (
                             <li
                                 key={nav.id}
-                                className='font-poppins font-medium cursor-pointer text-[16px] text-light-text dark:text-dark-text'
+                                className='font-poppins font-medium cursor-pointer text-[16px] text-light-text'
                                 onClick={() => setActive(nav.title)}
                             >
                                 <a href={`${nav.url}`}>{nav.title}</a>
@@ -86,7 +86,7 @@ const Navbar = () => {
                         ))}
 
                         {/* button for theme toggling */}
-                        <li className="font-poppins font-medium cursor-pointer text-[16px] text-light-text dark:text-dark-text">
+                        <li className="font-poppins font-medium cursor-pointer text-[16px] text-light-text">
                             <button className="" onClick={handleThemeSwitch}>
                                 <a>Dark Mode</a>
                             </button>

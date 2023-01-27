@@ -1,7 +1,5 @@
 /** @type {import('tailwindcss').Config} */
 
-const colors = require('tailwindcss/colors')
-
 module.exports = {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   darkMode: "class",
@@ -12,18 +10,21 @@ module.exports = {
         primary: "#00040f",
         dimWhite: "rgba(255, 255, 255, 0.7)",
         fury: "#4EDBFC",
+        "primary-text-light": "#4edbfc",
+        "primary-text-medium": "#2e9fb5",
+        "primary-text-dark": "#1e5661",
+        "gray-light": "#9090a7",
+        "gray-medium": "#555870",
+        "gray-dark": "#28293d",
+        "white-light": "#fafafc",
+        "white-medium": "#f2f2f4",
+        "white-dark": "#ebeaef",
         light: {
           text: "#1a1a1a",
           text_hover: "#525252",
           bg: "#f5f5f5",
           ws_bg: "#f0eded"
         },
-        dark: {
-          text: "#e5e5e5",
-          bg: "#262626",
-          text_hover: "#f5f5f5",
-          ws_bg: "#121212"
-        }
       },
       fontFamily: {
         poppins: ["Poppins", "sans-serif"],
