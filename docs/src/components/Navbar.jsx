@@ -2,6 +2,7 @@ import { fb_logo, menu, close, menu_black, close_black } from '../assets';
 import { navLinks } from "../constants";
 
 import { useState, useEffect, } from 'react';
+import { Link } from 'react-router-dom';
 
 
 const Navbar = () => {
@@ -37,8 +38,16 @@ const Navbar = () => {
                 <img src={fb_logo} alt="Fury-Bot Logo" className="w-[50px] h-[50px] rounded-full drop-shadow-lg" />
             </div>
 
+
             {/* Navigation Links for desktop (hidden for mobile) */}
             <ul className="list-none sm:flex hidden justify-end items-center flex-1 space-x-5" >
+                <li className="font-poppins font-normal cursor-pointer text-[16px] text-light-text dark:text-white-medium rounded-md bg-light-bg dark:bg-gray-medium shadow-lg">
+                    {/* Links to the documentation */}
+                    <Link to="/docs" className="px-4 py-3 flex space-x-2">Docs</Link>
+
+                </li>
+
+
                 {navLinks.map((nav, _index) => (
                     <li
                         key={nav.id}
@@ -59,7 +68,6 @@ const Navbar = () => {
                         Toggle Dark Mode
                     </button>
                 </li>
-
             </ul>
 
             {/* Navigation Links for mobile (hidden for desktop) */}
