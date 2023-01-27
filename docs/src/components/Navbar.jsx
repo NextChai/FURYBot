@@ -32,7 +32,7 @@ const Navbar = () => {
     }
 
     return (
-        <nav className="w-full flex py-6 justify-between items-center navbar">
+        <nav className="w-full flex py-6 justify-between items-center navbar bg-white-medium dark:bg-gray-dark">
             {/* FuryBot Logo */}
             <div className="pl-5">
                 <img src={fb_logo} alt="Fury-Bot Logo" className="w-[50px] h-[50px] rounded-full drop-shadow-lg" />
@@ -75,30 +75,36 @@ const Navbar = () => {
                 <img
                     src={toggle ? (theme == "dark" ? close : close_black) : (theme == "dark" ? menu : menu_black)}
                     alt="menu"
-                    className={`w-[28px] h-[28px] object-contain`}
+                    className={`w-[28px] h-[28px]`}
                     onClick={() => setToggle(!toggle)}
                 />
 
                 <div
-                    className={`${!toggle ? "hidden" : "flex"} p-6 bg-light-bg border-2 dark:border-light-bg absolute top-20 right-0 mx-4 my-2 min-w-[140px] rounded-xl sidebar`}
+                    className={`${!toggle ? "hidden" : "flex"} p-6 bg-white-medium dark:bg-gray-dark border-2 absolute top-20 right-0 mx-4 my-2 min-w-[140px] rounded-xl sidebar`}
                 >
                     <ul className="list-none flex justify-end items-start flex-1 flex-col">
                         {navLinks.map((nav, _index) => (
                             <li
                                 key={nav.id}
-                                className='font-poppins font-medium cursor-pointer text-[16px] text-light-text'
+                                className='font-poppins font-normal cursor-pointer text-[16px] text-light-text dark:text-white-medium rounded-md bg-light-bg dark:bg-gray-medium shadow-lg'
                                 onClick={() => setActive(nav.title)}
                             >
-                                <a href={`${nav.url}`}>{nav.title}</a>
+                                <a href={`${nav.url}`} className="px-4 py-3 flex space-x-2">{nav.title}</a>
                             </li>
                         ))}
 
                         {/* button for theme toggling */}
-                        <li className="font-poppins font-medium cursor-pointer text-[16px] text-light-text">
-                            <button className="" onClick={handleThemeSwitch}>
+                        <li className="font-poppins font-normal cursor-pointer text-[16px] text-light-text dark:text-white-medium rounded-md bg-light-bg dark:bg-gray-medium shadow-lg">
+                            <button className="px-4 py-3 flex space-x-2" onClick={handleThemeSwitch}>
                                 <a>Dark Mode</a>
                             </button>
                         </li>
+
+                        <li className="font-poppins font-normal cursor-pointer text-[16px] text-light-text dark:text-white-medium rounded-md bg-light-bg dark:bg-gray-medium shadow-lg">
+                            {/* Links to the documentation */}
+                            <Link to="/docs" className="px-4 py-3 flex space-x-2">Docs</Link>
+                        </li>
+
                     </ul>
                 </div>
             </div>
