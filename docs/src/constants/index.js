@@ -1,4 +1,5 @@
 import { github_logo_white } from "../assets";
+import { documentation } from "./documentation";
 
 export const navLinks = [
     {
@@ -14,3 +15,7 @@ export const navLinks = [
         icon: github_logo_white
     }
 ];
+
+export {
+    documentation
+}

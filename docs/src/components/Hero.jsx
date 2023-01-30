@@ -22,9 +22,9 @@ const Hero = () => {
                     </h1>
 
                     <p className="font-poppins text-white-dark text-center py-4 px-5">
-                        Fury Bot is a Discord bot to assist in the management of your e-sports Discord server.
-                        Through years of experience in the e-sports industry, we have developed a bot that will
-                        give you all the utilities you need to manage a PG-rated, safe, and fun Discord server.
+                    The Fury Bot is a Discord-based software tool designed to facilitate the management of your e-sports Discord server. 
+                    Our extensive experience in the e-sports industry has enabled us to create a bot that provides all the necessary features 
+                    to maintain a safe, enjoyable, and age-appropriate Discord server.
                     </p>
                 </div>
 
@@ -34,9 +34,9 @@ const Hero = () => {
                     </h1>
 
                     <p className="font-poppins text-white-dark text-center py-4 px-5">
-                        Fury Bot comes out of the box with a complete team management system. This system allows
-                        you to create teams, add players to teams, manage team rosters, send annoucements to teams,
-                        and much more. More about this can be found in the Team documentation.
+                    The Fury Bot is equipped with a comprehensive team management system out of the box. 
+                    This system enables you to create teams, add players, oversee rosters, disseminate announcements to teams, 
+                    and perform various other tasks. Further information about this system can be found in the Team Documentation.
                     </p>
                 </div>
 
@@ -46,10 +46,10 @@ const Hero = () => {
                     </h1>
 
                     <p className="font-poppins text-white-dark text-center py-4 px-5">
-                        The most important aspect about managing a Discord server fit for a school environment is
-                        the ability to moderate your members. This includes weeding out profanity and looking for signs
-                        of bullying, harassment, and other negative behavior. Fury Bot is here for you! Fury Bot comes
-                        with a complete set of tools to help you manage your members.
+                    The key aspect of managing a Discord server that is appropriate for a school environment is the ability to regulate 
+                    your members. This involves eliminating inappropriate language and monitoring for signs of bullying, harassment, 
+                    and other undesirable behaviors. The Fury Bot is equipped to assist you in these efforts. It comes with a complete 
+                    suite of tools to aid in the management of your members.
                     </p>
                 </div>
 
