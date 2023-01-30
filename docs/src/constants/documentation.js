@@ -5,6 +5,7 @@ export const documentation = [
             Our advanced team management system provides all the tools and features necessary to effectively organize, manage, and monitor your e-sports team. \
             From creating and managing rosters, to tracking practice times and performance statistics, Fury Bot streamlines the entire team management process and \
             helps you stay on top of your team's progress.`,
+        id: "team-management",
         subheadings: [
             {
                 title: "Team Practices",
@@ -21,6 +22,7 @@ export const documentation = [
                     valuable tool for moderators looking to take their e-sports teams to the next level. By providing an accurate \
                     and up-to-date view of team practice habits, moderators can make informed decisions and adjustments to \
                     improve their team's performance and achieve their goals.`,
+                id: "team-practices",
                 subheadings: [
                     {
                         title: "Starting a Practice as a Player",
@@ -31,6 +33,7 @@ export const documentation = [
                             and leave the voice chat, providing a complete record of your practice session.\n \
                             Once all members have left the voice channel, the practice session will end and your statistics will be updated. \
                             Please note that it may take up to 10 minutes for your practice time to be reflected on the leaderboard.`,
+                        id: "starting-a-practice-as-a-player",
                         // subheadings: [
                         //     {
                         //         title: "Sub sub sub heading",
@@ -45,5 +48,6 @@ export const documentation = [
     {
         title: "Other Big Heading",
         description: "This is a massive heading with no subheadings!",
-    }
+        id: "other-big-heading"
+    },
 ]
