@@ -247,7 +247,7 @@ class Teams(BaseCog):
             value=', '.join(m.mention for m in scrim.home_voters) or 'No members have voted.',
         )
         home_embed.add_field(
-            name=f'{scrim.home_team.display_name} Team Votes',
+            name=f'{scrim.away_team.display_name} Team Votes',
             value=', '.join(m.mention for m in scrim.away_voters) or 'No members have voted.',
         )
 
