@@ -45,9 +45,4 @@ export const documentation = [
             }
         ]
     },
-    {
-        title: "Other Big Heading",
-        description: "This is a massive heading with no subheadings!",
-        id: "other-big-heading"
-    },
 ]
