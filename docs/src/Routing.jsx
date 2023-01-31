@@ -6,7 +6,7 @@ import { Docs, Home, Layout } from './pages';
 const Routing = () => {
   return (
     <div>
-      <BrowserRouter basename="/Fury-Bot">
+      <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Home />} />
