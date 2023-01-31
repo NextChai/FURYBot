@@ -6,11 +6,11 @@ import { Docs, Home, Layout } from './pages';
 const Routing = () => {
   return (
     <div>
-      <BrowserRouter>
+      <BrowserRouter basename="/Fury-Bot">
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Home />} />
-            <Route path='docs' element={<Docs />} />
+            <Route path='/docs' element={<Docs />} />
           </Route>
         </Routes>
       </BrowserRouter>
