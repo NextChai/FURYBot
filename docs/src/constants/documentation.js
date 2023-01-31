@@ -1,3 +1,5 @@
+import { practice_start_embed, practice_start_slash_command, practice_ended_embed } from "../assets"
+
 export const documentation = [
     {
         title: "Team Management",
@@ -29,11 +31,21 @@ export const documentation = [
                         description: `All members are required to participate in a weekly practice session on Mondays unless otherwise agreed upon. \
                             The use of Fury Bot's Practice Session feature is essential to accurately record and monitor these practices.\n \
                             Initiating a Fury Bot Practice Session is a straightforward process, requiring only a single slash command. To start a session, \
-                            connect to your team's voice chat and enter the command "/practice start." Fury Bot will then track your team members as they join \
-                            and leave the voice chat, providing a complete record of your practice session.\n \
-                            Once all members have left the voice channel, the practice session will end and your statistics will be updated. \
-                            Please note that it may take up to 10 minutes for your practice time to be reflected on the leaderboard.`,
+                            connect to your team's voice chat and enter the command "/practice start." {image_practice_start_slash_command}\n \
+                            You will see a confirmation message that a practice session has started. This message will automatically update \
+                            as members join the practice and mark themselves as not attending. {image_practice_start_embed}\n \
+                            Shown on the image above, "Attending Members" are the members that have shown up to the practice. If you're unable \
+                            to attend a given practice, it's crucial that you notify your team using the "I Can't Attend" button and provide a \
+                            reason for your absence. If you do not join the practice and do not notify your team, you will be marked absent and \
+                            a Captain will be made aware so that they can take appropriate action. {image_practice_ended_embed}\n \
+                            When all team members have left the voice channel, the practice will end and you'll receieve a confirmation message \
+                            in your team text chat. On the practice ended message, you can see the total practice time, when the practice started and ended, as well as \
+                            the members who attended and those who were absent. During a given practice it's acceptable to leave and rejoin the \
+                            voice channel, the Fury Bot will track your time accordingly.`,
                         id: "starting-a-practice-as-a-player",
+                        image_practice_start_slash_command: practice_start_slash_command,
+                        image_practice_start_embed: practice_start_embed,
+                        image_practice_ended_embed: practice_ended_embed,
                         // subheadings: [
                         //     {
                         //         title: "Sub sub sub heading",

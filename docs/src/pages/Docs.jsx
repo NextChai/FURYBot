@@ -5,7 +5,7 @@ import { DocumentationSelectionEntry, DocumentationEntry } from '../components';
 
 const Docs = () => {
     return (
-        <div className="flex items-stretch divide-x-2 divide-gray-light">
+        <div className="sm:flex hidden items-stretch divide-x-2 divide-gray-light">
 
             <div className="w-80">
                 { /* 

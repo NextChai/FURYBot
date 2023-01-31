@@ -2,6 +2,56 @@ import React from 'react';
 
 import { link } from '../assets';
 
+const IMAGE_REGEX = /(\{image[\S]+\})/g;
+
+/// This function will parse the given split descroption line and format it to be displayed
+/// with any images that may be in the description.
+function parse_description_doc(line, item) {
+    // Match the description first to see if there's any images
+    const matches = line.match(IMAGE_REGEX);
+    if (!matches) {
+        // There are no images, so just return the description
+        return (
+            <p className="text-slate-300 font-poppins text-md py-4 max-w-[70%]">
+                {line}
+            </p>
+        )
+    }
+
+    // There are images, so we need to split the description  into parts by the images
+    let split = line.split(IMAGE_REGEX);
+    console.log(split);
+
+    return <div>
+        {
+            split.map((split_item) => {
+                console.log(split_item);
+                console.log(typeof split_item);
+                if (split_item.length == 0) {
+                    // Sometimes we can get empty strings, so we just skip them
+                    return null;
+                }
+
+                // If this is an image, we need to get the image from the item and display it
+                if (split_item.startsWith("{image")) {
+                    // Chop the "{" and "}" off the beginning and end of the string
+                    let image_name = split_item.substring(1, split_item.length - 1);
+                    let image = item[image_name];
+
+                    return <img src={image} className="max-w-md h-auto" />
+                }
+
+                // This isn't an image, so we can display the text as normal.
+                return (
+                    <p className="text-slate-300 font-poppins text-md py-4 max-w-[70%]">
+                        {split_item}
+                    </p>
+                )
+            })
+        }
+    </div>
+}
+
 function DocumentationSelectionEntry(item) {
     return (
         <div>
@@ -54,11 +104,7 @@ function DocumentationEntrySubheading(size, item) {
 
             {
                 item["description"] == null ? null : (
-                    item.description.split("\n").map((line) => (
-                        <p className="text-slate-300 font-poppins text-md py-4 max-w-[70%]">
-                            {line}
-                        </p>
-                    ))
+                    item.description.split("\n").map((line) => parse_description_doc(line, item))
                 )
             }
 

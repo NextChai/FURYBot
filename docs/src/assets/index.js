@@ -8,6 +8,9 @@ import close_black from './close_black.svg';
 import mobile_interface from './mobile_interface.svg';
 import pc from './pc.svg';
 import link from './link.png';
+import practice_start_embed from './practice_start_embed.png';
+import practice_start_slash_command from './practice_start_slash_command.png';
+import practice_ended_embed from './practice_ended_embed.png';
 
 export {
     fb_logo,
@@ -19,5 +22,8 @@ export {
     close_black,
     mobile_interface,
     pc,
-    link
+    link,
+    practice_start_embed,
+    practice_start_slash_command,
+    practice_ended_embed
 }
