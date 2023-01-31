@@ -1,13 +1,13 @@
 import React from 'react';
 import { Routes, Route, BrowserRouter } from "react-router-dom";
 import { Docs, Home, Layout } from './pages';
-import { base } from '../vite.config';
 
+const basename = process.env.NODE_ENV === 'production' ? '/Fury-Bot' : '/';
 
 const Routing = () => {
   return (
     <div>
-      <BrowserRouter basename={base}>
+      <BrowserRouter basename={basename}>
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Home />} />
