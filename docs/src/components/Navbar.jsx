@@ -13,7 +13,7 @@ const Navbar = () => {
         <nav className="w-full flex py-6 justify-between items-center navbar ">
             {/* FuryBot Logo */}
             <div className="pl-5">
-                <img src={fb_logo} alt="Fury-Bot Logo" className="w-[50px] h-[50px] rounded-full drop-shadow-lg" />
+                <img src={fb_logo} alt="Fury-Bot Logo" className="sm:w-[50px] sm:h-[50px] w-[40px] h-[40px] rounded-full drop-shadow-lg" />
             </div>
 
 
@@ -42,13 +42,15 @@ const Navbar = () => {
             </ul>
 
             {/* Navigation Links for mobile (hidden for desktop) */}
-            <div className="sm:hidden flex flex-1 justify-end items-center">
-                <img
-                    src={toggle ? close : menu}
-                    alt="menu"
-                    className={`w-[28px] h-[28px]`}
-                    onClick={() => setToggle(!toggle)}
-                />
+            <div className="sm:hidden flex justify-end items-center">
+                <div className="px-5">
+                    <img
+                        src={toggle ? close : menu}
+                        alt="menu"
+                        className={`w-[28px] h-[28px]`}
+                        onClick={() => setToggle(!toggle)}
+                    />
+                </div>
 
                 <div
                     className={`${!toggle ? "hidden" : "flex"} p-6 backdrop-blur absolute top-20 right-0 mx-4 my-2 min-w-[140px] rounded-xl sidebar`}

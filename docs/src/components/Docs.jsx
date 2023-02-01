@@ -12,7 +12,7 @@ function parse_description_doc(line, item) {
     if (!matches) {
         // There are no images, so just return the description
         return (
-            <p className="text-slate-300 font-poppins text-md py-4 max-w-[70%]">
+            <p className="text-slate-300 font-poppins sm:text-md text-sm py-4 sm:max-w-[70%] max-w-[90%]">
                 {line}
             </p>
         )
@@ -38,12 +38,12 @@ function parse_description_doc(line, item) {
                     let image_name = split_item.substring(1, split_item.length - 1);
                     let image = item[image_name];
 
-                    return <img src={image} className="max-w-md h-auto" />
+                    return <img src={image} className="sm:max-w-md max-w-xs h-auto" />
                 }
 
                 // This isn't an image, so we can display the text as normal.
                 return (
-                    <p className="text-slate-300 font-poppins text-md py-4 max-w-[70%]">
+                    <p className="text-slate-300 font-poppins sm:text-md text-sm py-4 sm:max-w-[70%] max-w-[90%]">
                         {split_item}
                     </p>
                 )
@@ -93,7 +93,7 @@ function DocumentationEntrySubheading(size, item) {
         <div className="py-4">
 
             <div className="flex space-x-2">
-                <p className={`font-poppins text-white text-${size}xl font-semibold`} id={item.id}>
+                <p className={`font-poppins text-white sm:text-${size}xl text-${size - 1}xl font-semibold`} id={item.id}>
                     {item.title}
                 </p>
 
@@ -126,7 +126,7 @@ function DocumentationEntry(item) {
             */}
 
             <div className="flex space-x-2">
-                <p className="text-fury font-poppins text-4xl font-bold" id={item.id}>
+                <p className="text-fury font-poppins sm:text-4xl text-2xl font-bold" id={item.id}>
                     {item.title}
                 </p>
 
@@ -137,7 +137,7 @@ function DocumentationEntry(item) {
 
             {
                 item["description"] == null ? null : (
-                    <p className="text-slate-300 font-poppins max-w-[70%] text-md px-1 py-2">
+                    <p className="text-slate-300 font-poppins sm:max-w-[70%] max-w-[90%] sm:text-md text-sm px-1 py-2">
                         {item.description}
                     </p>
                 )
