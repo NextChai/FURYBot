@@ -56,7 +56,7 @@ function DocumentationSelectionEntry(item) {
     return (
         <div>
             <p className="font-poppins text-white text-md pl-10 pt-5 pb-2 hover:scale-105 transition ease-in-out delay-50 duration-50">
-                <a href={`#${item.id}`}>{item.title}</a>
+                <a href={`#/docs/#${item.id}`}>{item.title}</a>
             </p>
 
             <ul className="list-disc text-slate-300 px-[5rem] hover:scale-105 transition ease-in-out delay-50 duration-50">
@@ -64,7 +64,7 @@ function DocumentationSelectionEntry(item) {
                     item['subheadings'] == null ? null : (
                         item.subheadings.map((subheading, index) => (
                             <li key={index}>
-                                <a href={`#${subheading.id}`}>{subheading.title}</a>
+                                <a href={`#/docs/#${subheading.id}`}>{subheading.title}</a>
                             </li>
                         ))
                     )
