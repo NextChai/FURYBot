@@ -97,7 +97,7 @@ function DocumentationEntrySubheading(size, item) {
                     {item.title}
                 </p>
 
-                <a href={`#${item.id}`}>
+                <a href={`#/docs/#${item.id}`}>
                     <img src={link} className="w-[10px] h-[10px]" />
                 </a>
             </div>
@@ -130,7 +130,7 @@ function DocumentationEntry(item) {
                     {item.title}
                 </p>
 
-                <a href={`#${item.id}`}>
+                <a href={`#/docs/#${item.id}`}>
                     <img src={link} className="w-[15px] h-[15px]" />
                 </a>
             </div>
