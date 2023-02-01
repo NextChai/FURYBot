@@ -6,9 +6,9 @@ import { Docs, Home, Layout } from './pages';
 const Routing = () => {
   return (
     <div>
-      <HashRouter basename='/Fury-Bot'>
+      <HashRouter basename='/'>
         <Routes>
-          <Route path="/" element={<Layout />}>
+          <Route path="/" element={<Layout />}> {/* put url base here and nest children routes */}
             <Route index element={<Home />} />
             <Route path='/docs' element={<Docs />} />
           </Route>
