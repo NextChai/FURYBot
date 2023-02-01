@@ -28,7 +28,7 @@ export const documentation = [
                 subheadings: [
                     {
                         title: "Starting a Practice as a Player",
-                        description: `All members are required to participate in a weekly practice session on Mondays unless otherwise agreed upon. \
+                        description: `All members are required to participate in a weekly practice session on Mondays unless otherwise agreed upon by the team. \
                             The use of Fury Bot's Practice Session feature is essential to accurately record and monitor these practices.\n \
                             Initiating a Fury Bot Practice Session is a straightforward process, requiring only a single slash command. To start a session, \
                             connect to your team's voice chat and enter the command "/practice start." {image_practice_start_slash_command}\n \
