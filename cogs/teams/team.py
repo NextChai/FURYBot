@@ -575,15 +575,19 @@ class Team:
                 'DELETE FROM teams.members WHERE team_id = $1 AND member_id = $2', self.id, team_member.member_id
             )
 
-        member = team_member.member or await team_member.fetch_member()
+        try:
+            member = team_member.member or await team_member.fetch_member()
+        except discord.NotFound:
+            # This member has left the guild, we can not edit the channels as a result.
+            pass
+        else:
+            category = self.category_channel
+            overwrites = category.overwrites
+            overwrites.pop(member, None)
+            await category.edit(overwrites=overwrites)
 
-        category = self.category_channel
-        overwrites = category.overwrites
-        overwrites.pop(member, None)
-        await category.edit(overwrites=overwrites)
-
-        await self.text_channel.edit(sync_permissions=True)
-        await self.voice_channel.edit(sync_permissions=True)
+            await self.text_channel.edit(sync_permissions=True)
+            await self.voice_channel.edit(sync_permissions=True)
 
         # Update the object
         self.team_members.pop(team_member.member_id, None)
