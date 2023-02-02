@@ -450,6 +450,26 @@ class FuryBot(commands.Bot):
             f'Connected to {len(self.guilds)} servers total watching over {sum(list(m_count for g in self.guilds if (m_count := g.member_count))):,} members.'
         )
         _log.info(f'Invite link: {discord.utils.oauth_url(self.user.id, permissions=discord.Permissions(0))}')
+        
+    async def on_raw_member_remove(self, payload: discord.RawMemberRemoveEvent) -> None:
+        """|coro|
+        
+        Called when a member has been removed from a specific guild. This event listener will delete this member
+        from any team they're on as to not allow members not in the server to appear on teams.
+        
+        Parameters
+        ----------
+        payload: :class:`discord.RawMemberRemoveEvent`
+            The payload for the event.
+        """
+        teams = self.get_teams(payload.guild_id)
+        if not teams:
+            return
+        
+        for team in teams:
+            member = team.get_member(payload.user.id)
+            if member is not None:
+                await member.remove_from_team()
 
     # Helper utilities
     def safe_connection(self, *, timeout: Optional[float] = 10.0) -> DbContextManager:

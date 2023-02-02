@@ -564,6 +564,11 @@ class Team:
         """|coro|
 
         A method used to remove this member from its team.
+        
+        Parameters
+        ----------
+        team_member: :class:`TeamMember`
+            The member you want to remove from the team.
         """
         async with self.bot.safe_connection() as connection:
             await connection.execute(
