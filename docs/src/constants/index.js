@@ -1,5 +1,6 @@
 import { github_logo_white } from "../assets";
 import { documentation } from "./documentation";
+import { hero } from  "./hero";
 
 export const navLinks = [
     {
@@ -17,5 +18,6 @@ export const navLinks = [
 ];
 
 export {
-    documentation
+    documentation,
+    hero
 }
