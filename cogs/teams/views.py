@@ -1199,6 +1199,9 @@ class TeamPracticesView(BaseView):
         )
         return await interaction.response.edit_message(view=self)
 
+    # TODO: Add a button to view complete practice history (see ID)
+    # TODO: Add a button to get a practice by it's ID
+
 
 class TeamView(BaseView):
     """The main Team View to edit a team."""
