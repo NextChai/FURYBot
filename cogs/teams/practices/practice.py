@@ -382,6 +382,49 @@ class Practice(Teamable):
 
         return self.ended_at - self.started_at
 
+    async def fetch_end_embed(self) -> discord.Embed:
+        embed = self.team.embed(
+            title=f'{self.team.display_name} Practice Ended.',
+            description=f'This practice started by {self.started_by.mention} has come to an end.\n\n'
+            f'- **Started At**: {self.format_start_time()}\n'
+            f'- **Ended At**: {self.format_end_time()}\n',
+        )
+
+        practice_members_formatted = '\n'.join(
+            [f'{m.mention}: {human_timedelta(m.get_total_practice_time().total_seconds())}' for m in self.attending_members]
+        )
+        excused_members_fornmatted = ', '.join([m.mention for m in self.excused_members])
+
+        embed.add_field(
+            name='Attended Members',
+            value=f'{len(self.attending_members)} members attended this practice session.\n{practice_members_formatted}',
+            inline=False,
+        )
+
+        if excused_members_fornmatted:
+            embed.add_field(
+                name='Excused Members',
+                value=f'The following members could not make it to this practice session: {excused_members_fornmatted}',
+                inline=False,
+            )
+
+        missing_members = self.missing_members
+        if missing_members:
+            missing_members_mentions = ', '.join([m.mention for m in missing_members])
+            embed.add_field(
+                name='Missing Members',
+                value=f'The following did not go to the practice and did not mark themselves as excused: {missing_members_mentions}',
+            )
+
+        ranking = await self.team.fetch_practice_rank()
+        embed.add_field(
+            name='Practice Time Rank',
+            value=f'Out of {len(self.bot.get_teams(self.guild_id))} teams, this team is ranked **#{ranking}** in practice time.',
+            inline=False,
+        )
+
+        return embed
+
     # Methods for managing members that join and leave the voice channel for the given practice session.
     async def handle_member_unable_to_join(self, *, member: discord.Member, reason: str) -> PracticeMember:
         """|coro|
@@ -547,47 +590,14 @@ class Practice(Teamable):
             )
 
         _log.debug("Practice %s has ended.", self.id)
+        
+        embed = await self.fetch_end_embed()
 
-        embed = self.team.embed(
-            title=f'{self.team.display_name} Practice Ended.',
-            description=f'This practice started by {self.started_by.mention} has come to an end.\n\n'
-            f'- **Started At**: {self.format_start_time()}\n'
-            f'- **Ended At**: {self.format_end_time()}\n',
-        )
+        # NOTE: Add a note for if only one member joins the pracrice session.
+        if len(self.attending_members) == 1:
+            embed.insert_field_at(0, name='Warning', value='There is only one member that attended this practice session.', inline=False)
 
-        practice_members_formatted = '\n'.join(
-            [f'{m.mention}: {human_timedelta(m.get_total_practice_time().total_seconds())}' for m in self.attending_members]
-        )
-        excused_members_fornmatted = ', '.join([m.mention for m in self.excused_members])
-
-        embed.add_field(
-            name='Attended Members',
-            value=f'{len(self.attending_members)} members attended this practice session.\n{practice_members_formatted}',
-            inline=False,
-        )
-
-        if excused_members_fornmatted:
-            embed.add_field(
-                name='Excused Members',
-                value=f'The following members could not make it to this practice session: {excused_members_fornmatted}',
-                inline=False,
-            )
-
-        missing_members = self.missing_members
-        if missing_members:
-            missing_members_mentions = ', '.join([m.mention for m in missing_members])
-            embed.add_field(
-                name='Missing Members',
-                value=f'The following did not go to the practice and did not mark themselves as excused: {missing_members_mentions}',
-            )
-
-        ranking = await self.team.fetch_practice_rank()
-        embed.add_field(
-            name='Practice Time Rank',
-            value=f'Out of {len(self.bot.get_teams(self.guild_id))} teams, this team is ranked **#{ranking}** in practice time.',
-            inline=False,
-        )
-
+        embed = await self.fetch_end_embed()
         message = await self.team.text_channel.fetch_message(self.message_id)
         await message.reply(
             embed=embed,
