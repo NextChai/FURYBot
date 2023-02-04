@@ -59,7 +59,31 @@ class PracticeMemberHistory(TeamMemberable, Teamable):
     - :class:`TeamMemberable`
     - :class:`Teamable`
 
-    NOTE: Add attrs
+    Parameters
+    ----------
+    member: :class:`PracticeMember`
+        The member this history belongs to.
+    data: :class:`dict`
+        The data to initialise this history with. See required
+        keys via the attributes section.
+
+    Attributes
+    ----------
+    member: :class:`PracticeMember`
+        The member this history belongs to.
+    id: :class:`int`
+        The ID of this practice entry.
+    joined_at: :class:`datetime.datetime`
+        The time the member joined the voice channel.
+    left_at: Optional[:class:`datetime.datetime`]
+        The time the member left the voice channel. If the member is still in the voice channel
+        then this will be ``None``.
+    team_id: :class:`int`
+        The ID of the team the member is on.
+    channel_id: :class:`int`
+        The ID of the voice channel this practice is in.
+    guild_id: :class:`int`
+        The ID of the guild this practice is in.
     """
 
     def __init__(self, *, member: PracticeMember, data: Dict[str, Any]) -> None:
@@ -104,7 +128,30 @@ class PracticeMember(TeamMemberable, Teamable):
     - :class:`TeamMemberable`
     - :class:`Teamable`
 
-    NOTE: Add attrs
+    Parameters
+    ----------
+    practice: :class:`Practice`
+        The practice this member belongs to.
+    data: :class:`dict`
+        The data to initialise this history with. See required
+        keys via the attributes section.
+
+    Attributes
+    ----------
+    practice: :class:`Practice`
+        The practice this member belongs to.
+    id: :class:`int`
+        The ID of this practice member.
+    member_id: :class:`int`
+        The Discord ID of the given member.
+    practice_id: :class:`int`
+        The ID of the practice this member belongs to.
+    attending: :class:`bool`
+        Whether the member is attending or not. Defaults to ``True`` but
+        can be ``False`` if the member has marked themselves as not attending.
+    reason: :class:`str`
+        The reason the member has marked themselves as not attending. If :attr:`attending`
+        is ``False``, this will be :class:`str` 100% of the time.
     """
 
     def __init__(self, *, practice: Practice, data: Dict[str, Any]) -> None:
@@ -164,10 +211,12 @@ class PracticeMember(TeamMemberable, Teamable):
 
     @property
     def history(self) -> List[PracticeMemberHistory]:
+        """List[:class:`PracticeMemberHistory`]: Returns the history for this member during this practice."""
         return self._history
 
     @property
     def is_practicing(self) -> bool:
+        """Determines if the member is currently in the voice channel for this practice."""
         current_history = self.current_history
         if current_history is None:
             return False
@@ -176,6 +225,7 @@ class PracticeMember(TeamMemberable, Teamable):
 
     @property
     def mention(self) -> str:
+        """:class:`str`: Returns a Discord mention for this member."""
         return f'<@{self.member_id}>'
 
     def get_total_practice_time(self) -> datetime.timedelta:
@@ -280,7 +330,40 @@ class Practice(Teamable):
     - :class:`Guildable`
     - :class:`Teamable`
 
-    NOTE: Add attrs
+    Parameters
+    ----------
+    bot: :class:`FuryBot`
+        The bot instance.
+    data: :class:`dict`
+        The raw data for this practice. See the attributes below
+        for the required keys.
+
+    Attributes
+    ----------
+    bot: :class:`FuryBot`
+        The bot instance.
+    id: :class:`int`
+        The ID of this practice.
+    started_at: :class:`datetime.datetime`
+        The time this practice was started.
+    ended_at: Optional[:class:`datetime.datetime`]
+        The time this practice was ended. This will be ``None`` if the practice is still ongoing.
+    team_id: :class:`int`
+        The ID of the team this practice is for.
+    channel_id: :class:`int`
+        The ID of the voice channel this practice is in.
+    guild_id: :class:`int`
+        The ID of the guild this practice is in.
+    status: :class:`PracticeStatus`
+        The status of this practice.
+    message_id: :class:`int`
+        The ID of the message that is used to display the current status of the practice
+        to the team members.
+    view: :class:`PracticeView`
+        The persistent view used to display the current status of the practice to the team members.
+        Also used to handle the buttons for the practice.
+    started_by_id: :class:`int`
+        The ID of the member that started this practice.
     """
 
     def __init__(self, *, bot: FuryBot, data: Dict[str, Any]) -> None:
@@ -327,61 +410,95 @@ class Practice(Teamable):
 
     @property
     def team(self) -> Team:
+        """:class:`Team`: The team this practice is for."""
         team = self.bot.get_team(self.team_id, self.guild_id)
         assert team
         return team
 
     @property
     def members(self) -> List[PracticeMember]:
+        """List[:class:`PracticeMember`]: A list of all members that are or are not attending this practice."""
         return list(self._members.values())
 
     @property
     def attending_members(self) -> List[PracticeMember]:
+        """List[:class:`PracticeMember`]: A list of all members that are attending this practice."""
         return [m for m in self.members if m.attending]
 
     @property
     def excused_members(self) -> List[PracticeMember]:
+        """List[:class:`PracticeMember`]: A list of all members that are excused from this practice. These are the members
+        that opted-out of this practice and provided a reason."""
         return [m for m in self.members if not m.attending]
 
     @property
     def missing_members(self) -> List[TeamMember]:
+        """List[:class:`TeamMember`]: A list of all members that are missing from this practice. These are the members
+        have not yet joined the practice or opted-out of it."""
         return [m for m in self.team.members if m.member_id not in self._members]
 
     @property
     def started_by(self) -> PracticeMember:
+        """:class:`PracticeMember`: The member that started this practice."""
         member = self.get_member(self.started_by_id)
         return cast(PracticeMember, member)
 
     @property
     def ongoing(self) -> bool:
+        """:class:`bool`: Whether this practice is ongoing or not."""
         return self.status is PracticeStatus.ongoing
 
     @property
     def duration(self) -> Optional[datetime.timedelta]:
+        """Optional[:class:`datetime.timedelta`]: The duration of this practice. This will be ``None`` if the practice has not ended."""
         if not self.ended_at:
             return None
 
         return self.ended_at - self.started_at
 
     def get_member(self, member_id: int) -> Optional[PracticeMember]:
+        """Gets a member from this practice.
+
+        Parameters
+        ----------
+        member_id: :class:`int`
+            The ID of the member to get.
+
+        Returns
+        -------
+        Optional[:class:`PracticeMember`]
+            The member if they are in this practice, otherwise ``None``.
+        """
         return self._members.get(member_id)
 
     def format_start_time(self) -> str:
+        """:class:`str`: A formatted string with Discord timestamps representing the start time of this practice."""
         return f'{discord.utils.format_dt(self.started_at, "F")} ({discord.utils.format_dt(self.started_at, "R")})'
 
     def format_end_time(self) -> Optional[str]:
+        """Optional[:class:`str`]: A formatted string with Discord timestamps representing the end time of this practice.
+        Will be ``None`` if the practice has not ended."""
         if not self.ended_at:
             return None
 
         return f'{discord.utils.format_dt(self.ended_at, "F")} ({discord.utils.format_dt(self.ended_at, "R")})'
 
     def get_total_practice_time(self) -> Optional[datetime.timedelta]:
+        """Optional[:class:`datetime.timedelta`]: The total time this practicve was. This will be ``None`` if the practice has not ended."""
         if not self.ended_at:
             return None
 
         return self.ended_at - self.started_at
 
     async def fetch_end_embed(self) -> discord.Embed:
+        """|coro|
+
+        Fetches the embed that is sent when this practice ends.
+
+        Returns
+        -------
+        :class:`discord.Embed`
+        """
         embed = self.team.embed(
             title=f'{self.team.display_name} Practice Ended.',
             description=f'This practice started by {self.started_by.mention} has come to an end.\n\n'
