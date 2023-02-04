@@ -175,6 +175,21 @@ class PracticeLeaderboard(Guildable):
 
 
 class PracticeLeaderboardCog(BaseCog):
+    """The cog to manmage creating and deleting practice leaderboards for a given guild.
+
+    Will also handle updating the leaderboard.
+
+    Parameters
+    ----------
+    bot: :class:`FuryBot`
+        The bot instance.
+
+    Attributes
+    ----------
+    leaderboard_cache: :class:`dict`
+        A mapping of ``{guild id: {channel id: practice_leaderboard}}`` to store the leaderboards in memory.
+    """
+
     practice_leaderboard = app_commands.Group(
         name='practice-leaderboard',
         description='Manage practice leaderboards.',
@@ -189,6 +204,11 @@ class PracticeLeaderboardCog(BaseCog):
         self.leaderboard_cache: Dict[int, Dict[int, PracticeLeaderboard]] = {}
 
     async def cog_load(self) -> None:
+        """|coro|
+
+        A helper method called when the co is loaded. This will load all the leaderboards from the database
+        into memory and start the update loop.
+        """
         async with self.bot.safe_connection() as connection:
             data = await connection.fetch('SELECT * FROM teams.practice_leaderboards;')
 
@@ -200,6 +220,10 @@ class PracticeLeaderboardCog(BaseCog):
         self.update_leaderboards.start()
 
     async def cog_unload(self) -> None:
+        """|coro|
+
+        Called when the cog is unloaded. This will stop the update loop.
+        """
         self.update_leaderboards.stop()
 
     @practice_leaderboard.command(name='create', description='Create a practice leaderboard.')
@@ -210,6 +234,17 @@ class PracticeLeaderboardCog(BaseCog):
     async def practcie_leaderboard_create(
         self, interaction: discord.Interaction, role: discord.Role, channel: Optional[discord.TextChannel]
     ) -> discord.InteractionMessage:
+        """|coro|
+
+        Creates the leaderboard in a given channel.
+
+        Parameters
+        ----------
+        role: :class:`discord.Role`
+            The role to ping when a team is on top of the leaderboard.
+        channel: Optional[:class:`discord.TextChannel`]
+            The channel to post the leaderboard in. If not provided, the channel the command was used in will be used.
+        """
         assert interaction.guild
 
         await interaction.response.defer(ephemeral=True)
@@ -275,6 +310,15 @@ class PracticeLeaderboardCog(BaseCog):
     async def practcie_leaderboard_delete(
         self, interaction: discord.Interaction, channel: Optional[discord.TextChannel]
     ) -> discord.InteractionMessage:
+        """|coro|
+
+        Deletes the leaderboard in a given channel.
+
+        Parameters
+        ----------
+        channel: Optional[:class:`discord.TextChannel`]
+            The channel to delete the leaderboard from. If not provided, the channel the command was used in will be used.
+        """
         assert interaction.guild
 
         await interaction.response.defer(ephemeral=True)
@@ -299,6 +343,18 @@ class PracticeLeaderboardCog(BaseCog):
         return await interaction.edit_original_response(content='Successfully deleted leaderboard!')
 
     def create_leaderboard_embed(self, guild: discord.Guild, leaderboard: PracticeLeaderboard) -> Optional[discord.Embed]:
+        """|coro|
+
+        Creates the leaderboard embed for the given guild. Requires the :class:`PracticeLeaderboard` to be passed in
+        in order to keep track of roles.
+
+        Parameters
+        ----------
+        guild: :class:`discord.Guild`
+            The guild to create the leaderboard embed for.
+        leaderboard: :class:`PracticeLeaderboard`
+            The leaderboard to create the embed for.
+        """
         teams = self.bot.get_teams(guild.id)
         if not teams:
             return None
@@ -369,6 +425,11 @@ class PracticeLeaderboardCog(BaseCog):
 
     @tasks.loop(minutes=10)
     async def update_leaderboards(self) -> None:
+        """|coro|
+
+        An loop called every 10 minutes that edits the leaderboard message with an updated embed. Will also reassign
+        roles to the top team if they have changed.
+        """
         for guild_id, leaderboards in self.leaderboard_cache.items():
             guild = self.bot.get_guild(guild_id)
             if not guild:
@@ -400,5 +461,10 @@ class PracticeLeaderboardCog(BaseCog):
 
     @update_leaderboards.before_loop
     async def before_update_leaderboards(self) -> None:
+        """|coro|
+
+        Called before the :meth:`update_leaderboards` loop is started. Will
+        wait for the bot to be ready before starting the loop.
+        """
         await self.bot.wait_until_ready()
         _log.info('Starting practice leaderboard update loop.')
