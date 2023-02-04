@@ -1089,6 +1089,25 @@ class TeamPracticeView(BaseView):
         )
         return await interaction.response.edit_message(view=self)
 
+    @discord.ui.button(label='Delete Practice From Database')
+    @default_button_doc_string
+    async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Delete this practice from the database."""
+        if self.practice.ongoing:
+            return await interaction.response.send_message('You can\'t delete a practice that is ongoing.', ephemeral=True)
+
+        async with self.bot.safe_connection() as connection:
+            await connection.execute("DELETE FROM teams.practice WHERE id = $1", self.practice.id)
+
+        # Delete this practice from the bot's cache as well
+        self.bot._team_practice_cache.get(self.practice.guild_id, {}).get(self.practice.team_id, {}).pop(
+            self.practice.id, None
+        )
+
+        # Go back a parent view
+        view = TeamPracticesView(team=self.practice.team, target=interaction, parent=None)
+        await interaction.response.edit_message(view=view, embed=view.embed)
+
 
 class TeamPracticesView(BaseView):
     """"""
