@@ -590,12 +590,14 @@ class Practice(Teamable):
             )
 
         _log.debug("Practice %s has ended.", self.id)
-        
+
         embed = await self.fetch_end_embed()
 
         # NOTE: Add a note for if only one member joins the pracrice session.
         if len(self.attending_members) == 1:
-            embed.insert_field_at(0, name='Warning', value='There is only one member that attended this practice session.', inline=False)
+            embed.insert_field_at(
+                0, name='Warning', value='There is only one member that attended this practice session.', inline=False
+            )
 
         embed = await self.fetch_end_embed()
         message = await self.team.text_channel.fetch_message(self.message_id)
@@ -604,3 +606,13 @@ class Practice(Teamable):
             allowed_mentions=discord.AllowedMentions(roles=self.team.captain_roles),
             content=', '.join(r.mention for r in self.team.captain_roles),
         )
+
+    async def delete(self) -> None:
+        """|coro|
+
+        Deletes the practice session and removes it from the cache.
+        """
+        async with self.bot.safe_connection() as connection:
+            await connection.execute("DELETE FROM teams.practice WHERE id = $1", self.id)
+        # Delete this practice from the bot's cache as well
+        self.bot._team_practice_cache.get(self.guild_id, {}).get(self.team_id, {}).pop(self.id, None)
