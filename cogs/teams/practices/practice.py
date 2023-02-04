@@ -31,8 +31,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
 
 import discord
 
-from utils.bases import Teamable, TeamMemberable
-from utils.time import human_timedelta
+from utils import human_timedelta, Teamable, TeamMemberable
 
 from ..errors import MemberNotOnTeam
 from .errors import *

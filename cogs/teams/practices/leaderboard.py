@@ -33,8 +33,7 @@ import discord
 from discord import app_commands
 from discord.ext import tasks
 
-from utils import BaseCog, Guildable, human_join
-from utils.time import human_timedelta
+from utils import BaseCog, Guildable, human_join, human_timedelta
 
 if TYPE_CHECKING:
     from bot import FuryBot
