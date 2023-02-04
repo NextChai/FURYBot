@@ -164,9 +164,9 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
         if before.channel == after.channel:
             return
 
-        if before.channel is None and after.channel is not None:
-            _log.debug('Member %s has joined a voice channel', member.id)
-            # The member joined a voice channel
+        if after.channel is not None:
+            _log.debug('Member %s has switched voice channels', member.id)
+
             joined_channel = after.channel
             category: Optional[discord.CategoryChannel] = joined_channel.category
 
@@ -193,9 +193,11 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
             except (MemberNotOnTeam, MemberNotAttendingPractice):
                 return
 
-        elif before.channel is not None and after.channel is None:  # The member left a voice channel.
-            left_chanenl = before.channel
-            category: Optional[discord.CategoryChannel] = left_chanenl.category
+        elif before.channel is not None and after.channel is None:
+            _log.debug('Member %s has left a voice channel', member.id)
+
+            left_channel = before.channel
+            category: Optional[discord.CategoryChannel] = left_channel.category
 
             if category is None:
                 return
