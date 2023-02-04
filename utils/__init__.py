@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     import discord
 
     BV = TypeVar('BV', bound='discord.ui.View')
-    ButtonCallback = Callable[[BV, discord.Interaction, discord.ui.Button[BV]], Coroutine[Any, Any, Any]]
+    ButtonCallback = Callable[[BV, discord.Interaction[Any], discord.ui.Button[BV]], Coroutine[Any, Any, Any]]
 
 __all__: Tuple[str, ...] = ('RUNNING_DEVELOPMENT', 'default_button_doc_string', 'human_join')
 

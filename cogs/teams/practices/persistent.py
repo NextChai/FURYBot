@@ -30,7 +30,7 @@ from typing_extensions import Self
 
 from cogs.teams.errors import MemberNotOnTeam
 from cogs.teams.practices.errors import MemberAlreadyInPractice
-from utils import human_timedelta
+from utils import human_timedelta, default_button_doc_string
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -41,6 +41,16 @@ __all__: Tuple[str, ...] = ('PracticeView', 'UnabletoAttendModal')
 
 
 class UnabletoAttendModal(discord.ui.Modal):
+    """A modal spawned from the :class:`PracticeView` when a member opts-out of a practice.
+
+    Parameters
+    ----------
+    practice: :class:`Practice`
+        The practice that the member is opting out of.
+    member: :class:`discord.Member`
+        The member that is opting out of the practice.
+    """
+
     reason: discord.ui.TextInput[Self] = discord.ui.TextInput(
         label='Why Can\'t You Attend?',
         style=discord.TextStyle.long,
@@ -55,13 +65,26 @@ class UnabletoAttendModal(discord.ui.Modal):
         super().__init__(timeout=None, title="Why Can't You Attend?")
 
     async def interaction_check(self, interaction: discord.Interaction, /) -> Optional[bool]:
+        """|coro|
+
+        A check to ensure that the interaction is from the member that is opting out of the practice.
+        """
         if interaction.user != self.member:
             return await interaction.response.send_message("Hey! This isn\'t yours!", ephemeral=True)
 
         return True
 
     async def on_submit(self, interaction: discord.Interaction[FuryBot], /) -> None:
-        # We need to create a new attending member entry and provide the reason
+        """|coro|
+
+        Called when the modal has been submitted. Will handle the member opting out of the practice
+        and complain to the invoker if they're not on the team or they've already opted out.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction created from the user pressing "Submit".
+        """
         await interaction.response.defer()
 
         try:
@@ -79,6 +102,14 @@ class UnabletoAttendModal(discord.ui.Modal):
 
 
 class PracticeView(discord.ui.View):
+    """The persistent practice view creates when a practice is created.
+
+    Parameters
+    ----------
+    practice: :class:`Practice`
+        The practice that the persistent view is being created for.
+    """
+
     def __init__(self, practice: Practice) -> None:
         self.practice: Practice = practice
         super().__init__(timeout=None)
@@ -123,6 +154,7 @@ class PracticeView(discord.ui.View):
 
     @property
     def embed(self) -> discord.Embed:
+        """:class:`discord.Emebd`: The embed that is displayed in the persistent view for this practice."""
         if not self.practice.ongoing:
             return self._practice_done_embed
 
@@ -183,8 +215,10 @@ class PracticeView(discord.ui.View):
         await message.edit(view=self, embed=self.embed)
 
     @discord.ui.button(label="I Can\'t Attend", style=discord.ButtonStyle.red, custom_id='unable-to-attend')
+    @default_button_doc_string
     async def handle_unable_to_attend(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> None:
+        """Called when the user presses the "I Can't Attend" button.". Will spawn the unable to attend modal."""
         assert isinstance(interaction.user, discord.Member)
         await interaction.response.send_modal(UnabletoAttendModal(practice=self.practice, member=interaction.user))
