@@ -167,6 +167,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
         if after.channel is not None:
             _log.debug('Member %s has switched voice channels', member.id)
 
+            # All we know is that the member has switched voice channels to a new one.
             joined_channel = after.channel
             category: Optional[discord.CategoryChannel] = joined_channel.category
 
@@ -180,7 +181,14 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
                 _log.debug('The channel %s is not in a team category', joined_channel.id)
                 return
 
-            # Check if this team has an ongoing practice
+            team_voice_channel = team.voice_channel
+            joined_team_voice_channel = (before.channel != team_voice_channel) and after.channel == team_voice_channel
+            if not joined_team_voice_channel:
+                return
+
+            _log.debug('Member %s has joined the team voice channel', member.id)
+
+            # This new channel is in a team category, so let's check if there's an ongoing practice
             practice = team.ongoing_practice
             if practice is None:
                 _log.debug('No ongoing team practice found for team %s', team.id)
@@ -192,14 +200,19 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
                 return await practice.handle_member_join(member=member)
             except (MemberNotOnTeam, MemberNotAttendingPractice):
                 return
-
-        elif before.channel is not None and after.channel is None:
+        else:
             _log.debug('Member %s has left a voice channel', member.id)
+
+            if before.channel is None:
+                # NOTE: This shouldn't happen really, but it's a fail safe.
+                _log.debug('Member %s was not in a voice channel before, returning.', member.id)
+                return
 
             left_channel = before.channel
             category: Optional[discord.CategoryChannel] = left_channel.category
 
             if category is None:
+                _log.debug('The channel %s the member left is not in a category', left_channel.id)
                 return
 
             try:
@@ -207,15 +220,17 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
             except Exception:
                 return
 
-            # Check if there's an ongoing practice
-            practice = team.ongoing_practice
-            if practice is None:
-                return
+            left_team_voice_chanenl = before.channel == team.voice_channel
+            if left_team_voice_chanenl:
+                # Check if there's an ongoing practice
+                practice = team.ongoing_practice
+                if practice is None:
+                    return
 
-            try:
-                return await practice.handle_member_leave(member=member)
-            except (MemberNotOnTeam, MemberNotInPractice, MemberNotAttendingPractice):
-                return
+                try:
+                    return await practice.handle_member_leave(member=member)
+                except (MemberNotOnTeam, MemberNotInPractice, MemberNotAttendingPractice):
+                    return
 
 
 async def setup(bot: FuryBot) -> None:
