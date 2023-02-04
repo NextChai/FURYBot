@@ -589,4 +589,8 @@ class Practice(Teamable):
         )
 
         message = await self.team.text_channel.fetch_message(self.message_id)
-        await message.reply(embed=embed)
+        await message.reply(
+            embed=embed,
+            allowed_mentions=discord.AllowedMentions(roles=self.team.captain_roles),
+            content=', '.join(r.mention for r in self.team.captain_roles),
+        )
