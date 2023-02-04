@@ -1024,7 +1024,15 @@ class TeamPracticeMemberView(BaseView):
 
         return embed
 
-    # TODO: Add buttons for removing this member from the practice.
+    @discord.ui.button(label='Delete Member From Practice')
+    @default_button_doc_string
+    async def delete_member_from_practice(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Deletes the given member from this practice and acts if they never attended in the first place."""
+        await self.member.delete()
+
+        view = TeamPracticeView(self.member.practice, target=interaction.user)
+        return await interaction.response.edit_message(view=view, embed=view.embed)
+
     # TODO: Add buttons for removing a history from this member.
 
 

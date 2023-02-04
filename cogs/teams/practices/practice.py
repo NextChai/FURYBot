@@ -239,6 +239,22 @@ class PracticeMember(TeamMemberable, Teamable):
 
         return total_time
 
+    async def delete(self) -> None:
+        """|coro|
+
+        Deletes this member from this practice, deleting their history for this practice as well.
+        """
+        async with self.practice.bot.safe_connection() as connection:
+            await connection.execute("DELETE FROM teans.practice_member WHERE id = $1", self.id)
+            await connection.execute(
+                "DELETE FROM teams.practice_member_history WHERE member_id = $1 AND practice_id = $2",
+                self.member_id,
+                self.practice_id,
+            )
+
+        # Remove from the practice's cache as well
+        self.practice._remove_member(self.member_id)
+
     async def handle_join(self, *, when: Optional[datetime.datetime] = None) -> PracticeMemberHistory:
         """|coro|
 
@@ -265,7 +281,7 @@ class PracticeMember(TeamMemberable, Teamable):
                     self.practice.team_id,
                     self.practice.channel_id,
                     self.practice.guild_id,
-                    self.practice.id,
+                    self.practice_id,
                     self.member_id,
                 )
                 assert practice_member_history_data
@@ -641,7 +657,6 @@ class Practice(Teamable):
             # Check if they manually selected not attending.
             if not attending_member.attending:
                 # They just joined the voice channel, let's ignore them
-                # TODO: Maybe edit this?
                 _log.debug("Member %s is not attending practice. ignoring them.", member.id)
                 raise MemberNotAttendingPractice(f'The member {member.id} is not attending practice {self.id}.')
 
