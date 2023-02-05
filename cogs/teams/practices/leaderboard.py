@@ -46,6 +46,20 @@ _log = logging.getLogger(__name__)
 _log.setLevel(logging.DEBUG)
 
 
+def _get_team_total_practice_time(team: Team) -> datetime.timedelta:
+    total_time = datetime.timedelta()
+    for practice in team.practices:
+        if len(practice.members) == 1:
+            # Only one member attended, we need to ignore them
+            continue
+
+        prac_time = practice.get_total_practice_time()
+        if prac_time is not None:
+            total_time += prac_time
+
+    return total_time
+
+
 @dataclasses.dataclass(init=True, kw_only=True)
 class PracticeLeaderboard(Guildable):
     """Represents a practice leaderboard for a specific guild.
@@ -277,7 +291,7 @@ class PracticeLeaderboardCog(BaseCog):
         )
         message = await channel.send(embed=embed)
 
-        top_ten_teams = sorted(teams, key=lambda team: team.get_total_practice_time(), reverse=True)[:10]
+        top_ten_teams = sorted(teams, key=lambda team: _get_team_total_practice_time(team), reverse=True)[:10]
         top_team = top_ten_teams[0]
 
         async with self.bot.safe_connection() as connection:

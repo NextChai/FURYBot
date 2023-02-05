@@ -428,7 +428,6 @@ class Team:
         return total_time
 
     def rank_member_practice_times(self) -> List[Tuple[TeamMember, datetime.timedelta]]:
-        """"""
         member_times: Dict[TeamMember, datetime.timedelta] = {}
 
         for practice in self.practices:
@@ -564,7 +563,7 @@ class Team:
         """|coro|
 
         A method used to remove this member from its team.
-        
+
         Parameters
         ----------
         team_member: :class:`TeamMember`
