@@ -730,7 +730,6 @@ class Practice(Teamable):
                 0, name='Warning', value='There is only one member that attended this practice session.', inline=False
             )
 
-        embed = await self.fetch_end_embed()
         message = await self.team.text_channel.fetch_message(self.message_id)
         await message.reply(
             embed=embed,
