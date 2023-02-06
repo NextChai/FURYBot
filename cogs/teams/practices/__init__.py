@@ -133,9 +133,14 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
 
             # Add this practice to the bot so we can access it later
             self.bot.add_practice(practice)
-            
+        
+        await practice.handle_member_join(member=member, when=interaction.created_at)
+        
         # Add all members in the voice channel already
         for connected_member in connected_channel.members:
+            if connected_member == member:
+                continue
+            
             try:
                 await practice.handle_member_join(member=connected_member, when=interaction.created_at)
             except MemberNotOnTeam:
