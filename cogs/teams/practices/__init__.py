@@ -129,18 +129,34 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
             )
             assert practice_data
 
-        practice = Practice(bot=self.bot, data=dict(practice_data))
+            practice = Practice(bot=self.bot, data=dict(practice_data))
 
-        # Add this practice to the bot so we can access it later
-        self.bot.add_practice(practice)
+            # Add this practice to the bot so we can access it later
+            self.bot.add_practice(practice)
+
+            # Add the new team member before we add the rest of the members
+            team_member = team.get_member(member.id)
+            assert team_member
+            
+            practice_member_data = await connection.fetchrow(
+                "INSERT INTO teams.practice_member (member_id, practice_id) VALUES ($1, $2) RETURNING *",
+                member.id,
+                practice.id,
+            )
+            
+            assert practice_member_data
+            practice._add_member(dict(practice_member_data))
 
         # Add all members in the voice channel already
-        for member in connected_channel.members:
-            team_member = team.get_member(member.id)
+        for connected_member in connected_channel.members:
+            if connected_member == member:
+                continue
+            
+            team_member = team.get_member(connected_member.id)
             if team_member is None:
                 continue
 
-            await practice.handle_member_join(member=member, when=interaction.created_at)
+            await practice.handle_member_join(member=connected_member, when=interaction.created_at)
 
         await interaction.edit_original_response(content="A new practice has been created.")
 
