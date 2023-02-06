@@ -29,8 +29,14 @@ import discord
 from discord import app_commands
 from typing_extensions import Self
 
-from utils import IMAGE_NOTIFICATIONS_ROLE_ID, IMAGE_REQUEST_CHANNEL_ID, BaseCog, BaseModal, default_button_doc_string
-from utils.constants import FURY_GUILD
+from utils import (
+    IMAGE_NOTIFICATIONS_ROLE_ID,
+    IMAGE_REQUEST_CHANNEL_ID,
+    BaseCog,
+    BaseModal,
+    default_button_doc_string,
+    FURY_GUILD,
+)
 
 if TYPE_CHECKING:
     from discord.interactions import InteractionChannel

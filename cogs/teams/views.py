@@ -67,7 +67,18 @@ def clamp(minimum: Optional[int], maximum: int) -> int:
 
 
 class TeamMemberPracticeStatisticsView(BaseView):
-    """"""
+    """Displays the statistics of a given practice for a given member.
+
+    This view is launched from the :class:`TeamMemberView` view.
+
+    Parameters
+    Attributes
+    ----------
+    memvber: :class:`TeamMember`
+        The member to display the statistics for.
+    discord_member: :class:`discord.Member`
+        The member's specific Discord object to use for display name.
+    """
 
     def __init__(self, member: TeamMember, discord_member: discord.Member, *args: Any, **kwargs: Any) -> None:
         self.member: TeamMember = member
@@ -76,6 +87,7 @@ class TeamMemberPracticeStatisticsView(BaseView):
 
     @property
     def embed(self) -> discord.Embed:
+        """:class:`discord.Embed`: Generates the practice statistics for the member."""
         team = self.member.team
         embed = team.embed(title="Practice Statistics")
 
@@ -761,7 +773,6 @@ class TeamChannelsView(BaseView):
 class TeamNamingView(BaseView):
     """A view used to manage naming and renaming a team.
 
-
     Parameters
     ----------
     team: :class:`.Team`
@@ -950,7 +961,18 @@ class TeamCaptainsView(BaseView):
 
 
 class TeamPracticeMemberView(BaseView):
-    """A view to manage a practice member"""
+    """A view to manage a practice member.
+
+    This view is launched from the :class:`TeamPracticeView` view.
+
+    Parameters
+    Attributes
+    ----------
+    member: :class:`.PracticeMember`
+        The practice member to manage.
+    discord_member: :class:`discord.Member`
+        The :class:`discord.Member` object representing the member.
+    """
 
     def __init__(self, member: PracticeMember, discord_member: discord.Member, *args: Any, **kwargs: Any) -> None:
         self.member: PracticeMember = member
@@ -959,6 +981,7 @@ class TeamPracticeMemberView(BaseView):
 
     @property
     def embed(self) -> discord.Embed:
+        """:class:`discord.Embed`: The embed representing this practice member."""
         practice = self.member.practice
 
         embed = practice.team.embed(
@@ -1001,8 +1024,21 @@ class TeamPracticeMemberView(BaseView):
 
         return embed
 
+    @discord.ui.button(label='Delete Member From Practice')
+    @default_button_doc_string
+    async def delete_member_from_practice(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Deletes the given member from this practice and acts if they never attended in the first place."""
+        await self.member.delete()
+
+        view = TeamPracticeView(self.member.practice, target=interaction.user)
+        return await interaction.response.edit_message(view=view, embed=view.embed)
+
+    # TODO: Add buttons for removing a history from this member.
+
 
 class TeamPracticeView(BaseView):
+    """"""
+
     def __init__(self, practice: Practice, *args: Any, **kwargs: Any) -> None:
         self.practice: Practice = practice
         super().__init__(*args, **kwargs)
@@ -1089,9 +1125,29 @@ class TeamPracticeView(BaseView):
         )
         return await interaction.response.edit_message(view=self)
 
+    @discord.ui.button(label='Delete Practice')
+    @default_button_doc_string
+    async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Delete this practice from the database."""
+        if self.practice.ongoing:
+            return await interaction.response.send_message('You can\'t delete a practice that is ongoing.', ephemeral=True)
+
+        await self.practice.delete()
+
+        # Go back a parent view
+        view = TeamPracticesView(team=self.practice.team, target=interaction, parent=None)
+        await interaction.response.edit_message(view=view, embed=view.embed)
+
 
 class TeamPracticesView(BaseView):
-    """"""
+    """Represents a view for displaying and managing a team's practices.
+
+    Parameters
+    Attributes
+    ----------
+    team: :class:`Team`
+        The team to display practices for.
+    """
 
     def __init__(self, team: Team, *args: Any, **kwargs: Any) -> None:
         self.team: Team = team
@@ -1099,6 +1155,7 @@ class TeamPracticesView(BaseView):
 
     @property
     def embed(self) -> discord.Embed:
+        """:class:`discord.Embed`: Displays team statistics for practices."""
 
         embed = self.team.embed(
             title="Practices.",
@@ -1179,6 +1236,9 @@ class TeamPracticesView(BaseView):
             callback=self._manage_practice_after,
         )
         return await interaction.response.edit_message(view=self)
+
+    # TODO: Add a button to view complete practice history (see ID)
+    # TODO: Add a button to get a practice by it's ID
 
 
 class TeamView(BaseView):

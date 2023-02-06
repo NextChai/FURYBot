@@ -31,7 +31,8 @@ export const documentation = [
                         description: `All members are required to participate in a weekly practice session on Mondays unless otherwise agreed upon by the team. \
                             The use of Fury Bot's Practice Session feature is essential to accurately record and monitor these practices.\n \
                             Initiating a Fury Bot Practice Session is a straightforward process, requiring only a single slash command. To start a session, \
-                            connect to your team's voice chat and enter the command "/practice start." {image_practice_start_slash_command}\n \
+                            connect to your team's voice chat and enter the command "/practice start." Please note this will include \
+                            all members currently in the voice channel into the practice as well. {image_practice_start_slash_command}\n \
                             You will see a confirmation message that a practice session has started. This message will automatically update \
                             as members join the practice and mark themselves as not attending. {image_practice_start_embed}\n \
                             Shown on the image above, "Attending Members" are the members that have shown up to the practice. If you're unable \
@@ -46,13 +47,26 @@ export const documentation = [
                         image_practice_start_slash_command: practice_start_slash_command,
                         image_practice_start_embed: practice_start_embed,
                         image_practice_ended_embed: practice_ended_embed,
-                        // subheadings: [
-                        //     {
-                        //         title: "Sub sub sub heading",
-                        //         description: "This is a sub sub sub heading lol"
-                        //     }
-                        // ]
-                    }
+                        subheadings: [
+                            {
+                                title: "Starting a Practice FAQ",
+                                description: `Below contains some of the frequently asked questions regarding starting a practice session. If you have \
+                                    any additional questions, please contact a Captain or Moderator.`,
+                                id: "starting-a-practice-faq",
+                                subheadings: [
+                                    {
+                                        title: "My Team is Not Showing Up for Practice",
+                                        description: `If you are the only member on your team that is showing up for a given practice, you should \
+                                            start a practice session, wait to see if any members join, and then end the practice session. You should not remain \
+                                            alone in the voice channel for an extended period of time. Fury Bot will automatically make a note of the \
+                                            practice session and notify a Captain or Moderator. If you are unable to attend a practice, please use the \
+                                            "I Can't Attend" button to notify your team.`,
+                                        id: "my-team-is-not-showing-up-for-practice",
+                                    }
+                                ]
+                            }
+                        ]
+                    },
                 ]
             }
         ]
