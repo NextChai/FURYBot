@@ -601,7 +601,7 @@ class Practice(Teamable):
 
         await self.view.update_message()
         return attending_member
-
+    
     async def handle_member_join(
         self, *, member: discord.Member, when: Optional[datetime.datetime] = None
     ) -> PracticeMember:

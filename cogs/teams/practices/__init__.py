@@ -133,30 +133,13 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
 
             # Add this practice to the bot so we can access it later
             self.bot.add_practice(practice)
-
-            # Add the new team member before we add the rest of the members
-            team_member = team.get_member(member.id)
-            assert team_member
             
-            practice_member_data = await connection.fetchrow(
-                "INSERT INTO teams.practice_member (member_id, practice_id) VALUES ($1, $2) RETURNING *",
-                member.id,
-                practice.id,
-            )
-            
-            assert practice_member_data
-            practice._add_member(dict(practice_member_data))
-
         # Add all members in the voice channel already
         for connected_member in connected_channel.members:
-            if connected_member == member:
-                continue
-            
-            team_member = team.get_member(connected_member.id)
-            if team_member is None:
-                continue
-
-            await practice.handle_member_join(member=connected_member, when=interaction.created_at)
+            try:
+                await practice.handle_member_join(member=connected_member, when=interaction.created_at)
+            except MemberNotOnTeam:
+                pass
 
         await interaction.edit_original_response(content="A new practice has been created.")
 
