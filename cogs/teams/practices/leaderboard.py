@@ -154,7 +154,11 @@ class PracticeLeaderboard(Guildable):
         previous_top_team = self.bot.get_team(self.top_team_id, team.guild_id)
         if previous_top_team:
             for team_member in previous_top_team.members:
-                member = team_member.member or await team_member.fetch_member()
+                try:
+                    member = team_member.member or await team_member.fetch_member()
+                except discord.NotFound:
+                    continue
+                    
                 try:
                     await member.remove_roles(role, reason='Team member booted off leaderboard.')
                 except discord.Forbidden:
@@ -170,12 +174,15 @@ class PracticeLeaderboard(Guildable):
 
         # Add roles onto new team
         for team_member in team.members:
-            member = team_member.member or await team_member.fetch_member()
+            try:
+                member = team_member.member or await team_member.fetch_member()
+            except discord.NotFound:
+                continue
+                
             try:
                 await member.add_roles(role, reason="Team member booted off leaderboard.")
             except discord.Forbidden:
                 pass
-
 
     async def delete(self) -> None:
         """|coro|
