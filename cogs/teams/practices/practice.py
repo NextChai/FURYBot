@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import math
 import asyncio
 import datetime
 import enum
@@ -498,7 +499,7 @@ class Practice(Teamable):
             return None
 
         hours = total_time.total_seconds() / 3600
-        return hours * (1 + 0.1 * (len(self.attending_members) - 1))
+        return hours * (1 + 0.2 * math.log10(len(self.attending_members)))
 
     def get_member(self, member_id: int) -> Optional[PracticeMember]:
         """Gets a member from this practice.
