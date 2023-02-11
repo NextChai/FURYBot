@@ -323,7 +323,7 @@ class PracticeLeaderboardCog(BaseCog):
 
         embed.add_field(
             name='Top Team',
-            value=f'{top_team.mention_members()}, great work! You have {top_points} points! For your efforts, you\'ve been rewarded with the '
+            value=f'{top_team.mention_members()}, great work! You have **{top_points:.2f} points**! For your efforts, you\'ve been rewarded with the '
             f'<@&{leaderboard.role_id}> role! This role will be reassigned if your team loses the #1 spot, so hold on tight!',
             inline=False,
         )
@@ -331,7 +331,7 @@ class PracticeLeaderboardCog(BaseCog):
         embed.add_field(
             name='Top 10 Teams',
             value='\n'.join(
-                f'{count}. **{team.display_name}**, {points} points'
+                f'{count}. **{team.display_name}**, {points:.2f} points'
                 for count, (team, points) in enumerate(teams[:10], start=1)
             ),
             inline=False,
