@@ -324,7 +324,7 @@ class PracticeLeaderboardCog(BaseCog):
         practice_time = top_team.get_total_practice_time().total_seconds()
         embed.add_field(
             name='Top Team',
-            value=f'{top_team.mention_members()}, great work! You have **{top_points:.2f} points**! You have'
+            value=f'{top_team.mention_members()}, great work! You have **{top_points:.2f} points**! You have '
             f'practiced for **{human_timedelta(practice_time)}**! For your efforts, you\'ve been rewarded with the '
             f'<@&{leaderboard.role_id}> role! This role will be reassigned if your team loses the #1 spot, so hold on tight!',
             inline=False,
