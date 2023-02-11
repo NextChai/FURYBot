@@ -23,10 +23,9 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import asyncio
 import dataclasses
 import logging
-from typing import TYPE_CHECKING, Any, Coroutine, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING,  Dict, List, Optional, Tuple, cast
 
 import discord
 from discord import app_commands
@@ -137,13 +136,18 @@ class PracticeLeaderboard(Guildable):
             # NOTE: Add exception raising here / auto removing leaderboard
             return
 
-        futures: List[Coroutine[Any, Any, None]] = []
-
         previous_top_team = self.bot.get_team(self.top_team_id, team.guild_id)
         if previous_top_team:
             for team_member in previous_top_team.members:
-                member = team_member.member or await team_member.fetch_member()
-                futures.append(member.remove_roles(role, reason='Team member booted off leaderboard.'))
+                try:
+                    member = team_member.member or await team_member.fetch_member()
+                except discord.NotFound:
+                    continue
+                    
+                try:
+                    await member.remove_roles(role, reason='Team member booted off leaderboard.')
+                except discord.Forbidden:
+                    pass
 
         self.top_team_id = team.id
         async with self.bot.safe_connection() as connection:
@@ -155,10 +159,15 @@ class PracticeLeaderboard(Guildable):
 
         # Add roles onto new team
         for team_member in team.members:
-            member = team_member.member or await team_member.fetch_member()
-            futures.append(member.add_roles(role, reason='Team member booted off leaderboard.'))
-
-        await asyncio.gather(*futures)
+            try:
+                member = team_member.member or await team_member.fetch_member()
+            except discord.NotFound:
+                continue
+                
+            try:
+                await member.add_roles(role, reason="Team member booted off leaderboard.")
+            except discord.Forbidden:
+                pass
 
     async def delete(self) -> None:
         """|coro|

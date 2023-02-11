@@ -27,7 +27,7 @@ import asyncio
 import datetime
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import discord
 
@@ -457,7 +457,8 @@ class Practice(Teamable):
     def started_by(self) -> PracticeMember:
         """:class:`PracticeMember`: The member that started this practice."""
         member = self.get_member(self.started_by_id)
-        return cast(PracticeMember, member)
+        assert member
+        return member
 
     @property
     def ongoing(self) -> bool:
@@ -627,7 +628,7 @@ class Practice(Teamable):
 
         await self.view.update_message()
         return attending_member
-
+    
     async def handle_member_join(
         self, *, member: discord.Member, when: Optional[datetime.datetime] = None
     ) -> PracticeMember:

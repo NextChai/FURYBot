@@ -1164,9 +1164,13 @@ class TeamPracticesView(BaseView):
 
         # Get the average number of members per practice
         # Get the average total time in a practice.
-        average_number_of_members = sum(len(p.members) for p in self.team.practices) / len(self.team.practices)
-        average_time = self.team.get_total_practice_time() / len(self.team.practices)
-
+        if len(self.team.practices) > 0:
+            average_number_of_members = sum(len(p.members) for p in self.team.practices) / len(self.team.practices)
+            average_time = self.team.get_total_practice_time() / len(self.team.practices)
+        else:
+            average_number_of_members = 0
+            average_time = datetime.timedelta()
+    
         embed.add_field(
             name='Average Number of Members', value=f'**{average_number_of_members:.2f}** members.', inline=False
         )
@@ -1177,27 +1181,30 @@ class TeamPracticesView(BaseView):
 
         # The total number of practices done "in a row". The longest streak of practices (a streak breaks if there is 8 days without a practice)
         streak = self.team.get_practice_streak()
-        embed.add_field(
-            name="Longest Practice Streak",
-            value=f"**{streak}** practices (8 days without a practice breaks the streak).",
-            inline=False,
-        )
+        if streak != 0:
+            embed.add_field(
+                name="Longest Practice Streak",
+                value=f"**{streak}** practices (8 days without a practice breaks the streak).",
+                inline=False,
+            )
 
         ranked_members = self.team.rank_member_practice_times()
-        embed.add_field(
-            name="Top 5 Practice Times",
-            value='\n'.join(
-                f'{member.mention}: {human_timedelta(time.total_seconds())}' for (member, time) in ranked_members[:5]
-            ),
-            inline=False,
-        )
+        if ranked_members:
+            embed.add_field(
+                name="Top 5 Practice Times",
+                value='\n'.join(
+                    f'{member.mention}: {human_timedelta(time.total_seconds())}' for (member, time) in ranked_members[:5]
+                ),
+                inline=False,
+            )
 
         absent_members = self.team.rank_member_absences()
-        embed.add_field(
-            name="Top 5 Absences",
-            value='\n'.join(f'{member.mention}: {absences}' for (member, absences) in absent_members[:5]),
-            inline=False,
-        )
+        if absent_members:
+            embed.add_field(
+                name="Top 5 Absences",
+                value='\n'.join(f'{member.mention}: {absences}' for (member, absences) in absent_members[:5]),
+                inline=False,
+            )
 
         return embed
 

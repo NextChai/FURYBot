@@ -843,3 +843,5 @@ class Team:
 
         for channel in self.extra_channels:
             await channel.delete()
+
+        self.bot.remove_team(self.id, self.guild_id)

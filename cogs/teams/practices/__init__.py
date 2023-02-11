@@ -129,18 +129,22 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
             )
             assert practice_data
 
-        practice = Practice(bot=self.bot, data=dict(practice_data))
+            practice = Practice(bot=self.bot, data=dict(practice_data))
 
-        # Add this practice to the bot so we can access it later
-        self.bot.add_practice(practice)
-
+            # Add this practice to the bot so we can access it later
+            self.bot.add_practice(practice)
+        
+        await practice.handle_member_join(member=member, when=interaction.created_at)
+        
         # Add all members in the voice channel already
-        for member in connected_channel.members:
-            team_member = team.get_member(member.id)
-            if team_member is None:
+        for connected_member in connected_channel.members:
+            if connected_member == member:
                 continue
-
-            await practice.handle_member_join(member=member, when=interaction.created_at)
+            
+            try:
+                await practice.handle_member_join(member=connected_member, when=interaction.created_at)
+            except MemberNotOnTeam:
+                pass
 
         await interaction.edit_original_response(content="A new practice has been created.")
 
