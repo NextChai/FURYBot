@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-import datetime
 import logging
 from typing import TYPE_CHECKING, Any, Coroutine, Dict, List, Optional, Tuple, cast
 
@@ -33,7 +32,7 @@ import discord
 from discord import app_commands
 from discord.ext import tasks
 
-from utils import BaseCog, Guildable, human_join, human_timedelta
+from utils import BaseCog, Guildable
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -44,20 +43,6 @@ __all__: Tuple[str, ...] = ('PracticeLeaderboard', 'PracticeLeaderboardCog')
 
 _log = logging.getLogger(__name__)
 _log.setLevel(logging.DEBUG)
-
-
-def _get_team_total_practice_time(team: Team) -> datetime.timedelta:
-    total_time = datetime.timedelta()
-    for practice in team.practices:
-        if len(practice.members) == 1:
-            # Only one member attended, we need to ignore them
-            continue
-
-        prac_time = practice.get_total_practice_time()
-        if prac_time is not None:
-            total_time += prac_time
-
-    return total_time
 
 
 @dataclasses.dataclass(init=True, kw_only=True)
@@ -240,6 +225,74 @@ class PracticeLeaderboardCog(BaseCog):
         """
         self.update_leaderboards.stop()
 
+    def rank_teams(self, guild_id: int, /) -> List[Tuple[Team, float]]:
+        """Rank all the teams for the given guild based on their total points.
+
+        Parameters
+        ----------
+        guild_id: :class:`int`
+            The guild ID to rank the teams for.
+
+        Returns
+        -------
+        List[Tuple[:class:`Team`, :class:`float`]]
+            A list of tuples containing the team and their total points.
+        """
+        teams = self.bot.get_teams(guild_id)
+        if not teams:
+            return []
+
+        ranked_teams = sorted(
+            self.bot.get_teams(guild_id),
+            key=lambda team: team.total_points,
+        )
+
+        return [(team, team.total_points) for team in ranked_teams]
+
+    def create_leaderboard_embed(self, leaderboard: PracticeLeaderboard, teams: List[Tuple[Team, float]]) -> discord.Embed:
+        """Creates the leaderboard embed for the given leaderboard and teams.
+
+        Parameters
+        ----------
+        leaderboard: :class:`PracticeLeaderboard`
+            The leaderboard to create the embed for.
+        teams: List[Tuple[:class:`Team`, :class:`float`]]
+            The teams to create the leaderboard for.
+
+        Returns
+        -------
+        :class:`discord.Embed`
+            The leaderboard embed.
+        """
+        if not teams:
+            return discord.Embed(title='Leaderboard', description='No teams found.')
+
+        top_team, top_points = teams[0]
+        embed = top_team.embed(
+            title="Practice Leaderboard",
+            description="Below represents the practice leaderboard for the teams on this server! "
+            f"This is a cumulative report based on the practice times logged from {self.bot.user.mention}. "
+            "To increase your team's practice time, start a Fury Bot practice with your team and play together!",
+        )
+
+        embed.add_field(
+            name='Top Team',
+            value=f'{top_team.mention_members()}, great work! You have **{top_points} points**! For your efforts, you\'ve been rewarded with the '
+            f'<@&{leaderboard.role_id}> role! This role will be reassigned if your team loses the #1 spot, so hold on tight!',
+            inline=False,
+        )
+
+        embed.add_field(
+            name='Top 10 Teams',
+            value='\n'.join(
+                f'{count}. **{team.display_name}**, **{points} points**'
+                for count, (team, points) in enumerate(teams[:10], start=1)
+            ),
+            inline=False,
+        )
+
+        return embed
+
     @practice_leaderboard.command(name='create', description='Create a practice leaderboard.')
     @app_commands.describe(
         channel='The channel the leaderboard should be posted in.',
@@ -291,8 +344,8 @@ class PracticeLeaderboardCog(BaseCog):
         )
         message = await channel.send(embed=embed)
 
-        top_ten_teams = sorted(teams, key=lambda team: _get_team_total_practice_time(team), reverse=True)[:10]
-        top_team = top_ten_teams[0]
+        ranked_teams = self.rank_teams(interaction.guild.id)
+        top_team = ranked_teams[0][0]
 
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
@@ -310,7 +363,7 @@ class PracticeLeaderboardCog(BaseCog):
         leaderboard = PracticeLeaderboard(bot=self.bot, **dict(data))
         self.leaderboard_cache.setdefault(interaction.guild.id, {})[channel.id] = leaderboard
 
-        embed = self.create_leaderboard_embed(interaction.guild, leaderboard)
+        embed = self.create_leaderboard_embed(leaderboard, ranked_teams)
         await message.edit(embed=embed)
 
         return await interaction.edit_original_response(
@@ -356,87 +409,6 @@ class PracticeLeaderboardCog(BaseCog):
 
         return await interaction.edit_original_response(content='Successfully deleted leaderboard!')
 
-    def create_leaderboard_embed(self, guild: discord.Guild, leaderboard: PracticeLeaderboard) -> Optional[discord.Embed]:
-        """|coro|
-
-        Creates the leaderboard embed for the given guild. Requires the :class:`PracticeLeaderboard` to be passed in
-        in order to keep track of roles.
-
-        Parameters
-        ----------
-        guild: :class:`discord.Guild`
-            The guild to create the leaderboard embed for.
-        leaderboard: :class:`PracticeLeaderboard`
-            The leaderboard to create the embed for.
-        """
-        teams = self.bot.get_teams(guild.id)
-        if not teams:
-            return None
-
-        # we need to rank the teams by their total practice time.
-        top_ten_teams = [
-            t
-            for t in sorted(teams, key=lambda team: team.get_total_practice_time(), reverse=True)
-            if t.get_total_practice_time() > datetime.timedelta(seconds=0)
-        ][:10]
-        top_team = top_ten_teams[0]
-
-        embed = top_team.embed(
-            title="Practice Leaderboard",
-            description="Below represents the practice leaderboard for the teams on this server! "
-            f"This is a cumulative report based on the practice times logged from {self.bot.user.mention}. "
-            "To increase your team's practice time, start a Fury Bot practice with your team and play together!",
-        )
-
-        member_mentions = human_join((member.mention for member in top_team.members))
-        embed.add_field(
-            name='Top Team',
-            value=f'{member_mentions}, great work! For your efforts, you\'ve been rewarded with the '
-            f'<@&{leaderboard.role_id}> role! This role will be reassigned if your team loses the #1 spot, so hold on tight!',
-            inline=False,
-        )
-
-        embed.add_field(
-            name='Top 10 Teams',
-            value='\n'.join(
-                f'{count}. **{team.display_name}**, {human_timedelta(team.get_total_practice_time().total_seconds())}'
-                for count, team in enumerate(top_ten_teams, start=1)
-            ),
-            inline=False,
-        )
-
-        # We need to get the up and coming teams. These are the teams that have the most amount of pracice time
-        # within the past 48 hours.
-        up_and_coming_teams: Dict[Team, datetime.timedelta] = {}
-        for team in teams:
-            for practice in team.practices:
-                duration = practice.duration
-                if not duration:
-                    continue
-
-                # Check if the practice ended within the past 48 hours.
-                assert practice.ended_at
-                if practice.ended_at < discord.utils.utcnow() - datetime.timedelta(days=2):
-                    continue
-
-                up_and_coming_teams[team] = up_and_coming_teams.get(team, datetime.timedelta()) + duration
-
-        if up_and_coming_teams:
-            sorted_teams: List[Tuple[Team, datetime.timedelta]] = sorted(
-                up_and_coming_teams.items(), key=lambda item: item[1], reverse=True
-            )[:10]
-
-            embed.add_field(
-                name='Up and Coming Teams',
-                value='\n'.join(
-                    f'{count}. **{team.display_name}**, {human_timedelta(duration.total_seconds())} in the past two days!'
-                    for count, (team, duration) in enumerate(sorted_teams, start=1)
-                ),
-                inline=False,
-            )
-
-        return embed
-
     @tasks.loop(minutes=10)
     async def update_leaderboards(self) -> None:
         """|coro|
@@ -451,25 +423,6 @@ class PracticeLeaderboardCog(BaseCog):
                 return None
 
             for leaderboard in leaderboards.values():
-                # We need to get the top team for the given guild
-                teams = self.bot.get_teams(guild_id)
-                top_ten_teams = sorted(teams, key=lambda team: team.get_total_practice_time(), reverse=True)[:10]
-                top_team = top_ten_teams[0]
-
-                if top_team.id != leaderboard.top_team_id:
-                    # Nothing to do
-                    _log.debug("Change in top team for guild %s.", guild_id)
-                    await leaderboard.change_top_team(top_team)
-
-                _log.debug('Updating message for leaderboard %s for guild %s.', leaderboard.id, guild_id)
-
-                message = await leaderboard.fetch_message()
-                if message is None:
-                    _log.debug('Unable to fetch message from leaderboard %s, skipping.', leaderboard.id)
-                    return
-
-                embed = self.create_leaderboard_embed(guild, leaderboard)
-                await message.edit(embed=embed)
 
                 _log.debug('Updated leaderboard %s for guild %s.', leaderboard.id, guild_id)
 

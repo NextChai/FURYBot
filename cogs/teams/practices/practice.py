@@ -472,6 +472,33 @@ class Practice(Teamable):
 
         return self.ended_at - self.started_at
 
+    @property
+    def total_points(self) -> Optional[float]:
+        """Calculates the total points this practice has generated for the team.
+
+        The formula used in the function gives a bonus of 10% for each additional member in the team,
+        in addition to the base score of hours.
+
+        For example, if a team of 2 members practiced for 5 hours, the score would be:
+
+        .. code-block:: python3
+
+            print(practice.total_points) # 5 hours at 2 members
+            >>> 7.0
+            
+        Returns
+        -------
+        Optional[:class:`float`]
+            The total points this practice has generated for the team. 
+            This will be ``None`` if the practice has not ended.
+        """
+        total_time = self.duration
+        if not total_time:
+            return None
+
+        hours = total_time.total_seconds() / 3600
+        return hours * (1 + 0.1 * (len(self.attending_members) - 1))
+
     def get_member(self, member_id: int) -> Optional[PracticeMember]:
         """Gets a member from this practice.
 

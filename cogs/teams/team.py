@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union,
 import discord
 from typing_extensions import Self
 
-from utils import MiniQueryBuilder
+from utils import MiniQueryBuilder, human_join
 
 if TYPE_CHECKING:
     import asyncpg
@@ -97,6 +97,10 @@ class TeamMember:
         return f'<@{self.member_id}>'
 
     async def remove_from_team(self) -> None:
+        """|coro|
+
+        Removes the member from the team.
+        """
         return await self.team.remove_team_member(self)
 
     async def demote(self) -> None:
@@ -356,20 +360,48 @@ class Team:
 
     @property
     def practices(self) -> List[Practice]:
+        """List[:class:`Practice`]: A list of all practices this team has."""
         return self.bot.get_practices_for(self.id, self.guild_id)
 
     @property
     def ongoing_practice(self) -> Optional[Practice]:
+        """Optional[:class:`Practice`]: The ongoing practice for this team."""
         return discord.utils.find(lambda practice: practice.ongoing, self.practices)
 
     @property
     def captain_roles(self) -> List[discord.Role]:
+        """List[:class:`discord.Role`]: A list of all captain roles for this team."""
         guild = self.guild
         return [role for role_id in self.captain_role_ids if (role := guild.get_role(role_id))]
 
     @property
     def display_name(self) -> str:
+        """:class:`str`: The display name for this team."""
         return f'{self.name} {f"({self.nickname})" if self.nickname else ""}'.strip()
+
+    @property
+    def total_points(self) -> float:
+        """:class:`float`: The total points for this team based on their practices."""
+        practice_points = list(points for practice in self.practices if (points := practice.total_points))
+        if not practice_points:
+            return 0
+
+        return sum(practice_points)
+
+    def mention_members(self, delimiter: str = ', ') -> str:
+        """Mentions all the members in this team.
+
+        Parameters
+        ----------
+        delimiter: :class:`str`
+            The delimiter to use when joining the mentions.
+
+        Returns
+        -------
+        :class:`str`
+            The mentions.
+        """
+        return human_join((member.mention for member in self.members), delimiter=delimiter)
 
     def embed(
         self,
@@ -379,6 +411,19 @@ class Team:
         description: Optional[Any] = None,
         author: Optional[Union[discord.User, discord.Member]] = None,
     ) -> discord.Embed:
+        """Creates and standard embed for ths team.
+
+        Parameters
+        ----------
+        title: :class:`str`
+            The title of the embed.
+        url: :class:`str`
+            The url of the embed.
+        description: :class:`str`
+            The description of the embed.
+        author: Union[:class:`discord.User`, :class:`discord.Member`]
+            The author of the embed.
+        """
         embed = self.bot.Embed(title=title, description=description, url=url, author=author)
 
         if author is None:
@@ -390,12 +435,43 @@ class Team:
         return embed
 
     def has_channel(self, channel_id: int, /) -> bool:
+        """Determines if a channel is bound to this team.
+
+        Parameters
+        ----------
+        channel_id: :class:`int`
+            The channel ID to check.
+
+        Returns
+        -------
+        :class:`bool`
+        """
         return channel_id in [self.category_channel_id, self.text_channel_id, self.voice_channel_id] + self.extra_channel_ids
 
     def get_member(self, member_id: int, /) -> Optional[TeamMember]:
+        """Gets a member from this team based upon the given ID.
+
+        Parameters
+        ----------
+        member_id: :class:`int`
+            The member ID to get.
+
+        Returns
+        -------
+        Optional[:class:`TeamMember`]
+            The member if found, otherwise ``None``.
+        """
         return self.team_members.get(member_id)
 
     def get_practice_streak(self) -> int:
+        """The current practice streak for this team. This is the number of practices in a row that have
+        been completed.
+
+        Returns
+        -------
+        :class:`int`
+            The practice streak.
+        """
         streak = 0
         for i, practice in enumerate(self.practices):
             if i == 0:
@@ -418,6 +494,13 @@ class Team:
         return streak
 
     def get_total_practice_time(self) -> datetime.timedelta:
+        """Gets the total practice time for this team.
+
+        Returns
+        -------
+        :class:`datetime.timedelta`
+            The total practice time.
+        """
         total_time = datetime.timedelta()
 
         for practice in self.practices:
@@ -428,6 +511,13 @@ class Team:
         return total_time
 
     def rank_member_practice_times(self) -> List[Tuple[TeamMember, datetime.timedelta]]:
+        """Ranks the members of this team based upon their practice times.
+
+        Returns
+        -------
+        List[Tuple[:class:`TeamMember`, :class:`datetime.timedelta`]]
+            A list of tuples containing the member and their practice time.
+        """
         member_times: Dict[TeamMember, datetime.timedelta] = {}
 
         for practice in self.practices:
@@ -452,7 +542,13 @@ class Team:
         return sorted(member_times.items(), key=lambda item: item[1], reverse=True)
 
     def rank_member_absences(self) -> List[Tuple[TeamMember, int]]:
-        """"""
+        """Ranks the members on their team based on their absences for team practices.
+
+        Returns
+        -------
+        List[Tuple[:class:`TeamMember`, :class:`int`]]
+            A list of tuples containing the member and their absence count.
+        """
         member_absences: Counter[TeamMember] = Counter()
 
         for practice in self.practices:
@@ -734,6 +830,10 @@ class Team:
         await builder(self.bot)
 
     async def delete(self) -> None:
+        """|coro|
+
+        Deletes the team and all of its channels.
+        """
         async with self.bot.safe_connection() as connection:
             await connection.execute('DELETE FROM teams.settings WHERE id = $1', self.id)
 

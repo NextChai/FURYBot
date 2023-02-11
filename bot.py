@@ -425,6 +425,15 @@ class FuryBot(commands.Bot):
     def get_practice(self, practice_id: int, team_id: int, guild_id: int, /) -> Optional[Practice]:
         return self._team_practice_cache.get(guild_id, {}).get(team_id, {}).get(practice_id)
 
+    def get_practices(self, guild_id: int, /) -> List[Practice]:
+        guild_practices = self._team_practice_cache.get(guild_id, {})
+
+        practices: List[Practice] = []
+        for team_practices in guild_practices.values():
+            practices.extend(team_practices.values())
+
+        return practices
+
     def add_practice(self, practice: Practice) -> None:
         self._team_practice_cache.setdefault(practice.guild_id, {}).setdefault(practice.team_id, {})[practice.id] = practice
 
@@ -450,13 +459,13 @@ class FuryBot(commands.Bot):
             f'Connected to {len(self.guilds)} servers total watching over {sum(list(m_count for g in self.guilds if (m_count := g.member_count))):,} members.'
         )
         _log.info(f'Invite link: {discord.utils.oauth_url(self.user.id, permissions=discord.Permissions(0))}')
-        
+
     async def on_raw_member_remove(self, payload: discord.RawMemberRemoveEvent) -> None:
         """|coro|
-        
+
         Called when a member has been removed from a specific guild. This event listener will delete this member
         from any team they're on as to not allow members not in the server to appear on teams.
-        
+
         Parameters
         ----------
         payload: :class:`discord.RawMemberRemoveEvent`
@@ -465,7 +474,7 @@ class FuryBot(commands.Bot):
         teams = self.get_teams(payload.guild_id)
         if not teams:
             return
-        
+
         for team in teams:
             member = team.get_member(payload.user.id)
             if member is not None:
