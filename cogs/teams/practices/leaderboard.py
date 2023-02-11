@@ -292,11 +292,7 @@ class PracticeLeaderboardCog(BaseCog):
         if not teams:
             return []
 
-        ranked_teams = sorted(
-            self.bot.get_teams(guild_id),
-            key=lambda team: team.total_points,
-        )
-
+        ranked_teams = sorted(self.bot.get_teams(guild_id), key=lambda team: team.total_points, reverse=True)
         return [(team, team.total_points) for team in ranked_teams]
 
     def create_leaderboard_embed(self, leaderboard: PracticeLeaderboard, teams: List[Tuple[Team, float]]) -> discord.Embed:
@@ -327,7 +323,7 @@ class PracticeLeaderboardCog(BaseCog):
 
         embed.add_field(
             name='Top Team',
-            value=f'{top_team.mention_members()}, great work! You have **{top_points} points**! For your efforts, you\'ve been rewarded with the '
+            value=f'{top_team.mention_members()}, great work! You have {top_points} points! For your efforts, you\'ve been rewarded with the '
             f'<@&{leaderboard.role_id}> role! This role will be reassigned if your team loses the #1 spot, so hold on tight!',
             inline=False,
         )
@@ -335,7 +331,7 @@ class PracticeLeaderboardCog(BaseCog):
         embed.add_field(
             name='Top 10 Teams',
             value='\n'.join(
-                f'{count}. **{team.display_name}**, **{points} points**'
+                f'{count}. **{team.display_name}**, {points} points'
                 for count, (team, points) in enumerate(teams[:10], start=1)
             ),
             inline=False,
