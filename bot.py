@@ -388,28 +388,124 @@ class FuryBot(commands.Bot):
 
     # Team management
     def get_teams(self, guild_id: int, /) -> List[Team]:
+        """Get all teams in a guild.
+
+        Parameters
+        ----------
+        guild_id: :class:`int`
+            The guild ID to get teams from.
+
+        Returns
+        -------
+        List[:class:`Team`]
+            The teams in the guild.
+        """
         return list(self._team_cache.get(guild_id, {}).values())
 
     def get_team(self, team_id: int, guild_id: int, /) -> Optional[Team]:
+        """Get a team from a guild.
+
+        Parameters
+        ----------
+        team_id: :class:`int`
+            The team ID to get.
+        guild_id: :class:`int`
+            The guild ID to get the team from.
+
+        Returns
+        -------
+        Optional[:class:`Team`]
+            The team, if it exists.
+        """
         return self._team_cache.get(guild_id, {}).get(team_id)
 
     def add_team(self, team: Team, /) -> None:
+        """Add a team to the cache.
+
+        Parameters
+        ----------
+        team: :class:`Team`
+            The team to add.
+        """
         self._team_cache.setdefault(team.guild_id, {})[team.id] = team
 
     def remove_team(self, team_id: int, guild_id: int, /) -> Optional[Team]:
+        """Remove a team from the cache.
+
+        Parameters
+        ----------
+        team_id: :class:`int`
+            The team ID to remove.
+        guild_id: :class:`int`
+            The guild ID to remove the team from.
+
+        Returns
+        -------
+        Optional[:class:`Team`]
+            The team that was removed, if it existed.
+        """
         return self._team_cache.get(guild_id, {}).pop(team_id, None)
 
     # Scrim Management
     def get_scrim(self, scrim_id: int, guild_id: int, /) -> Optional[Scrim]:
+        """Get a scrim from a guild.
+
+        Parameters
+        ----------
+        scrim_id: :class:`int`
+            The scrim ID to get.
+        guild_id: :class:`int`
+            The guild ID to get the scrim from.
+
+        Returns
+        -------
+        Optional[:class:`Scrim`]
+            The scrim, if it exists.
+        """
         return self._team_scrim_cache.get(guild_id, {}).get(scrim_id)
 
     def add_scrim(self, scrim: Scrim, /) -> None:
+        """Add a scrim to the cache.
+
+        Parameters
+        ----------
+        scrim: :class:`Scrim`
+            The scrim to add.
+        """
         self._team_scrim_cache.setdefault(scrim.guild_id, {})[scrim.id] = scrim
 
     def remove_scrim(self, scrim_id: int, guild_id: int, /) -> Optional[Scrim]:
+        """Remove a scrim from the cache.
+
+        Parameters
+        ----------
+        scrim_id: :class:`int`
+            The scrim ID to remove.
+        guild_id: :class:`int`
+            The guild ID to remove the scrim from.
+
+        Returns
+        -------
+        Optional[:class:`Scrim`]
+            The scrim that was removed, if it existed.
+        """
         return self._team_scrim_cache.get(guild_id, {}).pop(scrim_id, None)
 
     def get_scrims_for(self, team_id: int, guild_id: int, /) -> List[Scrim]:
+        """Get all scrims for the given team in the given guild.
+
+        Parameters
+        ----------
+        team_id: :class:`int`
+            The team ID to get scrims for.
+        guild_id: :class:`int`
+            The guild ID to get scrims from.
+
+        Returns
+        -------
+        List[:class:`Scrim`]
+            The scrims for the team in the guild.
+        """
         guild_scrims = self._team_scrim_cache.get(guild_id)
         if guild_scrims is None:
             return []
@@ -423,9 +519,32 @@ class FuryBot(commands.Bot):
 
     # Practice Management
     def get_practice(self, practice_id: int, team_id: int, guild_id: int, /) -> Optional[Practice]:
+        """Get a practice from a guild.
+
+        Parameters
+        ----------
+        practice_id: :class:`int`
+            The practice ID to get.
+        team_id: :class:`int`
+            The team ID to get the practice from.
+        guild_id: :class:`int`
+            The guild ID to get the practice from.
+
+        Returns
+        -------
+        Optional[:class:`Practice`]
+            The practice, if it exists.
+        """
         return self._team_practice_cache.get(guild_id, {}).get(team_id, {}).get(practice_id)
 
     def get_practices(self, guild_id: int, /) -> List[Practice]:
+        """Get all practices in a guild.
+
+        Parameters
+        ----------
+        List[:class:`Practice`]
+            The practices in the guild.
+        """
         guild_practices = self._team_practice_cache.get(guild_id, {})
 
         practices: List[Practice] = []
@@ -435,12 +554,49 @@ class FuryBot(commands.Bot):
         return practices
 
     def add_practice(self, practice: Practice) -> None:
+        """Add a practice to the cache.
+
+        Parameters
+        ----------
+        practice: :class:`Practice`
+            The practice to add.
+        """
         self._team_practice_cache.setdefault(practice.guild_id, {}).setdefault(practice.team_id, {})[practice.id] = practice
 
     def remove_practice(self, practice_id: int, team_id: int, guild_id: int, /) -> Optional[Practice]:
+        """Remove a practice from the cache.
+
+        Parameters
+        ----------
+        practice_id: :class:`int`
+            The practice ID to remove.
+        team_id: :class:`int`
+            The team ID to remove the practice from.
+        guild_id: :class:`int`
+            The guild ID to remove the practice from.
+
+        Returns
+        -------
+        Optional[:class:`Practice`]
+            The practice that was removed, if it existed.
+        """
         return self._team_practice_cache.get(guild_id, {}).get(team_id, {}).pop(practice_id, None)
 
     def get_practices_for(self, team_id: int, guild_id: int, /) -> List[Practice]:
+        """Get all practices for the given team in the given guild.
+
+        Parameters
+        ----------
+        team_id: :class:`int`
+            The team ID to get practices for.
+        guild_id: :class:`int`
+            The guild ID to get practices from.
+
+        Returns
+        -------
+        List[:class:`Practice`]
+            The practices for the team in the guild.
+        """
         guild_practices = self._team_practice_cache.get(guild_id)
         if guild_practices is None:
             return []
