@@ -342,9 +342,10 @@ class PracticeLeaderboardCog(BaseCog):
         embed.add_field(
             name='How Are Points Calculated?',
             value='Points are calculated based on the total time your team has spent practicing '
-            'as well as how many people attended each practice. Each team is assigned 1 point per '
-            'hour of practicing with a 10% increase for each additional person in the practice. This incentivizes '
-            'teams to practice together to get the most points the fastest!',
+            'as well as how many people attended each practice. This is calculated using a logarithmic '
+            'function that takes into account the number of people who attended the practice and the '
+            'team size. This gives a larger bonus for smaller teams and a smaller bonus for larger teams. '
+            'This incentivizes teams to practice together to get the most points the fastest!',
         )
 
         return embed

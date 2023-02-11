@@ -48,6 +48,8 @@ __all__: Tuple[str, ...] = ('Practice', 'PracticeMember', 'PracticeMemberHistory
 _log = logging.getLogger(__name__)
 _log.setLevel(logging.DEBUG)  # A temporary placeholder until everything is done.
 
+BONUS_STRENGTH: float = 0.2
+
 
 class PracticeMemberHistory(TeamMemberable, Teamable):
     """Represents the join leave history for the given practice member. A member can join
@@ -487,11 +489,11 @@ class Practice(Teamable):
 
             print(practice.total_points) # 5 hours at 2 members
             >>> 7.0
-            
+
         Returns
         -------
         Optional[:class:`float`]
-            The total points this practice has generated for the team. 
+            The total points this practice has generated for the team.
             This will be ``None`` if the practice has not ended.
         """
         total_time = self.duration
@@ -499,7 +501,7 @@ class Practice(Teamable):
             return None
 
         hours = total_time.total_seconds() / 3600
-        return hours * (1 + 0.2 * math.log10(len(self.attending_members)))
+        return hours * (1 + BONUS_STRENGTH * math.log10(len(self.attending_members)))
 
     def get_member(self, member_id: int) -> Optional[PracticeMember]:
         """Gets a member from this practice.
@@ -629,7 +631,7 @@ class Practice(Teamable):
 
         await self.view.update_message()
         return attending_member
-    
+
     async def handle_member_join(
         self, *, member: discord.Member, when: Optional[datetime.datetime] = None
     ) -> PracticeMember:
