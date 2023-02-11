@@ -23,9 +23,10 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import datetime
 import dataclasses
 import logging
-from typing import TYPE_CHECKING,  Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, cast
 
 import discord
 from discord import app_commands
@@ -121,6 +122,46 @@ class PracticeLeaderboard(Guildable):
         except discord.NotFound:
             return None
 
+    async def resend_message(self, embed: discord.Embed) -> discord.Message:
+        """|coro|
+
+        Resends the leaderboard message to not get API banned.
+
+        Parameters
+        ----------
+        embed: :class:`discord.Embed`
+            The embed to send.
+
+        Returns
+        -------
+        :class:`discord.Message`
+            The message that was sent.
+
+        Raises
+        ------
+        ValueError
+            The channel this leaderboard is in is not found.
+        """
+        message = await self.fetch_message()
+        if message is not None:
+            await message.delete()
+
+        channel = self.channel
+        if not channel:
+            raise ValueError('Channel not found.')
+
+        message = await channel.send(embed=embed)
+        self.message_id = message.id
+
+        async with self.bot.safe_connection() as connection:
+            await connection.execute(
+                'UPDATE teams.practice_leaderboards SET message_id = $1 WHERE id = $2;',
+                message.id,
+                self.id,
+            )
+
+        return message
+
     async def change_top_team(self, team: Team) -> None:
         """|coro|
 
@@ -143,7 +184,7 @@ class PracticeLeaderboard(Guildable):
                     member = team_member.member or await team_member.fetch_member()
                 except discord.NotFound:
                     continue
-                    
+
                 try:
                     await member.remove_roles(role, reason='Team member booted off leaderboard.')
                 except discord.Forbidden:
@@ -163,7 +204,7 @@ class PracticeLeaderboard(Guildable):
                 member = team_member.member or await team_member.fetch_member()
             except discord.NotFound:
                 continue
-                
+
             try:
                 await member.add_roles(role, reason="Team member booted off leaderboard.")
             except discord.Forbidden:
@@ -429,9 +470,29 @@ class PracticeLeaderboardCog(BaseCog):
             guild = self.bot.get_guild(guild_id)
             if not guild:
                 _log.debug('Ignoring guild %s in update leaderboard.', guild_id)
-                return None
+                continue
 
             for leaderboard in leaderboards.values():
+                top_teams = self.rank_teams(guild_id)
+                if not top_teams:
+                    continue
+
+                top_team, _ = top_teams[0]
+                if top_team.id != leaderboard.top_team_id:
+                    _log.debug("Change in top team for guild %s.", guild_id)
+                    await leaderboard.change_top_team(top_team)
+
+                _log.debug('Updating message for leaderboard %s for guild %s.', leaderboard.id, guild_id)
+                message = await leaderboard.fetch_message()
+                if message is None:
+                    continue
+
+                embed = self.create_leaderboard_embed(leaderboard, top_teams)
+                await message.edit(embed=embed)
+
+                # If the message is older than 7 days long, resend it
+                if (discord.utils.utcnow() - message.created_at) >= datetime.timedelta(days=7):
+                    await leaderboard.resend_message(embed)
 
                 _log.debug('Updated leaderboard %s for guild %s.', leaderboard.id, guild_id)
 
