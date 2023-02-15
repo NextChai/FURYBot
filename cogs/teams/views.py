@@ -123,7 +123,10 @@ class TeamMemberPracticeStatisticsView(BaseView):
             current_streak += 1
 
         total_team_practices = len(team.practices)
-        percentage_of_attended_practices = (total / total_team_practices) * 100
+        if total_team_practices > 0:
+            percentage_of_attended_practices = (total / total_team_practices) * 100
+        else:
+            percentage_of_attended_practices = 0
 
         embed.add_field(
             name='Attended Practices',
