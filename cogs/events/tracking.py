@@ -159,6 +159,9 @@ class MessageTracker(BaseCog):
             messages,
         )
         sender = ctx.author.send if private else ctx.send
+
+        await ctx.message.add_reaction('<:check:982087523322974269>')
+
         if not message:
             return await sender(f'No cached message was found in {ctx.channel.mention}')  # pyright: ignore
 
