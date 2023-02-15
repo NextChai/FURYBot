@@ -329,7 +329,7 @@ class BaseView(discord.ui.View, abc.ABC):
         The parent of this view. Defaults to ``None``.
     """
 
-    __slots__: Tuple[str, ...] = ("bot", "author", "parent", "context")
+    __slots__: Tuple[str, ...] = ("bot", "author", "parent", "target", 'guild')
 
     def __init_subclass__(cls: Type[Self]) -> None:
         cls.__init__ = _wrap_init(cls.__init__)  # pyright: ignore
