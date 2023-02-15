@@ -134,14 +134,22 @@ class TeamMemberPracticeStatisticsView(BaseView):
             inline=False,
         )
 
-        percentage_of_absences = (absences / total_team_practices) * 100
+        if total_team_practices:
+            percentage_of_absences = (absences / total_team_practices) * 100
+        else:
+            percentage_of_absences = 0
+
         embed.add_field(
             name='Absences',
             value=f'**Absences**: {absences}\n**Percentage**: {percentage_of_absences:.2f}%',
             inline=False,
         )
 
-        started_by_percentage = (started_by / total) * 100
+        if total > 0:
+            started_by_percentage = (started_by / total) * 100
+        else:
+            started_by_percentage = 0
+
         embed.add_field(
             name='Started Practices',
             value=f'**Total**: {started_by}\n**Percentage**: {started_by_percentage:.2f}%',
@@ -1173,7 +1181,7 @@ class TeamPracticesView(BaseView):
         else:
             average_number_of_members = 0
             average_time = datetime.timedelta()
-    
+
         embed.add_field(
             name='Average Number of Members', value=f'**{average_number_of_members:.2f}** members.', inline=False
         )
