@@ -59,7 +59,7 @@ T = TypeVar('T')
 P = ParamSpec('P')
 BT = TypeVar('BT', bound='FuryBot')
 TargetType: TypeAlias = Union[
-    'discord.Interaction',
+    'discord.Interaction[FuryBot]',
     'Context',
 ]
 BaseViewInit: TypeAlias = Callable[Concatenate["BaseView", P], T]
@@ -340,11 +340,7 @@ class BaseView(discord.ui.View, abc.ABC):
         if target.guild is None:
             raise ValueError("Cannot create a view in a DM context.")
 
-        self.bot: FuryBot = (
-            target.client
-            if isinstance(target, discord.Interaction)
-            else target.bot  # pyright: ignore # We're gonna have to eat this one, thank you dpy
-        )
+        self.bot: FuryBot = target.client if isinstance(target, discord.Interaction) else target.bot
         self.author: Union[discord.Member, discord.User] = (
             target.user if isinstance(target, discord.Interaction) else target.author
         )
