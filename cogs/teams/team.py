@@ -329,6 +329,14 @@ class Team:
     @property
     def members(self) -> List[TeamMember]:
         return list(self.team_members.values())
+    
+    @property
+    def main_roster(self) -> List[TeamMember]:
+        return [member for member in self.members if not member.is_sub]
+
+    @property
+    def sub_roster(self) -> List[TeamMember]:
+        return [member for member in self.members if member.is_sub]
 
     @property
     def text_channel(self) -> discord.TextChannel:
