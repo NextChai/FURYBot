@@ -731,7 +731,8 @@ class Practice(Teamable):
         # We need to check if all members have left the voice channel and if so, we need to mark the practice
         # as completed. Note if one member remains in the voice chat we can end it as well, they'd be alone.
         # We don't need API calls here we can use our cache
-        if all(not member.is_practicing for member in self.members if member != team_member):
+        remaining_practicers = [member for member in self.members if member.is_practicing and member != team_member]
+        if not remaining_practicers:
             # We can mark the practice as completed.
             await self.end()
 
