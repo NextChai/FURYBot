@@ -500,6 +500,9 @@ class Practice(Teamable):
         if not total_time:
             return None
 
+        if len(self.attending_members) == 1:
+            return 0
+
         hours = total_time.total_seconds() / 3600
         return hours * (1 + BONUS_STRENGTH * math.log10(len(self.attending_members)))
 
