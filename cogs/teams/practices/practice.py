@@ -734,6 +734,12 @@ class Practice(Teamable):
         remaining_practicers = [member for member in self.members if member.is_practicing and member != team_member]
         if not remaining_practicers or len(remaining_practicers) == 1:
             # We can mark the practice as completed.
+
+            # If there's one remaining member we need to make sure their history is accurate
+            if len(remaining_practicers) == 1:
+                remaining = remaining_practicers[0]
+                await remaining.handle_leave(when=when)
+
             await self.end()
 
     async def end(self) -> None:
