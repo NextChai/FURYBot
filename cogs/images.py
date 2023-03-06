@@ -275,6 +275,7 @@ class ImageRequests(BaseCog):
         attachment='The attachment you want to upload.',
         message='An optional message to send with the upload.',
     )
+    @app_commands.checks.cooldown(1, 30.0, key=lambda i: (i.guild_id, i.user.id))
     async def attachment_request(
         self,
         interaction: discord.Interaction,
