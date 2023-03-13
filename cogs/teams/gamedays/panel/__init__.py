@@ -23,6 +23,4 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from .gameday import *
 from .panel import *
-from .persistent import *

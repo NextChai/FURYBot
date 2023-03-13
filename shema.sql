@@ -116,6 +116,40 @@ CREATE TABLE IF NOT EXISTS teams.practice_leaderboards(
     role_id BIGINT
 );
 
+CREATE TABLE IF NOT EXISTS teams.gameday_config(
+    id SERIAL PRIMARY KEY,
+    team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
+    guild_id BIGINT,
+    weekday INTEGER,
+    game_time TIME WITH TIME ZONE,
+    members_on_team INTEGER,
+    total_rounds_per_gameday INTEGER,
+    best_of INTEGER,
+    automatic_sub_finding BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS teams.gamedays(
+    id SERIAL PRIMARY KEY,
+    config_id INTEGER REFERENCES teams.gameday_config(id) ON DELETE CASCADE,
+    guild_id BIGINT,
+    team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
+    started_at TIMESTAMP WITH TIME ZONE,
+    ended_at TIMESTAMP WITH TIME ZONE, -- Can be None
+    wins INTEGER,
+    losses INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS teams.gameday_members(
+    id SERIAL PRIMARY KEY,
+    gameday_id INTEGER REFERENCES teams.gameday(id) ON DELETE CASCADE,
+    team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
+    member_id BIGINT,
+    guild_id BIGINT,
+    reason TEXT,
+    is_temporary_sub BOOLEAN DEFAULT FALSE
+);
+
+
 CREATE TABLE IF NOT EXISTS timers(
     id BIGSERIAL PRIMARY KEY,
     precise BOOLEAN DEFAULT TRUE,

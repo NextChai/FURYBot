@@ -23,10 +23,11 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import math
 import dataclasses
 import datetime
 import enum
-from typing import Optional, Tuple, TYPE_CHECKING, Dict
+from typing import Optional, Tuple, TYPE_CHECKING, Dict, List
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -127,12 +128,16 @@ class Gameday(Teamable):
         /,
         *,
         bot: FuryBot,
+        config_id: int,
         id: int,
         guild_id: int,
         team_id: int,
         started_at: datetime.datetime,
+        wins: int,
+        losses: int,
         ended_at: Optional[datetime.datetime] = None,
         members: Dict[int, GamedayMember] = {},
+        
     ) -> None:
         self.bot: FuryBot = bot
         self.id: int = id
@@ -140,6 +145,11 @@ class Gameday(Teamable):
         self.team_id: int = team_id
         self.started_at: datetime.datetime = started_at
         self.ended_at: Optional[datetime.datetime] = ended_at
+        self.config_id: int = config_id
+        
+        # Wins and losses for the team for the given game.
+        self.wins: int = wins
+        self.losses: int = losses
 
         self._members: Dict[int, GamedayMember] = members
 
@@ -151,7 +161,15 @@ class Gameday(Teamable):
 
     def _get_team_id(self) -> int:
         return self.team_id
-
+    
+    @property
+    def subs_needed(self) -> int:
+        return self.config.members_on_team - len(self.get_members())
+    
+    @property
+    def config(self) -> GamedayConfig:
+        ...
+    
     def add_member(self, member: GamedayMember) -> None:
         self._members[member.member_id] = member
 
@@ -166,6 +184,7 @@ class Gameday(Teamable):
 
     def get_members_attending(self) -> Dict[int, GamedayMember]:
         return {k: v for k, v in self._members.items() if v.is_attending}
+    
 
 
 class GamedayConfig(Teamable):
@@ -229,3 +248,13 @@ class GamedayConfig(Teamable):
 
     def _get_team_id(self) -> int:
         return self.team_id
+
+    @property
+    def wins_needed(self) -> int:
+        return math.ceil(self.best_of / 2)
+    
+    async def fetch_gamedays(self) -> List[Gameday]:
+        async with self.bot.safe_connection() as connection:
+            data = await connection.fetch('SELECT * FROM teams.gamedays WHERE config_id = $1', self.id)
+        
+        return [Gameday(bot=self.bot, **dict(row)) for row in data]
