@@ -23,14 +23,15 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import dataclasses
 import datetime
 import enum
-from typing import Tuple, TYPE_CHECKING
+from typing import Optional, Tuple, TYPE_CHECKING, Dict
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
-from utils.bases import Teamable
+from utils.bases import TeamMemberable, Teamable
 
 __all__: Tuple[str, ...] = (
     'GamedayConfig',
@@ -48,7 +49,44 @@ class Weekday(enum.Enum):
     sunday = 7
 
 
-class Gameday:
+@dataclasses.dataclass()
+class GamedayMember(TeamMemberable):
+    """Represents a member who has confirmed or not confirmed that they will be attending a gameday.
+
+    A temporary sub is one found in a chat, such as a sub-finding channel, that shouldn't remain on the team after the game is over.
+    This sub will be auto-removed from the team after 1 hour of the gameday coming to an end.
+    """
+
+    bot: FuryBot
+    id: int
+    member_id: int
+    team_id: int
+    guild_id: int
+    gameday_id: int
+
+    # Determines if the member has confirmed that they will be attending the gameday.
+    reason: Optional[str]
+
+    is_temporary_sub: bool = False
+
+    def _get_bot(self) -> FuryBot:
+        return self.bot
+
+    def _get_guild_id(self) -> int:
+        return self.guild_id
+
+    def _get_team_id(self) -> int:
+        return self.team_id
+
+    def _get_member_id(self) -> int:
+        return self.member_id
+
+    @property
+    def is_attending(self) -> bool:
+        return bool(self.reason)
+
+
+class Gameday(Teamable):
     """Represents a gameday for a given team. A gameday is where a team gets together in order to play their e-sports games.
 
     A gameday is made up of rounds, which are represented by the :class:`Round` class. A gameday is made up of a total number of rounds,
@@ -56,15 +94,16 @@ class Gameday:
 
     Gameday Flow
     ------------
-    - Members will get a notification a day in advance at 11am EST to remind them they have a gameday coming up. Members will chose yes or no to attending.
-    If they chose no then they'll be required to provide a reason for not attending.
+        - Members will get a notification a day in advance at 11am EST to remind them they have a gameday coming up. Members will chose yes or no to attending.
+        If they chose no then they'll be required to provide a reason for not attending.
 
-        - Once all members have voted, or the team has been filled, the team's captain(s) will be notified. This has an 8 hour timeout.
+            - Once all members have voted, or the team has been filled, the team's captain(s) will be notified. This has a 5 hour timeout.
 
-        - If all team members have voted and the team is not filled, or 8 hours have passed, the bot will spawn one of two responses.
+        - If all team members have voted and the team is not filled, or 5 hours have passed, the bot will spawn one of two responses.
 
             - If auto sub finding is enabled, the client will make an effort to find a replacement for N members required to fill the team
-            using the specified sub role and sub channel.
+            using the specified sub role and sub channel. If the team has dedicated subs, the bot will look for those subs first (with a timeout of 3 hours),
+            then extend the search to the sub role and sub channel excluding the subs the bot already tried to recruit.
 
             - If auto sub finding is disabled, the client will notify the team's captain(s) that the team is not filled and that they need to find a replacement.
 
@@ -85,8 +124,48 @@ class Gameday:
 
     def __init__(
         self,
+        /,
+        *,
+        bot: FuryBot,
+        id: int,
+        guild_id: int,
+        team_id: int,
+        started_at: datetime.datetime,
+        ended_at: Optional[datetime.datetime] = None,
+        members: Dict[int, GamedayMember] = {},
     ) -> None:
-        ...
+        self.bot: FuryBot = bot
+        self.id: int = id
+        self.guild_id: int = guild_id
+        self.team_id: int = team_id
+        self.started_at: datetime.datetime = started_at
+        self.ended_at: Optional[datetime.datetime] = ended_at
+
+        self._members: Dict[int, GamedayMember] = members
+
+    def _get_bot(self) -> FuryBot:
+        return self.bot
+
+    def _get_guild_id(self) -> int:
+        return self.guild_id
+
+    def _get_team_id(self) -> int:
+        return self.team_id
+
+    def add_member(self, member: GamedayMember) -> None:
+        self._members[member.member_id] = member
+
+    def remove_member(self, member_id: int) -> None:
+        self._members.pop(member_id, None)
+
+    def get_member(self, member_id: int) -> Optional[GamedayMember]:
+        return self._members.get(member_id)
+
+    def get_members(self) -> Dict[int, GamedayMember]:
+        return self._members
+
+    def get_members_attending(self) -> Dict[int, GamedayMember]:
+        return {k: v for k, v in self._members.items() if v.is_attending}
 
 
 class GamedayConfig(Teamable):
