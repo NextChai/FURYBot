@@ -29,7 +29,8 @@ from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot import FuryBot
-    from ..team import Team
+
+from utils.bases import Teamable
 
 __all__: Tuple[str, ...] = (
     'GamedayConfig',
@@ -47,11 +48,52 @@ class Weekday(enum.Enum):
     sunday = 7
 
 
-class GamedayConfig:
+class Gameday:
+    """Represents a gameday for a given team. A gameday is where a team gets together in order to play their e-sports games.
+
+    A gameday is made up of rounds, which are represented by the :class:`Round` class. A gameday is made up of a total number of rounds,
+    which is determined by the gameday configuration.
+
+    Gameday Flow
+    ------------
+    - Members will get a notification a day in advance at 11am EST to remind them they have a gameday coming up. Members will chose yes or no to attending.
+    If they chose no then they'll be required to provide a reason for not attending.
+
+        - Once all members have voted, or the team has been filled, the team's captain(s) will be notified. This has an 8 hour timeout.
+
+        - If all team members have voted and the team is not filled, or 8 hours have passed, the bot will spawn one of two responses.
+
+            - If auto sub finding is enabled, the client will make an effort to find a replacement for N members required to fill the team
+            using the specified sub role and sub channel.
+
+            - If auto sub finding is disabled, the client will notify the team's captain(s) that the team is not filled and that they need to find a replacement.
+
+    - 4 hours before the scheduled gameday, the bot will send a reminder to all members that have agreed to attend the gameday.
+
+        - If the team has not been filled by this point, the bot will notify the team's captain(s) that the team is not filled and
+        that they need to find a replacement. This notification to the captain will be regardless of the auto sub finding setting.
+
+    - During the gameday, the bot will send a scoreboard to the team's text-channel. After each round of the gameday, a member of the team
+    will be required to update the scoreboard. They can either press the "Win" or "Loss" button on the scoreboard to update it.
+
+        - Optionally, team members can upload an in-game screenshot of each round to have for proof in case of an issue. This will be achieveed
+        via the `/gameday upload <attachment: Attachment>` command. **We will encourage members to do this, but it will not be required.**
+
+    - After a winner has been decided, the bot will gather the in-game screenshots, if applicable, and merge them to be sent in the final notification.
+    This notification will mention the team's captain(s) that their gameday is over.
+    """
+
+    def __init__(
+        self,
+    ) -> None:
+        ...
+
+
+class GamedayConfig(Teamable):
     """Represents the gameday configuration for a given team. Every team
     has a gameday configuration, which is used to determine when a team should
     be playing together for their e-sports games.
-    
+
     bot: FuryBot
         The bot instance.
     team: Team
@@ -71,26 +113,40 @@ class GamedayConfig:
         Represents the best of X rounds that are played in a given gameday. So for example,
         if best_of is 3, then the team that wins 2 rounds first wins the gameday.
     """
+
     def __init__(
-        self, 
+        self,
         /,
         *,
-        bot: FuryBot, 
-        team: Team, 
-        id: int, 
+        bot: FuryBot,
+        team_id: int,
+        guild_id: int,
+        id: int,
         weekday: int,
         game_time: datetime.time,
         members_on_team: int,
         total_rounds_per_gameday: int,
         best_of: int,
+        automatic_sub_finding: bool,
     ) -> None:
         self.bot: FuryBot = bot
-        self.team: Team = team
+        self.team_id: int = team_id
+        self.guild_id: int = guild_id
         self.id: int = id
-        
+
         self.weekday: Weekday = Weekday(weekday)
         self.game_time: datetime.time = game_time
-        
+
         self.members_on_team: int = members_on_team
         self.total_rounds_per_gameday: int = total_rounds_per_gameday
         self.best_of: int = best_of
+        self.automatic_sub_finding: bool = automatic_sub_finding
+
+    def _get_bot(self) -> FuryBot:
+        return self.bot
+
+    def _get_guild_id(self) -> int:
+        return self.guild_id
+
+    def _get_team_id(self) -> int:
+        return self.team_id
