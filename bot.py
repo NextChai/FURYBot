@@ -28,7 +28,7 @@ import functools
 import logging
 import os
 import time
-import traceback
+import inspect
 from concurrent import futures
 from typing import (
     TYPE_CHECKING,
@@ -59,7 +59,18 @@ from cogs.teams import Team
 from cogs.teams.gamedays import GamedayBucket
 from cogs.teams.practices import Practice
 from cogs.teams.scrim import Scrim, ScrimStatus
-from utils import RUNNING_DEVELOPMENT, ErrorHandler, LinkFilter, TimerManager
+from utils import (
+    RUNNING_DEVELOPMENT,
+    BYPASS_SETUP_HOOK,
+    USE_CUSTOM_INITIAL_EXTENSIONS,
+    BYPASS_SETUP_HOOK_CACHE_LOADING,
+    ErrorHandler,
+    LinkFilter,
+    TimerManager,
+    _parse_environ_boolean,
+    INITIAL_EXTENSIONS,
+    IGNORE_EXTENSIONS,
+)
 
 if TYPE_CHECKING:
     import datetime
@@ -71,27 +82,45 @@ P = ParamSpec('P')
 PoolType: TypeAlias = 'asyncpg.Pool[asyncpg.Record]'
 ConnectionType: TypeAlias = 'asyncpg.Connection[asyncpg.Record]'
 DecoFunc: TypeAlias = Callable[Concatenate['FuryBot', P], Coroutine[T, Any, Any]]
+CacheFunc: TypeAlias = Callable[Concatenate['FuryBot', ConnectionType, P], Coroutine[Any, Any, T]]
 
 _log = logging.getLogger(__name__)
-
-initial_extensions: Tuple[str, ...]
 if RUNNING_DEVELOPMENT:
-    initial_extensions = tuple(v for k, v in os.environ.items() if k.startswith('FURY_EXTENSION'))
-else:
-    initial_extensions = (
-        'jishaku',
-        'cogs.events.infractions',
-        'cogs.events.notifier',
-        'cogs.infractions',
-        'utils.error_handler',
-        'cogs.owner',
-        'cogs.events.tracking',
-        'cogs.teams',
-        'cogs.teams.practices',
-        'cogs.images',
-        'cogs.moderation',
-        'cogs.fun',
-    )
+    _log.setLevel(logging.DEBUG)
+
+initial_extensions: Tuple[str, ...] = (
+    'jishaku',
+    'cogs.events.infractions',
+    'cogs.events.notifier',
+    'cogs.infractions',
+    'utils.error_handler',
+    'cogs.owner',
+    'cogs.events.tracking',
+    'cogs.teams',
+    'cogs.teams.practices',
+    'cogs.images',
+    'cogs.moderation',
+    'cogs.fun',
+)
+
+
+def cache_loader(flag_name: str) -> Callable[[CacheFunc[P, T]], CacheFunc[P, Optional[T]]]:
+    def wrapped(func: CacheFunc[P, T]):
+        @functools.wraps(func)
+        async def call_func(self: FuryBot, connection: ConnectionType, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
+            flag = _parse_environ_boolean(f'{flag_name}_CACHE')
+            if not flag:
+                return
+
+            _log.info('Loading %s cache from func %s', flag_name, func.__name__)
+
+            return await func(self, connection, *args, **kwargs)
+
+        call_func.__cache_loader__ = True  # type: ignore
+
+        return call_func
+
+    return wrapped
 
 
 def wrap_extension(coro: DecoFunc[P, T]) -> DecoFunc[P, T]:
@@ -293,113 +322,6 @@ class FuryBot(commands.Bot):
             embed.set_author(name=author.name, icon_url=author.display_avatar.url)
 
         return embed
-
-    async def _load_image_request(self, data: asyncpg.Record) -> None:
-        await self.wait_until_ready()
-
-        guild = self.get_guild(data['guild_id'])
-        if not guild:
-            return
-
-        channel = cast(
-            Optional[Union[discord.TextChannel, discord.VoiceChannel, discord.Thread]], guild.get_channel(data['channel_id'])
-        )
-        if not channel:
-            return
-
-        attachment_data = data.get('attachment')
-        if attachment_data is None:
-            return
-
-        request = ImageRequest(
-            requester=await guild.fetch_member(data['requester_id']),
-            attachment=discord.Attachment(data=data['attachment'], state=self._connection),
-            channel=channel,
-            message=data['message'],
-            id=data['id'],
-        )
-
-        view = ApproveOrDenyImage(self, request)
-        self.add_view(view, message_id=data['message_id'])
-
-    # Hooks
-    async def setup_hook(self) -> None:
-        for extension in initial_extensions:
-            try:
-                await self.load_extension(extension)
-            except:
-                traceback.print_exc()
-
-        async with self.safe_connection() as connection:
-            team_data = await connection.fetch('SELECT * FROM teams.settings')
-            team_members_data = await connection.fetch('SELECT * FROM teams.members')
-
-            scrim_records = await connection.fetch('SELECT * FROM teams.scrims')
-
-            image_requests = await connection.fetch('SELECT * FROM image_requests')
-
-            practice_data = await connection.fetch("SELECT * FROM teams.practice")
-            practice_member_data = await connection.fetch("SELECT * FROM teams.practice_member")
-            practice_member_history_data = await connection.fetch("SELECT * FROM teams.practice_member_history")
-
-            game_day_bucket_data = await connection.fetch("SELECT * FROM teams.gameday_buckets")
-
-        for row in game_day_bucket_data:
-            bucket = GamedayBucket(bot=self, **dict(row))
-            self.add_gameday_bucket(bucket)
-
-            gamedays = await bucket.fetch_gamedays(self, bucket.id, connection=connection)
-            for gameday in gamedays:
-                bucket.add_gameday(gameday)
-
-        team_member_mapping: Dict[int, List[Dict[Any, Any]]] = {}
-        for entry in team_members_data:
-            team_member_mapping.setdefault(entry['team_id'], []).append(dict(entry))
-
-        for row in team_data:
-            members = team_member_mapping.get(row['id'], [])
-            team = await Team.from_record(dict(row), members, bot=self)
-            self._team_cache.setdefault(team.guild_id, {})[team.id] = team
-
-        for entry in scrim_records:
-            data = dict(entry)
-            data['status'] = ScrimStatus(data['status'])
-
-            scrim = Scrim(self, **data)
-            scrim.load_persistent_views()
-            self._team_scrim_cache.setdefault(scrim.guild_id, {})[scrim.id] = scrim
-
-        for request in image_requests:
-            self.create_task(self._load_image_request(request))
-
-        # Sort the member data to be {practice_id: {member_id: data}} because we can have more than one member per practice
-        practice_member_mapping: Dict[int, Dict[int, Dict[Any, Any]]] = {}
-        for entry in practice_member_data:
-            practice_member_mapping.setdefault(entry['practice_id'], {})[entry['member_id']] = dict(entry)
-
-        # Sort the member history data to be {practice_id: {member_id: List[data]}} because we an have more than one
-        # history entry per member per practice
-        practice_member_history_mapping: Dict[int, Dict[int, List[Dict[Any, Any]]]] = {}
-        for entry in practice_member_history_data:
-            practice_member_history_mapping.setdefault(entry['practice_id'], {}).setdefault(entry['member_id'], []).append(
-                dict(entry)
-            )
-
-        for entry in practice_data:
-            # We need to create a practice from this
-            practice = Practice(bot=self, data=dict(entry))
-
-            member_data = practice_member_mapping.get(practice.id, {})
-            for data in member_data.values():
-                member = practice._add_member(dict(data))
-
-                member_practice_history = practice_member_history_mapping.get(practice.id, {}).get(member.member_id, [])
-                for history_entry in member_practice_history:
-                    member._add_history(dict(history_entry))
-
-            self._team_practice_cache.setdefault(practice.guild_id, {}).setdefault(practice.team_id, {})[
-                practice.id
-            ] = practice
 
     # Team Gameday Bucket Management
     def get_gameday_buckets(self, guild_id: int, team_id: int, /) -> List[GamedayBucket]:
@@ -780,3 +702,144 @@ class FuryBot(commands.Bot):
     @wrap_extension
     async def unload_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
         return await super().unload_extension(name, package=package)
+
+    @cache_loader('TEAMS')
+    async def _cache_setup_teams(self, connection: ConnectionType) -> None:
+        team_data = await connection.fetch('SELECT * FROM teams.settings')
+        team_members_data = await connection.fetch('SELECT * FROM teams.members')
+
+        team_member_mapping: Dict[int, List[Dict[Any, Any]]] = {}
+        for entry in team_members_data:
+            team_member_mapping.setdefault(entry['team_id'], []).append(dict(entry))
+
+        for row in team_data:
+            members = team_member_mapping.get(row['id'], [])
+            team = await Team.from_record(dict(row), members, bot=self)
+            self._team_cache.setdefault(team.guild_id, {})[team.id] = team
+
+    @cache_loader('SCRIMS')
+    async def _cache_setup_scrims(self, connection: ConnectionType) -> None:
+        scrim_records = await connection.fetch('SELECT * FROM teams.scrims')
+
+        for entry in scrim_records:
+            data = dict(entry)
+            data['status'] = ScrimStatus(data['status'])
+
+            scrim = Scrim(self, **data)
+            scrim.load_persistent_views()
+            self._team_scrim_cache.setdefault(scrim.guild_id, {})[scrim.id] = scrim
+
+    async def _load_image_request(self, data: asyncpg.Record) -> None:
+        await self.wait_until_ready()
+
+        guild = self.get_guild(data['guild_id'])
+        if not guild:
+            return
+
+        channel = cast(
+            Optional[Union[discord.TextChannel, discord.VoiceChannel, discord.Thread]], guild.get_channel(data['channel_id'])
+        )
+        if not channel:
+            return
+
+        attachment_data = data.get('attachment')
+        if attachment_data is None:
+            return
+
+        request = ImageRequest(
+            requester=await guild.fetch_member(data['requester_id']),
+            attachment=discord.Attachment(data=data['attachment'], state=self._connection),
+            channel=channel,
+            message=data['message'],
+            id=data['id'],
+        )
+
+        view = ApproveOrDenyImage(self, request)
+        self.add_view(view, message_id=data['message_id'])
+
+    @cache_loader('IMAGE_REQUESTS')
+    async def _cache_setup_image_requests(self, connection: ConnectionType) -> None:
+        image_requests = await connection.fetch('SELECT * FROM image_requests')
+        for request in image_requests:
+            self.create_task(self._load_image_request(request))
+
+    @cache_loader('PRACTICES')
+    async def _cache_setup_practices(self, connection: ConnectionType) -> None:
+        practice_data = await connection.fetch("SELECT * FROM teams.practice")
+        practice_member_data = await connection.fetch("SELECT * FROM teams.practice_member")
+        practice_member_history_data = await connection.fetch("SELECT * FROM teams.practice_member_history")
+
+        # Sort the member data to be {practice_id: {member_id: data}} because we can have more than one member per practice
+        practice_member_mapping: Dict[int, Dict[int, Dict[Any, Any]]] = {}
+        for entry in practice_member_data:
+            practice_member_mapping.setdefault(entry['practice_id'], {})[entry['member_id']] = dict(entry)
+
+        # Sort the member history data to be {practice_id: {member_id: List[data]}} because we an have more than one
+        # history entry per member per practice
+        practice_member_history_mapping: Dict[int, Dict[int, List[Dict[Any, Any]]]] = {}
+        for entry in practice_member_history_data:
+            practice_member_history_mapping.setdefault(entry['practice_id'], {}).setdefault(entry['member_id'], []).append(
+                dict(entry)
+            )
+
+        for entry in practice_data:
+            # We need to create a practice from this
+            practice = Practice(bot=self, data=dict(entry))
+
+            member_data = practice_member_mapping.get(practice.id, {})
+            for data in member_data.values():
+                member = practice._add_member(dict(data))
+
+                member_practice_history = practice_member_history_mapping.get(practice.id, {}).get(member.member_id, [])
+                for history_entry in member_practice_history:
+                    member._add_history(dict(history_entry))
+
+            self._team_practice_cache.setdefault(practice.guild_id, {}).setdefault(practice.team_id, {})[
+                practice.id
+            ] = practice
+
+    @cache_loader('GAMEDAY_BUCKETS')
+    async def _cache_setup_gameday_buckets(self, connection: ConnectionType) -> None:
+        gameday_bucket_data = await connection.fetch("SELECT * FROM teams.gameday_buckets")
+
+        for row in gameday_bucket_data:
+            bucket = GamedayBucket(bot=self, **dict(row))
+            self.add_gameday_bucket(bucket)
+
+            gamedays = await bucket.fetch_gamedays(self, bucket.id, connection=connection)
+            for gameday in gamedays:
+                bucket.add_gameday(gameday)
+
+    # Hooks
+    async def setup_hook(self) -> None:
+        if BYPASS_SETUP_HOOK:
+            return
+
+        extensions_to_load = initial_extensions
+        if RUNNING_DEVELOPMENT:
+            # When running development, the user can prefix extensions they'd like to ignore loading
+            # using the `.env` file. So to allow a user to ignore something, they can do: `IGNORE_EXTENSIONS=ext1,ext2`
+            if USE_CUSTOM_INITIAL_EXTENSIONS:
+                filter_extensions = INITIAL_EXTENSIONS
+            else:
+                filter_extensions = initial_extensions
+
+            extensions_to_load = tuple(ext for ext in filter_extensions if ext not in IGNORE_EXTENSIONS)
+
+        await asyncio.gather(*(self.load_extension(ext) for ext in extensions_to_load))
+
+        if BYPASS_SETUP_HOOK_CACHE_LOADING:
+            _log.info('Bypassing cache loading.')
+            return
+
+        cache_loading_functions: List[Tuple[str, Callable[..., Coroutine[Any, Any, Any]]]] = [
+            item
+            for item in inspect.getmembers(self, predicate=inspect.iscoroutinefunction)
+            if getattr(item[1], '__cache_loader__', None)
+        ]
+
+        _log.info(f'Loading {len(cache_loading_functions)} cache entries.')
+
+        async with self.safe_connection() as connection:
+            for _, cache_loading_function in cache_loading_functions:
+                await cache_loading_function(connection=connection)

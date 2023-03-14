@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Iterable, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Iterable, Tuple, TypeVar, List
 
 from .bases import *
 from .cog import *
@@ -48,15 +48,28 @@ if TYPE_CHECKING:
 __all__: Tuple[str, ...] = ('RUNNING_DEVELOPMENT', 'default_button_doc_string', 'human_join')
 
 
-def _parse_environ_boolean(key: str) -> bool:
+def _parse_environ_boolean(key: str, *, false_if_none: bool = False) -> bool:
     val = os.environ.get(key)
     if val is None:
-        return False
+        if false_if_none:
+            return False
+
+        return True
 
     return val.lower() in ("true", "1")
 
 
 RUNNING_DEVELOPMENT: bool = _parse_environ_boolean('RUN_DEVELOPMENT')
+BYPASS_SETUP_HOOK: bool = _parse_environ_boolean('BYPASS_SETUP_HOOK', false_if_none=True)
+BYPASS_SETUP_HOOK_CACHE_LOADING: bool = _parse_environ_boolean('BYPASS_SETUP_HOOK_CACHE_LOADING', false_if_none=True)
+USE_CUSTOM_INITIAL_EXTENSIONS: bool = _parse_environ_boolean('USE_CUSTOM_INITIAL_EXTENSIONS', false_if_none=True)
+
+INITIAL_EXTENSIONS: List[str] = os.environ.get('INITIAL_EXTENSIONS', '').split(',')
+IGNORE_EXTENSIONS: List[str] = os.environ.get('IGNORE_EXTENSIONS', '').split(',')
+
+START_TIMER_MANAGER: bool = _parse_environ_boolean(
+    'START_TIMER_MANAGER',
+)
 
 
 def default_button_doc_string(func: ButtonCallback[BV]) -> ButtonCallback[BV]:
