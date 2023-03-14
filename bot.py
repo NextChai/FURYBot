@@ -46,6 +46,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    overload,
 )
 
 import asyncpg
@@ -55,9 +56,9 @@ from typing_extensions import Concatenate, Self
 
 from cogs.images import ApproveOrDenyImage, ImageRequest
 from cogs.teams import Team
+from cogs.teams.gamedays import GamedayBucket
 from cogs.teams.practices import Practice
 from cogs.teams.scrim import Scrim, ScrimStatus
-from cogs.teams.gamedays import GamedayBucket
 from utils import RUNNING_DEVELOPMENT, ErrorHandler, LinkFilter, TimerManager
 
 if TYPE_CHECKING:
@@ -418,7 +419,21 @@ class FuryBot(commands.Bot):
         """
         return list(self._team_gameday_buckets.get(guild_id, {}).get(team_id, {}).values())
 
-    def get_gameday_bucket(self, guild_id: int, team_id: int, bucket_id: int, /) -> Optional[GamedayBucket]:
+    @overload
+    def get_gameday_bucket(
+        self, guild_id: int, team_id: int, bucket_id: int, /, *, get: Literal[False] = False
+    ) -> GamedayBucket:
+        ...
+
+    @overload
+    def get_gameday_bucket(
+        self, guild_id: int, team_id: int, bucket_id: int, /, *, get: Literal[True] = True
+    ) -> Optional[GamedayBucket]:
+        ...
+
+    def get_gameday_bucket(
+        self, guild_id: int, team_id: int, bucket_id: int, /, *, get: bool = True
+    ) -> Optional[GamedayBucket]:
         """Get a gameday bucket for a team in a guild.
 
         Parameters
@@ -435,7 +450,11 @@ class FuryBot(commands.Bot):
         Optional[:class:`GamedayBucket`]
             The bucket, if it exists.
         """
-        return self._team_gameday_buckets.get(guild_id, {}).get(team_id, {}).get(bucket_id)
+        data = self._team_gameday_buckets.get(guild_id, {}).get(team_id, {})
+        if get:
+            return data.get(bucket_id)
+
+        return data[bucket_id]
 
     def add_gameday_bucket(self, bucket: GamedayBucket, /):
         """Add a gameday bucket to the cache.

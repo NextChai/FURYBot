@@ -38,6 +38,7 @@ if TYPE_CHECKING:
 
     from bot import FuryBot
 
+    from .gamedays.gameday import GamedayBucket
     from .practices import Practice
     from .scrim import Scrim
 
@@ -329,7 +330,7 @@ class Team:
     @property
     def members(self) -> List[TeamMember]:
         return list(self.team_members.values())
-    
+
     @property
     def main_roster(self) -> List[TeamMember]:
         return [member for member in self.members if not member.is_sub]
@@ -395,6 +396,12 @@ class Team:
             return 0
 
         return sum(practice_points)
+
+    def get_gameday_buckets(self) -> List[GamedayBucket]:
+        return self.bot.get_gameday_buckets(self.guild_id, self.id)
+
+    def get_gameday_bucket(self, bucket_id: int, /) -> Optional[GamedayBucket]:
+        return self.bot.get_gameday_bucket(self.guild_id, self.id, bucket_id)
 
     def mention_members(self, delimiter: str = ', ') -> str:
         """Mentions all the members in this team.

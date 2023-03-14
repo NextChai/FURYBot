@@ -23,8 +23,8 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import datetime
 import dataclasses
+import datetime
 import logging
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, cast
 

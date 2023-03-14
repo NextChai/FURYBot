@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Tuple, Optional
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import discord
 from discord import app_commands
@@ -32,8 +32,8 @@ from discord.ext import commands
 
 from utils import BaseCog
 
-from ..team import Team
 from ..errors import MemberNotOnTeam
+from ..team import Team
 from .errors import *
 from .leaderboard import *
 from .persistent import *
@@ -133,14 +133,14 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
 
             # Add this practice to the bot so we can access it later
             self.bot.add_practice(practice)
-        
+
         await practice.handle_member_join(member=member, when=interaction.created_at)
-        
+
         # Add all members in the voice channel already
         for connected_member in connected_channel.members:
             if connected_member == member:
                 continue
-            
+
             try:
                 await practice.handle_member_join(member=connected_member, when=interaction.created_at)
             except MemberNotOnTeam:
@@ -250,7 +250,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
                                 await practice.handle_member_leave(member=member)
                             except (MemberNotOnTeam, MemberNotInPractice, MemberNotAttendingPractice):
                                 pass
-        
+
             after_category = after.channel.category
             if after_category:
                 # Check if this new category is a team category
@@ -268,6 +268,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
                                 await practice.handle_member_join(member=member)
                             except (MemberNotOnTeam, MemberNotAttendingPractice):
                                 pass
+
 
 async def setup(bot: FuryBot) -> None:
     await bot.add_cog(PracticeCog(bot))

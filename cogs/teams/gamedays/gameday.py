@@ -27,8 +27,9 @@ import dataclasses
 import datetime
 import enum
 import math
-import discord
 from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, Type, Union
+
+import discord
 from typing_extensions import Self
 
 if TYPE_CHECKING:
@@ -213,7 +214,7 @@ class Gameday(Teamable):
 
     @property
     def bucket(self) -> GamedayBucket:
-        ...
+        return self.bot.get_gameday_bucket(self.guild_id, self.team_id, self.id, get=False)
 
     def add_member(self, member: GamedayMember) -> None:
         self._members[member.member_id] = member

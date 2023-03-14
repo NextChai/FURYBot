@@ -25,11 +25,24 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from utils.ui_kit import BaseView
+import discord
+from typing_extensions import Unpack
+
+from utils.ui_kit import BaseView, BaseViewKwargs
 
 if TYPE_CHECKING:
-    from ..gameday import GamedayConfig
+    from ..gameday import GamedayBucket
 
 
 class GamedayPanel(BaseView):
-    ...
+    def __init__(self, bucket: GamedayBucket, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+        self.bucket = bucket
+
+    @property
+    def emebd(self) -> discord.Embed:
+        team = self.bucket.team
+
+        embed = self.bot.Embed(title=f'{team.display_name} Gameday Management')
+
+        return embed

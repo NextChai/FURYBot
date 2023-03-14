@@ -30,7 +30,7 @@ from typing_extensions import Self
 
 from cogs.teams.errors import MemberNotOnTeam
 from cogs.teams.practices.errors import MemberAlreadyInPractice
-from utils import human_timedelta, default_button_doc_string
+from utils import default_button_doc_string, human_timedelta
 
 if TYPE_CHECKING:
     from bot import FuryBot

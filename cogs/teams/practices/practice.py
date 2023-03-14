@@ -23,16 +23,16 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import math
 import asyncio
 import datetime
 import enum
 import logging
+import math
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import discord
 
-from utils import human_timedelta, Teamable, TeamMemberable
+from utils import Teamable, TeamMemberable, human_timedelta
 
 from ..errors import MemberNotOnTeam
 from .errors import *
