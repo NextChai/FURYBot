@@ -57,6 +57,7 @@ from cogs.images import ApproveOrDenyImage, ImageRequest
 from cogs.teams import Team
 from cogs.teams.practices import Practice
 from cogs.teams.scrim import Scrim, ScrimStatus
+from cogs.teams.gamedays import GamedayBucket
 from utils import RUNNING_DEVELOPMENT, ErrorHandler, LinkFilter, TimerManager
 
 if TYPE_CHECKING:
@@ -208,6 +209,9 @@ class FuryBot(commands.Bot):
         # Mapping[guild_id, Mapping[team_id, Mapping[practice_id, Practice]]]
         self._team_practice_cache: Dict[int, Dict[int, Dict[int, Practice]]] = {}
 
+        # Mapping[guild_id, Mapping[team_id, Mapping[bucket_id, GamedayBucket]]]
+        self._team_gameday_buckets: Dict[int, Dict[int, Dict[int, GamedayBucket]]] = {}
+
         super().__init__(
             command_prefix=commands.when_mentioned_or('fury.'),
             help_command=None,
@@ -337,6 +341,16 @@ class FuryBot(commands.Bot):
             practice_member_data = await connection.fetch("SELECT * FROM teams.practice_member")
             practice_member_history_data = await connection.fetch("SELECT * FROM teams.practice_member_history")
 
+            game_day_bucket_data = await connection.fetch("SELECT * FROM teams.gameday_buckets")
+
+        for row in game_day_bucket_data:
+            bucket = GamedayBucket(bot=self, **dict(row))
+            self.add_gameday_bucket(bucket)
+
+            gamedays = await bucket.fetch_gamedays(self, bucket.id, connection=connection)
+            for gameday in gamedays:
+                bucket.add_gameday(gameday)
+
         team_member_mapping: Dict[int, List[Dict[Any, Any]]] = {}
         for entry in team_members_data:
             team_member_mapping.setdefault(entry['team_id'], []).append(dict(entry))
@@ -385,6 +399,53 @@ class FuryBot(commands.Bot):
             self._team_practice_cache.setdefault(practice.guild_id, {}).setdefault(practice.team_id, {})[
                 practice.id
             ] = practice
+
+    # Team Gameday Bucket Management
+    def get_gameday_buckets(self, guild_id: int, team_id: int, /) -> List[GamedayBucket]:
+        """Get all gameday buckets for a team in a guild.
+
+        Parameters
+        ----------
+        guild_id: :class:`int`
+            The guild ID to get buckets from.
+        team_id: :class:`int`
+            The team ID to get buckets from.
+
+        Returns
+        -------
+        List[:class:`GamedayBucket`]
+            The buckets in the guild.
+        """
+        return list(self._team_gameday_buckets.get(guild_id, {}).get(team_id, {}).values())
+
+    def get_gameday_bucket(self, guild_id: int, team_id: int, bucket_id: int, /) -> Optional[GamedayBucket]:
+        """Get a gameday bucket for a team in a guild.
+
+        Parameters
+        ----------
+        guild_id: :class:`int`
+            The guild ID to get buckets from.
+        team_id: :class:`int`
+            The team ID to get buckets from.
+        bucket_id: :class:`int`
+            The bucket ID to get.
+
+        Returns
+        -------
+        Optional[:class:`GamedayBucket`]
+            The bucket, if it exists.
+        """
+        return self._team_gameday_buckets.get(guild_id, {}).get(team_id, {}).get(bucket_id)
+
+    def add_gameday_bucket(self, bucket: GamedayBucket, /):
+        """Add a gameday bucket to the cache.
+
+        Parameters
+        ----------
+        bucket: :class:`GamedayBucket`
+            The bucket to add.
+        """
+        self._team_gameday_buckets.setdefault(bucket.guild_id, {}).setdefault(bucket.team_id, {})[bucket.id] = bucket
 
     # Team management
     def get_teams(self, guild_id: int, /) -> List[Team]:

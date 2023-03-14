@@ -27,15 +27,18 @@ import dataclasses
 import datetime
 import enum
 import math
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+import discord
+from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, Type, Union
+from typing_extensions import Self
 
 if TYPE_CHECKING:
-    from bot import FuryBot
+    from bot import FuryBot, ConnectionType
 
 from utils.bases import Teamable, TeamMemberable
 
 __all__: Tuple[str, ...] = (
-    'GamedayConfig',
+    'GamedayBucket',
+    'Gameday',
     'Weekday',
 )
 
@@ -59,6 +62,7 @@ class GamedayMember(TeamMemberable):
     """
 
     bot: FuryBot
+
     id: int
     member_id: int
     team_id: int
@@ -82,16 +86,47 @@ class GamedayMember(TeamMemberable):
     def _get_member_id(self) -> int:
         return self.member_id
 
+    @classmethod
+    async def create(
+        cls: Type[Self], user: Union[discord.Member, discord.User], gameday: Gameday, *, is_temporary_sub: bool = False
+    ) -> Self:
+        bot = gameday.bot
+        async with bot.safe_connection() as connection:
+            data = await connection.fetchrow(
+                'INSERT INTO teams.gameday_members(gameday_id, team_id, member_id, guild_id, is_temporary_sub) '
+                'VALUES($1, $2, $3, $4, $5) '
+                'RETURNING *',
+                gameday.id,
+                gameday.team_id,
+                user.id,
+                gameday.guild_id,
+                is_temporary_sub,
+            )
+            assert data
+
+        self = cls(bot, **dict(data))
+        gameday.add_member(self)
+
+        return self
+
     @property
     def is_attending(self) -> bool:
         return bool(self.reason)
+
+    async def delete(self) -> None:
+        bot = self.bot
+        async with bot.safe_connection() as connection:
+            await connection.execute(
+                'DELETE FROM teams.gameday_members WHERE id = $1',
+                self.id,
+            )
 
 
 class Gameday(Teamable):
     """Represents a gameday for a given team. A gameday is where a team gets together in order to play their e-sports games.
 
     A gameday is made up of rounds, which are represented by the :class:`Round` class. A gameday is made up of a total number of rounds,
-    which is determined by the gameday configuration.
+    which is determined by the gameday bucket.
 
     Gameday Flow
     ------------
@@ -128,7 +163,7 @@ class Gameday(Teamable):
         /,
         *,
         bot: FuryBot,
-        config_id: int,
+        bucket_id: int,
         id: int,
         guild_id: int,
         team_id: int,
@@ -144,7 +179,7 @@ class Gameday(Teamable):
         self.team_id: int = team_id
         self.started_at: datetime.datetime = started_at
         self.ended_at: Optional[datetime.datetime] = ended_at
-        self.config_id: int = config_id
+        self.bucket_id: int = bucket_id
 
         # Wins and losses for the team for the given game.
         self.wins: int = wins
@@ -161,12 +196,23 @@ class Gameday(Teamable):
     def _get_team_id(self) -> int:
         return self.team_id
 
-    @property
-    def subs_needed(self) -> int:
-        return self.config.members_on_team - len(self.get_members())
+    @classmethod
+    async def fetch_members(
+        cls: Type[Self], bot: FuryBot, gameday_id: int, *, connection: ConnectionType
+    ) -> Dict[int, GamedayMember]:
+        data = await connection.fetch(
+            'SELECT * FROM teams.gameday_members WHERE gameday_id = $1',
+            gameday_id,
+        )
+
+        return {row['member_id']: GamedayMember(bot=bot, **dict(row)) for row in data}
 
     @property
-    def config(self) -> GamedayConfig:
+    def subs_needed(self) -> int:
+        return self.bucket.members_on_team - len(self.get_members())
+
+    @property
+    def bucket(self) -> GamedayBucket:
         ...
 
     def add_member(self, member: GamedayMember) -> None:
@@ -185,9 +231,9 @@ class Gameday(Teamable):
         return {k: v for k, v in self._members.items() if v.is_attending}
 
 
-class GamedayConfig(Teamable):
-    """Represents the gameday configuration for a given team. Every team
-    has a gameday configuration, which is used to determine when a team should
+class GamedayBucket(Teamable):
+    """Represents the gameday bucket for a given team. Every team
+    has a gameday bucket, which is used to determine when a team should
     be playing together for their e-sports games.
 
     bot: FuryBot
@@ -195,7 +241,7 @@ class GamedayConfig(Teamable):
     team: Team
         The team instance.
     id: int
-        The ID of the gameday configuration.
+        The ID of the gameday bucket.
     weekday: int
         The day of the week this game is played on.
     game_time: datetime.time
@@ -238,6 +284,8 @@ class GamedayConfig(Teamable):
         self.best_of: int = best_of
         self.automatic_sub_finding: bool = automatic_sub_finding
 
+        self._gamedays: Dict[int, Gameday] = {}
+
     def _get_bot(self) -> FuryBot:
         return self.bot
 
@@ -247,12 +295,32 @@ class GamedayConfig(Teamable):
     def _get_team_id(self) -> int:
         return self.team_id
 
+    @classmethod
+    async def fetch_gamedays(
+        cls: Type[Self], bot: FuryBot, gameday_bucket_id: int, *, connection: ConnectionType
+    ) -> List[Gameday]:
+        gamedays: List[Gameday] = []
+        data = await connection.fetch('SELECT * FROM teams.gamedays WHERE bucket_id = $1', gameday_bucket_id)
+
+        for row in data:
+            members = await Gameday.fetch_members(bot=bot, gameday_id=row['id'], connection=connection)
+            gameday = Gameday(bot=bot, members=members, **dict(row))
+            gamedays.append(gameday)
+
+        return gamedays
+
+    def get_gamedays(self) -> Mapping[int, Gameday]:
+        return self._gamedays
+
+    def get_gameday(self, gameday_id: int) -> Optional[Gameday]:
+        return self._gamedays.get(gameday_id)
+
+    def add_gameday(self, gameday: Gameday) -> None:
+        self._gamedays[gameday.id] = gameday
+
+    def remove_gameday(self, gameday_id: int) -> None:
+        self._gamedays.pop(gameday_id, None)
+
     @property
     def wins_needed(self) -> int:
         return math.ceil(self.best_of / 2)
-
-    async def fetch_gamedays(self) -> List[Gameday]:
-        async with self.bot.safe_connection() as connection:
-            data = await connection.fetch('SELECT * FROM teams.gamedays WHERE config_id = $1', self.id)
-
-        return [Gameday(bot=self.bot, **dict(row)) for row in data]

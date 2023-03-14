@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS teams.practice_leaderboards(
     role_id BIGINT
 );
 
-CREATE TABLE IF NOT EXISTS teams.gameday_config(
+CREATE TABLE IF NOT EXISTS teams.gameday_buckets(
     id SERIAL PRIMARY KEY,
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     guild_id BIGINT,
@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS teams.gameday_config(
 
 CREATE TABLE IF NOT EXISTS teams.gamedays(
     id SERIAL PRIMARY KEY,
-    config_id INTEGER REFERENCES teams.gameday_config(id) ON DELETE CASCADE,
+    bucket_id INTEGER REFERENCES teams.gameday_buckets(id) ON DELETE CASCADE,
     guild_id BIGINT,
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     started_at TIMESTAMP WITH TIME ZONE,
