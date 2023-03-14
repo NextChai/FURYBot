@@ -65,3 +65,8 @@ class TeamMemberable(Teamable, Protocol):
     @property
     def team_member(self) -> Optional[TeamMember]:
         return self.team.get_member(self._get_member_id())
+
+    @property
+    def mention(self) -> str:
+        member_id = self._get_member_id()
+        return f'<@{member_id}>'

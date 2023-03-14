@@ -75,6 +75,15 @@ class GamedayMember(TeamMemberable):
 
     is_temporary_sub: bool = False
 
+    def __eq__(self, __o: object) -> bool:
+        return isinstance(__o, self.__class__) and self.member_id == __o.member_id
+
+    def __ne__(self, __o: object) -> bool:
+        return not self.__eq__(__o)
+
+    def __hash__(self) -> int:
+        return hash(self.member_id)
+
     def _get_bot(self) -> FuryBot:
         return self.bot
 
@@ -89,19 +98,25 @@ class GamedayMember(TeamMemberable):
 
     @classmethod
     async def create(
-        cls: Type[Self], user: Union[discord.Member, discord.User], gameday: Gameday, *, is_temporary_sub: bool = False
+        cls: Type[Self],
+        user: Union[discord.Member, discord.User],
+        gameday: Gameday,
+        *,
+        is_temporary_sub: bool = False,
+        reason: Optional[str] = None,
     ) -> Self:
         bot = gameday.bot
         async with bot.safe_connection() as connection:
             data = await connection.fetchrow(
-                'INSERT INTO teams.gameday_members(gameday_id, team_id, member_id, guild_id, is_temporary_sub) '
-                'VALUES($1, $2, $3, $4, $5) '
+                'INSERT INTO teams.gameday_members(gameday_id, team_id, member_id, guild_id, is_temporary_sub, reason) '
+                'VALUES($1, $2, $3, $4, $5, $6) '
                 'RETURNING *',
                 gameday.id,
                 gameday.team_id,
                 user.id,
                 gameday.guild_id,
                 is_temporary_sub,
+                reason,
             )
             assert data
 
@@ -230,6 +245,9 @@ class Gameday(Teamable):
 
     def get_members_attending(self) -> Dict[int, GamedayMember]:
         return {k: v for k, v in self._members.items() if v.is_attending}
+
+    def get_members_not_attending(self) -> Dict[int, GamedayMember]:
+        return {k: v for k, v in self._members.items() if not v.is_attending}
 
 
 class GamedayBucket(Teamable):
