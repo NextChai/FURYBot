@@ -70,6 +70,7 @@ from utils import (
     _parse_environ_boolean,
     INITIAL_EXTENSIONS,
     IGNORE_EXTENSIONS,
+    START_TIMER_MANAGER,
 )
 
 if TYPE_CHECKING:
@@ -224,9 +225,9 @@ class FuryBot(commands.Bot):
         self.pool: PoolType = pool
         self.thread_pool: futures.ThreadPoolExecutor = futures.ThreadPoolExecutor(max_workers=20)
 
-        _start_timer_manager = os.environ.get('FURY_START_TIMER_MANAGER')
-        if _start_timer_manager is None or _start_timer_manager.lower() in ('true', '1'):
-            self.timer_manager: TimerManager = TimerManager(bot=self)
+        self.timer_manager: Optional[TimerManager] = None
+        if START_TIMER_MANAGER:
+            self.timer_manager = TimerManager(bot=self)
 
         self.link_filter: LinkFilter = LinkFilter(self)
 
