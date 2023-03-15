@@ -32,6 +32,8 @@ from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, Type, Un
 import discord
 from typing_extensions import Self
 
+from utils import MiniQueryBuilder
+
 if TYPE_CHECKING:
     from bot import FuryBot, ConnectionType
 
@@ -42,6 +44,31 @@ __all__: Tuple[str, ...] = (
     'Gameday',
     'Weekday',
 )
+
+MISSING = discord.utils.MISSING
+
+
+def _get_attendance_voting_start_time(gameday_starts_at: datetime.datetime) -> datetime.datetime:
+    # Let's go to midnight (12:00am) then subtract 9 hours to get to 11am EST time.
+    midnight = gameday_starts_at.replace(hour=0, minute=0, second=0, microsecond=0)
+    return midnight - datetime.timedelta(hours=9)
+
+
+def _get_attendance_voting_end_time(gameday_starts_at: datetime.datetime) -> datetime.datetime:
+    # Let's go to midnight (12:00am) then subtract 4 hours to get to 4pm EST time.
+    return _get_attendance_voting_start_time(gameday_starts_at) + datetime.timedelta(hours=5)
+
+
+def _get_next_gameday_time(now: datetime.datetime, /, *, weekday: Weekday, game_time: datetime.time) -> datetime.datetime:
+    # Calculate the next occurrence of the given weekday
+    days_until_gameday = (weekday.value - now.weekday() - 1) % 7
+    next_gameday = now + datetime.timedelta(days=days_until_gameday)
+
+    next_gameday = next_gameday.replace(
+        hour=game_time.hour, minute=game_time.minute, second=game_time.second, microsecond=game_time.microsecond
+    )
+
+    return next_gameday
 
 
 class Weekday(enum.Enum):
@@ -138,6 +165,7 @@ class GamedayMember(TeamMemberable):
             )
 
 
+@dataclasses.dataclass()
 class Gameday(Teamable):
     """Represents a gameday for a given team. A gameday is where a team gets together in order to play their e-sports games.
 
@@ -188,6 +216,7 @@ class Gameday(Teamable):
         losses: int,
         ended_at: Optional[datetime.datetime] = None,
         members: Dict[int, GamedayMember] = {},
+        advance_gameday_notification_message_id: Optional[int] = None,
     ) -> None:
         self.bot: FuryBot = bot
         self.id: int = id
@@ -203,6 +232,12 @@ class Gameday(Teamable):
 
         self._members: Dict[int, GamedayMember] = members
 
+        # The message ID of the advance gameday notification message, also known as the panel
+        # that determines who is and isn't coming to the gameday.
+        self.attendance_voting_message_id: Optional[int] = advance_gameday_notification_message_id
+        self.attendance_voting_start: datetime.datetime = _get_attendance_voting_start_time(self.started_at)
+        self.attendance_voting_end: datetime.datetime = _get_attendance_voting_end_time(self.started_at)
+
     def _get_bot(self) -> FuryBot:
         return self.bot
 
@@ -211,6 +246,43 @@ class Gameday(Teamable):
 
     def _get_team_id(self) -> int:
         return self.team_id
+
+    @classmethod
+    async def create(
+        cls: Type[Self],
+        bot: FuryBot,
+        *,
+        gameday_bucket_id: int,
+        guild_id: int,
+        team_id: int,
+        starts_at: datetime.datetime,
+    ) -> Self:
+        async with bot.safe_connection() as connection:
+            data = await connection.fetchrow(
+                'INSERT INTO teams.gamedays (bucket_id, guild_id, team_id, started_at) VALUES ($1, $2, $3, $4) RETURNING *',
+                gameday_bucket_id,
+                guild_id,
+                team_id,
+                starts_at,
+            )
+            assert data
+
+        self = cls(bot=bot, **dict(data))
+        self.bucket.add_gameday(self)
+
+        # Let's spawn some tasks to start this gameday here
+        timer_manager = self.bot.timer_manager
+        if timer_manager is not None:
+            # Create a timer for when the gameday starts.
+            default_timer_args = (guild_id, team_id, gameday_bucket_id, self.id)
+
+            await timer_manager.create_timer(starts_at, 'gameday_start', *default_timer_args)
+
+            # Create a timer for the start and end of the voting
+            await timer_manager.create_timer(self.attendance_voting_start, 'attendance_voting_start', *default_timer_args)
+            await timer_manager.create_timer(self.attendance_voting_end, 'attendance_voting_end', *default_timer_args)
+
+        return self
 
     @classmethod
     async def fetch_members(
@@ -229,7 +301,11 @@ class Gameday(Teamable):
 
     @property
     def bucket(self) -> GamedayBucket:
-        return self.bot.get_gameday_bucket(self.guild_id, self.team_id, self.id, get=False)
+        return self.bot.get_gameday_bucket(self.guild_id, self.team_id, get=False)
+
+    @property
+    def is_full(self) -> bool:
+        return self.subs_needed <= 0
 
     def add_member(self, member: GamedayMember) -> None:
         self._members[member.member_id] = member
@@ -248,6 +324,51 @@ class Gameday(Teamable):
 
     def get_members_not_attending(self) -> Dict[int, GamedayMember]:
         return {k: v for k, v in self._members.items() if not v.is_attending}
+
+    def inject_metadata_into_embed(self, embed: discord.Embed) -> None:
+        attending_members = self.get_members_attending()
+
+        members: List[str] = []
+        subs: List[str] = []
+        for attending_member in attending_members.values():
+            if attending_member.is_temporary_sub:
+                subs.append(f'- {attending_member.mention} (One-Time Sub)')
+                continue
+
+            team_member = self.team.get_member(attending_member.member_id)
+            assert team_member  # A member can only be in this list of they're on the team
+
+            if team_member.is_sub:
+                subs.append(f'- {attending_member.mention}')
+                continue
+
+            members.append(f'- {attending_member.mention}')
+
+        embed.add_field(
+            name='Attending Members',
+            value='\n'.join(members) or 'No members have selected themselves as attending.',
+            inline=False,
+        )
+
+        if subs:
+            embed.add_field(name='Attending Subs', value='\n'.join(subs), inline=False)
+
+        not_attending_formatted = '\n'.join(f'{m.mention}: {m.reason}' for m in self.get_members_not_attending().values())
+        embed.add_field(
+            name='Not Attending Members',
+            value=not_attending_formatted or 'No members have marked themselves as not attending.',
+            inline=False,
+        )
+
+    async def edit(self, *, attendance_voting_message_id: int = MISSING) -> None:
+        query_builder = MiniQueryBuilder('teams.gamedays')
+        query_builder.add_condition('id', self.id)
+
+        if attendance_voting_message_id is not MISSING:
+            query_builder.add_arg('attendance_voting_message_id', attendance_voting_message_id)
+            self.attendance_voting_message_id = attendance_voting_message_id
+
+        await query_builder(self.bot)
 
 
 class GamedayBucket(Teamable):
@@ -268,8 +389,6 @@ class GamedayBucket(Teamable):
     members_on_team: int
         The number of members that can be on a given team. For example,
         for Rocket League it is 3.
-    total_rounds_per_gameday: int
-        The total number of rounds that are played in a given gameday.
     best_of: int
         Represents the best of X rounds that are played in a given gameday. So for example,
         if best_of is 3, then the team that wins 2 rounds first wins the gameday.
@@ -286,7 +405,6 @@ class GamedayBucket(Teamable):
         weekday: int,
         game_time: datetime.time,
         members_on_team: int,
-        total_rounds_per_gameday: int,
         best_of: int,
         automatic_sub_finding: bool,
     ) -> None:
@@ -299,7 +417,6 @@ class GamedayBucket(Teamable):
         self.game_time: datetime.time = game_time
 
         self.members_on_team: int = members_on_team
-        self.total_rounds_per_gameday: int = total_rounds_per_gameday
         self.best_of: int = best_of
         self.automatic_sub_finding: bool = automatic_sub_finding
 
@@ -313,6 +430,44 @@ class GamedayBucket(Teamable):
 
     def _get_team_id(self) -> int:
         return self.team_id
+
+    @classmethod
+    async def create(
+        cls: Type[Self],
+        bot: FuryBot,
+        *,
+        guild_id: int,
+        team_id: int,
+        members_on_team: int,
+        weekday: Weekday,
+        game_time: datetime.time,
+        best_of: int,
+        automatic_sub_finding: bool = True,
+    ) -> Self:
+        async with bot.safe_connection() as connection:
+            data = await connection.fetchrow(
+                'INSERT INTO teams.gameday_buckets (team_id, guild_id, weekday, game_time, members_on_team, best_of, automatic_sub_finding) '
+                'VALUES($1, $2, $3, $4, $5, $6, $7) '
+                'RETURNING *',
+                team_id,
+                guild_id,
+                weekday.value,
+                game_time,
+                members_on_team,
+                best_of,
+                automatic_sub_finding,
+            )
+            assert data
+
+        self = cls(bot=bot, **dict(data))
+        bot.add_gameday_bucket(self)
+
+        # Let's create the first gameday as well for this bucket which will start
+        # the cycle of timers.
+        gameday_time = _get_next_gameday_time(discord.utils.utcnow(), weekday=weekday, game_time=game_time)
+        await Gameday.create(bot, gameday_bucket_id=self.id, guild_id=guild_id, team_id=team_id, starts_at=gameday_time)
+
+        return self
 
     @classmethod
     async def fetch_gamedays(
