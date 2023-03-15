@@ -26,7 +26,6 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
-import os
 import time
 import inspect
 from concurrent import futures
@@ -240,8 +239,8 @@ class FuryBot(commands.Bot):
         # Mapping[guild_id, Mapping[team_id, Mapping[practice_id, Practice]]]
         self._team_practice_cache: Dict[int, Dict[int, Dict[int, Practice]]] = {}
 
-        # Mapping[guild_id, Mapping[team_id, Mapping[bucket_id, GamedayBucket]]]
-        self._team_gameday_buckets: Dict[int, Dict[int, Dict[int, GamedayBucket]]] = {}
+        # Mapping[guild_id, Mapping[team_id, GameBucket]]
+        self._team_gameday_buckets: Dict[int, Dict[int, GamedayBucket]] = {}
 
         super().__init__(
             command_prefix=commands.when_mentioned_or('fury.'),
@@ -324,39 +323,15 @@ class FuryBot(commands.Bot):
 
         return embed
 
-    # Team Gameday Bucket Management
-    def get_gameday_buckets(self, guild_id: int, team_id: int, /) -> List[GamedayBucket]:
-        """Get all gameday buckets for a team in a guild.
-
-        Parameters
-        ----------
-        guild_id: :class:`int`
-            The guild ID to get buckets from.
-        team_id: :class:`int`
-            The team ID to get buckets from.
-
-        Returns
-        -------
-        List[:class:`GamedayBucket`]
-            The buckets in the guild.
-        """
-        return list(self._team_gameday_buckets.get(guild_id, {}).get(team_id, {}).values())
-
     @overload
-    def get_gameday_bucket(
-        self, guild_id: int, team_id: int, bucket_id: int, /, *, get: Literal[True] = True
-    ) -> Optional[GamedayBucket]:
+    def get_gameday_bucket(self, guild_id: int, team_id: int, /, *, get: Literal[True] = True) -> Optional[GamedayBucket]:
         ...
 
     @overload
-    def get_gameday_bucket(
-        self, guild_id: int, team_id: int, bucket_id: int, /, *, get: Literal[False] = False
-    ) -> GamedayBucket:
+    def get_gameday_bucket(self, guild_id: int, team_id: int, /, *, get: Literal[False] = False) -> GamedayBucket:
         ...
 
-    def get_gameday_bucket(
-        self, guild_id: int, team_id: int, bucket_id: int, /, *, get: bool = True
-    ) -> Optional[GamedayBucket]:
+    def get_gameday_bucket(self, guild_id: int, team_id: int, /, *, get: bool = True) -> Optional[GamedayBucket]:
         """Get a gameday bucket for a team in a guild.
 
         Parameters
@@ -373,11 +348,11 @@ class FuryBot(commands.Bot):
         Optional[:class:`GamedayBucket`]
             The bucket, if it exists.
         """
-        data = self._team_gameday_buckets.get(guild_id, {}).get(team_id, {})
+        data = self._team_gameday_buckets.get(guild_id, {})
         if get:
-            return data.get(bucket_id)
+            return data.get(team_id, None)
 
-        return data[bucket_id]
+        return data[team_id]
 
     def add_gameday_bucket(self, bucket: GamedayBucket, /):
         """Add a gameday bucket to the cache.
@@ -387,7 +362,7 @@ class FuryBot(commands.Bot):
         bucket: :class:`GamedayBucket`
             The bucket to add.
         """
-        self._team_gameday_buckets.setdefault(bucket.guild_id, {}).setdefault(bucket.team_id, {})[bucket.id] = bucket
+        self._team_gameday_buckets.setdefault(bucket.guild_id, {})[bucket.team_id] = bucket
 
     # Team management
     def get_teams(self, guild_id: int, /) -> List[Team]:

@@ -329,14 +329,17 @@ class Team:
 
     @property
     def members(self) -> List[TeamMember]:
+        """List[:class:`TeamMember`]: A list of all team members."""
         return list(self.team_members.values())
 
     @property
     def main_roster(self) -> List[TeamMember]:
+        """List[:class:`TeamMember`]: A list of all team members that are not a sub."""
         return [member for member in self.members if not member.is_sub]
 
     @property
     def sub_roster(self) -> List[TeamMember]:
+        """List[:class:`TeamMember`]: A list of all team members that are a sub."""
         return [member for member in self.members if member.is_sub]
 
     @property
@@ -359,6 +362,7 @@ class Team:
 
     @property
     def extra_channels(self) -> List[discord.abc.GuildChannel]:
+        """List[:class:`discord.abc.GuildChannel`]: A list of all extra channels this team has."""
         guild = self.guild
         return [cast(discord.abc.GuildChannel, guild.get_channel(channel_id)) for channel_id in self.extra_channel_ids]
 
@@ -397,11 +401,9 @@ class Team:
 
         return sum(practice_points)
 
-    def get_gameday_buckets(self) -> List[GamedayBucket]:
-        return self.bot.get_gameday_buckets(self.guild_id, self.id)
-
-    def get_gameday_bucket(self, bucket_id: int, /) -> Optional[GamedayBucket]:
-        return self.bot.get_gameday_bucket(self.guild_id, self.id, bucket_id)
+    def get_gameday_bucket(self, /) -> Optional[GamedayBucket]:
+        """Optional[:class:`GamedayBucket`]: Gets the gameday bucket for this team."""
+        return self.bot.get_gameday_bucket(self.guild_id, self.id)
 
     def mention_members(self, delimiter: str = ', ') -> str:
         """Mentions all the members in this team.
@@ -573,6 +575,7 @@ class Team:
 
         return member_absences.most_common()
 
+    # TODO: Refactor to not use database
     async def fetch_practice_rank(self, *, connection: Optional[asyncpg.Connection[asyncpg.Record]] = None) -> int:
         """|coro|
 
