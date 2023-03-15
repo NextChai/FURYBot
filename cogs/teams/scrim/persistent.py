@@ -30,6 +30,7 @@ import discord
 from typing_extensions import Self
 
 from . import ScrimStatus
+from utils import default_button_doc_string
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -43,6 +44,22 @@ ButtonType: TypeAlias = discord.ui.Button[VT]
 
 
 class HomeConfirm(discord.ui.View):
+    """Represents the persistent view all  home members of a scrim must use to send the scrim
+    off to the away team.
+
+    Parameters
+    ----------
+    scrim: :class:`Scrim`
+        The scrim this view is for.
+
+    Attributes
+    ----------
+    scrim: :class:`Scrim`
+        The scrim this view is for.
+    bot: :class:`FuryBot`
+        The main bot instance.
+    """
+
     def __init__(self, scrim: Scrim, /) -> None:
         super().__init__(timeout=None)
         self.bot: FuryBot = scrim.bot
@@ -50,6 +67,7 @@ class HomeConfirm(discord.ui.View):
 
     @property
     def embed(self) -> discord.Embed:
+        """:class:`discord.Embed`: A discord embed to display information about the current state of the scrim to the home team."""
         scrim = self.scrim
 
         if scrim.status is ScrimStatus.pending_host:
@@ -123,6 +141,21 @@ class HomeConfirm(discord.ui.View):
         raise Exception('Unknown scrim status.')
 
     async def interaction_check(self, interaction: discord.Interaction) -> Optional[bool]:
+        """|coro|
+
+        A check called every time before a button callback is invoked.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction to check.
+
+        Returns
+        -------
+        Optional[:class:`bool`]
+            ``True`` if the interaction passes the check, ``False`` if it fails, and ``None`` if the check is not
+            applicable to the interaction.
+        """
         members = self.scrim.home_team.team_members
         if interaction.user.id not in members:
             return await interaction.response.send_message(
@@ -132,7 +165,9 @@ class HomeConfirm(discord.ui.View):
         return True
 
     @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green, custom_id='home-confirm-confirm')
+    @default_button_doc_string
     async def confirm(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
+        """Confirms a member on the home team wants to scrim."""
         try:
             await self.scrim.add_vote(interaction.user.id, self.scrim.home_id)
         except ValueError:
@@ -158,7 +193,9 @@ class HomeConfirm(discord.ui.View):
         await self.scrim.edit(away_message_id=message.id)
 
     @discord.ui.button(label='Remove Confirmation', custom_id='home-confirm-remove')
+    @default_button_doc_string
     async def remove_confirmation(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
+        """Allows an already confirmed member to remove their vote."""
         try:
             await self.scrim.remove_vote(interaction.user.id, self.scrim.home_id)
         except ValueError:
@@ -170,6 +207,24 @@ class HomeConfirm(discord.ui.View):
 
 
 class AwayForceConfirm(discord.ui.View):
+    """An away team can vote to "force confirm" a given scrim if they're unable to reach enough members.
+    This requires half of the scrim's "per-team" count to vote to force confirm.
+
+    Parameters
+    ----------
+    scrim: :class:`Scrim`
+        The scrim to force confirm.
+
+    Attributes
+    ----------
+    bot: :class:`FuryBot`
+        The bot instance.
+    scrim: :class:`Scrim`
+        The scrim to force confirm.
+    required_to_confirm: :class:`int`
+        The amount of votes required to force confirm.
+    """
+
     def __init__(self, scrim: Scrim, /) -> None:
         super().__init__(timeout=None)
         self.bot: FuryBot = scrim.bot
@@ -177,23 +232,9 @@ class AwayForceConfirm(discord.ui.View):
 
         self.required_to_confirm = self.scrim.per_team // 2
 
-    async def interaction_check(self, interaction: discord.Interaction) -> Optional[bool]:
-        members = self.scrim.away_team.team_members
-        if interaction.user.id not in members:
-            return await interaction.response.send_message(
-                'Hey, you aren\'t on this team so you can\'t vote!', ephemeral=True
-            )
-
-        # Check if they've voted, if they havent then we need to yell at them
-        if interaction.user.id not in self.scrim.away_confirm_anyways_voter_ids:
-            return await interaction.response.send_message(
-                'Hey, you haven\'t voted to force confirm this scrim yet!', ephemeral=True
-            )
-
-        return True
-
     @property
     def embed(self) -> discord.Embed:
+        """:class:`discord.Embed`: The embed to show for this view."""
         if len(self.scrim.away_confirm_anyways_voter_ids) >= self.required_to_confirm:
             # This vote has been passed, show an embed to represent it
             embed = self.bot.Embed(
@@ -223,8 +264,40 @@ class AwayForceConfirm(discord.ui.View):
 
         return embed
 
+    async def interaction_check(self, interaction: discord.Interaction) -> Optional[bool]:
+        """|coro|
+
+        A check called every time before a button callback is invoked.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction to check.
+
+        Returns
+        -------
+        Optional[:class:`bool`]
+            ``True`` if the interaction passes the check, ``False`` if it fails, and ``None`` if the check is not
+            applicable to the interaction.
+        """
+        members = self.scrim.away_team.team_members
+        if interaction.user.id not in members:
+            return await interaction.response.send_message(
+                'Hey, you aren\'t on this team so you can\'t vote!', ephemeral=True
+            )
+
+        # Check if they've voted, if they havent then we need to yell at them
+        if interaction.user.id not in self.scrim.away_confirm_anyways_voter_ids:
+            return await interaction.response.send_message(
+                'Hey, you haven\'t voted to force confirm this scrim yet!', ephemeral=True
+            )
+
+        return True
+
     @discord.ui.button(label='Force Confirm', style=discord.ButtonStyle.success, custom_id='away-force-confirm')
+    @default_button_doc_string
     async def force_confirm(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
+        """Votes the given member to force confirm the scrim."""
         self.scrim.away_confirm_anyways_voter_ids.append(interaction.user.id)
 
         await interaction.response.edit_message(embed=self.embed, view=self)
@@ -256,6 +329,21 @@ class AwayForceConfirm(discord.ui.View):
 
 
 class AwayConfirm(discord.ui.View):
+    """After all members on the :class:`HomeConfirm` view have confirmed, this view is shown to the away team.
+
+    Parameters
+    ----------
+    scrim: :class:`Scrim`
+        The scrim to show the view for.
+
+    Attributes
+    ----------
+    bot: :class:`FuryBot`
+        The bot instance.
+    scrim: :class:`Scrim`
+        The scrim to show the view for.
+    """
+
     def __init__(self, scrim: Scrim, /) -> None:
         super().__init__(timeout=None)
         self.bot: FuryBot = scrim.bot
@@ -263,6 +351,7 @@ class AwayConfirm(discord.ui.View):
 
     @property
     def embed(self) -> discord.Embed:
+        """:class:`discord.Embed`: The embed to show for this view."""
         scrim = self.scrim
 
         if scrim.status is ScrimStatus.pending_host:
@@ -320,6 +409,21 @@ class AwayConfirm(discord.ui.View):
         raise Exception('Unknown scrim status provided')
 
     async def interaction_check(self, interaction: discord.Interaction) -> Optional[bool]:
+        """|coro|
+
+        A check called every time before a button callback is invoked.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction to check.
+
+        Returns
+        -------
+        Optional[:class:`bool`]
+            ``True`` if the interaction passes the check, ``False`` if it fails, and ``None`` if the check is not
+            applicable to the interaction.
+        """
         members = self.scrim.away_team.team_members
         if interaction.user.id not in members:
             return await interaction.response.send_message(
@@ -329,7 +433,9 @@ class AwayConfirm(discord.ui.View):
         return True
 
     @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green, custom_id='away-confirm-confirm')
+    @default_button_doc_string
     async def confirm(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
+        """Confirms a given member on the away team to scrim at that given time."""
         try:
             await self.scrim.add_vote(interaction.user.id, self.scrim.away_id)
         except ValueError:
@@ -350,7 +456,10 @@ class AwayConfirm(discord.ui.View):
         await home_message.edit(embed=view.embed)
 
     @discord.ui.button(label='Force Confirm', custom_id='force-confirm-confirm')
+    @default_button_doc_string
     async def force_confirn(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
+        """Launches a vote to force confirm the scrim. This can be done if the team is unable to get a full team
+        but still wants to scrim."""
         if self.scrim.per_team < 2:
             return await interaction.response.send_message(
                 f'You can not vote to force confirm if "per team" is less than 2.', ephemeral=True
@@ -388,7 +497,9 @@ class AwayConfirm(discord.ui.View):
         await self.scrim.edit(away_confirm_anyways_message_id=message.id)
 
     @discord.ui.button(label='Unconfirm', custom_id='away-confirm-unconfirm')
+    @default_button_doc_string
     async def unconfirm(self, interaction: discord.Interaction, button: ButtonType[Self]) -> None:
+        """Allows a member to unconfirm their vote to scrim at that given time."""
         try:
             await self.scrim.remove_vote(interaction.user.id, self.scrim.away_id)
         except ValueError:

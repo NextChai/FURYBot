@@ -119,6 +119,25 @@ class Scrim:
         creator_id: int,
         bot: FuryBot,
     ) -> Self:
+        """|coro|
+
+        A class method to create a new scrim at the given specifications.
+
+        Parameters
+        ----------
+        when: :class:`datetime.datetime`
+            The time the scrim is scheduled for.
+        home_team: :class:`Team`
+            The home team.
+        away_team: :class:`Team`
+            The away team.
+        per_team: :class:`int`
+            The number of players per team.
+        creator_id: :class:`int`
+            The id of the user who created the scrim.
+        bot: :class:`FuryBot`
+            The bot instance.
+        """
         # Let's create the home message
         status = ScrimStatus.pending_host
 
@@ -151,21 +170,22 @@ class Scrim:
             )
             await scrim.edit(home_message_id=message.id)
 
-        scrim_scheduled_timer = await bot.timer_manager.create_timer(
-            when, 'scrim_scheduled', scrim_id=scrim.id, guild_id=home_team.guild_id
-        )
-
-        # If the scrim is more than a day out, create a reminder
-        scrim_reminder_timer = None
-        if (when - discord.utils.utcnow()).days > 1:
-            scrim_reminder_timer = await bot.timer_manager.create_timer(
-                when - datetime.timedelta(minutes=30), 'scrim_reminder', scrim_id=scrim.id, guild_id=home_team.guild_id
+        if bot.timer_manager:
+            scrim_scheduled_timer = await bot.timer_manager.create_timer(
+                when, 'scrim_scheduled', scrim_id=scrim.id, guild_id=home_team.guild_id
             )
 
-        await scrim.edit(
-            scrim_scheduled_timer_id=scrim_scheduled_timer.id,
-            scrim_reminder_timer_id=scrim_reminder_timer and scrim_reminder_timer.id,
-        )
+            # If the scrim is more than a day out, create a reminder
+            scrim_reminder_timer = None
+            if (when - discord.utils.utcnow()).days > 1:
+                scrim_reminder_timer = await bot.timer_manager.create_timer(
+                    when - datetime.timedelta(minutes=30), 'scrim_reminder', scrim_id=scrim.id, guild_id=home_team.guild_id
+                )
+
+            await scrim.edit(
+                scrim_scheduled_timer_id=scrim_scheduled_timer.id,
+                scrim_reminder_timer_id=scrim_reminder_timer and scrim_reminder_timer.id,
+            )
 
         bot.add_scrim(scrim)
         return scrim
@@ -241,6 +261,7 @@ class Scrim:
         return cast(discord.TextChannel, self.guild.get_channel(self.scrim_chat_id))
 
     def load_persistent_views(self) -> None:
+        """A helper method to load the persistent views for the scrim."""
         view = HomeConfirm(self)
         self.bot.add_view(view, message_id=self.home_message_id)
 
@@ -262,7 +283,8 @@ class Scrim:
         Returns
         --------
         :class:`discord.Message`
-            The message in the home team's text channel."""
+            The message in the home team's text channel.
+        """
         channel = self.home_team.text_channel
         return await channel.fetch_message(self.home_message_id)
 
@@ -281,6 +303,15 @@ class Scrim:
         return await channel.fetch_message(self.away_message_id)
 
     async def away_confirm_anyways_message(self) -> Optional[discord.Message]:
+        """|coro|
+
+        Fetches the away confirm anyways message.
+
+        Returns
+        -------
+        Optional[:class:`discord.Message`]
+            The message in the away team's text channel. ``None`` if there is no message in the away channel.
+        """
         if not self.away_confirm_anyways_message_id:
             return
 
@@ -300,6 +331,31 @@ class Scrim:
         away_confirm_anyways_voter_ids: List[int] = MISSING,
         home_message_id: int = MISSING,
     ) -> None:
+        """|coro|
+
+        Edit the given scrim and edit its state.
+
+        Parameters
+        ----------
+        scrim_chat_id: Optional[:class:`int`]
+            The ID of the scrim chat.
+        scrim_scheduled_timer_id: Optional[:class:`int`]
+            The ID of the scheduled timer.
+        scrim_reminder_timer_id: Optional[:class:`int`]
+            The ID of the reminder timer.
+        scrim_delete_timer_id: Optional[:class:`int`]
+            The ID of the delete timer.
+        scheduled_for: :class:`datetime.datetime`
+            The time the scrim is scheduled for.
+        away_confirm_anyways_message_id: Optional[:class:`int`]
+            The ID of the away confirm anyways message.
+        away_message_id: Optional[:class:`int`]
+            The ID of the away message.
+        away_confirm_anyways_voter_ids: List[:class:`int`]
+            The IDs of the away team's voters for confirming the scrim anyways.
+        home_message_id: :class:`int`
+            The ID of the home message.
+        """
         builder = MiniQueryBuilder('teams.scrims')
         builder.add_condition('id', self.id)
 
@@ -334,6 +390,16 @@ class Scrim:
         await builder(self.bot)
 
     async def create_scrim_chat(self) -> discord.TextChannel:
+        """|coro|
+
+        A helper method to create the scrim chat and assign the correct permissions to those
+        who have opted to play.
+
+        Returns
+        -------
+        :class:`discord.TextChannel`
+            The created text channel.
+        """
         overwrites: Mapping[Union[discord.Member, discord.Role], discord.PermissionOverwrite] = {
             m.member or await m.fetch_member(): discord.PermissionOverwrite(view_channel=True)
             for m in [*self.away_team.team_members.values(), *self.home_team.team_members.values()]
@@ -350,6 +416,7 @@ class Scrim:
 
         return channel
 
+    # TODO: Move this to the edit method.
     async def change_status(
         self, status: Literal[ScrimStatus.scheduled, ScrimStatus.pending_away, ScrimStatus.pending_host], /
     ) -> None:
@@ -440,6 +507,15 @@ class Scrim:
             )
 
     async def reschedle(self, when: datetime.datetime, *, editor: discord.abc.User) -> None:
+        """Reschedules the scrim for the updated time.
+
+        Parameters
+        ----------
+        when: :class:`datetime.datetime`
+            The new time to schedule the scrim for.
+        editor: :class:`discord.abc.User`
+            The user who is rescheduling the scrim.
+        """
         # Let's update the scrim's messages from the old time to the new time and update the scrim
         await self.edit(scheduled_for=when)
 
@@ -463,6 +539,10 @@ class Scrim:
             )
 
     async def cancel(self) -> None:
+        """|coro|
+
+        Cancels the given scrim and deletes all messages associated with it
+        """
         async with self.bot.safe_connection() as connection:
             await connection.execute('DELETE FROM teams.scrims WHERE id = $1', self.id)
 
@@ -476,7 +556,8 @@ class Scrim:
                 await connection.execute('DELETE FROM timers WHERE id = $1', self.scrim_delete_timer_id)
 
         # Just in case the bot was waiting on one of these timers, restart the timer loop
-        self.bot.timer_manager.restart_task()
+        if self.bot.timer_manager:
+            self.bot.timer_manager.restart_task()
 
         self.bot.remove_scrim(self.id, self.guild_id)
 
