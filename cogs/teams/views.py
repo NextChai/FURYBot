@@ -178,20 +178,18 @@ class TeamMemberView(BaseView):
     """A view used to manage a team member.
 
     Parameters
-    ----------
-    member: :class:`.TeamMember`
-        The member to manage.
-
     Attributes
     ----------
-    :class:`.TeamMember`
+    member: :class:`discord.Member`
         The member to manage.
+    team: :class:`.Team`
+        The team the member is in.
     """
 
-    def __init__(self, member: discord.Member, team: Team, *args: Any, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, member: discord.Member, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
         self.member: discord.Member = member
         self.team: Team = team
-        super().__init__(*args, **kwargs)
 
     @property
     def embed(self) -> discord.Embed:
@@ -256,9 +254,9 @@ class TeamMembersView(BaseView):
         The team to manage.
     """
 
-    def __init__(self, team: Team, *args: Any, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
         self.team: Team = team
-        super().__init__(*args, **kwargs)
 
     @property
     def embed(self) -> discord.Embed:
@@ -376,12 +374,6 @@ class ScrimView(BaseView):
     """Represents a view used to manage a scrim.
 
     Parameters
-    ----------
-    team: :class:`.Team`
-        The team currently being viewed in the view history.
-    scrim: :class:`.Scrim`
-        The scrim to manage.
-
     Attributes
     ----------
     team: :class:`.Team`
@@ -390,10 +382,10 @@ class ScrimView(BaseView):
         The scrim to manage.
     """
 
-    def __init__(self, team: Team, scrim: Scrim, *args: Any, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, team: Team, scrim: Scrim, **kwargs: Unpack[BaseViewKwargs]) -> None:
         self.team: Team = team
         self.scrim: Scrim = scrim
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     @property
     def embed(self) -> discord.Embed:
@@ -582,10 +574,6 @@ class TeamScrimsView(BaseView):
     """A view used to manage a teams scrims, alter times, etc.
 
     Parameters
-    ----------
-    team: :class:`.Team`
-        The team to manage the scrims for.
-
     Attributes
     ----------
     team: :class:`.Team`
@@ -663,10 +651,6 @@ class TeamChannelsView(BaseView):
     """A view used to manage and view team channels.
 
     Parameters
-    ----------
-    team: :class:`.Team`
-        The team to manage the scrims for.
-
     Attributes
     ----------
     team: :class:`.Team`
@@ -785,19 +769,15 @@ class TeamNamingView(BaseView):
     """A view used to manage naming and renaming a team.
 
     Parameters
-    ----------
-    team: :class:`.Team`
-        The team to manage the scrims for.
-
     Attributes
     ----------
     team: :class:`.Team`
         The team to manage the scrims for.
     """
 
-    def __init__(self, team: Team, *args: Any, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
         self.team: Team = team
-        super().__init__(*args, **kwargs)
 
     @property
     def embed(self) -> discord.Embed:
@@ -916,9 +896,9 @@ class TeamCaptainsView(BaseView):
         The team to manage the scrims for.
     """
 
-    def __init__(self, team: Team, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, team: Team, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
         self.team: Team = team
-        super().__init__(*args, **kwargs)
 
     @property
     def embed(self) -> discord.Embed:
@@ -985,10 +965,10 @@ class TeamPracticeMemberView(BaseView):
         The :class:`discord.Member` object representing the member.
     """
 
-    def __init__(self, member: PracticeMember, discord_member: discord.Member, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, member: PracticeMember, discord_member: discord.Member, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
         self.member: PracticeMember = member
         self.discord_member: discord.Member = discord_member
-        super().__init__(*args, **kwargs)
 
     @property
     def embed(self) -> discord.Embed:
@@ -1048,14 +1028,22 @@ class TeamPracticeMemberView(BaseView):
 
 
 class TeamPracticeView(BaseView):
-    """"""
+    """Represents the view for a practice.
 
-    def __init__(self, practice: Practice, *args: Any, **kwargs: Any) -> None:
+    Parameters
+    Attributes
+    ----------
+    practice: :class:`.Practice`
+        The practice to represent.
+    """
+
+    def __init__(self, practice: Practice, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
         self.practice: Practice = practice
-        super().__init__(*args, **kwargs)
 
     @property
     def embed(self) -> discord.Embed:
+        """:class:`discord.Embed`: The embed representing this practice."""
         embed = self.practice.team.embed(
             title="Practice Information",
             description='Below is some inforamtion for the given practice. Use the buttons below to view stats about '
@@ -1160,9 +1148,9 @@ class TeamPracticesView(BaseView):
         The team to display practices for.
     """
 
-    def __init__(self, team: Team, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, team: Team, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
         self.team: Team = team
-        super().__init__(*args, **kwargs)
 
     @property
     def embed(self) -> discord.Embed:
@@ -1260,11 +1248,18 @@ class TeamPracticesView(BaseView):
 
 
 class TeamView(BaseView):
-    """The main Team View to edit a team."""
+    """The main Team View to edit a team.
 
-    def __init__(self, team: Team, *args: Any, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    Parameters
+    Attributes
+    ----------
+    team: :class:`Team`
+        The team to display information for.
+    """
+
+    def __init__(self, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
         self.team: Team = team
-        super().__init__(*args, **kwargs)
 
     @property
     def embed(self) -> discord.Embed:
