@@ -232,10 +232,36 @@ class Teams(BaseCog):
     async def team_get_context_menu(
         self, interaction: discord.Interaction, member: discord.Member
     ) -> discord.InteractionMessage:
+        """|coro|
+
+        The context command for the team get command. This does not have decorators
+        as all management for this command is done in the classes init.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that triggered this command.
+        member: :class:`discord.Member`
+            The member you want to get the team status of.
+        """
         return await self._team_get_func(interaction, member)
 
     @classmethod
     def _create_scrim_cancelled_message(cls, bot: FuryBot, scrim: Scrim) -> discord.Embed:
+        """Creates an embed detailing that a scrim has been cancelled.
+
+        Parameters
+        ----------
+        bot: :class:`FuryBot`
+            The bot instance.
+        scrim: :class:`Scrim`
+            The scrim that was cancelled.
+
+        Returns
+        -------
+        :class:`discord.Embed`
+            The embed detailing that a scrim has been cancelled.
+        """
         home_embed = bot.Embed(
             title='This scrim has been cancelled.',
             description='There were not enough votes to start the scrim.\n\n'
@@ -256,6 +282,18 @@ class Teams(BaseCog):
     # Timer listeners for scrim
     @commands.Cog.listener('on_scrim_scheduled_timer_complete')
     async def on_scrim_scheduled_timer_complete(self, *, scrim_id: int, guild_id: int) -> None:
+        """|coro|
+
+        A scrim listener that is called when a scrim has been scheduled for a certain time. This
+        will check if the scrim has been confirmed then create the messages, views, and chats for the scrim.
+
+        Parameters
+        ----------
+        scrim_id: :class:`int`
+            The id of the scrim that has been scheduled.
+        guild_id: :class:`int`
+            The id of the guild that the scrim is in.
+        """
         scrim = self.bot.get_scrim(scrim_id, guild_id)
         if scrim is None:
             return
@@ -295,13 +333,26 @@ class Teams(BaseCog):
         await scrim_chat.send(embed=embed)
 
         # Create a timer to delete this channel in 4 hours and delete the scrim.
-        scrim_delete_timer = await self.bot.timer_manager.create_timer(
-            discord.utils.utcnow() + datetime.timedelta(hours=4), 'scrim_delete', scrim_id=scrim_id, guild_id=guild_id
-        )
-        await scrim.edit(scrim_delete_timer_id=scrim_delete_timer.id)
+        if self.bot.timer_manager:
+            scrim_delete_timer = await self.bot.timer_manager.create_timer(
+                discord.utils.utcnow() + datetime.timedelta(hours=4), 'scrim_delete', scrim_id=scrim_id, guild_id=guild_id
+            )
+            await scrim.edit(scrim_delete_timer_id=scrim_delete_timer.id)
 
     @commands.Cog.listener('on_scrim_delete_timer_complete')
     async def on_scrim_delete_timer_complete(self, *, scrim_id: int, guild_id: int) -> None:
+        """|coro|
+
+        After N time the scrim and its chats are automatically deleted. This is what this listener
+        is for.
+
+        Parameters
+        ----------
+        scrim_id: :class:`int`
+            The id of the scrim that has ended.
+        guild_id: :class:`int`
+            The id of the guild that the scrim is in.
+        """
         scrim = self.bot.remove_scrim(scrim_id, guild_id)
         if not scrim:
             return
@@ -315,8 +366,20 @@ class Teams(BaseCog):
         async with self.bot.safe_connection() as connection:
             await connection.execute('DELETE FROM teams.scrims WHERE id = $1', scrim.id)
 
-    @commands.Cog.listener()
+    @commands.Cog.listener('on_scrim_reminder_timer_complete')
     async def on_scrim_reminder_timer_complete(self, *, scrim_id: int, guild_id: int) -> None:
+        """|coro|
+
+        The scrim reminder timer. This will send a reminder to both teams that the scrim is about to start
+        in 30 minutes.
+
+        Parameters
+        ----------
+        scrim_id: :class:`int`
+            The id of the scrim that is about to start.
+        guild_id: :class:`int`
+            The id of the guild that the scrim is in.
+        """
         scrim = self.bot.get_scrim(scrim_id, guild_id)
         if not scrim:
             return
