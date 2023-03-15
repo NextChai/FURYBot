@@ -123,7 +123,6 @@ CREATE TABLE IF NOT EXISTS teams.gameday_buckets(
     weekday INTEGER,
     game_time TIME WITH TIME ZONE,
     members_on_team INTEGER,
-    total_rounds_per_gameday INTEGER,
     best_of INTEGER,
     automatic_sub_finding BOOLEAN DEFAULT TRUE
 );
@@ -136,7 +135,8 @@ CREATE TABLE IF NOT EXISTS teams.gamedays(
     started_at TIMESTAMP WITH TIME ZONE,
     ended_at TIMESTAMP WITH TIME ZONE, -- Can be None
     wins INTEGER,
-    losses INTEGER
+    losses INTEGER,
+    attendance_voting_message_id BIGINT
 );
 
 CREATE TABLE IF NOT EXISTS teams.gameday_members(

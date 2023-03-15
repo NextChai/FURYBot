@@ -29,7 +29,6 @@ from typing_extensions import Self
 import discord
 
 from ..gameday import GamedayMember
-from utils import human_join
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -72,28 +71,38 @@ class GamedayAttendanceView(discord.ui.View):
         self.gameday: Gameday = gameday
 
     @property
+    def filled_embed(self) -> discord.Embed:
+        team = self.gameday.team
+        embed = team.embed(
+            title=f'{team.display_name} Gameday Attendance',
+            description=f'This team has a gameday coming up on {discord.utils.format_dt(self.gameday.started_at, "F")} ({discord.utils.format_dt(self.gameday.started_at, "R")}). '
+            f'This team has been filled with members who have marked themselves as attending, in {discord.utils.format_dt(self.gameday.attendance_voting_end, "R")} this '
+            'panel will automatically close and the captains will be notified.',
+        )
+
+        embed.add_field(
+            name='All Roster Spots Filled',
+            value=f'**{len(self.gameday.get_members())} members** have marked themselves as attending, which is '
+            f'enough to fill the {self.gameday.bucket.members_on_team} roster spots.',
+            inline=False,
+        )
+
+        self.gameday.inject_metadata_into_embed(embed)
+
+        return embed
+
+    @property
     def embed(self) -> discord.Embed:
         team = self.gameday.team
         embed = team.embed(
             title=f'{team.display_name} Gameday Attendance',
             description=f'This team has a gameday coming up on {discord.utils.format_dt(self.gameday.started_at, "F")} ({discord.utils.format_dt(self.gameday.started_at, "R")}). '
-            'Please use the buttons below to mark yourself as attending or not attending for tomorrows gameday. Note this attendance panel is only '
-            'valid for 5 hours, after which it will be closed. If the team has not been filled before then, other members may step in to sub for you.',
+            'Please use the buttons below to mark yourself as attending or not attending for tomorrows gameday. Note this attendance panel will '
+            f'expire in {discord.utils.format_dt(self.gameday.attendance_voting_end, "R")}. After that time, if needed, subs will be found '
+            'to fill the roster and you will not be able to mark yourself as attending.',
         )
 
-        attending_members = self.gameday.get_members_attending()
-        embed.add_field(
-            name='Attending Members',
-            value=human_join((m.mention for m in attending_members.values())) or 'No Attending Members.',
-            inline=False,
-        )
-
-        not_attending_members = self.gameday.get_members_not_attending()
-        embed.add_field(
-            name='Not Attending Members',
-            value=human_join((m.mention for m in not_attending_members.values())) or 'No Not Attending Members.',
-            inline=False,
-        )
+        self.gameday.inject_metadata_into_embed(embed)
 
         return embed
 
@@ -131,6 +140,15 @@ class GamedayAttendanceView(discord.ui.View):
         await interaction.response.defer()
 
         await GamedayMember.create(interaction.user, self.gameday)
+
+        # If we have enough members to fill the entire team, let's close this panel.
+        if self.gameday.is_full:
+            for child in self.children:
+                assert isinstance(child, discord.ui.Button)
+                child.disabled = True
+
+            return await interaction.edit_original_response(embed=self.filled_embed, view=self)
+
         return await interaction.edit_original_response(embed=self.embed)
 
     @discord.ui.button(label='Cannot Attend', style=discord.ButtonStyle.red)

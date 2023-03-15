@@ -80,10 +80,10 @@ class TeamMemberPracticeStatisticsView(BaseView):
         The member's specific Discord object to use for display name.
     """
 
-    def __init__(self, member: TeamMember, discord_member: discord.Member, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, member: TeamMember, discord_member: discord.Member, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
         self.member: TeamMember = member
         self.discord_member: discord.Member = discord_member
-        super().__init__(*args, **kwargs)
 
     @property
     def embed(self) -> discord.Embed:
@@ -580,9 +580,9 @@ class TeamScrimsView(BaseView):
         The team to manage the scrims for.
     """
 
-    def __init__(self, team: Team, *args: Any, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
         self.team: Team = team
-        super().__init__(*args, **kwargs)
 
     @property
     def embed(self) -> discord.Embed:
@@ -657,9 +657,9 @@ class TeamChannelsView(BaseView):
         The team to manage the scrims for.
     """
 
-    def __init__(self, team: Team, *args: Any, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
         self.team: Team = team
-        super().__init__(*args, **kwargs)
 
     @property
     def embed(self) -> discord.Embed:

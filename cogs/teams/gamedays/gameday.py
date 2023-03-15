@@ -165,7 +165,6 @@ class GamedayMember(TeamMemberable):
             )
 
 
-@dataclasses.dataclass()
 class Gameday(Teamable):
     """Represents a gameday for a given team. A gameday is where a team gets together in order to play their e-sports games.
 
