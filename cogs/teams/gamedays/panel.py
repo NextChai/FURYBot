@@ -28,8 +28,7 @@ from typing import TYPE_CHECKING
 import discord
 from typing_extensions import Self, Unpack
 
-from utils import default_button_doc_string
-from utils.ui_kit import BaseView, BaseViewKwargs
+from utils import default_button_doc_string, BaseView, BaseViewKwargs
 
 if TYPE_CHECKING:
     from .gameday import GamedayBucket, Gameday, GamedayMember
