@@ -95,7 +95,7 @@ initial_extensions: Tuple[str, ...] = (
     'cogs.infractions',
     'utils.error_handler',
     'cogs.owner',
-    'cogs.events.tracking',
+    'cogs.message_tracking',
     'cogs.teams',
     'cogs.teams.practices',
     'cogs.images',
