@@ -53,6 +53,11 @@ class GamedayEventListener(BaseCog):
     - At the scheduled gameday time, this will send the scoreboard to the team channel.
     """
 
+    @commands.Cog.listener('on_gameday_start_timer_complete')
+    async def on_gameday_start(self, guild_id: int, team_id: int, gameday_bucket_id: int, gameday_id: int) -> None:
+        # TODO: Launch the scoreboard
+        raise NotImplementedError
+
     @commands.Cog.listener('on_attendance_voting_start_timer_complete')
     async def on_attendance_voting_start(self, guild_id: int, team_id: int, gameday_bucket_id: int, gameday_id: int) -> None:
         """|coro|
@@ -60,7 +65,7 @@ class GamedayEventListener(BaseCog):
         The timer listener for the advance gameday notificatrionm timer. This is the timer that launches
         11am EST the day before the gameday and starts launching the persistent panel for the yes or no.
         """
-        bucket = self.bot.get_gameday_bucket(guild_id, team_id, gameday_bucket_id)
+        bucket = self.bot.get_gameday_bucket(guild_id, team_id)
         if bucket is None:
             _log.debug(
                 'Ignoring bucket to guild %s team %s bucket id %s in advance gameday notification timer complete',
@@ -92,7 +97,7 @@ class GamedayEventListener(BaseCog):
 
     @commands.Cog.listener('on_attendance_voting_end_timer_complete')
     async def on_attendance_voting_end(self, guild_id: int, team_id: int, gameday_bucket_id: int, gameday_id: int) -> None:
-        bucket = self.bot.get_gameday_bucket(guild_id, team_id, gameday_bucket_id)
+        bucket = self.bot.get_gameday_bucket(guild_id, team_id)
         if bucket is None:
             _log.debug(
                 'Ignoring bucket to guild %s team %s bucket id %s in advance gameday notification timer complete',
@@ -150,3 +155,6 @@ class GamedayEventListener(BaseCog):
         await partial_attedance_message.reply(
             content=', '.join(captain_mentions), embed=embed, allowed_mentions=discord.AllowedMentions(roles=True)
         )
+
+        # TODO: Impl automatic sub finding here
+        raise NotImplementedError

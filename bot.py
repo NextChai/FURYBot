@@ -324,11 +324,11 @@ class FuryBot(commands.Bot):
         return embed
 
     @overload
-    def get_gameday_bucket(self, guild_id: int, team_id: int, /, *, get: Literal[True] = True) -> Optional[GamedayBucket]:
+    def get_gameday_bucket(self, guild_id: int, team_id: int, /, *, get: Literal[True]) -> Optional[GamedayBucket]:
         ...
 
     @overload
-    def get_gameday_bucket(self, guild_id: int, team_id: int, /, *, get: Literal[False] = False) -> GamedayBucket:
+    def get_gameday_bucket(self, guild_id: int, team_id: int, /, *, get: Literal[False]) -> GamedayBucket:
         ...
 
     def get_gameday_bucket(self, guild_id: int, team_id: int, /, *, get: bool = True) -> Optional[GamedayBucket]:

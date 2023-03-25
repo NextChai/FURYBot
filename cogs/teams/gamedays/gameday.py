@@ -501,6 +501,10 @@ class GamedayBucket(Teamable):
 
         return gamedays
 
+    @property
+    def wins_needed(self) -> int:
+        return math.ceil(self.best_of / 2)
+
     def get_gamedays(self) -> Mapping[int, Gameday]:
         return self._gamedays
 
@@ -513,6 +517,36 @@ class GamedayBucket(Teamable):
     def remove_gameday(self, gameday_id: int) -> None:
         self._gamedays.pop(gameday_id, None)
 
-    @property
-    def wins_needed(self) -> int:
-        return math.ceil(self.best_of / 2)
+    async def edit(
+        self,
+        *,
+        weekday: Weekday = MISSING,
+        game_time: datetime.time = MISSING,
+        members_on_team: int = MISSING,
+        best_of: int = MISSING,
+        automatic_sub_finding: bool = MISSING,
+    ) -> None:
+        query_builder = MiniQueryBuilder('teams.gameday_buckets')
+        query_builder.add_arg('id', self.id)
+
+        if weekday is not MISSING:
+            query_builder.add_arg('weekday', weekday.value)
+            self.weekday = weekday
+
+        if game_time is not MISSING:
+            query_builder.add_arg('game_time', game_time)
+            self.game_time = game_time
+
+        if members_on_team is not MISSING:
+            query_builder.add_arg('members_on_team', members_on_team)
+            self.members_on_team = members_on_team
+
+        if best_of is not MISSING:
+            query_builder.add_arg('best_of', best_of)
+            self.best_of = best_of
+
+        if automatic_sub_finding is not MISSING:
+            query_builder.add_arg('automatic_sub_finding', automatic_sub_finding)
+            self.automatic_sub_finding = automatic_sub_finding
+
+        await query_builder(self.bot)
