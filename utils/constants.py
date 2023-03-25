@@ -28,7 +28,6 @@ from typing import Mapping, Tuple, Type, Union
 import discord
 
 __all__: Tuple[str, ...] = (
-    'RULES_CHANNEL_ID',
     'IMAGE_REQUEST_CHANNEL_ID',
     'IMAGE_NOTIFICATIONS_ROLE_ID',
     'FURY_GUILD',
@@ -39,7 +38,6 @@ __all__: Tuple[str, ...] = (
     'CHANNEL_EMOJI_MAPPING',
 )
 
-RULES_CHANNEL_ID: int = 763418952243347467
 IMAGE_REQUEST_CHANNEL_ID: int = 1040653616047980596
 IMAGE_NOTIFICATIONS_ROLE_ID: int = 1040662419355205794
 FURY_GUILD: int = 757664675864248360
