@@ -23,18 +23,19 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Generic, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Optional, Tuple, TypeVar, Dict
+from typing_extensions import ParamSpec, Self
 
 import discord
-from typing_extensions import TypeVarTuple, Unpack
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
-Ts = TypeVarTuple('Ts')
 T = TypeVar('T')
+P = ParamSpec('P')
 
-AfterCallback = Callable[[discord.Interaction['FuryBot'], Unpack[Ts]], Coroutine[Any, Any, Any]]
+AfterCallback = Callable[..., Coroutine[Any, Any, Any]]
+MISSING = discord.utils.MISSING
 
 __all__: Tuple[str, ...] = ("BaseModal", 'AfterModal')
 
@@ -66,14 +67,26 @@ class BaseModal(discord.ui.Modal):
         return await super().on_error(interaction, error)
 
 
-class AfterModal(BaseModal, Generic[Unpack[Ts]]):
-    def __init__(self, bot: FuryBot, after: AfterCallback[Unpack[Ts]], *children: Unpack[Ts], **kwargs: Any) -> None:
-        super().__init__(bot, **kwargs)
-        self._after: AfterCallback[Unpack[Ts]] = after
-        self._added_children: Tuple[Unpack[Ts]] = children
+class AfterModal(BaseModal):
+    def __init__(
+        self,
+        bot: FuryBot,
+        after: AfterCallback,
+        *children: discord.ui.Item[Self],
+        title: str = MISSING,
+        timeout: Optional[int] = None,
+        custom_id: str = MISSING,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(bot, title=title, timeout=timeout, custom_id=custom_id)
+        self._after: AfterCallback = after
 
-        for child in self._added_children:
-            self.add_item(child)  # type: ignore # Can't bind typevartuple to a type yet :()
+        # Remove the unused kwargs we don't pass to the callback
+        self._after_kwargs: Dict[str, Any] = kwargs
+
+        self._added_children: Tuple[discord.ui.Item[Self]] = children
+        for child in children:
+            self.add_item(child)
 
     async def on_submit(self, interaction: discord.Interaction[FuryBot], /) -> None:
-        await self._after(interaction, *self._added_children)
+        await self._after(interaction, *self._added_children, **self._after_kwargs)

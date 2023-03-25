@@ -300,7 +300,9 @@ class Gameday(Teamable):
 
     @property
     def bucket(self) -> GamedayBucket:
-        return self.bot.get_gameday_bucket(self.guild_id, self.team_id, get=False)
+        bucket = self.bot.get_gameday_bucket(self.guild_id, self.team_id)
+        assert bucket is not None
+        return bucket
 
     @property
     def is_full(self) -> bool:

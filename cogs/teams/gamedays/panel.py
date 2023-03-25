@@ -23,12 +23,16 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import datetime
+import re
 from typing import TYPE_CHECKING
 
 import discord
 from typing_extensions import Self, Unpack
 
-from utils import default_button_doc_string, BaseView, BaseViewKwargs
+from .gameday import Weekday
+
+from utils import default_button_doc_string, BaseView, BaseViewKwargs, AfterModal
 
 if TYPE_CHECKING:
     from .gameday import GamedayBucket, Gameday, GamedayMember
@@ -209,28 +213,141 @@ class GamedayBucketPanel(BaseView):
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
         """Toggles this bucket's automatic sub finding."""
-        ...
+        await interaction.response.defer()
+
+        await self.bucket.edit(
+            automatic_sub_finding=not self.bucket.automatic_sub_finding,
+        )
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    async def _set_team_size_after(
+        self, interaction: discord.Interaction[FuryBot], size_input: discord.ui.TextInput[AfterModal]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        try:
+            size = int(size_input.value)
+        except ValueError:
+            await interaction.followup.send('This is not a valid number. Please try again.', ephemeral=True)
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        await self.bucket.edit(members_on_team=size)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Set Team Size')
     @default_button_doc_string
-    async def set_team_size(
-        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> discord.InteractionMessage:
+    async def set_team_size(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Sets this bucket's team size."""
-        ...
+        modal = AfterModal(
+            self.bot,
+            self._set_team_size_after,
+            discord.ui.TextInput(label='Enter Team Size', placeholder='Enter the new size of the team on game days.'),
+            title='Set New Team Size',
+            timeout=None,
+        )
+        return await interaction.response.send_modal(modal)
+
+    async def _set_best_of_after(
+        self, interaction: discord.Interaction[FuryBot], best_input: discord.ui.TextInput[AfterModal]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        try:
+            best_of = int(best_input.value)
+        except ValueError:
+            await interaction.followup.send('This is not a valid number. Please try again.', ephemeral=True)
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        await self.bucket.edit(best_of=best_of)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Set Best Of')
     @default_button_doc_string
-    async def set_best_of(
-        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> discord.InteractionMessage:
+    async def set_best_of(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Sets this bucket's best of."""
-        ...
+        modal = AfterModal(
+            self.bot,
+            self._set_team_size_after,
+            discord.ui.TextInput(label='Enter Best Of', placeholder='Enter the new best for game days.'),
+            title='Set New Best Of',
+            timeout=None,
+        )
+        return await interaction.response.send_modal(modal)
+
+    async def _change_time_and_date_after(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        weekday_time_input: discord.ui.TextInput[AfterModal],
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        # The weekday_time_input is a string of: Weekday Hour:Minute AM/PM
+        # We need to parse this with regex then convert it to a Weekday / datetime.time object
+        # Note that AM/PM is optional, so we will default to PM if it's not there
+        weekday_time_regex = re.compile(
+            r'(?P<weekday>\w+)(?:\s+)(?P<hour>[0-9]{1,})\:(?P<minute>[0-9]+)(?:\s+)?(?P<am_pm>AM|PM)?', re.IGNORECASE
+        )
+
+        # Let's try and find a match
+        match = weekday_time_regex.match(weekday_time_input.value.lower())
+        if not match:
+            await interaction.followup.send(
+                'This is not a valid time and date. An example would be `Wednesday 4:00 PM`. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        weekday, hour, minute, maybe_am_pm = match.groups()
+
+        try:
+            weekday = Weekday[weekday.lower()]
+        except KeyError:
+            await interaction.followup.send(
+                'This is not a valid weekday. An example would be `Tuesday 5:00 PM`. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        # Let's convert the hour and minute to integers
+        hour = int(hour)
+        minute = int(minute)
+        am_pm = maybe_am_pm or 'PM'
+
+        if am_pm == 'PM':
+            # Add 12 to the hour if it's PM to move into the 24 hour clock
+            hour += 12
+
+        try:
+            time = datetime.time(hour=hour, minute=minute)
+        except ValueError as exc:
+            await interaction.followup.send(
+                f'You did not enter a valid time. {str(exc).capitalize()}. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        await self.bucket.edit(weekday=weekday, game_time=time)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Change Gameday Time and Date')
     @default_button_doc_string
     async def change_gameday_time_and_date(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> discord.InteractionMessage:
+    ) -> None:
         """Changes this bucket's gameday time and date."""
-        ...
+        modal = AfterModal(
+            self.bot,
+            self._change_time_and_date_after,
+            discord.ui.TextInput(
+                label='Enter Time and Date.',
+                placeholder='Format: Weekday Hour:Minute AM/PM. Example: Wednesday 4:00 PM',
+                required=True,
+            ),
+            title='Change Gameday Time and Date',
+            timeout=None,
+        )
+        return await interaction.response.send_modal(modal)

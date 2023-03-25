@@ -45,7 +45,6 @@ from typing import (
     TypeVar,
     Union,
     cast,
-    overload,
 )
 
 import asyncpg
@@ -323,15 +322,11 @@ class FuryBot(commands.Bot):
 
         return embed
 
-    @overload
-    def get_gameday_bucket(self, guild_id: int, team_id: int, /, *, get: Literal[True]) -> Optional[GamedayBucket]:
-        ...
-
-    @overload
-    def get_gameday_bucket(self, guild_id: int, team_id: int, /, *, get: Literal[False]) -> GamedayBucket:
-        ...
-
-    def get_gameday_bucket(self, guild_id: int, team_id: int, /, *, get: bool = True) -> Optional[GamedayBucket]:
+    def get_gameday_bucket(
+        self,
+        guild_id: int,
+        team_id: int,
+    ) -> Optional[GamedayBucket]:
         """Get a gameday bucket for a team in a guild.
 
         Parameters
@@ -348,11 +343,7 @@ class FuryBot(commands.Bot):
         Optional[:class:`GamedayBucket`]
             The bucket, if it exists.
         """
-        data = self._team_gameday_buckets.get(guild_id, {})
-        if get:
-            return data.get(team_id, None)
-
-        return data[team_id]
+        return self._team_gameday_buckets.get(guild_id, {}).get(team_id, None)
 
     def add_gameday_bucket(self, bucket: GamedayBucket, /):
         """Add a gameday bucket to the cache.
