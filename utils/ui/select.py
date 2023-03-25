@@ -24,7 +24,19 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Generic, List, ParamSpec, Tuple, TypeAlias, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Coroutine,
+    Generic,
+    List,
+    ParamSpec,
+    Tuple,
+    TypeAlias,
+    TypeVar,
+    Union,
+)
 
 import discord
 from discord.app_commands import AppCommandChannel, AppCommandThread
@@ -32,7 +44,7 @@ from discord.app_commands import AppCommandChannel, AppCommandThread
 if TYPE_CHECKING:
     from bot import FuryBot
 
-    from .view import ViewMixin
+    from .view import BaseView
 
 __all__: Tuple[str, ...] = ('ChannelSelect', 'UserSelect', 'RoleSelect', 'MentionableSelect', 'SelectOneOfMany')
 
@@ -41,7 +53,7 @@ P = ParamSpec('P')
 ItemT = TypeVar('ItemT', bound='discord.ui.Item[Any]')
 SFT = TypeVar('SFT', bound='discord.abc.Snowflake')
 SFTC = TypeVar('SFTC', bound='discord.abc.Snowflake', contravariant=True)
-ViewMixinT = TypeVar('ViewMixinT', bound='ViewMixin')
+ViewMixinT = TypeVar('ViewMixinT', bound='BaseView')
 AfterCallback: TypeAlias = Callable[[discord.Interaction['FuryBot'], List[T]], Any]
 
 
@@ -65,9 +77,28 @@ class CleanupSelectHelper(Generic[ViewMixinT], discord.ui.Item[ViewMixinT]):
 
 
 class SelectOneOfMany(Generic[ViewMixinT]):
+    """A helper class to manage the cleanup of a select. This dynamically removes
+    all children from the parent, and then readds them when the select is closed.
+
+    Parameters
+    ----------
+    parent: :class:`BaseView`
+        The parent view to add the select to.
+    options: List[:class:`discord.SelectOption`]
+        The options to add to the select.
+    after: Callable[[:class:`discord.Interaction`, List[:class:`str`]], Coroutine]
+        The callback to call when the select is closed.
+    placeholder: :class:`str`
+        The placeholder to use for the select.
+    max_values: :class:`int`
+        The maximum number of values that can be selected.
+    """
+
     def __init__(
         self,
         parent: ViewMixinT,
+        /,
+        *,
         options: List[discord.SelectOption],
         after: Callable[[discord.Interaction[FuryBot], List[str]], Coroutine[Any, Any, Any]],
         placeholder: str = 'Select one...',

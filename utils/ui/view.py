@@ -25,24 +25,25 @@ from __future__ import annotations
 
 import abc
 import functools
-import inspect
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Coroutine,
     Generator,
     Generic,
+    Literal,
     Optional,
     Tuple,
     Type,
     TypedDict,
     TypeVar,
     Union,
+    Iterable,
+    List,
+    Dict,
 )
 
 import discord
-from discord.ext import commands
 from typing_extensions import Concatenate, NotRequired, ParamSpec, Self, TypeAlias, Unpack
 
 if TYPE_CHECKING:
@@ -51,35 +52,31 @@ if TYPE_CHECKING:
     from ..context import Context
 
 __all__: Tuple[str, ...] = (
-    'ViewMixin',
     'BaseViewKwargs',
     'BaseView',
-    'BaseAsyncView',
-    'PaginatorView',
     'walk_parents',
-    'AfterConfirmation',
 )
 
 T = TypeVar('T')
 P = ParamSpec('P')
 BT = TypeVar('BT', bound='FuryBot')
 TargetType: TypeAlias = Union['discord.Interaction[FuryBot]', 'Context']
-ViewMixinInit: TypeAlias = Callable[Concatenate["ViewMixin", P], T]
-ViewMixinT = TypeVar('ViewMixinT', bound='ViewMixin')
+BaseViewInit: TypeAlias = Callable[Concatenate["BaseView", P], T]
+BaseViewT = TypeVar('BaseViewT', bound='BaseView')
 
 QUESTION_MARK = "\N{BLACK QUESTION MARK ORNAMENT}"
 HOME = "\N{HOUSE BUILDING}"
 NON_MARKDOWN_INFORMATION_SOURCE = "\N{INFORMATION SOURCE}"
 
 
-def _wrap_init(__init__: ViewMixinInit[P, T]) -> ViewMixinInit[P, T]:
+def _wrap_init(__init__: BaseViewInit[P, T]) -> BaseViewInit[P, T]:
     """A decorator used to wrap the init of an existing
     child view's __init__ method, and then add the
     "Stop", "Go home", and "Go Back" buttons **always last**.
     """
 
     @functools.wraps(__init__)
-    def wrapped(self: ViewMixin, *args: P.args, **kwargs: P.kwargs) -> T:
+    def wrapped(self: BaseView, *args: P.args, **kwargs: P.kwargs) -> T:
         result = __init__(self, *args, **kwargs)
         self._add_menu_children()
         return result
@@ -87,7 +84,7 @@ def _wrap_init(__init__: ViewMixinInit[P, T]) -> ViewMixinInit[P, T]:
     return wrapped
 
 
-def walk_parents(view: ViewMixin) -> Generator[ViewMixin, None, None]:
+def walk_parents(view: BaseView) -> Generator[BaseView, None, None]:
     """Walk through the parents of a view, yielding each parent."""
 
     parent = view.parent
@@ -101,7 +98,7 @@ def walk_parents(view: ViewMixin) -> Generator[ViewMixin, None, None]:
         yield parent
 
 
-def find_home(view: ViewMixin) -> Optional[ViewMixin]:
+def find_home(view: BaseView) -> Optional[BaseView]:
     """A method to find the home parent from a view."""
     parents = list(walk_parents(view))
     if not parents:
@@ -112,14 +109,14 @@ def find_home(view: ViewMixin) -> Optional[ViewMixin]:
 
 class _OptionalViewMixinKwargs(TypedDict):
     timeout: NotRequired[Optional[float]]
-    parent: NotRequired[ViewMixin]
+    parent: NotRequired[BaseView]
 
 
 class BaseViewKwargs(_OptionalViewMixinKwargs):
     target: TargetType
 
 
-class Stop(discord.ui.Button["ViewMixin"]):
+class Stop(discord.ui.Button["BaseView"]):
     """A button used to stop the help command.
 
     Attributes
@@ -130,8 +127,8 @@ class Stop(discord.ui.Button["ViewMixin"]):
 
     __slots__: Tuple[str, ...] = ("parent",)
 
-    def __init__(self, parent: ViewMixin) -> None:
-        self.parent: ViewMixin = parent
+    def __init__(self, parent: BaseView) -> None:
+        self.parent: BaseView = parent
         super().__init__(
             style=discord.ButtonStyle.danger,
             label="Stop",
@@ -154,7 +151,7 @@ class Stop(discord.ui.Button["ViewMixin"]):
         return await interaction.response.edit_message(view=self.parent)
 
 
-class GoHome(discord.ui.Button[ViewMixinT], Generic[ViewMixinT]):
+class GoHome(discord.ui.Button[BaseViewT], Generic[BaseViewT]):
     """A button used to go home within the parent tree. Home
     is considered the root of the parent tree.
 
@@ -171,8 +168,8 @@ class GoHome(discord.ui.Button[ViewMixinT], Generic[ViewMixinT]):
         "bot",
     )
 
-    def __init__(self, parent: ViewMixinT) -> None:
-        self.parent: ViewMixinT = parent
+    def __init__(self, parent: BaseViewT) -> None:
+        self.parent: BaseViewT = parent
         self.bot: FuryBot = parent.bot
         super().__init__(
             label="Go Home",
@@ -190,15 +187,10 @@ class GoHome(discord.ui.Button[ViewMixinT], Generic[ViewMixinT]):
         interaction: :class:`discord.Interaction`
             The interaction that was created by interacting with the button.
         """
-        embed = self.parent._get_embed()
-        if inspect.iscoroutine(embed):
-            embed = await embed
-
-        assert isinstance(embed, discord.Embed)
-        await interaction.response.edit_message(view=self.parent, embed=embed)
+        await interaction.response.edit_message(view=self.parent, embed=self.parent.embed)
 
 
-class GoBack(discord.ui.Button["ViewMixin"], Generic[ViewMixinT]):
+class GoBack(discord.ui.Button["BaseView"], Generic[BaseViewT]):
     """A button used to go back within the parent tree.
 
     Attributes
@@ -209,9 +201,9 @@ class GoBack(discord.ui.Button["ViewMixin"], Generic[ViewMixinT]):
 
     __slots__: Tuple[str, ...] = ("parent",)
 
-    def __init__(self, parent: ViewMixinT) -> None:
+    def __init__(self, parent: BaseViewT) -> None:
         super().__init__(label="Go Back")
-        self.parent: ViewMixinT = parent
+        self.parent: BaseViewT = parent
 
     async def callback(self, interaction: discord.Interaction[FuryBot]) -> None:
         """|coro|
@@ -222,14 +214,10 @@ class GoBack(discord.ui.Button["ViewMixin"], Generic[ViewMixinT]):
         interaction: :class:`discord.Interaction`
             The interaction that was created by interacting with the button.
         """
-        embed = self.parent._get_embed()
-        if inspect.iscoroutine(embed):
-            embed = await embed
-
-        return await interaction.response.edit_message(embed=embed, view=self.parent)  # type: ignore
+        return await interaction.response.edit_message(embed=self.parent.embed, view=self.parent)
 
 
-class ViewMixin(discord.ui.View, abc.ABC):
+class BaseView(discord.ui.View, abc.ABC):
     """A base view that implements the logic that all other views implement.
 
     Parameters
@@ -271,7 +259,7 @@ class ViewMixin(discord.ui.View, abc.ABC):
         self.author: Union[discord.Member, discord.User] = (
             target.user if isinstance(target, discord.Interaction) else target.author
         )
-        self.parent: Optional[ViewMixin] = kwargs.get('parent')
+        self.parent: Optional[BaseView] = kwargs.get('parent')
         self.target: TargetType = target
         self.guild: discord.Guild = target.guild
         super().__init__(timeout=kwargs.get('timeout', 120))
@@ -287,8 +275,8 @@ class ViewMixin(discord.ui.View, abc.ABC):
         if not any(isinstance(child, Stop) for child in self.children):
             self.add_item(Stop(self))
 
-    @abc.abstractmethod
-    def _get_embed(self) -> Union[discord.Embed, Coroutine[Any, Any, discord.Embed]]:
+    @abc.abstractproperty
+    def embed(self) -> discord.Embed:
         ...
 
     def dump_kwargs(self) -> BaseViewKwargs:
@@ -334,153 +322,130 @@ class ViewMixin(discord.ui.View, abc.ABC):
         return await super().on_error(interaction, error, item)
 
 
-class BaseView(ViewMixin):
-    """Represents a base view with a non-async embed property."""
-
-    @property
-    @abc.abstractmethod
-    def embed(self) -> discord.Embed:
-        """:class:`discord.Embed`: The view's embed to display."""
-        raise NotImplementedError
-
-    def _get_embed(self) -> discord.Embed:
-        return self.embed
-
-
-class BaseAsyncView(ViewMixin):
-    """Represents a base view with an async embed method."""
-
-    @abc.abstractmethod
-    async def embed(self) -> discord.Embed:
-        """:class:`discord.Embed`: The view's embed to display."""
-        ...
-
-    def _get_embed(self) -> Coroutine[Any, Any, discord.Embed]:
-        return self.embed()
-
-
-class PaginatorView(BaseView):
-    """Represents a Paginator View. This class will wrap around a paginator
-    and allow for buttons to interact between the pages of this paginator.
-
-    Parameters
-    ----------
-    paginator: :class:`commands.Paginator`
-        The paginator to wrap around.
-    **kwargs: Any
-        The kwargs to pass to the :class:`ViewMixin` constructor.
-
-    Attributes
-    ----------
-    paginator: :class:`commands.Paginator`
-        The paginator to wrap around.
-    current: :class:`int`
-        The current index of the page that is being displayed.
-    """
-
-    def __init__(self, paginator: commands.Paginator, **kwargs: Unpack[BaseViewKwargs]) -> None:
-        self.paginator: commands.Paginator = paginator
-        self.current: int = 0
-
-        super().__init__(**kwargs)
-
-    @property
-    def embed(self) -> discord.Embed:
-        """:class:`discord.Embed`: Although not used, this property is required by the ABC."""
-        raise NotImplementedError
-
-    @discord.ui.button(emoji=discord.PartialEmoji(name='\N{BLACK LEFT-POINTING TRIANGLE}'))
-    async def backward(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """|coro|
-
-        Used to go backwards on the paginator view.
-
-        Parameters
-        ----------
-        interaction: :class:`discord.Interaction`
-            The interaction created from pressing the button.
-        button: :class:`discord.ui.Button`
-            The button that was pressed.
-        """
-        self.current -= 1
-        try:
-            page = self.paginator.pages[self.current]
-        except IndexError:
-            return await interaction.response.send_message('That\'s the last page!', ephemeral=True)
-
-        return await interaction.response.edit_message(content=page)
-
-    @discord.ui.button(emoji=discord.PartialEmoji(name='\N{BLACK RIGHT-POINTING TRIANGLE}'))
-    async def forward(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """|coro|
-
-        Used to go forward on the paginator view.
-
-        Parameters
-        ----------
-        interaction: :class:`discord.Interaction`
-            The interaction created from pressing the button.
-        button: :class:`discord.ui.Button`
-            The button that was pressed.
-        """
-        self.current += 1
-        try:
-            page = self.paginator.pages[self.current]
-        except IndexError:
-            return await interaction.response.send_message('That\'s the last page!', ephemeral=True)
-
-        return await interaction.response.edit_message(content=page)
-
-
-class AfterConfirmation(BaseView):
+class ChooseItemModal(discord.ui.Modal):
     def __init__(
         self,
-        after: Callable[[discord.Interaction[FuryBot], Optional[bool]], Coroutine[Any, Any, Any]],
-        **kwargs: Unpack[BaseViewKwargs],
+        *,
+        parent: SelectOneOfManyFrontend[BaseViewT, Any],
+        modal_title: str = 'Choose Item',
+        modal_item: Optional[discord.ui.TextInput[ChooseItemModal]] = None,
     ) -> None:
-        self.after: Callable[[discord.Interaction[FuryBot], Optional[bool]], Coroutine[Any, Any, Any]] = after
-        self.value: Optional[bool] = None
-        super().__init__(**kwargs)
+        super().__init__(title=modal_title, timeout=None)
+        self.parent: SelectOneOfManyFrontend[BaseViewT, Any] = parent
+
+        self.item = modal_item or discord.ui.TextInput(
+            label='Choose Item', placeholder='Choose the item from it\'s given hash.'
+        )
+        self.add_item(self.item)
+
+    async def on_submit(self, interaction: discord.Interaction[FuryBot], /) -> Any:
+        # It's assumed that the user was shown the hash from the item sooo they can type it in.
+        # We can get the item now?
+        item = self.parent.items_mapping.get(self.item.value)
+        if item is None:
+            await self.parent.launch(interaction)
+            return await interaction.followup.send(
+                'I could not find that item in this list. Please try again.', ephemeral=True
+            )
+
+        return await self.parent.on_item_chosen(interaction, item)
+
+
+class ChooseItemButton(discord.ui.Button[BaseViewT]):
+    def __init__(
+        self,
+        *,
+        parent: SelectOneOfManyFrontend[BaseViewT, Any],
+    ) -> None:
+        super().__init__(label='Choose Item', style=discord.ButtonStyle.green)
+        self.parent: SelectOneOfManyFrontend[BaseViewT, Any] = parent
+
+    async def callback(self, interaction: discord.Interaction[FuryBot]) -> None:
+        modal = ChooseItemModal(parent=self.parent)
+        return await interaction.response.send_message(view=modal)
+
+
+class PageManagerButton(discord.ui.Button[BaseViewT]):
+    def __init__(self, parent: SelectOneOfManyFrontend[BaseViewT, Any], action: Literal['increment', 'decrement']) -> None:
+        super().__init__(label=action.title(), style=discord.ButtonStyle.blurple)
+
+        self.parent: SelectOneOfManyFrontend[BaseViewT, Any] = parent
+        self.action: Literal['increment', 'decrement'] = action
+
+    async def callback(self, interaction: discord.Interaction[FuryBot]) -> Any:
+        # We need to increment or decrement the current page based on the action, but we need to make sure
+        # We don't go out of range of the pages.
+
+        if self.action == 'increment':
+            if self.parent.current_page == self.parent.max_page:
+                # Go to there first page.
+                self.parent.current_page = 0
+            else:
+                self.parent.current_page += 1
+        else:
+            if self.parent.current_page == 0:
+                # Go to the last page.
+                self.parent.current_page = self.parent.max_page
+            else:
+                self.parent.current_page -= 1
+
+        items = self.parent.current_items
+        embed = self.parent.create_embed(items)
+        return await interaction.response.edit_message(embed=embed)
+
+
+class SelectOneOfManyFrontend(Generic[BaseViewT, T], abc.ABC):
+    def __init__(
+        self,
+        *,
+        parent: BaseViewT,
+        items: List[T],
+        per_page: int = 10,
+        modal_title: str = 'Choose Item',
+        modal_item: Optional[discord.ui.TextInput[ChooseItemModal]] = None,
+    ) -> None:
+        self.modal_title: str = modal_title
+        self.modal_item: Optional[discord.ui.TextInput[ChooseItemModal]] = modal_item
+
+        self.parent: BaseViewT = parent
+        self._original_children: List[discord.ui.Item[BaseViewT]] = parent.children
+
+        parent.clear_items()
+        parent.add_item(PageManagerButton(parent=self, action='decrement'))
+        parent.add_item(PageManagerButton(parent=self, action='increment'))
+        parent.add_item(ChooseItemButton(parent=self))
+
+        self.items_mapping: Dict[str, T] = {self.hash_item(item): item for item in items}
+        self.pages = [items[i : i + per_page] for i in range(0, len(items), per_page)]
+        self.per_page: int = per_page
+        self.current_page: int = 0
 
     @property
-    def embed(self) -> discord.Embed:
-        return self.bot.Embed(
-            title='Confirmation',
-            description='Are you sure you want to do this?',
-        )
+    def total_pages(self) -> int:
+        return len(self.pages)
 
-    @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green)
-    async def confirm(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """|coro|
+    @property
+    def max_page(self) -> int:
+        return self.total_pages - 1
 
-        Called when the "Confirm" button has been clicked. When called, this will set the internal :attr:`value` to True
-        and close the view.
+    @property
+    def current_items(self) -> List[T]:
+        return self.pages[self.current_page]
 
-        Parameters
-        ----------
-        interaction: :class:`discord.Interaction[FuryBot]`
-            The interaction that triggered the button.
-        button: :class:`discord.ui.Button`
-            The button that was clicked.
-        """
-        self.value = True
-        self.stop()
-        await self.after(interaction, self.value)
+    @abc.abstractmethod
+    def create_embed(self, items: Iterable[T]) -> discord.Embed:
+        ...
 
-    @discord.ui.button(label='Cancel', style=discord.ButtonStyle.grey)
-    async def cancel(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """|coro|
+    @abc.abstractmethod
+    def hash_item(self, item: T) -> str:
+        ...
 
-        Called when the "Cancel" button has been clicked. When called, this will set the internal :attr:`value` to False
-        and close the view.
+    @abc.abstractmethod
+    async def on_item_chosen(self, interaction: discord.Interaction[FuryBot], item: T) -> Any:
+        ...
 
-        Parameters
-        ----------
-        interaction: :class:`discord.Interaction[FuryBot]`
-            The interaction that triggered the button.
-        button: :class:`discord.ui.Button`
-            The button that was clicked.
-        """
-        self.value = False
-        self.stop()
-        await self.after(interaction, self.value)
+    async def launch(self, interaction: discord.Interaction[FuryBot]) -> None:
+        # Get information from the first page
+        items = self.current_items
+        embed = self.create_embed(items)
+        await interaction.response.edit_message(embed=embed, view=self.parent)

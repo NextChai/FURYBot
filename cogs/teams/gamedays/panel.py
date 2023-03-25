@@ -25,14 +25,14 @@ from __future__ import annotations
 
 import datetime
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 import discord
 from typing_extensions import Self, Unpack
 
 from .gameday import Weekday
 
-from utils import default_button_doc_string, BaseView, BaseViewKwargs, AfterModal
+from utils import default_button_doc_string, BaseView, BaseViewKwargs, AfterModal, SelectOneOfMany
 
 if TYPE_CHECKING:
     from .gameday import GamedayBucket, Gameday, GamedayMember
@@ -206,6 +206,22 @@ class GamedayBucketPanel(BaseView):
         )
 
         return embed
+
+    async def _manage_gameday_after(self, interaction: discord.Interaction[FuryBot], values: List[str]) -> None:
+        ...
+
+    @discord.ui.button(label='Manage A Gameday', style=discord.ButtonStyle.primary)
+    async def manage_a_gameday(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        """A button to launch a view that manages all gamedays in this bucket."""
+        # TODO: Refactor this?
+        gamedays = sorted(self.bucket.get_gamedays().values(), key=lambda gameday: gameday.started_at, reverse=True)[:25]
+
+        SelectOneOfMany(
+            self, 
+            options=[], 
+            after=self._manage_gameday_after, 
+            placeholder='Select a gameday...'
+        )
 
     @discord.ui.button(label='Toggle Automatic Sub Finding')
     @default_button_doc_string
