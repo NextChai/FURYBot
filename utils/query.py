@@ -28,10 +28,10 @@ from typing import TYPE_CHECKING, Any, Coroutine, List, Optional, Tuple
 if TYPE_CHECKING:
     from bot import FuryBot
 
-__all__: Tuple[str, ...] = ('MiniQueryBuilder',)
+__all__: Tuple[str, ...] = ('QueryBuilder',)
 
 
-class MiniQueryBuilder:
+class QueryBuilder:
     def __init__(self, table: str) -> None:
         self.table: str = table
         self._args: List[Tuple[str, Any]] = []

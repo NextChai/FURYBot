@@ -31,7 +31,7 @@ import discord
 from discord.utils import MISSING
 from typing_extensions import Self
 
-from utils import MiniQueryBuilder
+from utils import QueryBuilder
 
 from . import ScrimStatus
 from .persistent import AwayConfirm, AwayForceConfirm, HomeConfirm
@@ -356,7 +356,7 @@ class Scrim:
         home_message_id: :class:`int`
             The ID of the home message.
         """
-        builder = MiniQueryBuilder('teams.scrims')
+        builder = QueryBuilder('teams.scrims')
         builder.add_condition('id', self.id)
 
         if scrim_chat_id is not MISSING:

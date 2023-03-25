@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union,
 import discord
 from typing_extensions import Self
 
-from utils import MiniQueryBuilder, human_join
+from utils import QueryBuilder, human_join
 
 if TYPE_CHECKING:
     import asyncpg
@@ -814,7 +814,7 @@ class Team:
         None
             When updated, the current instance is edited.
         """
-        builder = MiniQueryBuilder('teams.settings')
+        builder = QueryBuilder('teams.settings')
         builder.add_condition('id', self.id)
 
         if name is not MISSING:

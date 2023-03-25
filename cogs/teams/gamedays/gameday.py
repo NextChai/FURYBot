@@ -32,7 +32,7 @@ from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, Type, Un
 import discord
 from typing_extensions import Self
 
-from utils import MiniQueryBuilder
+from utils import QueryBuilder
 
 if TYPE_CHECKING:
     from bot import FuryBot, ConnectionType
@@ -367,7 +367,7 @@ class Gameday(Teamable):
         losses: int = MISSING,
         ended_at: datetime.datetime = MISSING,
     ) -> None:
-        query_builder = MiniQueryBuilder('teams.gamedays')
+        query_builder = QueryBuilder('teams.gamedays')
         query_builder.add_condition('id', self.id)
 
         if attendance_voting_message_id is not MISSING:
@@ -526,7 +526,7 @@ class GamedayBucket(Teamable):
         best_of: int = MISSING,
         automatic_sub_finding: bool = MISSING,
     ) -> None:
-        query_builder = MiniQueryBuilder('teams.gameday_buckets')
+        query_builder = QueryBuilder('teams.gameday_buckets')
         query_builder.add_arg('id', self.id)
 
         if weekday is not MISSING:
