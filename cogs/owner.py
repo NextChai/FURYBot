@@ -28,42 +28,15 @@ import sys
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
-from utils import BaseCog, Context, TimeTransformer
+from utils import BaseCog, Context
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
 
 class Owner(BaseCog):
-    @app_commands.command(description='Transform some time.')
-    @app_commands.default_permissions(moderate_members=True)
-    @app_commands.describe(value='The value to convert to a time.')
-    @app_commands.guild_only()
-    async def time_transform(
-        self, interaction: discord.Interaction, value: app_commands.Transform[TimeTransformer, TimeTransformer('n/a')]
-    ) -> None:
-        """|coro|
-
-        Transforms the given time input to a human readable format. This is to test the time transformer.
-
-        Parameters
-        ----------
-        value: :class:`str`
-            The value to convert to a time.
-        """
-        assert value.dt
-
-        embed = self.bot.Embed(
-            title='Transformed Time',
-            description=f'{discord.utils.format_dt(value.dt, "F")} ({discord.utils.format_dt(value.dt, "R")})',
-        )
-        embed.add_field(name='Argument', value=value.arg)
-
-        return await interaction.response.send_message(embed=embed)
-
     @commands.command(name='reload')
     @commands.is_owner()
     async def _reload(self, ctx: Context, force_importlib: bool = False, *extensions: str) -> discord.Message:
