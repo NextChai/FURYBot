@@ -37,7 +37,7 @@ from .query import *
 from .time import *
 from .timers import *
 from .types import *
-from .ui_kit import *
+from .ui import *
 
 if TYPE_CHECKING:
     import discord
