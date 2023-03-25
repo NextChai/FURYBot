@@ -27,63 +27,18 @@ import asyncio
 from typing import TYPE_CHECKING, List, Optional, cast
 
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
-from utils import RULES_CHANNEL_ID, BaseCog
+from utils import BaseCog
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
-
+# TODO: Maybe refactor this to a guild can have a large settings panel for things like this?
 class Notifier(BaseCog):
     def __init__(self, bot: FuryBot) -> None:
         self.bot: FuryBot = bot
         self.member_notifier_task.start()
-
-    @commands.Cog.listener('on_member_join')
-    async def member_notifier(self, member: discord.Member) -> None:
-        embed = self.bot.Embed(
-            title='Welcome!',
-            description='Welcome to the FLVS Fury Discord server! My name is Fury Bot, the '
-            'main moderation tool for the server. Let\'s walk through some important things you '
-            'need to know.',
-            author=member.guild.me,
-        )
-        embed.add_field(
-            name='Rules',
-            value=f'Check out the <#{RULES_CHANNEL_ID}> channel to view all the server\'s rules. '
-            'You will be expected to know these and follow them throughout the season. **Failure to '
-            'read the rules will not result in excemption from them.**',
-            inline=False,
-        )
-        embed.add_field(
-            name='Profanity',
-            value='The FLVS Fury Discord server is a PG Discord server. Due to the server being a school '
-            'run privilege, failure to keep your communication with other students PG will '
-            'result in punishments down the road. **If you wouldn\'t say it to your teacher '
-            'don\'t say it in the server.**',
-            inline=False,
-        )
-        embed.add_field(
-            name='Private DMS',
-            value='It\'s important you turn your DMs from peers in the FLVS Fury server off. [This gif '
-            'will show you how](https://cdn.discordapp.com/attachments/881935961972436992/1017087615641587722/'
-            '2022-09-07_10-52-33_online-video-cutter.com.gif). This is required, failure to do turn off your DM\'s will result '
-            'in one of the Coaches reaching out to you.',
-            inline=False,
-        )
-        embed.add_field(
-            name='Add the Coaches!',
-            value='In addition to turning of your DMs, you also must add all of the Coaches '
-            'and Lead Captains on Discord so they can Direct Message you if needed. In the Discord '
-            'server on the right side, right click on each Coach and Lead Captain, and select "Add Friend".',
-            inline=False,
-        )
-
-        try:
-            await member.send(embed=embed)
-        except (discord.Forbidden, discord.HTTPException):
-            pass
 
     async def _fetch_and_send_members(self, guild: discord.Guild, moderators: List[int]) -> List[discord.Member]:
         embed = self.bot.Embed(
