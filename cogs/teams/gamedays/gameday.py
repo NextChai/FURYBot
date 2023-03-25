@@ -359,13 +359,32 @@ class Gameday(Teamable):
             inline=False,
         )
 
-    async def edit(self, *, attendance_voting_message_id: int = MISSING) -> None:
+    async def edit(
+        self,
+        *,
+        attendance_voting_message_id: int = MISSING,
+        wins: int = MISSING,
+        losses: int = MISSING,
+        ended_at: datetime.datetime = MISSING,
+    ) -> None:
         query_builder = MiniQueryBuilder('teams.gamedays')
         query_builder.add_condition('id', self.id)
 
         if attendance_voting_message_id is not MISSING:
             query_builder.add_arg('attendance_voting_message_id', attendance_voting_message_id)
             self.attendance_voting_message_id = attendance_voting_message_id
+
+        if wins is not MISSING:
+            query_builder.add_arg('wins', wins)
+            self.wins = wins
+
+        if losses is not MISSING:
+            query_builder.add_arg('losses', losses)
+            self.losses = losses
+
+        if ended_at is not MISSING:
+            query_builder.add_arg('ended_at', ended_at)
+            self.ended_at = ended_at
 
         await query_builder(self.bot)
 

@@ -92,14 +92,15 @@ class ShortTime:
     __slots__: Tuple[str, ...] = ('dt',)
 
     compiled = re.compile(
-        """(?:(?P<years>[0-9])(?:years?|y))?             # e.g. 2y
-                             (?:(?P<months>[0-9]{1,2})(?:months?|mo))?     # e.g. 2months
-                             (?:(?P<weeks>[0-9]{1,4})(?:weeks?|w))?        # e.g. 10w
-                             (?:(?P<days>[0-9]{1,5})(?:days?|d))?          # e.g. 14d
-                             (?:(?P<hours>[0-9]{1,5})(?:hours?|h))?        # e.g. 12h
-                             (?:(?P<minutes>[0-9]{1,5})(?:minutes?|m))?    # e.g. 10m
-                             (?:(?P<seconds>[0-9]{1,5})(?:seconds?|s))?    # e.g. 15s
-                          """,
+        """
+        (?:(?P<years>[0-9])(?:years?|y))?             # e.g. 2y
+        (?:(?P<months>[0-9]{1,2})(?:months?|mo))?     # e.g. 2months
+        (?:(?P<weeks>[0-9]{1,4})(?:weeks?|w))?        # e.g. 10w
+        (?:(?P<days>[0-9]{1,5})(?:days?|d))?          # e.g. 14d
+        (?:(?P<hours>[0-9]{1,5})(?:hours?|h))?        # e.g. 12h
+        (?:(?P<minutes>[0-9]{1,5})(?:minutes?|m))?    # e.g. 10m
+        (?:(?P<seconds>[0-9]{1,5})(?:seconds?|s))?    # e.g. 15s
+        """,
         re.VERBOSE,
     )
 
@@ -215,7 +216,7 @@ class Time(HumanTime):
         try:
             o = ShortTime(argument)
         except Exception:
-            super().__init__(argument)
+            super().__init__(argument, now=now)
         else:
             self.dt: datetime.datetime = o.dt
             self._past = False
@@ -250,7 +251,7 @@ class TimeTransformer(app_commands.Transformer):
         self.arg: Optional[str] = None
         self.default: Optional[str] = default
 
-    async def _check_constraints(self, interaction: discord.Interaction, now: datetime.datetime, remaining: str) -> Self:
+    async def _check_constraints(self, now: datetime.datetime, remaining: str) -> Self:
         """|coro|
 
         A coroutine to ensure that the given inputs are not in the past or missing arguments.
@@ -304,7 +305,7 @@ class TimeTransformer(app_commands.Transformer):
             data = {k: int(v) for k, v in match.groupdict(default=0).items()}
             remaining = value[match.end() :].strip()
             result.dt = now + relativedelta(**data)
-            return await result._check_constraints(interaction, now, remaining)
+            return await result._check_constraints(now, remaining)
 
         if value.endswith('from now'):
             value = value[:-8].strip()
@@ -350,4 +351,4 @@ class TimeTransformer(app_commands.Transformer):
         else:
             raise BadArgument('I\'m so sorry but I didn\'t understand this time!')
 
-        return await result._check_constraints(interaction, now, remaining)
+        return await result._check_constraints(now, remaining)
