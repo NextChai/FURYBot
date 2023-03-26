@@ -31,6 +31,7 @@ from typing import (
     Callable,
     Generator,
     Generic,
+    Hashable,
     Literal,
     Optional,
     Tuple,
@@ -51,11 +52,7 @@ if TYPE_CHECKING:
 
     from ..context import Context
 
-__all__: Tuple[str, ...] = (
-    'BaseViewKwargs',
-    'BaseView',
-    'walk_parents',
-)
+__all__: Tuple[str, ...] = ('BaseViewKwargs', 'BaseView', 'walk_parents', 'MultiSelector')
 
 T = TypeVar('T')
 P = ParamSpec('P')
@@ -326,12 +323,12 @@ class _ChooseItemModal(discord.ui.Modal):
     def __init__(
         self,
         *,
-        parent: SelectOneOfManyFrontend[BaseViewT, Any],
+        parent: MultiSelector[BaseViewT, Any],
         modal_title: str = 'Choose Item',
         modal_item: Optional[discord.ui.TextInput[_ChooseItemModal]] = None,
     ) -> None:
         super().__init__(title=modal_title, timeout=None)
-        self.parent: SelectOneOfManyFrontend[BaseViewT, Any] = parent
+        self.parent: MultiSelector[BaseViewT, Any] = parent
 
         self.item = modal_item or discord.ui.TextInput(
             label='Choose Item', placeholder='Choose the item from it\'s given hash.'
@@ -355,10 +352,10 @@ class _ChooseItemButton(discord.ui.Button[BaseViewT]):
     def __init__(
         self,
         *,
-        parent: SelectOneOfManyFrontend[BaseViewT, Any],
+        parent: MultiSelector[BaseViewT, Any],
     ) -> None:
         super().__init__(label='Choose Item', style=discord.ButtonStyle.green)
-        self.parent: SelectOneOfManyFrontend[BaseViewT, Any] = parent
+        self.parent: MultiSelector[BaseViewT, Any] = parent
 
     async def callback(self, interaction: discord.Interaction[FuryBot]) -> None:
         modal = _ChooseItemModal(parent=self.parent)
@@ -366,10 +363,10 @@ class _ChooseItemButton(discord.ui.Button[BaseViewT]):
 
 
 class _PageManagerButton(discord.ui.Button[BaseViewT]):
-    def __init__(self, parent: SelectOneOfManyFrontend[BaseViewT, Any], action: Literal['increment', 'decrement']) -> None:
+    def __init__(self, parent: MultiSelector[BaseViewT, Any], action: Literal['increment', 'decrement']) -> None:
         super().__init__(label=action.title(), style=discord.ButtonStyle.blurple)
 
-        self.parent: SelectOneOfManyFrontend[BaseViewT, Any] = parent
+        self.parent: MultiSelector[BaseViewT, Any] = parent
         self.action: Literal['increment', 'decrement'] = action
 
     async def callback(self, interaction: discord.Interaction[FuryBot]) -> Any:
@@ -394,7 +391,7 @@ class _PageManagerButton(discord.ui.Button[BaseViewT]):
         return await interaction.response.edit_message(embed=embed)
 
 
-class SelectOneOfManyFrontend(Generic[BaseViewT, T], abc.ABC):
+class MultiSelector(Generic[BaseViewT, T], abc.ABC):
     def __init__(
         self,
         *,
@@ -415,7 +412,7 @@ class SelectOneOfManyFrontend(Generic[BaseViewT, T], abc.ABC):
         parent.add_item(_PageManagerButton(parent=self, action='increment'))
         parent.add_item(_ChooseItemButton(parent=self))
 
-        self.items_mapping: Dict[str, T] = {self.hash_item(item): item for item in items}
+        self.items_mapping: Dict[Hashable, T] = {self.hash_item(item): item for item in items}
         self.pages = [items[i : i + per_page] for i in range(0, len(items), per_page)]
         self.per_page: int = per_page
         self.current_page: int = 0
@@ -437,7 +434,7 @@ class SelectOneOfManyFrontend(Generic[BaseViewT, T], abc.ABC):
         ...
 
     @abc.abstractmethod
-    def hash_item(self, item: T) -> str:
+    def hash_item(self, item: T) -> Hashable:
         ...
 
     @abc.abstractmethod
