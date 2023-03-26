@@ -110,36 +110,91 @@ class GamedayMemberPanel(BaseView):
         The member you want to edit and manage.
     """
 
-    def __init__(self, member: GamedayMember, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, member: GamedayMember, discord_member: discord.Member, **kwargs: Unpack[BaseViewKwargs]) -> None:
         super().__init__(**kwargs)
         self.member: GamedayMember = member
+        self.discord_member: discord.Member = discord_member
 
     @property
     def embed(self) -> discord.Embed:
         """:class:`discord.Embed`: The embed representing this panel."""
-        ...
+        embed = self.member.team.embed(
+            title=f'{self.discord_member.display_name} Gameday Management',
+            description=f'Use the buttons below to manage {self.discord_member.mention}\'s gameday.',
+        )
+
+        if self.member.is_attending:
+            embed.add_field(name='Attendance', value='Member has attended this gameday.', inline=False)
+        else:
+            embed.add_field(
+                name='Attendance',
+                value=f'This member is not attending this gameday.\n`Reason`: {self.member.reason}',
+                inline=False,
+            )
+
+        if self.member.is_temporary_sub:
+            embed.add_field(
+                name='Temporary Sub',
+                value=f'This member is a temporary sub, meaning that after this gameday is over they '
+                'will automatically be removed from the team\'s sub roster.',
+            )
+
+        return embed
 
     @discord.ui.button(label='Toggle Is Temporary Sub')
     @default_button_doc_string
     async def toggle_is_temporary_sub(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> None:
+    ) -> discord.InteractionMessage:
         """A button to toggle whether this member is a temporary sub or not."""
-        ...
+        await interaction.response.defer()
+
+        await self.member.edit(is_temporary_sub=not self.member.is_temporary_sub)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    async def _edit_reason_after(
+        self, interaction: discord.Interaction[FuryBot], reason_input: discord.ui.TextInput[AfterModal]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        await self.member.edit(reason=reason_input.value)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Edit Reason')
     @default_button_doc_string
     async def edit_reason(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """A button to edit the reason for this member not coming to this gameday."""
-        ...
+        modal = AfterModal(
+            self.bot,
+            self._edit_reason_after,
+            discord.ui.TextInput(
+                label='New Reason',
+                style=discord.TextStyle.long,
+                placeholder='Enter the new reason for this member not coming to this gameday.',
+                max_length=2000,
+            ),
+            title='Change Reason',
+            timeout=None,
+        )
+        return await interaction.response.send_modal(modal)
 
     @discord.ui.button(label='Remove Member From Gameday')
     @default_button_doc_string
     async def remove_member_from_gameday(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> None:
+    ) -> discord.InteractionMessage:
         """A button to remove this member from the gameday."""
-        ...
+        await interaction.response.defer()
+
+        await self.member.delete()
+
+        gameday = self.member.gameday
+        assert gameday
+
+        panel = GamedayPanel(gameday, target=interaction)
+        return await interaction.edit_original_response(view=panel, embed=panel.embed)
 
 
 class GamedayPanel(BaseView):
@@ -205,7 +260,7 @@ class GamedayPanel(BaseView):
             await interaction.followup.send(f'{member.mention} is not involved in this gameday.', ephemeral=True)
             return await interaction.edit_original_response(view=self, embed=self.embed)
 
-        view = self.create_child(GamedayMemberPanel, member=gameday_member)
+        view = self.create_child(GamedayMemberPanel, member=gameday_member, discord_member=member)
         return await interaction.edit_original_response(view=view, embed=view.embed)
 
     @discord.ui.button(label='Manage Member')
@@ -257,17 +312,20 @@ class GamedayPanel(BaseView):
         )
         return await interaction.response.send_modal(modal)
 
-    @discord.ui.button(label='Change Start Time')
-    @default_button_doc_string
-    async def change_start_time(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """A button to launch a model that changes the start time of this gameday."""
-        ...
+    # TODO: Is this neatly possible or needed?
+    # @discord.ui.button(label='Change Start Time')
+    # @default_button_doc_string
+    # async def change_start_time(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+    #     """A button to launch a model that changes the start time of this gameday."""
+    #
+    #     ...
 
-    @discord.ui.button(label='Change End Time')
-    @default_button_doc_string
-    async def change_end_time(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """A button to launch a model that changes the end time of this gameday."""
-        ...
+    # TODO; Same with this?
+    # @discord.ui.button(label='Change End Time')
+    # @default_button_doc_string
+    # async def change_end_time(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+    #    """A button to launch a model that changes the end time of this gameday."""
+    #    ...
 
 
 class GamedayBucketPanel(BaseView):

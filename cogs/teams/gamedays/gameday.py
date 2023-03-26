@@ -156,6 +156,15 @@ class GamedayMember(TeamMemberable):
     def is_attending(self) -> bool:
         return bool(self.reason)
 
+    @property
+    def gameday(self) -> Optional[Gameday]:
+        team = self.team
+        bucket = team.get_gameday_bucket()
+        if bucket is None:
+            return
+
+        return bucket.get_gameday(self.gameday_id)
+
     async def delete(self) -> None:
         bot = self.bot
         async with bot.safe_connection() as connection:
@@ -163,6 +172,24 @@ class GamedayMember(TeamMemberable):
                 'DELETE FROM teams.gameday_members WHERE id = $1',
                 self.id,
             )
+
+        gameday = self.gameday
+        if gameday is not None:
+            gameday.remove_member(self.member_id)
+
+    async def edit(self, *, is_temporary_sub: bool = MISSING, reason: str = MISSING) -> None:
+        query = QueryBuilder('teams.gameday_members')
+        query.add_condition('id', self.id)
+
+        if is_temporary_sub is not MISSING:
+            query.add_arg('is_temporary_sub', is_temporary_sub)
+            self.is_temporary_sub = is_temporary_sub
+
+        if reason is not MISSING:
+            query.add_arg('reason', reason)
+            self.reason = reason
+
+        await query(self.bot)
 
 
 class Gameday(Teamable):
