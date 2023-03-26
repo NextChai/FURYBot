@@ -1,30 +1,3 @@
-CREATE TABLE IF NOT EXISTS profane_words (
-    id SERIAL PRIMARY KEY,
-    word TEXT UNIQUE
-);
-
-CREATE SCHEMA infractions;
-
-CREATE TABLE IF NOT EXISTS infractions.time (
-    guild_id BIGINT,
-    type TEXT,
-    time BIGINT -- In seconds,
-);
-
-CREATE TABLE IF NOT EXISTS infractions.settings (
-    guild_id BIGINT UNIQUE,
-    notification_channel_id BIGINT,
-    moderators BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
-    moderator_role_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
-    valid_links TEXT [] DEFAULT ARRAY [] :: TEXT [],
-    ignored_channel_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT []
-);
-
-CREATE TABLE IF NOT EXISTS infractions.profanity (
-    guild_id BIGINT UNIQUE,
-    automod_rule_id BIGINT
-);
-
 CREATE SCHEMA teams;
 
 CREATE TABLE IF NOT EXISTS teams.settings (
@@ -50,7 +23,7 @@ CREATE TABLE IF NOT EXISTS teams.members (
 -- pending_scrimer: Pending for scrimmer to confirm
 -- pending_host: Pending for host to confirm
 -- scheduled: Scirm has been scheduled.
-CREATE TYPE scrim_status AS ENUM ('pending_away', 'scheduled', 'pending_host');
+CREATE TYPE teams.scrim_status AS ENUM ('pending_away', 'scheduled', 'pending_host');
 
 CREATE TABLE IF NOT EXISTS teams.scrims (
     id SERIAL PRIMARY KEY,
@@ -74,7 +47,7 @@ CREATE TABLE IF NOT EXISTS teams.scrims (
     scrim_delete_timer_id BIGINT
 );
 
-CREATE TYPE practice_status AS ENUM ('ongoing', 'completed');
+CREATE TYPE teams.practice_status AS ENUM ('ongoing', 'completed');
 
 CREATE TABLE IF NOT EXISTS teams.practice (
     id BIGSERIAL PRIMARY KEY,
@@ -83,7 +56,7 @@ CREATE TABLE IF NOT EXISTS teams.practice (
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     channel_id BIGINT,
     guild_id BIGINT, 
-    status practice_status,
+    status teams.practice_status,
     started_by_id BIGINT,
     message_id BIGINT
 );
@@ -141,7 +114,7 @@ CREATE TABLE IF NOT EXISTS teams.gamedays(
 
 CREATE TABLE IF NOT EXISTS teams.gameday_members(
     id SERIAL PRIMARY KEY,
-    gameday_id INTEGER REFERENCES teams.gameday(id) ON DELETE CASCADE,
+    gameday_id INTEGER REFERENCES teams.gamedays(id) ON DELETE CASCADE,
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     member_id BIGINT,
     guild_id BIGINT,

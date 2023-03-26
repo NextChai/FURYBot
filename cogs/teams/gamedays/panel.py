@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from .gameday import Gameday, GamedayBucket, GamedayMember
 
 
-class SelectGameday(MultiSelector['GamedayBucketPanel', Gameday]):
+class SelectGameday(MultiSelector['GamedayBucketPanel', 'Gameday']):
     def __init__(self, *, parent: GamedayBucketPanel) -> None:
         super().__init__(
             parent=parent,

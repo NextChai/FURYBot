@@ -1,5 +1,5 @@
 [Unit]
-Description=The Fury bot service.
+Description=The bot service for systemctl.
 
 [Service]
 ExecStart=python3.10 /root/Fury-Bot/__main__.py
