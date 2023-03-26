@@ -357,6 +357,9 @@ class FuryBot(commands.Bot):
         """
         self._team_gameday_buckets.setdefault(bucket.guild_id, {})[bucket.team_id] = bucket
 
+    def remove_gameday_bucket(self, guild_id: int, team_id: int, /) -> Optional[GamedayBucket]:
+        return self._team_gameday_buckets.get(guild_id, {}).pop(team_id, None)
+
     # Team management
     def get_teams(self, guild_id: int, /) -> List[Team]:
         """Get all teams in a guild.

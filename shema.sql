@@ -110,7 +110,9 @@ CREATE TABLE IF NOT EXISTS teams.gamedays(
     wins INTEGER DEFAULT 0,
     losses INTEGER DEFAULT 0,
     attendance_voting_message_id BIGINT,
-    scoreboard_message_id BIGINT
+    scoreboard_message_id BIGINT,
+    attendance_voting_start TIMESTAMP WITH TIME ZONE,
+    attendance_voting_end TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE IF NOT EXISTS teams.gameday_images(

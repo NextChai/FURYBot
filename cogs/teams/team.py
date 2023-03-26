@@ -851,3 +851,7 @@ class Team:
             await channel.delete()
 
         self.bot.remove_team(self.id, self.guild_id)
+
+        bucket = self.get_gameday_bucket()
+        if bucket is not None:
+            await bucket.delete()  # To cleanup the timers.

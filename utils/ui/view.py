@@ -52,7 +52,7 @@ if TYPE_CHECKING:
 
     from ..context import Context
 
-__all__: Tuple[str, ...] = ('BaseViewKwargs', 'BaseView', 'walk_parents', 'MultiSelector')
+__all__: Tuple[str, ...] = ('BaseViewKwargs', 'BaseView', 'walk_parents', 'MultiSelector', 'find_home')
 
 T = TypeVar('T')
 P = ParamSpec('P')

@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import pytz
 import datetime
 import re
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
@@ -30,7 +31,7 @@ from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
 import discord
 from typing_extensions import Self, Unpack
 
-from utils import AfterModal, BaseView, BaseViewKwargs, MultiSelector, default_button_doc_string
+from utils import AfterModal, BaseView, BaseViewKwargs, MultiSelector, default_button_doc_string, find_home
 from utils.ui.select import UserSelect
 
 from .gameday import Weekday, GamedayBucket
@@ -45,6 +46,8 @@ WEEKDAY_TIME_REGEX = re.compile(
     r'(?P<weekday>\w+)(?:\s+)(?P<hour>[0-9]{1,})\:(?P<minute>[0-9]+)(?:\s+)?(?P<am_pm>AM|PM)?', re.IGNORECASE
 )
 
+EST = pytz.timezone("Us/Eastern")
+
 
 def parse_time_and_date(value: str) -> Tuple[Optional[Weekday], Optional[datetime.time]]:
     match = WEEKDAY_TIME_REGEX.match(value.lower())
@@ -57,9 +60,9 @@ def parse_time_and_date(value: str) -> Tuple[Optional[Weekday], Optional[datetim
     # Let's convert the hour and minute to integers
     hour = int(hour)
     minute = int(minute)
-    am_pm = maybe_am_pm or 'PM'
+    am_pm = maybe_am_pm or 'pm'
 
-    if am_pm == 'PM':
+    if am_pm.lower() == 'pm':
         # Add 12 to the hour if it's PM to move into the 24 hour clock
         hour += 12
 
@@ -658,4 +661,38 @@ class GamedayBucketPanel(BaseView):
             title='Change Gameday Time and Date',
             timeout=None,
         )
+        return await interaction.response.send_modal(modal)
+
+    async def _delete_bucket_after(
+        self, interaction: discord.Interaction[FuryBot], confirm_input: discord.ui.TextInput[AfterModal]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        if confirm_input.value.lower() != 'confirm':
+            await interaction.followup.send('Aborting.', ephemeral=True)
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        await self.bucket.delete()
+
+        home = find_home(self)
+        assert home
+
+        return await interaction.edit_original_response(view=home, embed=home.embed)
+
+    @discord.ui.button(label='Delete Bucket', style=discord.ButtonStyle.danger)
+    @default_button_doc_string
+    async def delete_bucket(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        """Deletes this bucket."""
+        modal = AfterModal(
+            self.bot,
+            self._delete_bucket_after,
+            discord.ui.TextInput(
+                label='Are you sure you want to delete this bucket?',
+                placeholder='Type "confirm" to delete this bucket.',
+                required=True,
+            ),
+            title='Delete Bucket',
+            timeout=None,
+        )
+
         return await interaction.response.send_modal(modal)
