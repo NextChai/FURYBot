@@ -30,7 +30,6 @@ import discord
 from typing_extensions import Self, Unpack
 
 from utils import (
-    CHANNEL_EMOJI_MAPPING,
     AfterModal,
     BaseView,
     BaseViewKwargs,
@@ -337,10 +336,7 @@ class TeamChannelsView(BaseView):
         SelectOneOfMany(
             self,
             options=[
-                discord.SelectOption(
-                    label=channel.name, value=str(channel.id), emoji=CHANNEL_EMOJI_MAPPING.get(type(channel), None)
-                )
-                for channel in self.team.extra_channels
+                discord.SelectOption(label=channel.name, value=str(channel.id)) for channel in self.team.extra_channels
             ],
             after=self._delete_extra_channels_after,
             placeholder='Select the channels to delete...',

@@ -23,33 +23,16 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import Mapping, Tuple, Type, Union
-
-import discord
+from typing import Tuple, List
 
 __all__: Tuple[str, ...] = (
     'IMAGE_REQUEST_CHANNEL_ID',
     'IMAGE_NOTIFICATIONS_ROLE_ID',
     'FURY_GUILD',
-    'TEXT_CHANNEL_EMOJI',
-    'VOICE_CHANNEL_EMOJI',
-    'THREAD_CHANNEL_EMOJI',
-    'CATEGORY_CHANNEL_EMOJI',
-    'CHANNEL_EMOJI_MAPPING',
 )
 
 IMAGE_REQUEST_CHANNEL_ID: int = 1040653616047980596
 IMAGE_NOTIFICATIONS_ROLE_ID: int = 1040662419355205794
 FURY_GUILD: int = 757664675864248360
 
-TEXT_CHANNEL_EMOJI: str = '<:text:1033064232767467560> '
-VOICE_CHANNEL_EMOJI: str = '<:voice:1033064208457285784>'
-THREAD_CHANNEL_EMOJI: str = '<:thread:1033064225133822073>'
-CATEGORY_CHANNEL_EMOJI: str = '<:category:1033064217336615004> '
-
-CHANNEL_EMOJI_MAPPING: Mapping[Type[Union[discord.abc.GuildChannel, discord.Thread]], str] = {
-    discord.TextChannel: TEXT_CHANNEL_EMOJI,
-    discord.VoiceChannel: VOICE_CHANNEL_EMOJI,
-    discord.CategoryChannel: CATEGORY_CHANNEL_EMOJI,
-    discord.Thread: THREAD_CHANNEL_EMOJI,
-}
+PROFANE_WORDS: List[str] = open('static/profane_words.txt', 'r').read().split(', ')
