@@ -25,20 +25,20 @@ from __future__ import annotations
 
 import datetime
 import re
-from typing import TYPE_CHECKING, List, Any, Union
+from typing import TYPE_CHECKING, Any, List, Union
 
 import discord
 from typing_extensions import Self, Unpack
 
+from utils import AfterModal, BaseView, BaseViewKwargs, MultiSelector, default_button_doc_string
 from utils.ui.select import UserSelect
 
 from .gameday import Weekday
 
-from utils import default_button_doc_string, BaseView, BaseViewKwargs, AfterModal, MultiSelector
-
 if TYPE_CHECKING:
-    from .gameday import GamedayBucket, Gameday, GamedayMember
     from bot import FuryBot
+
+    from .gameday import Gameday, GamedayBucket, GamedayMember
 
 
 class SelectGameday(MultiSelector['GamedayBucketPanel', Gameday]):

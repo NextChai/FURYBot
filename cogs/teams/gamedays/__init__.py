@@ -23,9 +23,9 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+from .events import *
 from .gameday import *
 from .panel import *
-from .events import *
 
 if TYPE_CHECKING:
     from bot import FuryBot

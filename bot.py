@@ -25,9 +25,9 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import inspect
 import logging
 import time
-import inspect
 from concurrent import futures
 from typing import (
     TYPE_CHECKING,
@@ -56,19 +56,19 @@ from cogs.images import ApproveOrDenyImage, ImageRequest
 from cogs.teams import Team
 from cogs.teams.gamedays import GamedayBucket
 from cogs.teams.practices import Practice
-from cogs.teams.scrim import Scrim, ScrimStatus
+from cogs.teams.scrims import Scrim, ScrimStatus
 from utils import (
-    RUNNING_DEVELOPMENT,
     BYPASS_SETUP_HOOK,
-    USE_CUSTOM_INITIAL_EXTENSIONS,
     BYPASS_SETUP_HOOK_CACHE_LOADING,
+    IGNORE_EXTENSIONS,
+    INITIAL_EXTENSIONS,
+    RUNNING_DEVELOPMENT,
+    START_TIMER_MANAGER,
+    USE_CUSTOM_INITIAL_EXTENSIONS,
     ErrorHandler,
     LinkFilter,
     TimerManager,
     _parse_environ_boolean,
-    INITIAL_EXTENSIONS,
-    IGNORE_EXTENSIONS,
-    START_TIMER_MANAGER,
 )
 
 if TYPE_CHECKING:

@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Iterable, Tuple, TypeVar, List
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Iterable, List, Tuple, TypeVar
 
 from .bases import *
 from .cog import *

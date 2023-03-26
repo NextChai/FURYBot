@@ -24,19 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 from functools import partial
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Coroutine,
-    Generic,
-    List,
-    ParamSpec,
-    Tuple,
-    TypeAlias,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Generic, List, ParamSpec, Tuple, TypeAlias, TypeVar, Union
 
 import discord
 from discord.app_commands import AppCommandChannel, AppCommandThread

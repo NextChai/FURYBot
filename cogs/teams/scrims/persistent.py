@@ -29,8 +29,9 @@ from typing import TYPE_CHECKING, Optional, Tuple, TypeAlias, TypeVar, cast
 import discord
 from typing_extensions import Self
 
-from . import ScrimStatus
 from utils import default_button_doc_string
+
+from . import ScrimStatus
 
 if TYPE_CHECKING:
     from bot import FuryBot

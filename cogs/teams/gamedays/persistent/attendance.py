@@ -24,14 +24,15 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, Union
-from typing_extensions import Self
 
 import discord
+from typing_extensions import Self
 
 from ..gameday import GamedayMember
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
     from ..gameday import Gameday
 
 

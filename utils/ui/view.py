@@ -29,9 +29,12 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Dict,
     Generator,
     Generic,
     Hashable,
+    Iterable,
+    List,
     Literal,
     Optional,
     Tuple,
@@ -39,9 +42,6 @@ from typing import (
     TypedDict,
     TypeVar,
     Union,
-    Iterable,
-    List,
-    Dict,
 )
 
 import discord

@@ -23,10 +23,10 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Optional, Tuple, TypeVar, Dict
-from typing_extensions import ParamSpec, Self
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, Optional, Tuple, TypeVar
 
 import discord
+from typing_extensions import ParamSpec, Self
 
 if TYPE_CHECKING:
     from bot import FuryBot

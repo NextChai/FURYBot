@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 
     from .gamedays.gameday import GamedayBucket
     from .practices import Practice
-    from .scrim import Scrim
+    from .scrims import Scrim
 
 MISSING = discord.utils.MISSING
 

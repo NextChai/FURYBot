@@ -24,10 +24,11 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import logging
-from utils import BaseCog
 
 import discord
 from discord.ext import commands
+
+from utils import BaseCog
 
 from .persistent.attendance import GamedayAttendanceView
 

@@ -24,21 +24,131 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import datetime
-import pytz
-import discord
-from utils import BaseView, BaseViewKwargs, human_timedelta, default_button_doc_string, SelectOneOfMany, UserSelect
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
-from typing import TYPE_CHECKING, List, Tuple, Union
-from typing_extensions import Unpack, Self
+import discord
+import pytz
+from typing_extensions import Self, Unpack
+
+from utils import BaseView, BaseViewKwargs, SelectOneOfMany, UserSelect, default_button_doc_string, human_timedelta
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
+    from ..team import Team, TeamMember
     from .practice import Practice, PracticeMember
-    from ..team import Team
 
 __all__: Tuple[str, ...] = ('TeamPracticesPanel', 'PracticePanel', 'PracticeMemberPanel')
 
 EST = pytz.timezone("Us/Eastern")
+
+
+class PracticeMemberStatistics(BaseView):
+    """Displays the statistics of a given practice for a given member.
+
+    This view is launched from the :class:`TeamMemberView` view.
+
+    Parameters
+    Attributes
+    ----------
+    member: :class:`TeamMember`
+        The member to display the statistics for.
+    discord_member: :class:`discord.Member`
+        The member's specific Discord object to use for display name.
+    """
+
+    def __init__(self, member: TeamMember, discord_member: discord.Member, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+        self.member: TeamMember = member
+        self.discord_member: discord.Member = discord_member
+
+    @property
+    def embed(self) -> discord.Embed:
+        """:class:`discord.Embed`: Generates the practice statistics for the member."""
+        team = self.member.team
+        embed = team.embed(title="Practice Statistics")
+
+        # Get the: total time, total amount, total started, absences
+        total, absences, started_by = 0, 0, 0
+        total_time: datetime.timedelta = datetime.timedelta()
+        last_attended: Optional[Practice] = None
+        for practice in team.practices:
+            member = practice.get_member(self.discord_member.id)
+            if member is None:
+                absences += 1
+                continue
+
+            total += 1
+            total_time += member.get_total_practice_time()
+
+            if practice.started_by == member:
+                started_by += 1
+
+            if last_attended is None:
+                last_attended = practice
+            elif last_attended.started_at < practice.started_at:
+                last_attended = practice
+
+        # Get the current streak of attended practices
+        current_streak = 0
+        for practice in sorted(team.practices, key=lambda p: p.started_at, reverse=True):
+            member = practice.get_member(self.discord_member.id)
+            if member is None:
+                current_streak = 0
+                continue
+
+            current_streak += 1
+
+        total_team_practices = len(team.practices)
+        if total_team_practices > 0:
+            percentage_of_attended_practices = (total / total_team_practices) * 100
+        else:
+            percentage_of_attended_practices = 0
+
+        embed.add_field(
+            name='Attended Practices',
+            value=f'**Count**: {total}\n**Percentage**: {percentage_of_attended_practices:.2f}%',
+            inline=False,
+        )
+
+        if total_team_practices:
+            percentage_of_absences = (absences / total_team_practices) * 100
+        else:
+            percentage_of_absences = 0
+
+        embed.add_field(
+            name='Absences',
+            value=f'**Absences**: {absences}\n**Percentage**: {percentage_of_absences:.2f}%',
+            inline=False,
+        )
+
+        if total > 0:
+            started_by_percentage = (started_by / total) * 100
+        else:
+            started_by_percentage = 0
+
+        embed.add_field(
+            name='Started Practices',
+            value=f'**Total**: {started_by}\n**Percentage**: {started_by_percentage:.2f}%',
+            inline=False,
+        )
+
+        embed.add_field(
+            name='Practice Time',
+            value=f'**Total**: {human_timedelta(total_time.total_seconds())}\n**Average**: {human_timedelta(total_time.total_seconds() / total)}',
+            inline=False,
+        )
+
+        embed.add_field(name='Streaks', value=f'**Current Streak**: {current_streak}\n')
+
+        last_attended_fmt = (
+            last_attended
+            and f'**Started At**: {last_attended.format_start_time()}\n**Ended At**: {last_attended.format_end_time()}'
+            or 'Has never attended a practice.'
+        )
+        embed.add_field(name='Last Attended Practice', value=last_attended_fmt, inline=False)
+
+        return embed
 
 
 class PracticeMemberPanel(BaseView):
