@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import enum
-from typing import Tuple
+from typing import TYPE_CHECKING, Tuple
 
 __all__: Tuple[str, ...] = ('ScrimStatus',)
 
@@ -45,3 +45,11 @@ class ScrimStatus(enum.Enum):
 
 from .persistent import *
 from .scrim import *
+from .events import *
+
+if TYPE_CHECKING:
+    from bot import FuryBot
+
+
+async def setup(bot: FuryBot) -> None:
+    await bot.add_cog(ScrimEventListener(bot))

@@ -88,18 +88,20 @@ if RUNNING_DEVELOPMENT:
     _log.setLevel(logging.DEBUG)
 
 initial_extensions: Tuple[str, ...] = (
-    'jishaku',
     'cogs.events.infractions',
     'cogs.events.notifier',
-    'cogs.infractions',
-    'utils.error_handler',
-    'cogs.owner',
-    'cogs.message_tracking',
-    'cogs.teams',
-    'cogs.teams.practices',
-    'cogs.images',
-    'cogs.moderation',
     'cogs.fun',
+    'cogs.images',
+    'cogs.infractions',
+    'cogs.message_tracking',
+    'cogs.moderation',
+    'cogs.owner',
+    'cogs.teams',
+    'cogs.teams.gamedays',
+    'cogs.teams.practices',
+    'cogs.teams.scrims',
+    'jishaku',
+    'utils.error_handler',
 )
 
 
