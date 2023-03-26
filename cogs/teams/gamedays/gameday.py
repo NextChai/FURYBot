@@ -219,6 +219,34 @@ class GamedayImage(Teamable):
         assert bucket is not None
         return bucket
 
+    @classmethod
+    async def create(
+        cls: Type[Self],
+        gameday: Gameday,
+        *,
+        image_url: str,
+        uploader_id: int,
+        uploaded_at: datetime.datetime,
+    ) -> Self:
+        async with gameday.bot.safe_connection() as connection:
+            data = await connection.fetchrow(
+                'INSERT INTO teams.gameday_images(gameday_id, team_id, guild_id, image_url, uploader_id, uploaded_at) '
+                'VALUES($1, $2, $3, $4, $5, $6) '
+                'RETURNING *',
+                gameday.id,
+                gameday.team_id,
+                gameday.guild_id,
+                image_url,
+                uploader_id,
+                uploaded_at,
+            )
+            assert data
+
+        image = GamedayImage(gameday.bot, **dict(data))
+        gameday.add_image(image)
+
+        return image
+
 
 class Gameday(Teamable):
     """Represents a gameday for a given team. A gameday is where a team gets together in order to play their e-sports games.
@@ -228,10 +256,10 @@ class Gameday(Teamable):
 
     Gameday Flow
     ------------
-        - Members will get a notification a day in advance at 11am EST to remind them they have a gameday coming up. Members will chose yes or no to attending.
-        If they chose no then they'll be required to provide a reason for not attending.
+    - Members will get a notification a day in advance at 11am EST to remind them they have a gameday coming up. Members will chose yes or no to attending.
+    If they chose no then they'll be required to provide a reason for not attending.
 
-            - Once all members have voted, or the team has been filled, the team's captain(s) will be notified. This has a 5 hour timeout.
+        - Once all members have voted, or the team has been filled, the team's captain(s) will be notified. This has a 5 hour timeout.
 
         - If all team members have voted and the team is not filled, or 5 hours have passed, the bot will spawn one of two responses.
 
@@ -270,7 +298,7 @@ class Gameday(Teamable):
         losses: int,
         ended_at: Optional[datetime.datetime] = None,
         members: Dict[int, GamedayMember] = {},
-        advance_gameday_notification_message_id: Optional[int] = None,
+        attendance_voting_message_id: Optional[int] = None,
         scoreboard_message_id: Optional[int] = None,
         images: List[GamedayImage] = [],
     ) -> None:
@@ -290,7 +318,7 @@ class Gameday(Teamable):
 
         # The message ID of the advance gameday notification message, also known as the panel
         # that determines who is and isn't coming to the gameday.
-        self.attendance_voting_message_id: Optional[int] = advance_gameday_notification_message_id
+        self.attendance_voting_message_id: Optional[int] = attendance_voting_message_id
         self.attendance_voting_start: datetime.datetime = _get_attendance_voting_start_time(self.started_at)
         self.attendance_voting_end: datetime.datetime = _get_attendance_voting_end_time(self.started_at)
 
@@ -342,9 +370,27 @@ class Gameday(Teamable):
 
             await timer_manager.create_timer(starts_at, 'gameday_start', *default_timer_args)
 
-            # Create a timer for the start and end of the voting
-            await timer_manager.create_timer(self.attendance_voting_start, 'attendance_voting_start', *default_timer_args)
-            await timer_manager.create_timer(self.attendance_voting_end, 'attendance_voting_end', *default_timer_args)
+            now = discord.utils.utcnow()
+            if now > self.attendance_voting_start:
+                # We didn't have enough time to start voting normally, so we can start it now
+                await timer_manager.create_timer(now, 'attendance_voting_start', *default_timer_args)
+
+                # If we don't have 5 hours to do the entire vote (because the gameday starts before then), then we need to make
+                # the vote end 1 hour before the gameday starts.
+                if now + datetime.timedelta(hours=5) > starts_at:
+                    await timer_manager.create_timer(
+                        starts_at - datetime.timedelta(hours=1), 'attendance_voting_end', *default_timer_args
+                    )
+                else:
+                    await timer_manager.create_timer(
+                        now + datetime.timedelta(hours=5), 'attendance_voting_end', *default_timer_args
+                    )
+            else:
+                await timer_manager.create_timer(
+                    self.attendance_voting_start, 'attendance_voting_start', *default_timer_args
+                )
+
+                await timer_manager.create_timer(self.attendance_voting_end, 'attendance_voting_end', *default_timer_args)
 
         return self
 
@@ -509,6 +555,16 @@ class Gameday(Teamable):
                 allowed_mentions=discord.AllowedMentions(roles=True),
             )
 
+        # We need to schedule the next gameday. It's a week from the given start time
+        next_gameday_starts_at = self.started_at + datetime.timedelta(days=7)
+        await Gameday.create(
+            self.bot,
+            gameday_bucket_id=self.bucket_id,
+            guild_id=self.guild_id,
+            team_id=self.team_id,
+            starts_at=next_gameday_starts_at,
+        )
+
     async def merge_gameday_images(self) -> Optional[discord.File]:
         if not self.images:
             return None
@@ -637,7 +693,9 @@ class GamedayBucket(Teamable):
 
     @property
     def ongoing_gameday(self) -> Optional[Gameday]:
-        return discord.utils.find(lambda gameday: gameday.ongoing and gameday.started_at < discord.utils.utcnow(), self._gamedays.values())
+        return discord.utils.find(
+            lambda gameday: gameday.ongoing and gameday.started_at < discord.utils.utcnow(), self._gamedays.values()
+        )
 
     def get_gamedays(self) -> Mapping[int, Gameday]:
         return self._gamedays

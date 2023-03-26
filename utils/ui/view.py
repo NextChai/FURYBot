@@ -359,12 +359,12 @@ class _ChooseItemButton(discord.ui.Button[BaseViewT]):
 
     async def callback(self, interaction: discord.Interaction[FuryBot]) -> None:
         modal = _ChooseItemModal(parent=self.parent)
-        return await interaction.response.send_message(view=modal)
+        return await interaction.response.send_modal(modal)
 
 
 class _PageManagerButton(discord.ui.Button[BaseViewT]):
     def __init__(self, parent: MultiSelector[BaseViewT, Any], action: Literal['increment', 'decrement']) -> None:
-        super().__init__(label=action.title(), style=discord.ButtonStyle.blurple)
+        super().__init__(label=f'{action.title()} Page', style=discord.ButtonStyle.blurple)
 
         self.parent: MultiSelector[BaseViewT, Any] = parent
         self.action: Literal['increment', 'decrement'] = action

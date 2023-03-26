@@ -26,7 +26,8 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, TypeVar, Union, Type
+from typing_extensions import Self
 
 import asyncpg
 import discord
@@ -134,6 +135,11 @@ class Timer:
 
     def __repr__(self) -> str:
         return f'<Timer created={self.created_at!r} expires={self.expires!r} event={self.event!r}>'
+
+    @classmethod
+    async def delete_where(cls: Type[Self], bot: FuryBot, *args: Any, **kwargs: Any) -> None:
+        async with bot.safe_connection() as connection:
+            await connection.execute('DELETE FROM timers WHERE extra = $1', {'args': list(args), 'kwargs': kwargs})
 
     @discord.utils.cached_slot_property('_cs_event_name')
     def event_name(self) -> str:

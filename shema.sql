@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS teams.gameday_buckets(
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     guild_id BIGINT,
     weekday INTEGER,
-    game_time TIME WITH TIME ZONE,
+    game_time TIME,
     members_on_team INTEGER,
     best_of INTEGER,
     automatic_sub_finding BOOLEAN DEFAULT TRUE
@@ -107,8 +107,8 @@ CREATE TABLE IF NOT EXISTS teams.gamedays(
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     started_at TIMESTAMP WITH TIME ZONE,
     ended_at TIMESTAMP WITH TIME ZONE, -- Can be None
-    wins INTEGER,
-    losses INTEGER,
+    wins INTEGER DEFAULT 0,
+    losses INTEGER DEFAULT 0,
     attendance_voting_message_id BIGINT,
     scoreboard_message_id BIGINT
 );

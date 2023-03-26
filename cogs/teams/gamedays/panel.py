@@ -71,7 +71,6 @@ class CreateGamedayBucketPanel(BaseView):
     def __init__(self, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
         super().__init__(**kwargs)
         self.team: Team = team
-        raise NotImplementedError
 
     @property
     def embed(self) -> discord.Embed:
@@ -384,7 +383,7 @@ class GamedayPanel(BaseView):
 
         embed.add_field(
             name='Score',
-            value=f'**{team.display_name}**: {self.gameday.wins}\n**Other Team**: {self.gameday.losses}',
+            value=f'**{team.display_name} Wins**: {self.gameday.wins}\n**Opposing Team Wins**: {self.gameday.losses}',
             inline=False,
         )
 
@@ -637,6 +636,9 @@ class GamedayBucketPanel(BaseView):
         assert time
 
         await self.bucket.edit(weekday=weekday, game_time=time)
+
+        # We need to edit the next gamedays's time and date as well so that it is correct and dispatches as the correct time.
+
         return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Change Gameday Time and Date')

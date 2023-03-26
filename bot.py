@@ -390,6 +390,9 @@ class FuryBot(commands.Bot):
         """
         return self._team_cache.get(guild_id, {}).get(team_id)
 
+    def get_team_from_channel(self, channel_id: int, guild_id: int, /) -> Optional[Team]:
+        return Team.from_channel(channel_id, guild_id, bot=self)
+
     def add_team(self, team: Team, /) -> None:
         """Add a team to the cache.
 

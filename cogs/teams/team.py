@@ -453,7 +453,7 @@ class Team:
             embed.set_thumbnail(url=self.logo)
             embed.set_author(name=self.display_name, icon_url=self.logo, url=self.logo)
 
-        embed.set_footer(text=str(self.id))
+        embed.set_footer(text=f'Team ID: {self.id}')
 
         return embed
 

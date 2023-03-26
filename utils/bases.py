@@ -23,14 +23,14 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Protocol, Tuple, cast
+from typing import TYPE_CHECKING, Optional, Protocol, Tuple
+
 
 if TYPE_CHECKING:
     import discord
 
     from bot import FuryBot
-
-    from ..cogs.teams.team import Team, TeamMember
+    from cogs.teams.team import Team, TeamMember
 
 __all__: Tuple[str, ...] = ('Guildable', 'Teamable', 'Botable', 'TeamMemberable')
 
@@ -55,7 +55,9 @@ class Teamable(Guildable, Protocol):
 
     @property
     def team(self) -> Team:
-        return cast(Team, self._get_bot().get_team(self._get_team_id(), self._get_guild_id()))
+        team = self._get_bot().get_team(self._get_team_id(), self._get_guild_id())
+        assert team
+        return team
 
 
 class TeamMemberable(Teamable, Protocol):

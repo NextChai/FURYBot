@@ -25,11 +25,61 @@ from __future__ import annotations
 
 from .events import *
 from .gameday import *
+from .gameday import GamedayImage
 from .panel import *
+
+from utils import BaseCog
+import discord
+from discord import app_commands
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
 
+class GamedayCommands(BaseCog):
+    gameday = app_commands.Group(name='gameday', description='Commands for managing gamedays', guild_only=True)
+
+    @gameday.command(name='upload', description='Upload supporting images for a gameday (such as score).')
+    @app_commands.describe(attachment='The image to upload')
+    async def gameday_upload(
+        self, interaction: discord.Interaction[FuryBot], attachment: discord.Attachment
+    ) -> discord.InteractionMessage:
+        assert interaction.guild
+        assert interaction.channel_id
+
+        await interaction.response.defer(ephemeral=True)
+
+        team = self.bot.get_team_from_channel(interaction.channel_id, interaction.guild.id)
+        if not team:
+            return await interaction.edit_original_response(content='This command can only be used in a team channel.')
+
+        gameday = team.ongoing_gameday
+        if gameday is None:
+            return await interaction.edit_original_response(content='There is no ongoing gameday to upload to.')
+
+        scoreboard_message_id = gameday.scoreboard_message_id
+        if scoreboard_message_id is None:
+            return await interaction.edit_original_response(content='There is no scoreboard message to upload to.')
+
+        await GamedayImage.create(
+            gameday, image_url=attachment.url, uploader_id=interaction.user.id, uploaded_at=interaction.created_at
+        )
+
+        # Let's edit the message, if it exists
+        file = await gameday.merge_gameday_images()
+        assert file
+
+        partial = team.text_channel.get_partial_message(scoreboard_message_id)
+        try:
+            await partial.edit(embed=gameday.scoreboard.embed, attachments=[file])
+        except discord.NotFound:
+            return await interaction.edit_original_response(
+                content='I added the image but I was unable to edit the scoreboard message as it no longer exists.'
+            )
+
+        return await interaction.edit_original_response(content='Successfully added the image.')
+
+
 async def setup(bot: FuryBot):
     await bot.add_cog(GamedayEventListener(bot))
+    await bot.add_cog(GamedayCommands(bot))
