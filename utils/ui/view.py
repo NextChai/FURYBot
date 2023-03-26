@@ -322,13 +322,13 @@ class BaseView(discord.ui.View, abc.ABC):
         return await super().on_error(interaction, error, item)
 
 
-class ChooseItemModal(discord.ui.Modal):
+class _ChooseItemModal(discord.ui.Modal):
     def __init__(
         self,
         *,
         parent: SelectOneOfManyFrontend[BaseViewT, Any],
         modal_title: str = 'Choose Item',
-        modal_item: Optional[discord.ui.TextInput[ChooseItemModal]] = None,
+        modal_item: Optional[discord.ui.TextInput[_ChooseItemModal]] = None,
     ) -> None:
         super().__init__(title=modal_title, timeout=None)
         self.parent: SelectOneOfManyFrontend[BaseViewT, Any] = parent
@@ -351,7 +351,7 @@ class ChooseItemModal(discord.ui.Modal):
         return await self.parent.on_item_chosen(interaction, item)
 
 
-class ChooseItemButton(discord.ui.Button[BaseViewT]):
+class _ChooseItemButton(discord.ui.Button[BaseViewT]):
     def __init__(
         self,
         *,
@@ -361,11 +361,11 @@ class ChooseItemButton(discord.ui.Button[BaseViewT]):
         self.parent: SelectOneOfManyFrontend[BaseViewT, Any] = parent
 
     async def callback(self, interaction: discord.Interaction[FuryBot]) -> None:
-        modal = ChooseItemModal(parent=self.parent)
+        modal = _ChooseItemModal(parent=self.parent)
         return await interaction.response.send_message(view=modal)
 
 
-class PageManagerButton(discord.ui.Button[BaseViewT]):
+class _PageManagerButton(discord.ui.Button[BaseViewT]):
     def __init__(self, parent: SelectOneOfManyFrontend[BaseViewT, Any], action: Literal['increment', 'decrement']) -> None:
         super().__init__(label=action.title(), style=discord.ButtonStyle.blurple)
 
@@ -402,18 +402,18 @@ class SelectOneOfManyFrontend(Generic[BaseViewT, T], abc.ABC):
         items: List[T],
         per_page: int = 10,
         modal_title: str = 'Choose Item',
-        modal_item: Optional[discord.ui.TextInput[ChooseItemModal]] = None,
+        modal_item: Optional[discord.ui.TextInput[_ChooseItemModal]] = None,
     ) -> None:
         self.modal_title: str = modal_title
-        self.modal_item: Optional[discord.ui.TextInput[ChooseItemModal]] = modal_item
+        self.modal_item: Optional[discord.ui.TextInput[_ChooseItemModal]] = modal_item
 
         self.parent: BaseViewT = parent
         self._original_children: List[discord.ui.Item[BaseViewT]] = parent.children
 
         parent.clear_items()
-        parent.add_item(PageManagerButton(parent=self, action='decrement'))
-        parent.add_item(PageManagerButton(parent=self, action='increment'))
-        parent.add_item(ChooseItemButton(parent=self))
+        parent.add_item(_PageManagerButton(parent=self, action='decrement'))
+        parent.add_item(_PageManagerButton(parent=self, action='increment'))
+        parent.add_item(_ChooseItemButton(parent=self))
 
         self.items_mapping: Dict[str, T] = {self.hash_item(item): item for item in items}
         self.pages = [items[i : i + per_page] for i in range(0, len(items), per_page)]

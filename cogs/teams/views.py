@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import datetime
 import functools
-from typing import TYPE_CHECKING, Any, List, Optional, cast
+from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
 
 import discord
 import pytz
@@ -34,13 +34,15 @@ from typing_extensions import Self, Unpack
 from cogs.teams.scrim.persistent import AwayConfirm, HomeConfirm
 from utils import (
     CHANNEL_EMOJI_MAPPING,
-    AutoRemoveSelect,
+    UserSelect,
+    RoleSelect,
     BaseView,
     BaseViewKwargs,
-    BasicInputModal,
+    AfterModal,
     TimeTransformer,
     default_button_doc_string,
     human_timedelta,
+    SelectOneOfMany,
 )
 
 from . import ScrimStatus
@@ -50,6 +52,8 @@ if TYPE_CHECKING:
     from .practices import Practice, PracticeMember
     from .scrim import Scrim
     from .team import Team
+
+    from bot import FuryBot
 
 EST = pytz.timezone("Us/Eastern")
 
@@ -218,7 +222,7 @@ class TeamMemberView(BaseView):
     @discord.ui.button(label='Remove Member')
     @default_button_doc_string
     async def remove_member(
-        self, interaction: discord.Interaction, button: discord.ui.Button[Self]
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
         """Remove this member from the team."""
         await interaction.response.defer()
@@ -275,30 +279,41 @@ class TeamMembersView(BaseView):
 
         return embed
 
-    async def _manage_member_after(self, select: discord.ui.UserSelect[Self], interaction: discord.Interaction) -> None:
+    async def _manage_member_after(
+        self, interaction: discord.Interaction[FuryBot], members: List[Union[discord.Member, discord.User]]
+    ) -> None:
         await interaction.response.defer()
 
-        team_member = self.team.get_member(select.values[0].id)
+        member = members[0]
+        assert isinstance(member, discord.Member)
+
+        team_member = self.team.get_member(member.id)
         if not team_member:
             await interaction.edit_original_response(embed=self.embed, view=self)
             await interaction.followup.send('This member is not on the team.', ephemeral=True)
             return
 
-        member = cast(discord.Member, select.values[0])
         view = self.create_child(TeamMemberView, member=member, team=self.team)
         await interaction.edit_original_response(embed=view.embed, view=view)
 
+    @discord.ui.button(label='Manage Member')
+    @default_button_doc_string
+    async def manage_member(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Manage this member on the team. You can remove them from it and demote them to a sub."""
+        UserSelect(after=self._manage_member_after, parent=self)
+        return await interaction.response.edit_message(view=self)
+
     async def _manage_member_assignment(
         self,
-        select: discord.ui.UserSelect[Self],
-        interaction: discord.Interaction,
+        interaction: discord.Interaction[FuryBot],
+        members: List[Union[discord.Member, discord.User]],
         *,
         assign_sub: bool = False,
         remove_member: bool = False,
     ) -> None:
         await interaction.response.defer()
 
-        for member in select.values:
+        for member in members:
             if remove_member:
                 team_member = self.team.get_member(member.id)
                 if team_member is not None:
@@ -310,63 +325,33 @@ class TeamMembersView(BaseView):
 
         await interaction.edit_original_response(embed=self.embed, view=self)
 
-    @discord.ui.button(label='Manage Member')
-    @default_button_doc_string
-    async def manage_member(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
-        """Manage this member on the team. You can remove them from it and demote them to a sub."""
-        AutoRemoveSelect(item=discord.ui.UserSelect[Self](), parent=self, callback=self._manage_member_after)
-        return await interaction.response.edit_message(view=self)
-
     @discord.ui.button(label='Add Members')
     @default_button_doc_string
     async def add_members(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Add members to this team."""
-        AutoRemoveSelect(
-            item=discord.ui.UserSelect[Self](
-                max_values=clamp(self.guild.member_count, 25), placeholder='Select members to add...'
-            ),
-            parent=self,
-            callback=self._manage_member_assignment,
-        )
+        UserSelect(after=self._manage_member_assignment, parent=self)
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Remove Members')
     @default_button_doc_string
     async def remove_members(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Remove members from this team."""
-        AutoRemoveSelect(
-            item=discord.ui.UserSelect[Self](
-                max_values=clamp(self.guild.member_count, 25), placeholder='Select members to remove...'
-            ),
-            parent=self,
-            callback=functools.partial(self._manage_member_assignment, remove_member=True),
-        )
+        UserSelect(after=functools.partial(self._manage_member_assignment, remove_member=True), parent=self)
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Add Subs')
     @default_button_doc_string
     async def add_subs(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Add subs to this team."""
-        AutoRemoveSelect(
-            item=discord.ui.UserSelect[Self](
-                max_values=clamp(self.guild.member_count, 25), placeholder='Select a subs to add...'
-            ),
-            parent=self,
-            callback=functools.partial(self._manage_member_assignment, assign_sub=True),
-        )
+        UserSelect(after=functools.partial(self._manage_member_assignment, assign_sub=True), parent=self)
+
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Remove Subs')
     @default_button_doc_string
     async def remove_subs(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Remove subs from this team."""
-        AutoRemoveSelect(
-            item=discord.ui.UserSelect[Self](
-                max_values=clamp(self.guild.member_count, 25), placeholder='Select subs to remove...'
-            ),
-            parent=self,
-            callback=functools.partial(self._manage_member_assignment, remove_member=True),
-        )
+        UserSelect(after=functools.partial(self._manage_member_assignment, assign_sub=True, remove_member=True), parent=self)
         return await interaction.response.edit_message(view=self)
 
 
@@ -420,14 +405,13 @@ class ScrimView(BaseView):
         return embed
 
     async def _reschedule_scrim_after(
-        self, modal: BasicInputModal[discord.ui.TextInput[Any]], interaction: discord.Interaction
+        self, interaction: discord.Interaction, reschedule_input: discord.ui.TextInput[AfterModal]
     ) -> None:
         await interaction.response.defer()
 
         # Let's try and parse this time
-        value = modal.children[0].value
         try:
-            transformed = await TimeTransformer('n/a').transform(interaction, value)
+            transformed = await TimeTransformer('n/a').transform(interaction, reschedule_input.value)
         except Exception as exc:
             await interaction.edit_original_response(embed=self.embed, view=self)
             return await interaction.followup.send(content=str(exc), ephemeral=True)
@@ -438,15 +422,35 @@ class ScrimView(BaseView):
             content=f'I\'ve rescheduled this scrim for {self.scrim.scheduled_for_formatted()}.'
         )
 
+    @discord.ui.button(label='Reschedule')
+    @default_button_doc_string
+    async def reschedule_scrim(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Reschedule this scrim to a later date."""
+        # If this scrim has already started, we can't reschedule it
+        if self.scrim.scheduled_for < interaction.created_at:
+            return await interaction.response.send_message(
+                'This scrim has already started, you cannot reschedule it.', ephemeral=True
+            )
+
+        modal = AfterModal(self.bot, after=self._reschedule_scrim_after)
+        modal.add_item(
+            discord.ui.TextInput(label='When you want to reschedule this scrim to. For example: Tomorrow at 4pm.')
+        )
+        await interaction.response.send_modal(modal)
+
     async def _manage_member_assignment(
-        self, select: discord.ui.UserSelect[Self], interaction: discord.Interaction, *, add_vote: bool = True
+        self,
+        interaction: discord.Interaction[FuryBot],
+        members: List[Union[discord.Member, discord.User]],
+        *,
+        add_vote: bool = True,
     ) -> None:
         await interaction.response.defer()
 
         home_team = self.scrim.home_team
         away_team = self.scrim.away_team
 
-        for member in select.values:
+        for member in members:
             home_member = home_team.get_member(member.id)
             team = home_team if home_member is not None else away_team
 
@@ -486,46 +490,19 @@ class ScrimView(BaseView):
 
         await interaction.edit_original_response(embed=self.embed, view=self)
 
-    @discord.ui.button(label='Reschedule')
-    @default_button_doc_string
-    async def reschedule_scrim(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
-        """Reschedule this scrim to a later date."""
-        # If this scrim has already started, we can't reschedule it
-        if self.scrim.scheduled_for < interaction.created_at:
-            return await interaction.response.send_message(
-                'This scrim has already started, you cannot reschedule it.', ephemeral=True
-            )
-
-        modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(self.bot, after=self._reschedule_scrim_after)
-        modal.add_item(
-            discord.ui.TextInput(label='When you want to reschedule this scrim to. For example: Tomorrow at 4pm.')
-        )
-        await interaction.response.send_modal(modal)
-
     @discord.ui.button(label='Remove Confirmation')
     @default_button_doc_string
     async def remove_confirmation(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Forcefully remove confirmation for a member."""
-        AutoRemoveSelect(
-            item=discord.ui.UserSelect[Self](
-                max_values=clamp(self.guild.member_count, 25), placeholder='Select members to remove confirmation for...'
-            ),
-            callback=functools.partial(self._manage_member_assignment, add_vote=False),
-            parent=self,
-        )
+        UserSelect(after=functools.partial(self._manage_member_assignment, add_vote=False), parent=self)
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Force Add Confirmation')
     @default_button_doc_string
     async def force_add_confirmation(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Forcefully add confirmation for a member."""
-        AutoRemoveSelect(
-            item=discord.ui.UserSelect[Self](
-                max_values=clamp(self.guild.member_count, 25), placeholder='Select members to remove confirmation for...'
-            ),
-            callback=self._manage_member_assignment,
-            parent=self,
-        )
+
+        UserSelect(after=functools.partial(self._manage_member_assignment, add_vote=True), parent=self)
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Force Schedule Scrim')
@@ -610,8 +587,8 @@ class TeamScrimsView(BaseView):
 
         return embed
 
-    async def _manage_a_scrim_callback(self, select: discord.ui.Select[Any], interaction: discord.Interaction) -> None:
-        scrim = discord.utils.get(self.team.scrims, id=int(select.values[0]))
+    async def _manage_a_scrim_callback(self, interaction: discord.Interaction[FuryBot], values: List[str]) -> None:
+        scrim = discord.utils.get(self.team.scrims, id=int(values[0]))
         if not scrim:
             # Something really went wrong!
             return await interaction.response.edit_message(embed=self.embed, view=self)
@@ -626,19 +603,17 @@ class TeamScrimsView(BaseView):
         if not self.team.scrims:
             return await interaction.response.send_message('This team has no scrims.', ephemeral=True)
 
-        AutoRemoveSelect(
-            item=discord.ui.Select[Self](
-                placeholder='Select a scrim to manage...',
-                options=[
-                    discord.SelectOption(
-                        label=scrim.scheduled_for.strftime("%A, %B %d, %Y at %I:%M %p"),
-                        value=str(scrim.id),
-                    )
-                    for scrim in self.team.scrims
-                ],
-            ),
-            parent=self,
-            callback=self._manage_a_scrim_callback,
+        SelectOneOfMany(
+            self,
+            options=[
+                discord.SelectOption(
+                    label=scrim.scheduled_for.strftime("%A, %B %d, %Y at %I:%M %p"),
+                    value=str(scrim.id),
+                )
+                for scrim in self.team.scrims
+            ],
+            placeholder='Select a scrim to manage...',
+            after=self._manage_a_scrim_callback,
         )
 
         # The AutoRemoveSelect automatically removes all children
@@ -677,21 +652,21 @@ class TeamChannelsView(BaseView):
         return embed
 
     async def _create_extra_channel_after(
-        self, modal: BasicInputModal[discord.ui.TextInput[Any], discord.ui.TextInput[Any]], interaction: discord.Interaction
+        self,
+        interaction: discord.Interaction[FuryBot],
+        channel_name_input: discord.ui.TextInput[AfterModal],
+        channel_type_input: discord.ui.TextInput[AfterModal],
     ) -> None:
         await interaction.response.defer()
-
-        channel_name: str = modal.children[0].value
-        channel_type: str = modal.children[1].value
 
         meth_mapping = {
             'text': self.team.category_channel.create_text_channel,
             'voice': self.team.category_channel.create_voice_channel,
         }
 
-        meth = meth_mapping.get(channel_type.lower(), None)
+        meth = meth_mapping.get(channel_type_input.value, None)
         if meth:
-            channel = await meth(name=channel_name)
+            channel = await meth(name=channel_name_input.value)
 
             extra_channel_ids = self.team.extra_channel_ids.copy()
             extra_channel_ids.append(channel.id)
@@ -699,13 +674,27 @@ class TeamChannelsView(BaseView):
 
         await interaction.edit_original_response(view=self, embed=self.embed)
 
-    async def _delete_extra_channels_after(self, select: discord.ui.Select[Self], interaction: discord.Interaction) -> None:
+    @discord.ui.button(label='Create Extra Channel')
+    @default_button_doc_string
+    async def create_extra_channel(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        """Allows the user to create an extra channel for the team."""
+        modal = AfterModal(
+            self.bot,
+            self._create_extra_channel_after,
+            discord.ui.TextInput(label='Channel Name', placeholder='Enter the channel name...'),
+            discord.ui.TextInput(label='Channel Type', placeholder='"text" or "voice"...'),
+            title='Create Extra Channel',
+            timeout=None,
+        )
+        await interaction.response.send_modal(modal)
+
+    async def _delete_extra_channels_after(self, interaction: discord.Interaction[FuryBot], values: List[str]) -> None:
         await interaction.response.defer()
 
         # Get the new channel ids
         valid_extra_channel_ids = self.team.extra_channel_ids.copy()
 
-        for str_channel_id in select.values:
+        for str_channel_id in values:
             channel_id = int(str_channel_id)
             if channel_id in valid_extra_channel_ids:
                 valid_extra_channel_ids.remove(channel_id)
@@ -718,20 +707,6 @@ class TeamChannelsView(BaseView):
 
         await interaction.edit_original_response(view=self, embed=self.embed)
 
-    @discord.ui.button(label='Create Extra Channel')
-    @default_button_doc_string
-    async def create_extra_channel(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
-        """Allows the user to create an extra channel for the team."""
-        modal: BasicInputModal[discord.ui.TextInput[Any], discord.ui.TextInput[Any]] = BasicInputModal(
-            self.bot,
-            after=self._create_extra_channel_after,
-            title='Create Extra Channel',
-            timeout=None,
-        )
-        modal.add_item(discord.ui.TextInput(label='Channel Name', placeholder='Enter the channel name...'))
-        modal.add_item(discord.ui.TextInput(label='Channel Type', placeholder='"text" or "voice"...'))
-        await interaction.response.send_modal(modal)
-
     @discord.ui.button(label='Delete Extra Channels')
     @default_button_doc_string
     async def delete_extra_channel(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
@@ -739,21 +714,17 @@ class TeamChannelsView(BaseView):
         if not self.team.extra_channels:
             return await interaction.response.send_message('This team has no extra channels.', ephemeral=True)
 
-        AutoRemoveSelect(
-            item=discord.ui.Select[Self](
-                max_values=clamp(len(self.team.extra_channel_ids), 25),
-                placeholder='Select the channels to delete...',
-                options=[
-                    discord.SelectOption(
-                        label=channel.name, value=str(channel.id), emoji=CHANNEL_EMOJI_MAPPING.get(type(channel), None)
-                    )
-                    for channel in self.team.extra_channels
-                ],
-            ),
-            parent=self,
-            callback=self._delete_extra_channels_after,
+        SelectOneOfMany(
+            self,
+            options=[
+                discord.SelectOption(
+                    label=channel.name, value=str(channel.id), emoji=CHANNEL_EMOJI_MAPPING.get(type(channel), None)
+                )
+                for channel in self.team.extra_channels
+            ],
+            after=self._delete_extra_channels_after,
+            placeholder='Select the channels to delete...',
         )
-
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Sync Channels')
@@ -791,94 +762,100 @@ class TeamNamingView(BaseView):
         return embed
 
     async def _perform_after(
-        self, kwarg_name: str, modal: BasicInputModal[discord.ui.TextInput[Any]], interaction: discord.Interaction
+        self, interaction: discord.Interaction[FuryBot], text_input: discord.ui.TextInput[AfterModal], *, kwarg: str
     ) -> None:
         await interaction.response.defer()
 
-        value = modal.children[0].value
-        await self.team.edit(**{kwarg_name: value})
+        await self.team.edit(**{kwarg: text_input.value})
         await interaction.edit_original_response(embed=self.embed, view=self)
 
     async def _rename_after(
-        self, modal: BasicInputModal[discord.ui.TextInput[Any]], interaction: discord.Interaction
+        self, interaction: discord.Interaction[FuryBot], text_input: discord.ui.TextInput[AfterModal]
     ) -> None:
-        await self._perform_after("name", modal, interaction)
+        await self._perform_after(interaction, text_input, kwarg='name')
 
     async def _change_nickname_after(
-        self, modal: BasicInputModal[discord.ui.TextInput[Any]], interaction: discord.Interaction
+        self, interaction: discord.Interaction[FuryBot], text_input: discord.ui.TextInput[AfterModal]
     ) -> None:
-        await self._perform_after("nickname", modal, interaction)
+        await self._perform_after(interaction, text_input, kwarg='nickname')
 
     async def _change_description_after(
-        self, modal: BasicInputModal[discord.ui.TextInput[Any]], interaction: discord.Interaction
+        self, interaction: discord.Interaction[FuryBot], text_input: discord.ui.TextInput[AfterModal]
     ) -> None:
-        await self._perform_after('description', modal, interaction)
+        await self._perform_after(interaction, text_input, kwarg='description')
+        await self.team.text_channel.edit(topic=text_input.value)
 
     async def _change_logo_after(
-        self, modal: BasicInputModal[discord.ui.TextInput[Any]], interaction: discord.Interaction
+        self, interaction: discord.Interaction[FuryBot], text_input: discord.ui.TextInput[AfterModal]
     ) -> None:
-        await self._perform_after('logo', modal, interaction)
+        await self._perform_after(interaction, text_input, kwarg='logo')
 
     @discord.ui.button(label='Rename')
     @default_button_doc_string
     async def rename(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Rename this team."""
-        modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
-            self.bot, title='Rename Team', after=self._rename_after
+        modal = AfterModal(
+            self.bot,
+            self._rename_after,
+            discord.ui.TextInput(label='New Name', placeholder='Enter a new name...', max_length=100),
+            title='Rename Team',
+            timeout=None,
         )
-        modal.add_item(discord.ui.TextInput(label='New Name', placeholder='Enter a new name...', max_length=100))
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label='Change Nickname')
     @default_button_doc_string
     async def change_nickname(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Change the nickname of this team."""
-        modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
-            self.bot, title='Change Team Nickname', after=self._change_nickname_after
+
+        modal = AfterModal(
+            self.bot,
+            self._change_nickname_after,
+            discord.ui.TextInput(label='New Nickname', placeholder='Enter a new nickname...', max_length=100),
+            title='Change Team Nickname',
+            timeout=None,
         )
-        modal.add_item(
-            discord.ui.TextInput(
-                label='Update Nickname', placeholder='Enter a new nickname...', max_length=100, required=False
-            )
-        )
+
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label='Change Description')
     @default_button_doc_string
     async def change_description(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Change the description of this team."""
-        modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
-            self.bot, title='Change Team Nickname', after=self._change_description_after
-        )
-        modal.add_item(
+        modal = AfterModal(
+            self.bot,
+            self._change_description_after,
             discord.ui.TextInput(
                 label='Update Description',
                 placeholder='Enter a new description...',
                 max_length=1024,
                 required=False,
                 style=discord.TextStyle.long,
-            )
+            ),
+            title='Change Team Description',
+            timeout=None,
         )
-        await interaction.response.send_modal(modal)
 
-        await modal.wait()
-        await self.team.text_channel.edit(topic=modal.children[0].value)
+        return await interaction.response.send_modal(modal)
 
     @discord.ui.button(label='Change Logo')
     @default_button_doc_string
     async def change_logo(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Change the logo of this team."""
-        modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
-            self.bot, title='Change Team Logo', after=self._change_logo_after
-        )
-        modal.add_item(
+
+        modal = AfterModal(
+            self.bot,
+            self._change_logo_after,
             discord.ui.TextInput(
                 label='Update Logo',
                 placeholder='Enter a new logo...',
                 required=False,
                 style=discord.TextStyle.short,
-            )
+            ),
+            title='Change Team Logo',
+            timeout=None,
         )
+
         await interaction.response.send_modal(modal)
 
 
@@ -915,12 +892,12 @@ class TeamCaptainsView(BaseView):
         return embed
 
     async def handle_captain_action(
-        self, select: discord.ui.RoleSelect[Self], interaction: discord.Interaction, *, add: bool = True
+        self, interaction: discord.Interaction[FuryBot], roles: List[discord.Role], *, add: bool = True
     ) -> None:
         await interaction.response.defer()
 
         meth = self.team.add_captain if add else self.team.remove_captain
-        for role in select.values:
+        for role in roles:
             try:
                 await meth(role.id)
             except Exception:
@@ -932,22 +909,16 @@ class TeamCaptainsView(BaseView):
     @default_button_doc_string
     async def add_captain(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Add a captain role to this team."""
-        AutoRemoveSelect(
-            item=discord.ui.RoleSelect[Self](max_values=clamp(len(self.team.captain_roles), 25)),
-            parent=self,
-            callback=self.handle_captain_action,
-        )
+
+        RoleSelect(self.handle_captain_action, self)
+
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label='Remove Captains')
     @default_button_doc_string
     async def remove_captain(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Remove a captain role from this team."""
-        AutoRemoveSelect(
-            item=discord.ui.RoleSelect[Self](max_values=clamp(len(self.team.captain_roles), 25)),
-            parent=self,
-            callback=functools.partial(self.handle_captain_action, add=False),
-        )
+        RoleSelect(functools.partial(self.handle_captain_action, add=False), self)
         return await interaction.response.edit_message(view=self)
 
 
@@ -1093,9 +1064,10 @@ class TeamPracticeView(BaseView):
         await interaction.message.edit(embed=self.embed, view=self)
 
     async def _manage_practice_members_after(
-        self, select: discord.ui.UserSelect[Self], interaction: discord.Interaction
+        self, interaction: discord.Interaction[FuryBot], users: List[Union[discord.Member, discord.User]]
     ) -> None:
-        selected: discord.Member = cast(discord.Member, select.values[0])  # This is in a guild so it'll resolve to Member
+        selected = users[0]
+        assert isinstance(selected, discord.Member)
 
         if self.practice.team.get_member(selected.id) is None:
             await interaction.response.edit_message(view=self, embed=self.embed)
@@ -1117,10 +1089,8 @@ class TeamPracticeView(BaseView):
     @default_button_doc_string
     async def manage_practice_members(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Manage a specific member in this practice."""
-        AutoRemoveSelect(
-            item=discord.ui.UserSelect[Self](placeholder="Select a member to manage...", max_values=1),
-            parent=self,
-            callback=self._manage_practice_members_after,
+        UserSelect(
+            after=self._manage_practice_members_after, parent=self, placeholder="Select a member to manage...", max_values=1
         )
         return await interaction.response.edit_message(view=self)
 
@@ -1207,8 +1177,8 @@ class TeamPracticesView(BaseView):
 
         return embed
 
-    async def _manage_practice_after(self, select: discord.ui.Select[Self], interaction: discord.Interaction) -> None:
-        practice_id = int(select.values[0])
+    async def _manage_practice_after(self, interaction: discord.Interaction[FuryBot], values: List[str]) -> None:
+        practice_id = int(values[0])
         practice = discord.utils.get(self.team.practices, id=practice_id)
         if not practice:
             await interaction.response.edit_message(view=self, embed=self.embed)
@@ -1231,16 +1201,12 @@ class TeamPracticesView(BaseView):
             ended_at = practice.ended_at and practice.ended_at.astimezone(tz=EST).strftime(date_format) or 'In Progress...'
             options.append(discord.SelectOption(label=ended_at, value=str(practice.id)))
 
-        select: discord.ui.Select[Self] = discord.ui.Select(
+        SelectOneOfMany(
+            self,
             options=options,
-            placeholder='Select a practice to manage...',
+            after=self._manage_practice_after,
         )
 
-        AutoRemoveSelect(
-            item=select,
-            parent=self,
-            callback=self._manage_practice_after,
-        )
         return await interaction.response.edit_message(view=self)
 
     # TODO: Add a button to view complete practice history (see ID)
@@ -1298,11 +1264,10 @@ class TeamView(BaseView):
         return embed
 
     async def _delete_team_after(
-        self, modal: BasicInputModal[discord.ui.TextInput[Any]], interaction: discord.Interaction
+        self, interaction: discord.Interaction[FuryBot], confirm_input: discord.ui.TextInput[AfterModal]
     ) -> None:
-        value = modal.children[0].value
 
-        if value.lower() != 'delete':
+        if confirm_input.value.lower() != 'delete':
             return await interaction.response.send_message('Aborted as `delete` was not typed.', ephemeral=True)
 
         await self.team.delete()
@@ -1354,14 +1319,16 @@ class TeamView(BaseView):
     @default_button_doc_string
     async def delete(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
         """Delete this team."""
-        modal: BasicInputModal[discord.ui.TextInput[Any]] = BasicInputModal(
-            self.bot, after=self._delete_team_after, title='Delete Team?'
-        )
-        modal.add_item(
+        modal = AfterModal(
+            self.bot,
+            self._delete_team_after,
             discord.ui.TextInput(
                 label='Delete Team Confirmation',
                 placeholder='Type "DELETE" to confirm...',
                 max_length=6,
-            )
+            ),
+            title='Delete Team?',
+            timeout=None,
         )
+
         return await interaction.response.send_modal(modal)
