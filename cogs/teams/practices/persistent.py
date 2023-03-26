@@ -64,7 +64,7 @@ class UnabletoAttendModal(discord.ui.Modal):
         self.member: discord.Member = member
         super().__init__(timeout=None, title="Why Can't You Attend?")
 
-    async def interaction_check(self, interaction: discord.Interaction, /) -> Optional[bool]:
+    async def interaction_check(self, interaction: discord.Interaction[FuryBot], /) -> Optional[bool]:
         """|coro|
 
         A check to ensure that the interaction is from the member that is opting out of the practice.

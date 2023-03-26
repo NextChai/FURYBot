@@ -38,7 +38,9 @@ class Moderation(BaseCog):
     @app_commands.command(name='nick', description='Nick a member.')
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.describe(member='The member to change the nick for.', nick='The nick to use. Do not include for no nick.')
-    async def nick(self, interaction: discord.Interaction, member: discord.Member, nick: Optional[str] = None) -> None:
+    async def nick(
+        self, interaction: discord.Interaction[FuryBot], member: discord.Member, nick: Optional[str] = None
+    ) -> None:
         await member.edit(nick=nick)
         return await interaction.response.send_message(
             f'I\'ve updated the nickname on {member.mention} to `{nick}`', ephemeral=True
@@ -47,7 +49,7 @@ class Moderation(BaseCog):
     @app_commands.command(name='assign', description='Assign a role to a member.')
     @app_commands.default_permissions(manage_roles=True)
     @app_commands.describe(member='The member to assign the role to.', role='The role to assign.')
-    async def assign(self, interaction: discord.Interaction, member: discord.Member, role: discord.Role) -> None:
+    async def assign(self, interaction: discord.Interaction[FuryBot], member: discord.Member, role: discord.Role) -> None:
         await member.add_roles(role)
         return await interaction.response.send_message(f'I\'ve assigned {role.mention} to {member.mention}', ephemeral=True)
 

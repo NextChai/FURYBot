@@ -59,22 +59,16 @@ class TeamTransformer(app_commands.Transformer):
     def type(self) -> discord.AppCommandOptionType:
         return discord.AppCommandOptionType.integer
 
-    def _get_similar_teams(self, interaction: discord.Interaction) -> List[Team]:
+    def _get_similar_teams(self, interaction: discord.Interaction[FuryBot]) -> List[Team]:
         # A helper to get all teams that are similar to the team this command was invoked on.
         # This will only be called if clamp_teams is True.
-        bot: FuryBot = interaction.client  # type: ignore
-
         channel = interaction.channel
         if channel is None or isinstance(channel, discord.PartialMessageable):
             # dpy couldnt resolve this channel (maybe not in cache?)
             return []
 
         guild = channel.guild
-        if guild is None:
-            # This command can't be used in DMS
-            return []
-
-        guild_teams = bot.get_teams(guild.id)
+        guild_teams = interaction.client.get_teams(guild.id)
         team = discord.utils.find(lambda team: team.has_channel(channel.id), guild_teams)
         if not team:
             # This command wasnt invoked in a team chat
@@ -85,7 +79,7 @@ class TeamTransformer(app_commands.Transformer):
 
         return [t for t in guild_teams if team_name_parsed in t.name and t != team]
 
-    async def autocomplete(self, interaction: discord.Interaction, value: str) -> List[app_commands.Choice[int]]:
+    async def autocomplete(self, interaction: discord.Interaction[FuryBot], value: str) -> List[app_commands.Choice[int]]:
         """|coro|
 
         Transforms the user's input that they're typing to a list of recommended choices based upon
@@ -102,7 +96,7 @@ class TeamTransformer(app_commands.Transformer):
             # This command can't be used in DMS
             return []
 
-        bot: FuryBot = interaction.client  # type: ignore
+        bot: FuryBot = interaction.client
 
         # If we're clamping the teams, we need to get the similar teams to use.
         if self.clamp_teams:
@@ -126,7 +120,7 @@ class TeamTransformer(app_commands.Transformer):
 
         return choices
 
-    async def transform(self, interaction: discord.Interaction, value: int, /) -> Team:
+    async def transform(self, interaction: discord.Interaction[FuryBot], value: int, /) -> Team:
         """|coro|
 
         Transforms the given users input to a team.
@@ -142,9 +136,7 @@ class TeamTransformer(app_commands.Transformer):
         if not guild:
             raise AutocompleteValidationException('This command can only be used in a server.')
 
-        bot: FuryBot = interaction.client  # type: ignore
-
-        team = bot.get_team(value, guild.id)
+        team = interaction.client.get_team(value, guild.id)
         if team is None:
             raise AutocompleteValidationException('User did not select a valid team.')
 

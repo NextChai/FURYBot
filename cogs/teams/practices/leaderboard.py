@@ -356,7 +356,7 @@ class PracticeLeaderboardCog(BaseCog):
         role='The role to ping when a team is on top of the leaderboard.',
     )
     async def practcie_leaderboard_create(
-        self, interaction: discord.Interaction, role: discord.Role, channel: Optional[discord.TextChannel]
+        self, interaction: discord.Interaction[FuryBot], role: discord.Role, channel: Optional[discord.TextChannel]
     ) -> discord.InteractionMessage:
         """|coro|
 
@@ -432,7 +432,7 @@ class PracticeLeaderboardCog(BaseCog):
         channel='The channel the leaderboard should be deleted from.',
     )
     async def practcie_leaderboard_delete(
-        self, interaction: discord.Interaction, channel: Optional[discord.TextChannel]
+        self, interaction: discord.Interaction[FuryBot], channel: Optional[discord.TextChannel]
     ) -> discord.InteractionMessage:
         """|coro|
 

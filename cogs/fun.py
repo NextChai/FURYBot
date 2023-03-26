@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 class Fun(BaseCog):
     @app_commands.command(name='avatar', description='Get the avatar of a user.')
     @app_commands.describe(member='The member to get the avatar of.')
-    async def avatar(self, interaction: discord.Interaction, member: Optional[discord.Member] = None) -> None:
+    async def avatar(self, interaction: discord.Interaction[FuryBot], member: Optional[discord.Member] = None) -> None:
         """|coro|
 
         Gets the avatar of a user.

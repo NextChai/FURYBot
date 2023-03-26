@@ -118,7 +118,7 @@ class DeniedImageReason(BaseModal):
         self.parent: ApproveOrDenyImage = parent
         self.request: ImageRequest = request
 
-    async def on_submit(self, interaction: discord.Interaction, /) -> None:
+    async def on_submit(self, interaction: discord.Interaction[FuryBot], /) -> None:
         """|coro|
 
         Called when the modal has been submitted. This will deny the image request by sending a message to the requester
@@ -191,7 +191,7 @@ class ApproveOrDenyImage(discord.ui.View):
 
         return embed
 
-    async def _approve(self, interaction: discord.Interaction) -> Optional[discord.InteractionMessage]:
+    async def _approve(self, interaction: discord.Interaction[FuryBot]) -> Optional[discord.InteractionMessage]:
         request = self.request
 
         embed = self.bot.Embed(
@@ -241,7 +241,7 @@ class ApproveOrDenyImage(discord.ui.View):
     @discord.ui.button(label='Approve', style=discord.ButtonStyle.green)
     @default_button_doc_string
     async def approve(
-        self, interaction: discord.Interaction, button: discord.ui.Button[Self]
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> Optional[discord.InteractionMessage]:
         """Approves the image request by sending the image to the channel and deleting the request from the database."""
         await interaction.response.defer()
@@ -250,7 +250,9 @@ class ApproveOrDenyImage(discord.ui.View):
 
     @discord.ui.button(label='Approve Without Message', style=discord.ButtonStyle.gray)
     @default_button_doc_string
-    async def approve_without_message(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+    async def approve_without_message(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> None:
         """Approves the image request by sending the image to the channel and deleting the request from the database. This
         will not send the message that was attached to the request. This comes in handy when the user has passed a message that
         is specific to the mods and shouldn't be shared with the rest of the server.
@@ -262,7 +264,7 @@ class ApproveOrDenyImage(discord.ui.View):
 
     @discord.ui.button(label='Deny', style=discord.ButtonStyle.red)
     @default_button_doc_string
-    async def deny(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+    async def deny(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Deny the image request by sending a message to the requester with the information and deleting the request from the database."""
         modal = DeniedImageReason(self.bot, self, self.request)
         return await interaction.response.send_modal(modal)

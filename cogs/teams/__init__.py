@@ -50,13 +50,11 @@ TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_t
 FRONT_END_TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=True)]
 
 
-def _maybe_team(interaction: discord.Interaction, team: Optional[Team]) -> Optional[Team]:
+def _maybe_team(interaction: discord.Interaction[FuryBot], team: Optional[Team]) -> Optional[Team]:
     assert interaction.guild
 
     if team is not None:
         return team
-
-    bot: FuryBot = interaction.client  # type: ignore
 
     channel = interaction.channel
     if not channel:
@@ -67,7 +65,7 @@ def _maybe_team(interaction: discord.Interaction, team: Optional[Team]) -> Optio
         return None
 
     try:
-        return Team.from_channel(category.id, interaction.guild.id, bot=bot)
+        return Team.from_channel(category.id, interaction.guild.id, bot=interaction.client)
     except Exception:
         return None
 
@@ -100,7 +98,7 @@ class Teams(BaseCog):
     @team.command(name='create', description='Create a team.')
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.describe(name='The name of the team.')
-    async def team_create(self, interaction: discord.Interaction, name: str) -> discord.InteractionMessage:
+    async def team_create(self, interaction: discord.Interaction[FuryBot], name: str) -> discord.InteractionMessage:
         """|coro|
 
         Create a team.
@@ -122,7 +120,7 @@ class Teams(BaseCog):
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.describe(team='The team you want to manage.')
     async def team_manage(
-        self, interaction: discord.Interaction, team: Optional[TEAM_TRANSFORM]
+        self, interaction: discord.Interaction[FuryBot], team: Optional[TEAM_TRANSFORM]
     ) -> Optional[discord.InteractionMessage]:
         """|coro|
 
@@ -155,7 +153,7 @@ class Teams(BaseCog):
     )
     async def scrim_create(
         self,
-        interaction: discord.Interaction,
+        interaction: discord.Interaction[FuryBot],
         team: FRONT_END_TEAM_TRANSFORM,
         when: Annotated[TimeTransformer, TimeTransformer('n/a')],
         per_team: app_commands.Range[int, 2, 10],
@@ -190,7 +188,9 @@ class Teams(BaseCog):
             content=f'A scrim for {scrim.scheduled_for_formatted()} has been created against {team.display_name}.'
         )
 
-    async def _team_get_func(self, interaction: discord.Interaction, member: discord.Member) -> discord.InteractionMessage:
+    async def _team_get_func(
+        self, interaction: discord.Interaction[FuryBot], member: discord.Member
+    ) -> discord.InteractionMessage:
         assert interaction.guild
 
         await interaction.response.defer()
@@ -230,7 +230,7 @@ class Teams(BaseCog):
         return await self._team_get_func(interaction, member)
 
     async def team_get_context_menu(
-        self, interaction: discord.Interaction, member: discord.Member
+        self, interaction: discord.Interaction[FuryBot], member: discord.Member
     ) -> discord.InteractionMessage:
         """|coro|
 

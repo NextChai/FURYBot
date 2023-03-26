@@ -116,7 +116,7 @@ class ShortTime:
         self.dt = dt.replace(tzinfo=datetime.timezone.utc)
 
     @classmethod
-    async def convert(cls: Type[STT], interaction: discord.Interaction, argument: str) -> STT:
+    async def convert(cls: Type[STT], interaction: discord.Interaction[FuryBot], argument: str) -> STT:
         """|coro|
 
         A method used to transform the given argument to a :class:`ShortTime` object.
@@ -171,7 +171,7 @@ class HumanTime:
         self._past = dt < now
 
     @classmethod
-    async def transform(cls: Type[HTT], interaction: discord.Interaction, argument: str) -> HTT:
+    async def transform(cls: Type[HTT], interaction: discord.Interaction[FuryBot], argument: str) -> HTT:
         """|coro|
 
         A method used to convert the given argument to a :class:`HumanTime` object.
@@ -276,7 +276,7 @@ class TimeTransformer(app_commands.Transformer):
         self.arg = remaining or self.default
         return self
 
-    async def transform(self, interaction: discord.Interaction, value: Any) -> Self:
+    async def transform(self, interaction: discord.Interaction[FuryBot], value: Any) -> Self:
         """|coro|
 
         Transform the user\'s argument into a :class:`TimeTransformer` object.

@@ -27,7 +27,7 @@ __all__: Tuple[str, ...] = ('ErrorHandler',)
 _log = logging.getLogger(__name__)
 
 
-def _resolve_role_mention(interaction: discord.Interaction, role: Union[int, str]) -> str:
+def _resolve_role_mention(interaction: discord.Interaction[FuryBot], role: Union[int, str]) -> str:
     assert interaction.guild is not None
 
     if isinstance(role, int):
@@ -172,7 +172,11 @@ class ExceptionManager:
             await webhook.send(embeds=embeds, **kwargs)
 
     async def add_error(
-        self, *, error: Exception, target: Optional[Union[Context, discord.Interaction]], event_name: Optional[str] = None
+        self,
+        *,
+        error: Exception,
+        target: Optional[Union[Context, discord.Interaction[FuryBot]]],
+        event_name: Optional[str] = None,
     ) -> None:
         """|coro|
 
@@ -283,7 +287,7 @@ class ErrorHandler:
         self,
         exception: Exception,
         *,
-        origin: Union[Context, discord.Interaction],
+        origin: Union[Context, discord.Interaction[FuryBot]],
         sender: Optional[Callable[..., Awaitable[Optional[discord.WebhookMessage]]]] = None,
         event_name: Optional[Any] = None,
     ) -> None:
@@ -306,7 +310,7 @@ class ErrorHandler:
 
         await self.exception_manager.add_error(error=exception, target=origin, event_name=event_name)
 
-    async def on_tree_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+    async def on_tree_error(self, interaction: discord.Interaction[FuryBot], error: app_commands.AppCommandError) -> None:
         """|coro|
 
         Called when there's an exception raised when the CommandTree has reached an error state.

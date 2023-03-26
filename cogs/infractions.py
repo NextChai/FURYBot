@@ -94,7 +94,7 @@ class Infractions(BaseCog):
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.guild_only()
     @app_commands.describe(channel='The channel to set for notifications.')
-    async def infraction_channel(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
+    async def infraction_channel(self, interaction: discord.Interaction[FuryBot], channel: discord.TextChannel) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -130,7 +130,7 @@ class Infractions(BaseCog):
             app_commands.Choice(name='14 days', value=60 * 60 * 24 * 14),
         ],
     )
-    async def infraction_time(self, interaction: discord.Interaction, type: InfractionType, time: int) -> None:
+    async def infraction_time(self, interaction: discord.Interaction[FuryBot], type: InfractionType, time: int) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -184,7 +184,7 @@ class Infractions(BaseCog):
 
     @infraction_moderator.command(name='add', description='Add a moderator to your list of moderators.')
     @app_commands.describe(member='The member to add as a moderator.')
-    async def infraction_moderator_add(self, interaction: discord.Interaction, member: discord.Member) -> None:
+    async def infraction_moderator_add(self, interaction: discord.Interaction[FuryBot], member: discord.Member) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -203,7 +203,7 @@ class Infractions(BaseCog):
 
     @infraction_moderator.command(name='remove', description='Remove a moderator to your list of moderators.')
     @app_commands.describe(member='The member to remove as a moderator.')
-    async def infraction_moderator_remove(self, interaction: discord.Interaction, member: discord.Member) -> None:
+    async def infraction_moderator_remove(self, interaction: discord.Interaction[FuryBot], member: discord.Member) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -219,7 +219,7 @@ class Infractions(BaseCog):
 
     @infraction_moderator_role.command(name='add', description='Add a moderator role to your list of moderators.')
     @app_commands.describe(role='The role to add as a moderator role.')
-    async def infraction_moderator_role_add(self, interaction: discord.Interaction, role: discord.Role) -> None:
+    async def infraction_moderator_role_add(self, interaction: discord.Interaction[FuryBot], role: discord.Role) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -238,7 +238,7 @@ class Infractions(BaseCog):
 
     @infraction_moderator_role.command(name='remove', description='Remove a moderator role to your list of moderators.')
     @app_commands.describe(role='The role to remove as a moderator role.')
-    async def infraction_moderator_role_remove(self, interaction: discord.Interaction, role: discord.Role) -> None:
+    async def infraction_moderator_role_remove(self, interaction: discord.Interaction[FuryBot], role: discord.Role) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -254,7 +254,9 @@ class Infractions(BaseCog):
 
     @infraction_ignored_channel.command(name='add', description='Add an ignored channel to the infraction manager.')
     @app_commands.describe(channel='The channel to add.')
-    async def infraction_ignored_channel_add(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
+    async def infraction_ignored_channel_add(
+        self, interaction: discord.Interaction[FuryBot], channel: discord.TextChannel
+    ) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -274,9 +276,9 @@ class Infractions(BaseCog):
         )
 
     @infraction_ignored_channel.command(name='remove', description='Remove an ignored channel to the infraction manager.')
-    @app_commands.describe(channel='The channel to remove.')
+    @app_commands.describe(discord.Interaction[FuryBot]l to remove.')
     async def infraction_ignored_channel_remove(
-        self, interaction: discord.Interaction, channel: discord.TextChannel
+        self, interaction: discord.Interaction[FuryBot], channel: discord.TextChannel
     ) -> None:
         assert interaction.guild
 
@@ -293,9 +295,9 @@ class Infractions(BaseCog):
             f'I\'ve removed {channel.mention} as an ignored channel.', ephemeral=True
         )
 
-    @infraction_allowed_link.command(name='add', description='Add an allowed link to the link filter.')
+    @infraction_allowed_link.command(name='add', description=discord.Interaction[FuryBot]k to the link filter.')
     @app_commands.describe(link='The link to add.')
-    async def infraction_allowed_link_add(self, interaction: discord.Interaction, link: str) -> None:
+    async def infraction_allowed_link_add(self, interaction: discord.Interaction[FuryBot], link: str) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -313,9 +315,9 @@ class Infractions(BaseCog):
         self.bot.link_filter._allowed_links.pop(interaction.guild.id, None)
         return await interaction.response.send_message(f'I\'ve added `{link}` as an allowed link.', ephemeral=True)
 
-    @infraction_allowed_link.command(name='remove', description='Remove an allowed link to the link filter.')
+    @infraction_allowed_link.command(name='remove', description=discord.Interaction[FuryBot]link to the link filter.')
     @app_commands.describe(link='The link to remove.')
-    async def infraction_allowed_link_remove(self, interaction: discord.Interaction, link: str) -> None:
+    async def infraction_allowed_link_remove(self, interaction: discord.Interaction[FuryBot], link: str) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -330,9 +332,9 @@ class Infractions(BaseCog):
         self.bot.link_filter._allowed_links.pop(interaction.guild.id, None)
         return await interaction.response.send_message(f'I\'ve removed `{link}` as an allowed link.', ephemeral=True)
 
-    @infraction_profanity.command(name='add', description='Add a profane word to the profanity filter.')
+    @infraction_profanity.command(name='add', description=discord.Interaction[FuryBot] to the profanity filter.')
     @app_commands.describe(term='The term to add.')
-    async def infraction_profanity_add(self, interaction: discord.Interaction, term: str) -> None:
+    async def infraction_profanity_add(self, interaction: discord.Interaction[FuryBot], term: str) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -395,9 +397,9 @@ class Infractions(BaseCog):
             content=f'Done. I\'ve created a new profanity filter for you and added the term `{term}`.'
         )
 
-    @infraction_profanity.command(name='remove', description='Remove a profane word to the profanity filter.')
+    @infraction_profanity.command(name='remove', description=discord.Interaction[FuryBot]ord to the profanity filter.')
     @app_commands.describe(term='The term to remove.')
-    async def infraction_profanity_remove(self, interaction: discord.Interaction, term: str) -> None:
+    async def infraction_profanity_remove(self, interaction: discord.Interaction[FuryBot], term: str) -> None:
         assert interaction.guild
 
         async with self.bot.safe_connection() as connection:
@@ -422,9 +424,9 @@ class Infractions(BaseCog):
 
     @app_commands.command(name='get_links', description='Get the links from a given text.')
     @app_commands.default_permissions(manage_messages=True)
-    @app_commands.describe(phrase='The phrase to check for links.')
+    @app_commands.describe(phrase='The phradiscord.Interaction[FuryBot]ks.')
     @app_commands.guild_only()
-    async def get_links(self, interaction: discord.Interaction, phrase: str) -> None:
+    async def get_links(self, interaction: discord.Interaction[FuryBot], phrase: str) -> None:
         assert interaction.guild
 
         links = await self.bot.link_filter.get_links(phrase, guild_id=interaction.guild.id)
