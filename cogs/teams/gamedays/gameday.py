@@ -61,14 +61,15 @@ def _get_attendance_voting_end_time(gameday_starts_at: datetime.datetime) -> dat
 
 
 def _get_next_gameday_time(now: datetime.datetime, /, *, weekday: Weekday, game_time: datetime.time) -> datetime.datetime:
+    # The game_time variable was given in EST time, so we need to make sure to convert it to UTC time which is what the
+    # bot works off of.
+
+    # Convert the game_time to UTC time.
+    game_time = datetime.datetime.combine(datetime.date.today(), game_time).astimezone(datetime.timezone.utc).time()
+
     # Calculate the next occurrence of the given weekday
     days_until_gameday = (weekday.value - now.weekday() - 1) % 7
     next_gameday = now + datetime.timedelta(days=days_until_gameday)
-
-    next_gameday = next_gameday.replace(
-        hour=game_time.hour, minute=game_time.minute, second=game_time.second, microsecond=game_time.microsecond
-    )
-
     return next_gameday
 
 
@@ -155,7 +156,7 @@ class GamedayMember(TeamMemberable):
 
     @property
     def is_attending(self) -> bool:
-        return bool(self.reason)
+        return not bool(self.reason)
 
     @property
     def gameday(self) -> Optional[Gameday]:
@@ -301,6 +302,8 @@ class Gameday(Teamable):
         attendance_voting_message_id: Optional[int] = None,
         scoreboard_message_id: Optional[int] = None,
         images: List[GamedayImage] = [],
+        attendance_voting_start: datetime.datetime,
+        attendance_voting_end: datetime.datetime,
     ) -> None:
         self.bot: FuryBot = bot
         self.id: int = id
@@ -319,8 +322,8 @@ class Gameday(Teamable):
         # The message ID of the advance gameday notification message, also known as the panel
         # that determines who is and isn't coming to the gameday.
         self.attendance_voting_message_id: Optional[int] = attendance_voting_message_id
-        self.attendance_voting_start: datetime.datetime = _get_attendance_voting_start_time(self.started_at)
-        self.attendance_voting_end: datetime.datetime = _get_attendance_voting_end_time(self.started_at)
+        self.attendance_voting_start: datetime.datetime = attendance_voting_start
+        self.attendance_voting_end: datetime.datetime = attendance_voting_end
 
         self.scoreboard_message_id: Optional[int] = scoreboard_message_id
         self.scoreboard: ScoreboardPanel = ScoreboardPanel(self)
@@ -349,18 +352,46 @@ class Gameday(Teamable):
         team_id: int,
         starts_at: datetime.datetime,
     ) -> Self:
+        # If there's under 24 hours but greater than 6 hours until the gameday starts, we can start the voting process now with automatic sub finding enabled
+        # If there's under 24 hours but less than 5 hours until the gameday starts, we can start the vorint process now with automatic sub finding disabled.
+        # If there's more than 24 hours BUT the normal voting start time is in the past, we start it now and set it to end 5 hours from now.
+
+        disable_automatic_sub_finding = False
+        now = discord.utils.utcnow()
+        hours_until_gameday_starts = (starts_at - now).total_seconds() / 3600
+        if hours_until_gameday_starts < 24:
+            # Less than 24 hours, we need to start the voting process now
+            voting_start_at = now
+            voting_end_at = now + datetime.timedelta(hours=5)
+
+            if hours_until_gameday_starts > 7:
+                # There's less than 6 hours, so we need to disable automatic sub finding
+                disable_automatic_sub_finding = True
+        else:
+            # More than 24 hours, we can start the voting process at the normal time
+            voting_start_at = _get_attendance_voting_start_time(starts_at)
+            voting_end_at = _get_attendance_voting_end_time(starts_at)
+
         async with bot.safe_connection() as connection:
             data = await connection.fetchrow(
-                'INSERT INTO teams.gamedays (bucket_id, guild_id, team_id, started_at) VALUES ($1, $2, $3, $4) RETURNING *',
+                'INSERT INTO teams.gamedays (bucket_id, guild_id, team_id, started_at, attendance_voting_start, attendance_voting_end) '
+                'VALUES ($1, $2, $3, $4, $5, $6) '
+                'RETURNING *',
                 gameday_bucket_id,
                 guild_id,
                 team_id,
                 starts_at,
+                voting_start_at,
+                voting_end_at,
             )
             assert data
 
         self = cls(bot=bot, **dict(data))
         self.bucket.add_gameday(self)
+
+        if disable_automatic_sub_finding and self.bucket.automatic_sub_finding is True:
+            # We have a condition where we need to disable automatic sub finding
+            await self.bucket.edit(automatic_sub_finding=False)
 
         # Let's spawn some tasks to start this gameday here
         timer_manager = self.bot.timer_manager
@@ -368,29 +399,14 @@ class Gameday(Teamable):
             # Create a timer for when the gameday starts.
             default_timer_args = (guild_id, team_id, gameday_bucket_id, self.id)
 
+            print(starts_at)
+            print(self.attendance_voting_start)
+            print(self.attendance_voting_end)
+
             await timer_manager.create_timer(starts_at, 'gameday_start', *default_timer_args)
 
-            now = discord.utils.utcnow()
-            if now > self.attendance_voting_start:
-                # We didn't have enough time to start voting normally, so we can start it now
-                await timer_manager.create_timer(now, 'attendance_voting_start', *default_timer_args)
-
-                # If we don't have 5 hours to do the entire vote (because the gameday starts before then), then we need to make
-                # the vote end 1 hour before the gameday starts.
-                if now + datetime.timedelta(hours=5) > starts_at:
-                    await timer_manager.create_timer(
-                        starts_at - datetime.timedelta(hours=1), 'attendance_voting_end', *default_timer_args
-                    )
-                else:
-                    await timer_manager.create_timer(
-                        now + datetime.timedelta(hours=5), 'attendance_voting_end', *default_timer_args
-                    )
-            else:
-                await timer_manager.create_timer(
-                    self.attendance_voting_start, 'attendance_voting_start', *default_timer_args
-                )
-
-                await timer_manager.create_timer(self.attendance_voting_end, 'attendance_voting_end', *default_timer_args)
+            await timer_manager.create_timer(self.attendance_voting_start, 'attendance_voting_start', *default_timer_args)
+            await timer_manager.create_timer(self.attendance_voting_end, 'attendance_voting_end', *default_timer_args)
 
         return self
 
@@ -429,7 +445,7 @@ class Gameday(Teamable):
 
     @property
     def ongoing(self) -> bool:
-        return bool(self.ended_at)
+        return not bool(self.ended_at)
 
     def add_member(self, member: GamedayMember) -> None:
         self._members[member.member_id] = member
@@ -534,6 +550,19 @@ class Gameday(Teamable):
             self.scoreboard_message_id = scoreboard_message_id
 
         await query_builder(self.bot)
+
+    async def delete(self) -> None:
+        async with self.bot.safe_connection() as connection:
+            await connection.execute('DELETE FROM teams.gamedays WHERE id = $1', self.id)
+
+            # We need to delete the timers that have the following args in their extras field: (guild_id, team_id, gameday_bucket_id, self.id)
+            # extra looks like: {"args": [guild_id, team_id, gameday_bucket_id, gameday_id], "kwargs": {}}
+            await connection.execute(
+                'DELETE FROM timers WHERE extra @> $1',
+                {'args': [self.guild_id, self.team_id, self.bucket.id, self.id]},
+            )
+
+        self.bucket.remove_gameday(self.id)
 
     async def end(self, *, when: Optional[datetime.datetime] = None) -> None:
         when = when or discord.utils.utcnow()
@@ -742,3 +771,15 @@ class GamedayBucket(Teamable):
             self.automatic_sub_finding = automatic_sub_finding
 
         await query_builder(self.bot)
+
+    async def delete(self) -> None:
+        async with self.bot.safe_connection() as connection:
+            await connection.execute('DELETE FROM teams.gameday_buckets WHERE id = $1', self.id)
+
+            # We need to delete all timers that contain this gameday bucket
+            # The timer args are: (guild_id, team_id, gameday_bucket_id, gameday_id), so we need to check the 3rd
+            # element for the bucket ID and delete all timers that match. Remember that the args in a JSONB field
+            # named extra: {"args": [guild_id, team_id, gameday_bucket_id, gameday_id], "kwargs": {}}
+            await connection.execute('DELETE FROM timers WHERE extra->>\'args\' LIKE $1', f'%{self.id}%')
+
+        self.bot.remove_gameday_bucket(self.guild_id, self.team_id)
