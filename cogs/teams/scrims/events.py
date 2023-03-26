@@ -23,14 +23,17 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import discord
-from typing import TYPE_CHECKING, Tuple
-from utils import BaseCog
 import datetime
+from typing import TYPE_CHECKING, Tuple
+
+import discord
 from discord.ext import commands
+
+from utils import BaseCog
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
     from .scrim import Scrim, ScrimStatus
 
 __all__: Tuple[str, ...] = ('ScrimEventListener',)

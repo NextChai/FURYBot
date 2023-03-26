@@ -43,9 +43,9 @@ class ScrimStatus(enum.Enum):
     pending_host = 'pending_host'
 
 
+from .events import *
 from .persistent import *
 from .scrim import *
-from .events import *
 
 if TYPE_CHECKING:
     from bot import FuryBot
