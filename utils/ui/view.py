@@ -106,7 +106,7 @@ def find_home(view: BaseView) -> Optional[BaseView]:
 
 class _OptionalViewMixinKwargs(TypedDict):
     timeout: NotRequired[Optional[float]]
-    parent: NotRequired[BaseView]
+    parent: NotRequired[Optional[BaseView]]
 
 
 class BaseViewKwargs(_OptionalViewMixinKwargs):
