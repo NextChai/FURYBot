@@ -106,12 +106,12 @@ initial_extensions: Tuple[str, ...] = (
 
 
 def cache_loader(flag_name: str) -> Callable[[CacheFunc[P, T]], CacheFunc[P, Optional[T]]]:
-    def wrapped(func: CacheFunc[P, T]):
+    def wrapped(func: CacheFunc[P, T]) -> CacheFunc[P, Optional[T]]:
         @functools.wraps(func)
         async def call_func(self: FuryBot, connection: ConnectionType, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
             flag = _parse_environ_boolean(f'{flag_name}_CACHE')
             if not flag:
-                return
+                return None
 
             _log.info('Loading %s cache from func %s', flag_name, func.__name__)
 
