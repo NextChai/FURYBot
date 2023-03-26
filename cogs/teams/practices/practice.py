@@ -582,7 +582,7 @@ class Practice(Teamable):
                 value=f'The following did not go to the practice and did not mark themselves as excused: {missing_members_mentions}',
             )
 
-        ranking = await self.team.fetch_practice_rank()
+        ranking = self.team.get_practice_rank()
         embed.add_field(
             name='Practice Time Rank',
             value=f'Out of {len(self.bot.get_teams(self.guild_id))} teams, this team is ranked **#{ranking}** in practice time.',

@@ -47,6 +47,7 @@ from utils import (
 
 from . import ScrimStatus
 from .team import TeamMember
+from .gamedays import GamedayBucketPanel
 
 if TYPE_CHECKING:
     from .practices import Practice, PracticeMember
@@ -1321,6 +1322,19 @@ class TeamView(BaseView):
     async def practices(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Manage the team\'s practices."""
         view = self.create_child(TeamPracticesView, self.team)
+        return await interaction.response.edit_message(embed=view.embed, view=view)
+
+    @discord.ui.button(label='Gameday Management')
+    @default_button_doc_string
+    async def gameday(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        """Manage the team\'s gameday."""
+        bucket = self.team.get_gameday_bucket()
+
+        if bucket is None:
+            # We need to create a new bucket.
+            raise NotImplementedError
+
+        view = self.create_child(GamedayBucketPanel, bucket)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
     @discord.ui.button(label='Delete Team', style=discord.ButtonStyle.danger)

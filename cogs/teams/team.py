@@ -34,8 +34,6 @@ from typing_extensions import Self
 from utils import QueryBuilder, human_join
 
 if TYPE_CHECKING:
-    import asyncpg
-
     from bot import FuryBot
 
     from .gamedays.gameday import GamedayBucket
@@ -575,38 +573,20 @@ class Team:
 
         return member_absences.most_common()
 
-    # TODO: Refactor to not use database
-    async def fetch_practice_rank(self, *, connection: Optional[asyncpg.Connection[asyncpg.Record]] = None) -> int:
+    async def get_practice_rank(self) -> int:
         """|coro|
 
-        Fetches the rank of this team in the practice leaderboard.
-
-        Parameters
-        ----------
-        connection: Optional[:class:`asyncpg.Connection`]
-            The connection to the database.
+        Gets the rank of this team in the practice leaderboard.
 
         Returns
         -------
         :class:`int`
             The rank of the team in the practice leaderboard.
         """
-        query = """
-        WITH team_time AS (
-            SELECT team_id, SUM(EXTRACT(EPOCH FROM (COALESCE(ended_at, NOW()) - started_at))) as total_time
-            FROM teams.practice
-            GROUP BY team_id
-        )
-        SELECT team_id, rank() OVER (ORDER BY total_time DESC) as ranking
-        FROM team_time
-        WHERE team_id = $1;
-        """
-
-        awaitable = connection or self.bot.pool
-        rank = await awaitable.fetchrow(query, self.id)
-        assert rank
-
-        return rank['ranking']
+        # Count up all the teams scores, rank them, then get the rank of the team we're looking for
+        teams = self.bot.get_teams(self.guild_id)
+        team_scores = [(team, team.total_points) for team in teams]
+        return sorted(team_scores, key=lambda item: item[1], reverse=True).index((self, self.total_points)) + 1
 
     async def sync(self) -> None:
         """|coro|

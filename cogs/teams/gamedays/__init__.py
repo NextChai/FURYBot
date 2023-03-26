@@ -25,3 +25,11 @@ from __future__ import annotations
 
 from .gameday import *
 from .panel import *
+from .events import *
+
+if TYPE_CHECKING:
+    from bot import FuryBot
+
+
+async def setup(bot: FuryBot):
+    await bot.add_cog(GamedayEventListener(bot))
