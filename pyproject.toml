@@ -10,6 +10,7 @@ reportUnusedImport = "error"
 reportUnnecessaryTypeIgnoreComment = "error"
 reportIncompatibleMethodOverride = "none"
 reportPrivateUsage = "none"
+reportImportCycles = "none"
 exclude = [
     "**/__pycache__",
     '.github',

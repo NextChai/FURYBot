@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import datetime
 import re
-from typing import Any, Optional, Tuple, Type, TypeVar
+from typing import Any, Optional, Tuple, Type, TypeVar, TYPE_CHECKING
 
 import discord
 import parsedatetime
@@ -35,6 +35,9 @@ from discord import app_commands
 from typing_extensions import Self
 
 from .errors import BadArgument
+
+if TYPE_CHECKING:
+    from bot import FuryBot
 
 # Monkey patch mins and secs into the units
 units: Any = parsedatetime.pdtLocales['en_US'].units  # type: ignore

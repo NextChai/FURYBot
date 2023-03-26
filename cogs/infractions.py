@@ -276,7 +276,7 @@ class Infractions(BaseCog):
         )
 
     @infraction_ignored_channel.command(name='remove', description='Remove an ignored channel to the infraction manager.')
-    @app_commands.describe(discord.Interaction[FuryBot]l to remove.')
+    @app_commands.describe(channel='The channel to remove.')
     async def infraction_ignored_channel_remove(
         self, interaction: discord.Interaction[FuryBot], channel: discord.TextChannel
     ) -> None:
@@ -295,7 +295,7 @@ class Infractions(BaseCog):
             f'I\'ve removed {channel.mention} as an ignored channel.', ephemeral=True
         )
 
-    @infraction_allowed_link.command(name='add', description=discord.Interaction[FuryBot]k to the link filter.')
+    @infraction_allowed_link.command(name='add', description='Add a link to the link filter.')
     @app_commands.describe(link='The link to add.')
     async def infraction_allowed_link_add(self, interaction: discord.Interaction[FuryBot], link: str) -> None:
         assert interaction.guild
@@ -315,7 +315,7 @@ class Infractions(BaseCog):
         self.bot.link_filter._allowed_links.pop(interaction.guild.id, None)
         return await interaction.response.send_message(f'I\'ve added `{link}` as an allowed link.', ephemeral=True)
 
-    @infraction_allowed_link.command(name='remove', description=discord.Interaction[FuryBot]link to the link filter.')
+    @infraction_allowed_link.command(name='remove', description='The link to remove from the link filter.')
     @app_commands.describe(link='The link to remove.')
     async def infraction_allowed_link_remove(self, interaction: discord.Interaction[FuryBot], link: str) -> None:
         assert interaction.guild
@@ -332,7 +332,7 @@ class Infractions(BaseCog):
         self.bot.link_filter._allowed_links.pop(interaction.guild.id, None)
         return await interaction.response.send_message(f'I\'ve removed `{link}` as an allowed link.', ephemeral=True)
 
-    @infraction_profanity.command(name='add', description=discord.Interaction[FuryBot] to the profanity filter.')
+    @infraction_profanity.command(name='add', description='Add a term to the profanity filter.')
     @app_commands.describe(term='The term to add.')
     async def infraction_profanity_add(self, interaction: discord.Interaction[FuryBot], term: str) -> None:
         assert interaction.guild
@@ -397,7 +397,7 @@ class Infractions(BaseCog):
             content=f'Done. I\'ve created a new profanity filter for you and added the term `{term}`.'
         )
 
-    @infraction_profanity.command(name='remove', description=discord.Interaction[FuryBot]ord to the profanity filter.')
+    @infraction_profanity.command(name='remove', description='Remove a word to the profanity filter.')
     @app_commands.describe(term='The term to remove.')
     async def infraction_profanity_remove(self, interaction: discord.Interaction[FuryBot], term: str) -> None:
         assert interaction.guild

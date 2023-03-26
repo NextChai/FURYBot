@@ -992,7 +992,7 @@ class TeamPracticeMemberView(BaseView):
 
     @discord.ui.button(label='Delete Member From Practice')
     @default_button_doc_string
-    async def delete_member_from_practice(discord.Interaction[FuryBot]
+    async def delete_member_from_practice(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> None:
         """Deletes the given member from this practice and acts if they never attended in the first place."""
@@ -1093,7 +1093,9 @@ class TeamPracticeView(BaseView):
 
     @discord.ui.button(label="Manage Practice Members")
     @default_button_doc_string
-    async def manage_practice_members(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+    async def manage_practice_members(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> None:
         """Manage a specific member in this practice."""
         UserSelect(
             after=self._manage_practice_members_after, parent=self, placeholder="Select a member to manage...", max_values=1

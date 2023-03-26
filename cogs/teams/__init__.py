@@ -215,7 +215,9 @@ class Teams(BaseCog):
         return await interaction.edit_original_response(embed=embed)
 
     @team.command(name='get', description='Get the team status of a member.')
-    async def team_get(self, interaction: discord.Interaction, member: discord.Member) -> discord.InteractionMessage:
+    async def team_get(
+        self, interaction: discord.Interaction[FuryBot], member: discord.Member
+    ) -> discord.InteractionMessage:
         """|coro|
 
         Allows you to get the team status of a member.

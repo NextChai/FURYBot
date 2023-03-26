@@ -53,9 +53,7 @@ class LinkFilter(URLExtract):
 
         allowed_links = self._allowed_links[guild_id]
         for link in links:
-            if any(
-                [await self.bot.wrap(re.findall, allowed_link, link) for allowed_link in allowed_links]  # pyright: ignore
-            ):
+            if any([await self.bot.wrap(re.findall, allowed_link, link) for allowed_link in allowed_links]):
                 links.remove(link)
 
         return links
