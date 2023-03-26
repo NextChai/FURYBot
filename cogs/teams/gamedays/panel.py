@@ -163,7 +163,26 @@ class CreateGamedayBucketPanel(BaseView):
     async def create_gameday_bucket(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> None:
-        raise NotImplementedError
+        modal = AfterModal(
+            self.bot,
+            self._get_gametime_after,
+            discord.ui.TextInput(
+                label='Enter Time and Date.',
+                placeholder='Format: Weekday Hour:Minute AM/PM. Example: Wednesday 4:00 PM',
+                required=True,
+            ),
+            discord.ui.TextInput(
+                label='Members On a Team During a Match',
+                placeholder='How many members play on a team during a match?',
+            ),
+            discord.ui.TextInput(
+                label="Best of?", placeholder='What is the best of? Example: 5 (first team to get to 3 wins)'
+            ),
+            title='Create Gameday Bucket',
+            timeout=None,
+        )
+
+        return await interaction.response.send_modal(modal)
 
 
 class SelectGameday(MultiSelector['GamedayBucketPanel', 'Gameday']):
