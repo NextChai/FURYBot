@@ -56,8 +56,32 @@ class GamedayEventListener(BaseCog):
 
     @commands.Cog.listener('on_gameday_start_timer_complete')
     async def on_gameday_start(self, guild_id: int, team_id: int, gameday_bucket_id: int, gameday_id: int) -> None:
-        # TODO: Launch the scoreboard
-        raise NotImplementedError
+        bucket = self.bot.get_gameday_bucket(guild_id, team_id)
+        if bucket is None:
+            _log.debug(
+                'Ignoring bucket to guild %s team %s bucket id %s in gameday start timer complete',
+                guild_id,
+                team_id,
+                gameday_bucket_id,
+            )
+            return
+
+        gameday = bucket.get_gameday(gameday_id)
+        if gameday is None:
+            _log.debug(
+                'Gameday %s not found in bucket %s to guild %s in team %s in gameday start timer complete',
+                gameday_id,
+                gameday_bucket_id,
+                guild_id,
+                team_id,
+            )
+            return
+
+        # Let's send the scoreboard to the team channel
+        channel = gameday.team.text_channel
+        message = await channel.send(embed=gameday.scoreboard.embed, view=gameday.scoreboard)
+
+        await gameday.edit(scoreboard_message_id=message.id)
 
     @commands.Cog.listener('on_attendance_voting_start_timer_complete')
     async def on_attendance_voting_start(self, guild_id: int, team_id: int, gameday_bucket_id: int, gameday_id: int) -> None:
@@ -87,7 +111,7 @@ class GamedayEventListener(BaseCog):
             )
             return
 
-        view = GamedayAttendanceView(self.bot, gameday)
+        view = GamedayAttendanceView(gameday)
 
         channel = gameday.team.text_channel
         message = await channel.send(embed=view.embed, view=view)
@@ -149,7 +173,6 @@ class GamedayEventListener(BaseCog):
             )
 
         gameday.inject_metadata_into_embed(embed)
-
         await partial_attedance_message.edit(view=None)
 
         captain_mentions = [r.mention for r in gameday.team.captain_roles]

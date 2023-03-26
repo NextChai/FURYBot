@@ -32,7 +32,8 @@ from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, Type, Un
 import discord
 from typing_extensions import Self
 
-from utils import QueryBuilder
+from utils import QueryBuilder, image_from_urls, image_to_file
+from .persistent.scoreboard import ScoreboardPanel
 
 if TYPE_CHECKING:
     from bot import FuryBot, ConnectionType
@@ -192,6 +193,33 @@ class GamedayMember(TeamMemberable):
         await query(self.bot)
 
 
+@dataclasses.dataclass()
+class GamedayImage(Teamable):
+    bot: FuryBot
+    id: int
+    gameday_id: int
+    team_id: int
+    guild_id: int
+    image_url: str
+    uploader_id: int
+    uploaded_at: datetime.datetime
+
+    def _get_bot(self) -> FuryBot:
+        return self.bot
+
+    def _get_guild_id(self) -> int:
+        return self.guild_id
+
+    def _get_team_id(self) -> int:
+        return self.team_id
+
+    @property
+    def bucket(self) -> GamedayBucket:
+        bucket = self.bot.get_gameday_bucket(self.guild_id, self.team_id)
+        assert bucket is not None
+        return bucket
+
+
 class Gameday(Teamable):
     """Represents a gameday for a given team. A gameday is where a team gets together in order to play their e-sports games.
 
@@ -243,6 +271,8 @@ class Gameday(Teamable):
         ended_at: Optional[datetime.datetime] = None,
         members: Dict[int, GamedayMember] = {},
         advance_gameday_notification_message_id: Optional[int] = None,
+        scoreboard_message_id: Optional[int] = None,
+        images: List[GamedayImage] = [],
     ) -> None:
         self.bot: FuryBot = bot
         self.id: int = id
@@ -263,6 +293,14 @@ class Gameday(Teamable):
         self.attendance_voting_message_id: Optional[int] = advance_gameday_notification_message_id
         self.attendance_voting_start: datetime.datetime = _get_attendance_voting_start_time(self.started_at)
         self.attendance_voting_end: datetime.datetime = _get_attendance_voting_end_time(self.started_at)
+
+        self.scoreboard_message_id: Optional[int] = scoreboard_message_id
+        self.scoreboard: ScoreboardPanel = ScoreboardPanel(self)
+
+        if self.scoreboard_message_id and self.ongoing:
+            bot.add_view(self.scoreboard, message_id=self.scoreboard_message_id)
+
+        self.images: List[GamedayImage] = images
 
     def _get_bot(self) -> FuryBot:
         return self.bot
@@ -321,6 +359,14 @@ class Gameday(Teamable):
 
         return {row['member_id']: GamedayMember(bot=bot, **dict(row)) for row in data}
 
+    @classmethod
+    async def fetch_images(
+        cls: Type[Self], bot: FuryBot, gameday_id: int, *, connection: ConnectionType
+    ) -> List[GamedayImage]:
+        data = await connection.fetch('SELECT * FROM teams.gameday_images WHERE gameday_id = $1', gameday_id)
+
+        return [GamedayImage(bot=bot, **dict(row)) for row in data]
+
     @property
     def subs_needed(self) -> int:
         return self.bucket.members_on_team - len(self.get_members())
@@ -334,6 +380,10 @@ class Gameday(Teamable):
     @property
     def is_full(self) -> bool:
         return self.subs_needed <= 0
+
+    @property
+    def ongoing(self) -> bool:
+        return bool(self.ended_at)
 
     def add_member(self, member: GamedayMember) -> None:
         self._members[member.member_id] = member
@@ -352,6 +402,20 @@ class Gameday(Teamable):
 
     def get_members_not_attending(self) -> Dict[int, GamedayMember]:
         return {k: v for k, v in self._members.items() if not v.is_attending}
+
+    def add_image(self, image: GamedayImage) -> None:
+        self.images.append(image)
+
+    def remove_image(self, image: GamedayImage) -> None:
+        self.images.remove(image)
+
+    # A function to determine if the team has won or lost the gameday
+    # based on the score of the gameday and the bucket's "best_of" value.
+    def has_won(self) -> bool:
+        return self.wins >= self.bucket.best_of
+
+    def has_lost(self) -> bool:
+        return self.losses >= self.bucket.best_of
 
     def inject_metadata_into_embed(self, embed: discord.Embed) -> None:
         attending_members = self.get_members_attending()
@@ -388,6 +452,9 @@ class Gameday(Teamable):
             inline=False,
         )
 
+        if self.images:
+            embed.set_image(url='attachment://gameday.png')
+
     async def edit(
         self,
         *,
@@ -395,6 +462,7 @@ class Gameday(Teamable):
         wins: int = MISSING,
         losses: int = MISSING,
         ended_at: datetime.datetime = MISSING,
+        scoreboard_message_id: int = MISSING,
     ) -> None:
         query_builder = QueryBuilder('teams.gamedays')
         query_builder.add_condition('id', self.id)
@@ -415,7 +483,39 @@ class Gameday(Teamable):
             query_builder.add_arg('ended_at', ended_at)
             self.ended_at = ended_at
 
+        if scoreboard_message_id is not MISSING:
+            query_builder.add_arg('scoreboard_message_id', scoreboard_message_id)
+            self.scoreboard_message_id = scoreboard_message_id
+
         await query_builder(self.bot)
+
+    async def end(self, *, when: Optional[datetime.datetime] = None) -> None:
+        when = when or discord.utils.utcnow()
+
+        # And let's set the ended_at timestamp.
+        await self.edit(ended_at=when)
+
+        if self.scoreboard_message_id:
+            channel = self.team.text_channel
+            message = channel.get_partial_message(self.scoreboard_message_id)
+
+            await message.edit(view=None)
+
+            captain_mentions = ', '.join([r.mention for r in self.team.captain_roles])
+
+            # TODO: Maybe provide a better embed?
+            await message.reply(
+                content=f'{captain_mentions} The gameday has ended.',
+                allowed_mentions=discord.AllowedMentions(roles=True),
+            )
+
+    async def merge_gameday_images(self) -> Optional[discord.File]:
+        if not self.images:
+            return None
+
+        image = await image_from_urls(self.bot, [image.image_url for image in self.images], images_per_row=2)
+        file = image_to_file(image, filename='gameday.png', description='Gameday Images')
+        return file
 
 
 class GamedayBucket(Teamable):
@@ -525,7 +625,8 @@ class GamedayBucket(Teamable):
 
         for row in data:
             members = await Gameday.fetch_members(bot=bot, gameday_id=row['id'], connection=connection)
-            gameday = Gameday(bot=bot, members=members, **dict(row))
+            images = await Gameday.fetch_images(bot=bot, gameday_id=row['id'], connection=connection)
+            gameday = Gameday(bot=bot, members=members, images=images, **dict(row))
             gamedays.append(gameday)
 
         return gamedays
@@ -533,6 +634,10 @@ class GamedayBucket(Teamable):
     @property
     def wins_needed(self) -> int:
         return math.ceil(self.best_of / 2)
+
+    @property
+    def ongoing_gameday(self) -> Optional[Gameday]:
+        return discord.utils.find(lambda gameday: gameday.ongoing and gameday.started_at < discord.utils.utcnow(), self._gamedays.values())
 
     def get_gamedays(self) -> Mapping[int, Gameday]:
         return self._gamedays

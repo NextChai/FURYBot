@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import datetime
 import re
-from typing import TYPE_CHECKING, Any, List, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
 
 import discord
 from typing_extensions import Self, Unpack
@@ -33,12 +33,137 @@ from typing_extensions import Self, Unpack
 from utils import AfterModal, BaseView, BaseViewKwargs, MultiSelector, default_button_doc_string
 from utils.ui.select import UserSelect
 
-from .gameday import Weekday
+from .gameday import Weekday, GamedayBucket
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
-    from .gameday import Gameday, GamedayBucket, GamedayMember
+    from .gameday import Gameday, GamedayMember
+    from ..team import Team
+
+WEEKDAY_TIME_REGEX = re.compile(
+    r'(?P<weekday>\w+)(?:\s+)(?P<hour>[0-9]{1,})\:(?P<minute>[0-9]+)(?:\s+)?(?P<am_pm>AM|PM)?', re.IGNORECASE
+)
+
+
+def parse_time_and_date(value: str) -> Tuple[Optional[Weekday], Optional[datetime.time]]:
+    match = WEEKDAY_TIME_REGEX.match(value.lower())
+    if not match:
+        return None, None
+
+    weekday, hour, minute, maybe_am_pm = match.groups()
+    weekday_enum = Weekday[weekday.lower()]
+
+    # Let's convert the hour and minute to integers
+    hour = int(hour)
+    minute = int(minute)
+    am_pm = maybe_am_pm or 'PM'
+
+    if am_pm == 'PM':
+        # Add 12 to the hour if it's PM to move into the 24 hour clock
+        hour += 12
+
+    time = datetime.time(hour=hour, minute=minute)
+    return (weekday_enum, time)
+
+
+class CreateGamedayBucketPanel(BaseView):
+    def __init__(self, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+        self.team: Team = team
+        raise NotImplementedError
+
+    @property
+    def embed(self) -> discord.Embed:
+        embed = self.team.embed(
+            title='What is a Gameday Bucket?',
+            description=f'A gameday bucket is how you can track this team\'s gamedays against other teams. '
+            'Each team can have one gameday bucket. After setup, during a given scheduled esports game day, '
+            'the bot will help the team members track their wins and losses against other teams to neatly '
+            'organize the information to the team\'s captains for easy viewing. Statistics can be created from this as well as'
+            'tracking the teams overall performance.',
+        )
+
+        embed.add_field(
+            name='What is so gain from this?',
+            value=f'When you have a Gameday bucket added to a given team, the team will automatically recieve '
+            'notifications a day in advance of the scheduled gameday to remind them. The bot will have the '
+            'team members mark their attendance, and if needed, can automatically find sub replacements '
+            'for the team.',
+        )
+
+        return embed
+
+    async def _get_gametime_after(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        weekday_time_input: discord.ui.TextInput[AfterModal],
+        members_per_team_input: discord.ui.TextInput[AfterModal],
+        best_of_input: discord.ui.TextInput[AfterModal],
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        try:
+            weekday, time = parse_time_and_date(weekday_time_input.value)
+        except KeyError:
+            await interaction.followup.send(
+                'This is not a valid weekday. An example would be `Tuesday 5:00 PM`. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+        except ValueError as exc:
+            await interaction.followup.send(
+                f'You did not enter a valid time. {str(exc).capitalize()}. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        if not weekday and not time:
+            await interaction.followup.send(
+                'This is not a valid time and date. An example would be `Wednesday 4:00 PM`. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        assert weekday
+        assert time
+
+        try:
+            members_per_team = int(members_per_team_input.value)
+        except ValueError:
+            await interaction.followup.send(
+                'You did not enter a valid number of members per team. Feel free to try again.', ephemeral=True
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        try:
+            best_of = int(best_of_input.value)
+        except ValueError:
+            await interaction.followup.send(
+                'You did not enter a valid number of games to play in a match. Feel free to try again.', ephemeral=True
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        # We can create a bucket now!
+        bucket = await GamedayBucket.create(
+            self.bot,
+            guild_id=self.team.guild_id,
+            team_id=self.team.id,
+            members_on_team=members_per_team,
+            weekday=weekday,
+            game_time=time,
+            best_of=best_of,
+            automatic_sub_finding=False,
+        )
+
+        view = GamedayBucketPanel(bucket, target=interaction)
+        return await interaction.edit_original_response(embed=view.embed, view=view)
+
+    @discord.ui.button(label='Create Gameday Bucket', style=discord.ButtonStyle.green)
+    async def create_gameday_bucket(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> None:
+        raise NotImplementedError
 
 
 class SelectGameday(MultiSelector['GamedayBucketPanel', 'Gameday']):
@@ -194,7 +319,8 @@ class GamedayMemberPanel(BaseView):
         assert gameday
 
         panel = GamedayPanel(gameday, target=interaction)
-        return await interaction.edit_original_response(view=panel, embed=panel.embed)
+        image = await gameday.merge_gameday_images()
+        return await interaction.edit_original_response(view=panel, embed=panel.embed, attachments=[image] if image else [])
 
 
 class GamedayPanel(BaseView):
@@ -462,44 +588,14 @@ class GamedayBucketPanel(BaseView):
     ) -> discord.InteractionMessage:
         await interaction.response.defer()
 
-        # The weekday_time_input is a string of: Weekday Hour:Minute AM/PM
-        # We need to parse this with regex then convert it to a Weekday / datetime.time object
-        # Note that AM/PM is optional, so we will default to PM if it's not there
-        weekday_time_regex = re.compile(
-            r'(?P<weekday>\w+)(?:\s+)(?P<hour>[0-9]{1,})\:(?P<minute>[0-9]+)(?:\s+)?(?P<am_pm>AM|PM)?', re.IGNORECASE
-        )
-
-        # Let's try and find a match
-        match = weekday_time_regex.match(weekday_time_input.value.lower())
-        if not match:
-            await interaction.followup.send(
-                'This is not a valid time and date. An example would be `Wednesday 4:00 PM`. Feel free to try again.',
-                ephemeral=True,
-            )
-            return await interaction.edit_original_response(view=self, embed=self.embed)
-
-        weekday, hour, minute, maybe_am_pm = match.groups()
-
         try:
-            weekday = Weekday[weekday.lower()]
+            weekday, time = parse_time_and_date(weekday_time_input.value)
         except KeyError:
             await interaction.followup.send(
                 'This is not a valid weekday. An example would be `Tuesday 5:00 PM`. Feel free to try again.',
                 ephemeral=True,
             )
             return await interaction.edit_original_response(view=self, embed=self.embed)
-
-        # Let's convert the hour and minute to integers
-        hour = int(hour)
-        minute = int(minute)
-        am_pm = maybe_am_pm or 'PM'
-
-        if am_pm == 'PM':
-            # Add 12 to the hour if it's PM to move into the 24 hour clock
-            hour += 12
-
-        try:
-            time = datetime.time(hour=hour, minute=minute)
         except ValueError as exc:
             await interaction.followup.send(
                 f'You did not enter a valid time. {str(exc).capitalize()}. Feel free to try again.',
@@ -507,8 +603,21 @@ class GamedayBucketPanel(BaseView):
             )
             return await interaction.edit_original_response(view=self, embed=self.embed)
 
-        await self.bucket.edit(weekday=weekday, game_time=time)
+        if not weekday and not time:
+            await interaction.followup.send(
+                'This is not a valid time and date. An example would be `Wednesday 4:00 PM`. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
 
+        # The fucntion can either return None, None or a weekday and time.
+        # If it returns None, None, then the user did not enter a valid time and date.
+        # if it raises, the parsing failed.
+        # So if we get here, we know that the parsing succeeded.
+        assert weekday
+        assert time
+
+        await self.bucket.edit(weekday=weekday, game_time=time)
         return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Change Gameday Time and Date')

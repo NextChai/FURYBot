@@ -39,7 +39,7 @@ from utils import (
     default_button_doc_string,
 )
 
-from .gamedays import GamedayBucketPanel
+from .gamedays import GamedayBucketPanel, CreateGamedayBucketPanel
 from .practices.panel import PracticeMemberStatistics, TeamPracticesPanel
 from .scrims.panel import TeamScrimsPanel
 from .team import TeamMember
@@ -648,7 +648,8 @@ class TeamView(BaseView):
 
         if bucket is None:
             # We need to create a new bucket.
-            raise NotImplementedError
+            child = self.create_child(CreateGamedayBucketPanel, self.team)
+            return await interaction.response.edit_message(embed=child.embed, view=child)
 
         view = self.create_child(GamedayBucketPanel, bucket)
         return await interaction.response.edit_message(embed=view.embed, view=view)

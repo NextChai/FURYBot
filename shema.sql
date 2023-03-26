@@ -109,7 +109,17 @@ CREATE TABLE IF NOT EXISTS teams.gamedays(
     ended_at TIMESTAMP WITH TIME ZONE, -- Can be None
     wins INTEGER,
     losses INTEGER,
-    attendance_voting_message_id BIGINT
+    attendance_voting_message_id BIGINT,
+    scoreboard_message_id BIGINT
+);
+
+CREATE TABLE IF NOT EXISTS teams.gameday_images(
+    id SERIAL PRIMARY KEY,
+    gameday_id INTEGER REFERENCES teams.gamedays(id) ON DELETE CASCADE,
+    team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
+    image_url TEXT,
+    uploader_id BIGINT,
+    uploaded_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE IF NOT EXISTS teams.gameday_members(

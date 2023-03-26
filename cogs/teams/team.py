@@ -36,7 +36,7 @@ from utils import QueryBuilder, human_join
 if TYPE_CHECKING:
     from bot import FuryBot
 
-    from .gamedays.gameday import GamedayBucket
+    from .gamedays.gameday import GamedayBucket, Gameday
     from .practices import Practice
     from .scrims import Scrim
 
@@ -398,6 +398,14 @@ class Team:
             return 0
 
         return sum(practice_points)
+
+    @property
+    def ongoing_gameday(self) -> Optional[Gameday]:
+        bucket = self.get_gameday_bucket()
+        if not bucket:
+            return
+
+        return bucket.ongoing_gameday
 
     def get_gameday_bucket(self, /) -> Optional[GamedayBucket]:
         """Optional[:class:`GamedayBucket`]: Gets the gameday bucket for this team."""

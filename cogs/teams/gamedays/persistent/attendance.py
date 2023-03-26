@@ -66,9 +66,9 @@ class CannotAttendModal(discord.ui.Modal):
 
 
 class GamedayAttendanceView(discord.ui.View):
-    def __init__(self, bot: FuryBot, gameday: Gameday) -> None:
+    def __init__(self, gameday: Gameday) -> None:
         super().__init__(timeout=None)
-        self.bot: FuryBot = bot
+        self.bot: FuryBot = gameday.bot
         self.gameday: Gameday = gameday
 
     @property
