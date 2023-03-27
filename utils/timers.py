@@ -33,6 +33,7 @@ import asyncpg
 import discord
 
 from .errors import TimerNotFound
+from .query import QueryBuilder
 
 if TYPE_CHECKING:
     from bot import ConnectionType, FuryBot
@@ -47,6 +48,7 @@ if TYPE_CHECKING:
 __all__: Tuple[str, ...] = ('Timer', 'TimerManager')
 
 T = TypeVar('T')
+MISSING = discord.utils.MISSING
 
 _log = logging.getLogger(__name__)
 
@@ -195,6 +197,16 @@ class Timer:
                 raise TimerNotFound(self.id)
 
             await connection.execute(f'DELETE FROM timers WHERE id = $1', self.id)
+
+    async def edit(self, *, expires: datetime.datetime = MISSING) -> None:
+        builder = QueryBuilder('timers')
+        builder.add_condition('id', self.id)
+
+        if expires is not MISSING:
+            builder.add_arg('expires', expires)
+            self.expires = expires
+
+        await builder(self.bot)
 
 
 class TimerManager:

@@ -34,7 +34,7 @@ from typing_extensions import Self, Unpack
 from utils import AfterModal, BaseView, BaseViewKwargs, MultiSelector, default_button_doc_string, find_home
 from utils.ui.select import UserSelect
 
-from .gameday import Weekday, GamedayBucket
+from .gameday import Weekday, GamedayBucket, get_next_gameday_time
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -641,7 +641,10 @@ class GamedayBucketPanel(BaseView):
         await self.bucket.edit(weekday=weekday, game_time=time)
 
         # We need to edit the next gamedays's time and date as well so that it is correct and dispatches as the correct time.
-        raise NotImplementedError
+        next_gameday = self.bucket.next_gameday
+        if next_gameday is not None:
+            next_gameday_time = get_next_gameday_time(weekday=weekday, game_time=time)
+            await next_gameday.reschedule(starts_at=next_gameday_time)
 
         return await interaction.edit_original_response(view=self, embed=self.embed)
 

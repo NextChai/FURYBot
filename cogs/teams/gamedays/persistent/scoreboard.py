@@ -70,19 +70,6 @@ class ScoreboardPanel(discord.ui.View):
 
         return True
 
-    @discord.ui.button(label='Add Loss', style=discord.ButtonStyle.red, custom_id='add_loss')
-    async def add_loss(
-        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self], /
-    ) -> Optional[discord.InteractionMessage]:
-        await interaction.response.defer()
-
-        await self.gameday.edit(losses=self.gameday.losses + 1)
-
-        if self.gameday.has_won():
-            return await self.gameday.end()
-
-        return await interaction.edit_original_response(embed=self.embed)
-
     @discord.ui.button(label='Add Win', style=discord.ButtonStyle.green, custom_id='add_win')
     async def add_win(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self], /
@@ -91,8 +78,27 @@ class ScoreboardPanel(discord.ui.View):
 
         await self.gameday.edit(wins=self.gameday.wins + 1)
 
+        if self.gameday.has_won():
+            await self.gameday.end()
+
+            self.clear_items()
+            return await interaction.edit_original_response(embed=self.embed, view=self)
+
+        return await interaction.edit_original_response(embed=self.embed)
+
+    @discord.ui.button(label='Add Loss', style=discord.ButtonStyle.red, custom_id='add_loss')
+    async def add_loss(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self], /
+    ) -> Optional[discord.InteractionMessage]:
+        await interaction.response.defer()
+
+        await self.gameday.edit(losses=self.gameday.losses + 1)
+
         if self.gameday.has_lost():
-            return await self.gameday.end()
+            await self.gameday.end()
+
+            self.clear_items()
+            return await interaction.edit_original_response(embed=self.embed, view=self)
 
         return await interaction.edit_original_response(embed=self.embed)
 

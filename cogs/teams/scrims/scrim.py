@@ -546,14 +546,19 @@ class Scrim:
         async with self.bot.safe_connection() as connection:
             await connection.execute('DELETE FROM teams.scrims WHERE id = $1', self.id)
 
+            timer_ids: List[int] = []
+
             if self.scrim_scheduled_timer_id:
-                await connection.execute('DELETE FROM timers WHERE id = $1', self.scrim_scheduled_timer_id)
+                timer_ids.append(self.scrim_scheduled_timer_id)
 
             if self.scrim_reminder_timer_id:
-                await connection.execute('DELETE FROM timers WHERE id = $1', self.scrim_reminder_timer_id)
+                timer_ids.append(self.scrim_reminder_timer_id)
 
             if self.scrim_delete_timer_id:
-                await connection.execute('DELETE FROM timers WHERE id = $1', self.scrim_delete_timer_id)
+                timer_ids.append(self.scrim_delete_timer_id)
+
+            if timer_ids:
+                await connection.execute('DELETE FROM timers WHERE id = ANY($1)', timer_ids)
 
         # Just in case the bot was waiting on one of these timers, restart the timer loop
         if self.bot.timer_manager:
