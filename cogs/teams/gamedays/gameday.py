@@ -69,13 +69,12 @@ def _get_next_gameday_time(*, weekday: Weekday, game_time: datetime.time) -> dat
     now_est = datetime.datetime.now(EST).replace(
         hour=game_time.hour, minute=game_time.minute, second=game_time.second, microsecond=game_time.microsecond
     )
-    # Replace now's time with the game time to get the game time in EST time.
 
     # Now we need to get the next occurance of the given weekday.
     est_weekday = now_est.weekday()
     days_until_gameday = (weekday.value - est_weekday - 1) % 7
-    # We can add days until gameday to now_est to get the next gameday time in EST time.
 
+    # We can add days until gameday to now_est to get the next gameday time in EST time.
     now_est = now_est + datetime.timedelta(days=days_until_gameday)
 
     # Convert to UTC time now
