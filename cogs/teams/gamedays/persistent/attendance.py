@@ -75,7 +75,7 @@ class GamedayAttendanceView(discord.ui.View):
     def filled_embed(self) -> discord.Embed:
         team = self.gameday.team
         embed = team.embed(
-            title=f'{team.display_name} Gameday Attendance',
+            title=f'{team.display_name} Gameday Attendance Filled',
             description=f'This team has a gameday coming up on {discord.utils.format_dt(self.gameday.started_at, "F")} ({discord.utils.format_dt(self.gameday.started_at, "R")}). '
             f'This team has been filled with members who have marked themselves as attending, in {discord.utils.format_dt(self.gameday.attendance_voting_end, "R")} this '
             'panel will automatically close and the captains will be notified.',

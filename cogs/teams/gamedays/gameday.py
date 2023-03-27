@@ -27,6 +27,7 @@ import dataclasses
 import datetime
 import enum
 import math
+import pytz
 from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, Type, Union
 
 import discord
@@ -46,6 +47,7 @@ __all__: Tuple[str, ...] = (
     'Weekday',
 )
 
+EST = pytz.timezone('US/Eastern')
 MISSING = discord.utils.MISSING
 
 
@@ -60,17 +62,26 @@ def _get_attendance_voting_end_time(gameday_starts_at: datetime.datetime) -> dat
     return _get_attendance_voting_start_time(gameday_starts_at) + datetime.timedelta(hours=5)
 
 
-def _get_next_gameday_time(now: datetime.datetime, /, *, weekday: Weekday, game_time: datetime.time) -> datetime.datetime:
+def _get_next_gameday_time(*, weekday: Weekday, game_time: datetime.time) -> datetime.datetime:
     # The game_time variable was given in EST time, so we need to make sure to convert it to UTC time which is what the
     # bot works off of.
 
-    # Convert the game_time to UTC time.
-    game_time = datetime.datetime.combine(datetime.date.today(), game_time).astimezone(datetime.timezone.utc).time()
+    now_est = datetime.datetime.now(EST).replace(
+        hour=game_time.hour, minute=game_time.minute, second=game_time.second, microsecond=game_time.microsecond
+    )
+    # Replace now's time with the game time to get the game time in EST time.
 
-    # Calculate the next occurrence of the given weekday
-    days_until_gameday = (weekday.value - now.weekday() - 1) % 7
-    next_gameday = now + datetime.timedelta(days=days_until_gameday)
-    return next_gameday
+    # Now we need to get the next occurance of the given weekday.
+    est_weekday = now_est.weekday()
+    days_until_gameday = (weekday.value - est_weekday - 1) % 7
+    # We can add days until gameday to now_est to get the next gameday time in EST time.
+
+    now_est = now_est + datetime.timedelta(days=days_until_gameday)
+
+    # Convert to UTC time now
+    utc_datetime = now_est.astimezone(pytz.utc)
+
+    return utc_datetime
 
 
 class Weekday(enum.Enum):
@@ -696,7 +707,7 @@ class GamedayBucket(Teamable):
 
         # Let's create the first gameday as well for this bucket which will start
         # the cycle of timers.
-        gameday_time = _get_next_gameday_time(discord.utils.utcnow(), weekday=weekday, game_time=game_time)
+        gameday_time = _get_next_gameday_time(weekday=weekday, game_time=game_time)
         await Gameday.create(bot, gameday_bucket_id=self.id, guild_id=guild_id, team_id=team_id, starts_at=gameday_time)
 
         return self
