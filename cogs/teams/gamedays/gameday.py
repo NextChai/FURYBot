@@ -27,13 +27,14 @@ import dataclasses
 import datetime
 import enum
 import math
-import pytz
 from typing import TYPE_CHECKING, Dict, List, Mapping, NamedTuple, Optional, Tuple, Type, Union
 
 import discord
+import pytz
 from typing_extensions import Self
 
-from utils import QueryBuilder, image_from_urls, image_to_file, Timer
+from utils import QueryBuilder, Timer, image_from_urls, image_to_file
+
 from .persistent.scoreboard import ScoreboardPanel
 
 if TYPE_CHECKING:
@@ -226,7 +227,8 @@ class GamedayMember(TeamMemberable):
             query.add_arg('reason', reason)
             self.reason = reason
 
-        await query(self.bot)
+        async with self.bot.safe_connection() as connection:
+            await query(connection)
 
 
 @dataclasses.dataclass()
@@ -613,7 +615,8 @@ class Gameday(Teamable):
             query_builder.add_arg('attendance_voting_end', attendance_voting_end)
             self.attendance_voting_end = attendance_voting_end
 
-        await query_builder(self.bot)
+        async with self.bot.safe_connection() as connection:
+            await query_builder(connection)
 
     async def delete(self) -> None:
         async with self.bot.safe_connection() as connection:

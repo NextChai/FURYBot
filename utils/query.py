@@ -26,7 +26,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Coroutine, List, Optional, Tuple
 
 if TYPE_CHECKING:
-    from bot import FuryBot
+    from bot import ConnectionType
 
 __all__: Tuple[str, ...] = ('QueryBuilder',)
 
@@ -61,8 +61,8 @@ class QueryBuilder:
         clauses = [value for (_, value) in self._conds]
         return (*conds, *clauses)
 
-    def __call__(self, bot: FuryBot) -> Coroutine[Any, Any, Optional[str]]:
-        return self._execute_query(bot)
+    def __call__(self, connection: ConnectionType) -> Coroutine[Any, Any, Optional[str]]:
+        return self._execute_query(connection)
 
     def add_arg(self, predicate: str, value: Any) -> None:
         self._args.append((predicate, value))
@@ -70,9 +70,8 @@ class QueryBuilder:
     def add_condition(self, predicate: str, value: Any) -> None:
         self._conds.append((predicate, value))
 
-    async def _execute_query(self, bot: FuryBot) -> Optional[str]:
-        if not self.query:
+    async def _execute_query(self, connection: ConnectionType) -> Optional[str]:
+        if not self._args:
             return
 
-        async with bot.safe_connection() as connection:
-            return await connection.execute(self.query, *self.args)
+        return await connection.execute(self.query, *self.args)

@@ -23,24 +23,24 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import pytz
 import datetime
 import re
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
 
 import discord
+import pytz
 from typing_extensions import Self, Unpack
 
 from utils import AfterModal, BaseView, BaseViewKwargs, MultiSelector, default_button_doc_string, find_home
 from utils.ui.select import UserSelect
 
-from .gameday import Weekday, GamedayBucket, get_next_gameday_time
+from .gameday import GamedayBucket, Weekday, get_next_gameday_time
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
-    from .gameday import Gameday, GamedayMember
     from ..team import Team
+    from .gameday import Gameday, GamedayMember
 
 WEEKDAY_TIME_REGEX = re.compile(
     r'(?P<weekday>\w+)(?:\s+)(?P<hour>[0-9]{1,})\:(?P<minute>[0-9]+)(?:\s+)?(?P<am_pm>AM|PM)?', re.IGNORECASE

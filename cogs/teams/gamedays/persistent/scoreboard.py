@@ -22,16 +22,18 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
-from typing_extensions import Self
+
+from typing import TYPE_CHECKING, Optional
 
 import discord
-from typing import TYPE_CHECKING, Optional
+from typing_extensions import Self
 
 from utils import AfterModal
 
 if TYPE_CHECKING:
-    from ..gameday import Gameday
     from bot import FuryBot
+
+    from ..gameday import Gameday
 
 
 class ScoreboardPanel(discord.ui.View):

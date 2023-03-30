@@ -36,7 +36,7 @@ from utils import QueryBuilder, human_join
 if TYPE_CHECKING:
     from bot import FuryBot
 
-    from .gamedays.gameday import GamedayBucket, Gameday
+    from .gamedays.gameday import Gameday, GamedayBucket
     from .practices import Practice
     from .scrims import Scrim
 
@@ -833,7 +833,8 @@ class Team:
             builder.add_arg('sub_role_ids', sub_role_ids)
             self.sub_role_ids = sub_role_ids
 
-        await builder(self.bot)
+        async with self.bot.safe_connection() as connection:
+            await builder(connection)
 
     async def delete(self) -> None:
         """|coro|

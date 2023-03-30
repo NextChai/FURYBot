@@ -387,7 +387,8 @@ class Scrim:
             builder.add_arg('home_message_id', home_message_id)
             self.home_message_id = home_message_id
 
-        await builder(self.bot)
+        async with self.bot.safe_connection() as connection:
+            await builder(connection)
 
     async def create_scrim_chat(self) -> discord.TextChannel:
         """|coro|

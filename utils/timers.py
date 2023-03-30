@@ -26,11 +26,11 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, TypeVar, Union, Type
-from typing_extensions import Self
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import asyncpg
 import discord
+from typing_extensions import Self
 
 from .errors import TimerNotFound
 from .query import QueryBuilder
@@ -206,7 +206,8 @@ class Timer:
             builder.add_arg('expires', expires)
             self.expires = expires
 
-        await builder(self.bot)
+        async with self.bot.safe_connection() as connection:
+            await builder(connection)
 
 
 class TimerManager:
@@ -400,7 +401,7 @@ class TimerManager:
         timer = Timer(record=row, bot=self.bot)
         return timer
 
-    async def get_timer(self, id: int) -> Timer:
+    async def fetch_timer(self, id: int) -> Timer:
         """|coro|
 
         Used to get a timer from it's ID.

@@ -91,50 +91,67 @@ CREATE TABLE IF NOT EXISTS teams.practice_leaderboards(
 
 CREATE TABLE IF NOT EXISTS teams.gameday_buckets(
     id SERIAL PRIMARY KEY,
-    team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     guild_id BIGINT,
-    weekday INTEGER,
-    game_time TIME,
-    members_on_team INTEGER,
-    best_of INTEGER,
-    automatic_sub_finding BOOLEAN DEFAULT TRUE
-);
+    team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
+    automatic_sub_finding_if_possible BOOLEAN DEFAULT TRUE,
+    automatic_sub_finding_channel_id BIGINT -- Can be None
+)
 
-CREATE TABLE IF NOT EXISTS teams.gamedays(
+CREATE TABLE IF NOT EXISTS teams.gameday_times(
     id SERIAL PRIMARY KEY,
+    guild_id BIGINT,
+    team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE
     bucket_id INTEGER REFERENCES teams.gameday_buckets(id) ON DELETE CASCADE,
+    weekday INTEGER,
+    starts_at TIME,
+);
+
+CREATE TABLE IF NOT EXISTS teams.gamedays (
+    id SERIAL PRIMARY KEY,
     guild_id BIGINT,
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
-    started_at TIMESTAMP WITH TIME ZONE,
-    ended_at TIMESTAMP WITH TIME ZONE, -- Can be None
-    wins INTEGER DEFAULT 0,
-    losses INTEGER DEFAULT 0,
-    attendance_voting_message_id BIGINT,
-    scoreboard_message_id BIGINT,
-    attendance_voting_start TIMESTAMP WITH TIME ZONE,
-    attendance_voting_end TIMESTAMP WITH TIME ZONE,
-    attendance_voting_start_timer_id INTEGER REFERENCES timers(id),
-    attendance_voting_end_timer_id INTEGER REFERENCES timers(id),
-    gameday_start_timer_id INTEGER REFERENCES timers(id)
+    bucket_id INTEGER REFERENCES teams.gameday_buckets(id) ON DELETE CASCADE,
+    starts_at TIMESTAMP WITH TIME ZONE,
+    automatic_sub_finding BOOLEAN,
+    voting_starts_at TIMESTAMP WITH TIME ZONE,
+    voting_ends_at TIMESTAMP WITH TIME ZONE,
+    voting_starts_at_timer_id BIGINT REFERENCES timers(id),
+    voting_ends_at_timer_id BIGINT REFERENCES timers(id),
+    starts_at_timer_id BIGINT REFERENCES timers(id),
+    voting_message_id BIGINT -- Can be None
 );
 
-CREATE TABLE IF NOT EXISTS teams.gameday_images(
+
+CREATE TABLE IF NOT EXISTS teams.gameday_score_reports (
     id SERIAL PRIMARY KEY,
-    gameday_id INTEGER REFERENCES teams.gamedays(id) ON DELETE CASCADE,
+    guild_id BIGINT,
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
-    image_url TEXT,
-    uploader_id BIGINT,
-    uploaded_at TIMESTAMP WITH TIME ZONE
+    gameday_id INTEGER REFERENCES teams.gamedays(id) ON DELETE CASCADE,
+    bucket_id INTEGER REFERENCES teams.gameday_buckets(id) ON DELETE CASCADE,
+    text TEXT,
+    reported_by_id BIGINT,
+    reported_at TIMESTAMP WITH TIME ZONE,
 );
 
-CREATE TABLE IF NOT EXISTS teams.gameday_members(
+CREATE TABLE IF NOT EXISTS teams.gameday_members (
     id SERIAL PRIMARY KEY,
-    gameday_id INTEGER REFERENCES teams.gamedays(id) ON DELETE CASCADE,
+    guild_id BIGINT,
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
+    gameday_id INTEGER REFERENCES teams.gamedays(id) ON DELETE CASCADE,
+    bucket_id INTEGER REFERENCES teams.gameday_buckets(id) ON DELETE CASCADE,
     member_id BIGINT,
+    reason TEXT -- Will be None if they're attending
+);
+
+CREATE TABLE IF NOT EXISTS teams.gameday_images (
+    id SERIAL PRIMARY KEY,
     guild_id BIGINT,
-    reason TEXT,
-    is_temporary_sub BOOLEAN DEFAULT FALSE
+    team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
+    gameday_id INTEGER REFERENCES teams.gamedays(id) ON DELETE CASCADE,
+    bucket_id INTEGER REFERENCES teams.gameday_buckets(id) ON DELETE CASCADE,
+    url TEXT,
+    uploader_id TIMESTAMP WITH TIME ZONE,
+    uploaded_at BIGINT,
 );
 
 

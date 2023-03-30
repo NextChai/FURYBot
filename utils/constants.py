@@ -23,7 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import Tuple, List
+from typing import List, Tuple
 
 __all__: Tuple[str, ...] = (
     'IMAGE_REQUEST_CHANNEL_ID',

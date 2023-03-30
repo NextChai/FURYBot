@@ -29,17 +29,9 @@ from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
 import discord
 from typing_extensions import Self, Unpack
 
-from utils import (
-    AfterModal,
-    BaseView,
-    BaseViewKwargs,
-    RoleSelect,
-    SelectOneOfMany,
-    UserSelect,
-    default_button_doc_string,
-)
+from utils import AfterModal, BaseView, BaseViewKwargs, RoleSelect, SelectOneOfMany, UserSelect, default_button_doc_string
 
-from .gamedays import GamedayBucketPanel, CreateGamedayBucketPanel
+from .gamedays import CreateGamedayBucketPanel, GamedayBucketPanel
 from .practices.panel import PracticeMemberStatistics, TeamPracticesPanel
 from .scrims.panel import TeamScrimsPanel
 from .team import TeamMember

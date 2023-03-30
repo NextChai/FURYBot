@@ -23,14 +23,14 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from .events import *
-from .gameday import *
-from .gameday import GamedayImage
-from .panel import *
-
-from utils import BaseCog
 import discord
 from discord import app_commands
+
+from utils import BaseCog
+
+from .events import *
+from .gameday import *
+from .panel import *
 
 if TYPE_CHECKING:
     from bot import FuryBot
