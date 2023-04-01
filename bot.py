@@ -240,8 +240,8 @@ class FuryBot(commands.Bot):
         # Mapping[guild_id, Mapping[team_id, Mapping[practice_id, Practice]]]
         self._team_practice_cache: Dict[int, Dict[int, Dict[int, Practice]]] = {}
 
-        # Mapping[guild_id, Mapping[team_id, Mapping[bucket_id, GameBucket]]]
-        self._team_gameday_buckets: Dict[int, Dict[int, Dict[int, GamedayBucket]]] = {}
+        # Mapping[guild_id, Mapping[team_id, GameBucket]]
+        self._team_gameday_buckets: Dict[int, Dict[int, GamedayBucket]] = {}
 
         super().__init__(
             command_prefix=commands.when_mentioned_or('fury.'),
@@ -328,7 +328,6 @@ class FuryBot(commands.Bot):
         self,
         guild_id: int,
         team_id: int,
-        bucket_id: int,
     ) -> Optional[GamedayBucket]:
         """Get a gameday bucket for a team in a guild.
 
@@ -346,7 +345,7 @@ class FuryBot(commands.Bot):
         Optional[:class:`GamedayBucket`]
             The bucket, if it exists.
         """
-        return self._team_gameday_buckets.get(guild_id, {}).get(team_id, {}).get(bucket_id, None)
+        return self._team_gameday_buckets.get(guild_id, {}).get(team_id, None)
 
     def add_gameday_bucket(self, bucket: GamedayBucket, /):
         """Add a gameday bucket to the cache.
@@ -356,10 +355,10 @@ class FuryBot(commands.Bot):
         bucket: :class:`GamedayBucket`
             The bucket to add.
         """
-        self._team_gameday_buckets.setdefault(bucket.guild_id, {}).setdefault(bucket.team_id, {})[bucket.id] = bucket
+        self._team_gameday_buckets.setdefault(bucket.guild_id, {})[bucket.team_id] = bucket
 
-    def remove_gameday_bucket(self, guild_id: int, team_id: int, bucket_id: int, /) -> Optional[GamedayBucket]:
-        return self._team_gameday_buckets.get(guild_id, {}).get(team_id, {}).pop(bucket_id, None)
+    def remove_gameday_bucket(self, guild_id: int, team_id: int, /) -> Optional[GamedayBucket]:
+        return self._team_gameday_buckets.get(guild_id, {}).pop(team_id, None)
 
     # Team management
     def get_teams(self, guild_id: int, /) -> List[Team]:

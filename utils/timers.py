@@ -168,7 +168,7 @@ class Timer:
         else:
             await connection.execute(query, *args)
 
-    async def delete(self, connection: Optional[ConnectionType] = None) -> None:
+    async def delete(self, *, connection: Optional[ConnectionType] = None) -> None:
         """|coro|
 
         Delete the timer.
@@ -401,7 +401,7 @@ class TimerManager:
         timer = Timer(record=row, bot=self.bot)
         return timer
 
-    async def fetch_timer(self, id: int) -> Timer:
+    async def fetch_timer(self, id: int, *, connection: Optional[ConnectionType] = None) -> Timer:
         """|coro|
 
         Used to get a timer from it's ID.
@@ -421,8 +421,11 @@ class TimerManager:
         TimerNotFound
             A timer with that ID does not exist.
         """
-        async with self.bot.safe_connection() as conn:
-            data = await conn.fetchrow(f'SELECT * FROM timers WHERE id = $1', id)
+        if connection is None:
+            async with self.bot.safe_connection() as conn:
+                data = await conn.fetchrow(f'SELECT * FROM timers WHERE id = $1', id)
+        else:
+            data = await connection.fetchrow(f'SELECT * FROM timers WHERE id = $1', id)
 
         if not data:
             raise TimerNotFound(id)

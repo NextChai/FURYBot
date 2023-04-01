@@ -23,20 +23,47 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, List, NamedTuple
+import datetime
+import re
+from typing import TYPE_CHECKING, Dict, List, NamedTuple, Tuple, Union
 
 import discord
 from typing_extensions import Self, Unpack
 
 from utils import BaseView, MultiSelector, AfterModal
 
-from .gameday import Gameday, GamedayBucket, GamedayMember, GamedayTime
+from .gameday import Gameday, GamedayBucket, GamedayMember, GamedayTime, Weekday
 
 if TYPE_CHECKING:
     from bot import FuryBot
     from utils import BaseViewKwargs
 
+WEEKDAY_TIME_REGEX = re.compile(
+    r'(?P<weekday>\w+)(?:\s+)(?P<hour>[0-9]{1,})\:(?P<minute>[0-9]+)(?:\s+)?(?P<am_pm>AM|PM)?', re.IGNORECASE
+)
+
 GamedayMemberInformation = NamedTuple('GamedayMemberInformation', [('gameday', GamedayMember), ('discord', discord.Member)])
+
+
+def parse_time_and_date(value: str) -> Union[Tuple[None, None], Tuple[Weekday, datetime.time]]:
+    match = WEEKDAY_TIME_REGEX.match(value.lower())
+    if not match:
+        return None, None
+
+    weekday, hour, minute, maybe_am_pm = match.groups()
+    weekday_enum = Weekday[weekday.lower()]
+
+    # Let's convert the hour and minute to integers
+    hour = int(hour)
+    minute = int(minute)
+    am_pm = maybe_am_pm or 'pm'
+
+    if am_pm.lower() == 'pm':
+        # Add 12 to the hour if it's PM to move into the 24 hour clock
+        hour += 12
+
+    time = datetime.time(hour=hour, minute=minute)
+    return (weekday_enum, time)
 
 
 class SelectGameday(MultiSelector['GamedayBucketPanel', 'Gameday']):
@@ -119,8 +146,13 @@ class SelectGamedayTime(MultiSelector['GamedayTimeManagementPanel', 'GamedayTime
     def hash_item(self, gameday: GamedayTime) -> str:
         return str(gameday.id)
 
-    async def on_item_chosen(self, interaction: discord.Interaction[FuryBot], item: GamedayTime) -> None:
-        ...
+    async def on_item_chosen(
+        self, interaction: discord.Interaction[FuryBot], item: GamedayTime
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        view = self.parent.create_child(ManageGamedayTime, gameday_time=item)
+        return await interaction.edit_original_response(view=view, embed=view.embed)
 
 
 class GamedayMemberPanel(BaseView):
@@ -176,13 +208,29 @@ class ManageGamedayTime(BaseView):
     def embed(self) -> discord.Embed:
         ...
 
+    async def _edit_gameday_time_after(self, interaction: discord.Interaction[FuryBot]) -> None:
+        ...
+
     @discord.ui.button(label='Edit Gameday Time and Weekday', style=discord.ButtonStyle.green)
     async def edit_gameday_time(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         ...
 
     @discord.ui.button(label='Delete Gameday Time', style=discord.ButtonStyle.red)
-    async def delete_gameday_time(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        ...
+    async def delete_gameday_time(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            await self.gameday_time.delete(connection=connection)
+
+        # Let's *try* and find the bucket from this gameday time
+        bucket = self.gameday_time.bucket
+        if bucket is None:
+            raise ValueError('Gameday time has no bucket.')
+
+        view = GamedayBucketPanel(bucket, target=interaction)
+        return await interaction.edit_original_response(view=view, embed=view.embed)
 
 
 class GamedayTimeManagementPanel(BaseView):
@@ -200,18 +248,87 @@ class GamedayTimeManagementPanel(BaseView):
         embed = team.embed(title=f'Game Time Management')
 
         for gameday_time in self.gameday_times.values():
-            ...
+            metadata = [
+                f'**ID**: {gameday_time.id}',
+                f'**Time**: {gameday_time.starts_at.strftime("%I:%M %p")}',
+                f'**Wekday**: {gameday_time.weekday.name.title()}',
+            ]
+            embed.add_field(name=f'Gameday Time {gameday_time.id}', value='\n'.join(metadata), inline=False)
+
+        return embed
 
     async def _create_new_gametime_after(
-        self, interaction: discord.Interaction, weekday_time_input: discord.ui.TextInput[AfterModal]
+        self,
+        interaction: discord.Interaction,
+        weekday_time_input: discord.ui.TextInput[AfterModal],
     ) -> discord.InteractionMessage:
-        ...
+        await interaction.response.defer()
+
+        try:
+            weekday, time = parse_time_and_date(weekday_time_input.value)
+        except KeyError:
+            await interaction.followup.send(
+                'This is not a valid weekday. An example would be `Tuesday 5:00 PM`. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+        except ValueError as exc:
+            await interaction.followup.send(
+                f'You did not enter a valid time. {str(exc).capitalize()}. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        if not weekday and not time:
+            await interaction.followup.send(
+                'This is not a valid time and date. An example would be `Wednesday 4:00 PM`. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        assert weekday
+        assert time
+
+        # Let's make sure a gameday with this time and weekday doesn't exist already
+        for game_time in self.gameday_times.values():
+            if game_time.weekday == weekday and game_time.starts_at == time:
+                await interaction.followup.send(
+                    f'There is already a gameday time for {weekday.name.title()} at {time.strftime("%I:%M %p")}.',
+                    ephemeral=True,
+                )
+                return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        # Let's create a new gametime, this will spawn the gameday and timers
+        # accordingly.
+        async with self.bot.safe_connection() as connection:
+            await GamedayTime.create(
+                self.bot,
+                connection=connection,
+                guild_id=self.bucket.guild_id,
+                team_id=self.bucket.team_id,
+                bucket_id=self.bucket.id,
+                weekday=weekday,
+                starts_at=time,
+            )
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Create New Gameday Time', style=discord.ButtonStyle.green)
     async def create_new_gameday_time(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> None:
-        ...
+        modal = AfterModal(
+            self.bot,
+            self._create_new_gametime_after,
+            discord.ui.TextInput(
+                label='Enter Time and Date.',
+                placeholder='Format: Weekday Hour:Minute AM/PM. Example: Wednesday 4:00 PM',
+                required=True,
+            ),
+            title='Create Gameday Time',
+            timeout=None,
+        )
+        return await interaction.response.send_modal(modal)
 
     @discord.ui.button(label='Manage Existing Gameday Time')
     async def manage_existing_gameday_time(

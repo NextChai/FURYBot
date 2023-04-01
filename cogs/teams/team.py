@@ -31,12 +31,13 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union,
 import discord
 from typing_extensions import Self
 
+
 from utils import QueryBuilder, human_join
 
 if TYPE_CHECKING:
-    from bot import FuryBot
+    from bot import FuryBot, ConnectionType
 
-    from .gamedays.gameday import Gameday, GamedayBucket
+    from .gamedays_rewritten.gameday import GamedayBucket
     from .practices import Practice
     from .scrims import Scrim
 
@@ -399,14 +400,6 @@ class Team:
 
         return sum(practice_points)
 
-    @property
-    def ongoing_gameday(self) -> Optional[Gameday]:
-        bucket = self.get_gameday_bucket()
-        if not bucket:
-            return
-
-        return bucket.ongoing_gameday
-
     def get_gameday_bucket(self, /) -> Optional[GamedayBucket]:
         """Optional[:class:`GamedayBucket`]: Gets the gameday bucket for this team."""
         return self.bot.get_gameday_bucket(self.guild_id, self.id)
@@ -661,7 +654,7 @@ class Team:
 
         return team_member
 
-    async def remove_team_member(self, team_member: TeamMember, /) -> None:
+    async def remove_team_member(self, team_member: TeamMember, /, force_voice_disconnect: bool = False) -> None:
         """|coro|
 
         A method used to remove this member from its team.
@@ -682,6 +675,11 @@ class Team:
             # This member has left the guild, we can not edit the channels as a result.
             pass
         else:
+            if member.voice and force_voice_disconnect:
+                channel = member.voice.channel
+                if channel and channel in (self.voice_channel, *self.extra_channels):
+                    await member.move_to(None, reason='Member removed from the team.')
+
             category = self.category_channel
             overwrites = category.overwrites
             overwrites.pop(member, None)
@@ -836,13 +834,12 @@ class Team:
         async with self.bot.safe_connection() as connection:
             await builder(connection)
 
-    async def delete(self) -> None:
+    async def delete(self, *, connection: ConnectionType) -> None:
         """|coro|
 
         Deletes the team and all of its channels.
         """
-        async with self.bot.safe_connection() as connection:
-            await connection.execute('DELETE FROM teams.settings WHERE id = $1', self.id)
+        await connection.execute('DELETE FROM teams.settings WHERE id = $1', self.id)
 
         await self.voice_channel.delete()
         await self.text_channel.delete()
@@ -855,4 +852,4 @@ class Team:
 
         bucket = self.get_gameday_bucket()
         if bucket is not None:
-            await bucket.delete()  # To cleanup the timers.
+            await bucket.delete(connection=connection)  # To cleanup the timers.
