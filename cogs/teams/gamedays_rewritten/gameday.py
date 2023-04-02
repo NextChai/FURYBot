@@ -884,6 +884,72 @@ class GamedayTime:
     def team(self) -> Optional[Team]:
         return self.bot.get_team(self.guild_id, self.team_id)
 
+    async def edit(
+        self,
+        *,
+        connection: ConnectionType,
+        weekday: Weekday = MISSING,
+        starts_at: datetime.time = MISSING,
+    ) -> None:
+        builder = QueryBuilder('teams.gameday_times')
+        builder.add_condition('id', self.id)
+
+        if weekday is not MISSING:
+            builder.add_arg('weekday', weekday.value)
+            self.weekday = weekday
+
+        if starts_at is not MISSING:
+            builder.add_arg('starts_at', starts_at)
+            self.starts_at = starts_at
+
+        if weekday is not MISSING or starts_at is not MISSING:
+            # We need to update all the gamedays that have this time.
+
+            weekday = weekday if weekday is not MISSING else self.weekday
+            starts_at = starts_at if starts_at is not MISSING else self.starts_at
+
+            # We need to edit all the gamedays that have this time.
+            bucket = self.bucket
+            if bucket is None:
+                raise ValueError(f'Bucket {self.bucket_id} does not exist')
+
+            now = discord.utils.utcnow()
+            for gameday in bucket.gamedays.values():
+                if gameday.gameday_time_id != self.id:
+                    continue
+
+                if now > gameday.voting.starts_at:
+                    # Don't want to edit a gameday that has already started its process.
+                    continue
+
+                new_starts_at = get_next_gameday_time(weekday=weekday, game_time=starts_at)
+                voting = determine_comfy_voting_times(new_starts_at)
+
+                await gameday.edit(
+                    connection,
+                    starts_at=new_starts_at,
+                    voting_starts_at=voting.start,
+                    voting_ends_at=voting.end,
+                    automatic_sub_finding=voting.can_use_automatic_sub_finding,
+                )
+
+                # Some timers may need to be updated as well, so let's do that.
+                timers = [
+                    (gameday.voting.fetch_starts_at_timer, voting.start),
+                    (gameday.voting.fetch_ends_at_timer, voting.end),
+                    (gameday.fetch_starts_at_timer, new_starts_at),
+                ]
+                for timer_coro, new_time in timers:
+                    try:
+                        timer = await timer_coro(connection=connection)
+                    except TimerNotFound:
+                        continue
+                    else:
+                        if timer is not None:
+                            await timer.edit(expires=new_time)
+
+        await builder(connection)
+
     async def delete(self, *, connection: ConnectionType) -> None:
         query = """
             DELETE FROM teams.gameday_times WHERE id = $1

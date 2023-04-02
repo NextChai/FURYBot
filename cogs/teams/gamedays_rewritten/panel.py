@@ -32,7 +32,13 @@ from typing_extensions import Self, Unpack
 
 from utils import BaseView, MultiSelector, AfterModal
 
-from .gameday import Gameday, GamedayBucket, GamedayMember, GamedayTime, Weekday
+from .gameday import (
+    Gameday,
+    GamedayBucket,
+    GamedayMember,
+    GamedayTime,
+    Weekday,
+)
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -184,7 +190,9 @@ class GamedayPanel(BaseView):
 
     @property
     def embed(self) -> discord.Embed:
-        ...
+        embed = self.bot.Embed(
+            title='Gameday Management',
+        )
 
     @discord.ui.button(label='Manage Members')
     async def manage_members(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
@@ -206,14 +214,76 @@ class ManageGamedayTime(BaseView):
 
     @property
     def embed(self) -> discord.Embed:
-        ...
+        embed = self.bot.Embed(
+            title='Manage Gameday Time',
+            description='Use the buttons below to manage this gameday time.',
+        )
+        embed.add_field(name='Weekday', value=self.gameday_time.weekday.name.title(), inline=False)
+        embed.add_field(name='Starts At', value=self.gameday_time.starts_at.strftime('%I:%M %p'), inline=False)
+        return embed
 
-    async def _edit_gameday_time_after(self, interaction: discord.Interaction[FuryBot]) -> None:
-        ...
+    async def _edit_gameday_time_after(
+        self, interaction: discord.Interaction[FuryBot], weekday_time_input: discord.ui.TextInput[AfterModal]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        try:
+            weekday, time = parse_time_and_date(weekday_time_input.value)
+        except KeyError:
+            await interaction.followup.send(
+                'This is not a valid weekday. An example would be `Tuesday 5:00 PM`. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+        except ValueError as exc:
+            await interaction.followup.send(
+                f'You did not enter a valid time. {str(exc).capitalize()}. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        if not weekday and not time:
+            await interaction.followup.send(
+                'This is not a valid time and date. An example would be `Wednesday 4:00 PM`. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        assert weekday
+        assert time
+
+        # Let's make sure a gameday with this time and weekday doesn't exist already
+        bucket = self.gameday_time.bucket
+        if bucket is None:
+            raise RuntimeError('Gameday time does not have a bucket.')
+
+        for game_time in bucket.gameday_times.values():
+            if game_time.weekday == weekday and game_time.starts_at == time:
+                await interaction.followup.send(
+                    f'There is already a gameday time for {weekday.name.title()} at {time.strftime("%I:%M %p")}.',
+                    ephemeral=True,
+                )
+                return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        # Let's edit this gametime's weekday and time, then update any gamedays that have not started
+        # that use this gameday time.
+        async with self.bot.safe_connection() as connection:
+            await self.gameday_time.edit(connection=connection, weekday=weekday, starts_at=time)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Edit Gameday Time and Weekday', style=discord.ButtonStyle.green)
     async def edit_gameday_time(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        ...
+        modal = AfterModal(
+            self.bot,
+            self._edit_gameday_time_after,
+            discord.ui.TextInput(
+                label='New Weekday and Time', placeholder='Format: Weekday Hour:Minute AM/PM. Example: Wednesday 4:00 PM'
+            ),
+            title='Change Gameday Time and Weekday',
+            timeout=None,
+        )
+        return await interaction.response.send_modal(modal)
 
     @discord.ui.button(label='Delete Gameday Time', style=discord.ButtonStyle.red)
     async def delete_gameday_time(
