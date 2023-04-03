@@ -30,7 +30,8 @@ from typing import TYPE_CHECKING, Dict, List, NamedTuple, Tuple, Union
 import discord
 from typing_extensions import Self, Unpack
 
-from utils import BaseView, MultiSelector, AfterModal
+from utils import BaseView, MultiSelector, AfterModal, human_timestamp
+from utils.ui.select import UserSelect
 
 from .gameday import (
     Gameday,
@@ -162,9 +163,9 @@ class SelectGamedayTime(MultiSelector['GamedayTimeManagementPanel', 'GamedayTime
 
 
 class GamedayMemberPanel(BaseView):
-    def __init__(self, member: GamedayMember, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, member: GamedayMemberInformation, **kwargs: Unpack[BaseViewKwargs]) -> None:
         super().__init__(**kwargs)
-        self.member: GamedayMember = member
+        self.member: GamedayMemberInformation = member
 
     @property
     def embed(self) -> discord.Embed:
@@ -192,14 +193,118 @@ class GamedayPanel(BaseView):
     def embed(self) -> discord.Embed:
         embed = self.bot.Embed(
             title='Gameday Management',
+            description=f'Use the buttons below to manage the gameday {self.gameday.id}.',
         )
 
-    @discord.ui.button(label='Manage Members')
-    async def manage_members(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        ...
+        stars_ends_info: List[str] = [
+            f'**Starts at**: {human_timestamp(self.gameday.starts_at)}',
+            f'**Ends at**: {human_timestamp(self.gameday.ended_at) if self.gameday.ended_at else "This gameday has not ended."}',
+        ]
+        embed.add_field(
+            name='Starts and Ends',
+            value='\n'.join(stars_ends_info),
+            inline=False,
+        )
+
+        member_mentions = ', '.join(member.mention for member in self.gameday.get_members())
+        embed.add_field(
+            name='Attending Members', value=member_mentions or 'No members have joined this gameday yet.', inline=False
+        )
+
+        image_hyperlinks = ', '.join(
+            f'[image-{count}]({image.url})' for count, image in enumerate(self.gameday.images.values(), start=1)
+        )
+        embed.add_field(
+            name='Images', value=image_hyperlinks or 'No supporting images have been added to this gameday.', inline=False
+        )
+
+        embed.add_field(
+            name='Automatic Sub Finding',
+            value=f'Automatic sub finding is {"enabled" if self.gameday.automatic_sub_finding else "disabled"}.',
+            inline=False,
+        )
+
+        attendance_voting_info: List[str] = [
+            f'Voting Starts At: {human_timestamp(self.gameday.voting.starts_at)}',
+            f'Voting Ends At: {human_timestamp(self.gameday.voting.ends_at)}',
+        ]
+
+        embed.add_field(
+            name='Attendance Voting Information',
+            value='\n'.join(attendance_voting_info),
+        )
+
+        return embed
+
+    async def _manage_member_after(
+        self, interaction: discord.Interaction[FuryBot], members: List[Union[discord.Member, discord.User]]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        member = members[0]
+        assert isinstance(member, discord.Member)
+
+        gameday_member = self.gameday.get_member(member.id)
+        if gameday_member is None:
+            await interaction.followup.send(f'{member.mention} is not a member of this gameday.', ephemeral=True)
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        information = GamedayMemberInformation(gameday=gameday_member, discord=member)
+        view = self.create_child(GamedayMemberPanel, member=information)
+        return await interaction.edit_original_response(view=view, embed=view.embed)
+
+    @discord.ui.button(label='Manage Member')
+    async def manage_members(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        UserSelect(
+            after=self._manage_member_after,
+            parent=self,
+            placeholder='Select a member to manage.',
+        )
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    async def _add_members_to_gameday_after(
+        self, interaction: discord.Interaction[FuryBot], members: List[Union[discord.Member, discord.User]]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            for member in members:
+                if not isinstance(member, discord.Member):
+                    continue
+
+                await GamedayMember.create(
+                    self.bot,
+                    connection=connection,
+                    member_id=member.id,
+                    team_id=self.gameday.team_id,
+                    guild_id=self.gameday.guild_id,
+                    bucket_id=self.gameday.bucket_id,
+                    gameday_id=self.gameday.id,
+                    reason=None,
+                )
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Add Members To Gameday')
+    async def add_member_to_gameday(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        UserSelect(
+            after=self._add_members_to_gameday_after,
+            parent=self,
+            placeholder='Select members to add to this gameday.',
+        )
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Skip This Gameday (bye week)')
     async def skip_gameday(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        # Instead of legit skipping it let's just reschedule it for the next week lol
         ...
 
     @discord.ui.button(label='Manage Images')

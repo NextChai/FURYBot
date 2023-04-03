@@ -42,6 +42,7 @@ from .ui import *
 
 if TYPE_CHECKING:
     import discord
+    import datetime
 
     BV = TypeVar('BV', bound='discord.ui.View')
     ButtonCallback = Callable[[BV, discord.Interaction[Any], discord.ui.Button[BV]], Coroutine[Any, Any, Any]]
@@ -88,6 +89,10 @@ def default_button_doc_string(func: ButtonCallback[BV]) -> ButtonCallback[BV]:
     """
     func.__doc__ = default_doc.format(doc=func.__doc__ or '')
     return func
+
+
+def human_timestamp(dt: datetime.datetime) -> str:
+    return f'{discord.utils.format_dt(dt, "F")} ({discord.utils.format_dt(dt, "R")})'
 
 
 def human_join(iterable: Iterable[Any], /, *, last: str = 'and', delimiter: str = ',') -> str:

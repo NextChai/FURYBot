@@ -809,6 +809,25 @@ class Gameday:
             builder.add_arg('ended_at', ended_at)
             self.ended_at = ended_at
 
+        if self.bot.timer_manager:
+            updating_timers = [
+                (starts_at, self.fetch_starts_at_timer),
+                (voting_starts_at, self.voting.fetch_starts_at_timer),
+                (voting_ends_at, self.voting.fetch_ends_at_timer),
+            ]
+
+            for new_datetime, coro in updating_timers:
+                if new_datetime is MISSING:
+                    continue
+
+                try:
+                    timer = await coro(connection=connection)
+                except TimerNotFound:
+                    continue
+                else:
+                    if timer is not None:
+                        await timer.edit(expires=new_datetime)
+
         await builder(connection)
 
 
