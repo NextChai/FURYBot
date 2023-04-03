@@ -162,6 +162,16 @@ class SelectGamedayTime(MultiSelector['GamedayTimeManagementPanel', 'GamedayTime
         return await interaction.edit_original_response(view=view, embed=view.embed)
 
 
+class GamedayImagePanel(BaseView):
+    def __init__(self, gameday: Gameday, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+        self.gameday: Gameday = gameday
+
+    @property
+    def embed(self) -> discord.Embed:
+        ...
+
+
 class GamedayMemberPanel(BaseView):
     def __init__(self, member: GamedayMemberInformation, **kwargs: Unpack[BaseViewKwargs]) -> None:
         super().__init__(**kwargs)
@@ -174,14 +184,56 @@ class GamedayMemberPanel(BaseView):
     @discord.ui.button(label='Toggle Is Temporary Sub')
     async def toggle_is_temporary_sub(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> None:
-        ...
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            await self.member.gameday.edit(connection=connection, is_temporary_sub=not self.member.gameday.is_temporary_sub)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Remove Member From Gameday')
     async def remove_member_from_gameday(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> None:
-        ...
+    ) -> discord.InteractionMessage:
+        """A button to remove this member from the gameday."""
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            await self.member.gameday.delete(connection=connection)
+
+        gameday = self.member.gameday.gameday
+        assert gameday
+
+        panel = GamedayPanel(gameday, target=interaction)
+        return await interaction.edit_original_response(view=panel, embed=panel.embed)
+
+    async def _edit_reason_after(
+        self, interaction: discord.Interaction[FuryBot], reason_input: discord.ui.TextInput[AfterModal]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            await self.member.gameday.edit(connection=connection, reason=reason_input.value)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Edit Reason')
+    async def edit_reason(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        """A button to edit the reason for this member not coming to this gameday."""
+        modal = AfterModal(
+            self.bot,
+            self._edit_reason_after,
+            discord.ui.TextInput(
+                label='New Reason',
+                style=discord.TextStyle.long,
+                placeholder='Enter the new reason for this member not coming to this gameday.',
+                max_length=2000,
+            ),
+            title='Change Reason',
+            timeout=None,
+        )
+        return await interaction.response.send_modal(modal)
 
 
 class GamedayPanel(BaseView):
@@ -303,9 +355,26 @@ class GamedayPanel(BaseView):
         return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Skip This Gameday (bye week)')
-    async def skip_gameday(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+    async def skip_gameday(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
         # Instead of legit skipping it let's just reschedule it for the next week lol
-        ...
+        await interaction.response.defer()
+
+        if self.gameday.ended_at:
+            await interaction.followup.send('This gameday has already ended.', ephemeral=True)
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        offset = datetime.timedelta(days=7)
+        async with self.bot.safe_connection() as connection:
+            await self.gameday.edit(
+                connection=connection,
+                starts_at=self.gameday.starts_at + offset,
+                voting_starts_at=self.gameday.voting.starts_at + offset,
+                voting_ends_at=self.gameday.voting.ends_at + offset,
+            )
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Manage Images')
     async def manage_images(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:

@@ -198,13 +198,17 @@ class GamedayMember:
 
         gameday.remove_member(self.id)
 
-    async def edit(self, connection: ConnectionType, *, reason: str = MISSING) -> None:
+    async def edit(self, connection: ConnectionType, *, reason: str = MISSING, is_temporary_sub: bool = MISSING) -> None:
         builder = QueryBuilder('teams.gameday_members')
         builder.add_condition('id', self.id)
 
         if reason is not MISSING:
             builder.add_arg('reason', reason)
             self.reason = reason
+        
+        if is_temporary_sub is not MISSING:
+            builder.add_arg('is_temporary_sub', is_temporary_sub)
+            self.is_temporary_sub = is_temporary_sub
 
         await builder(connection)
 
