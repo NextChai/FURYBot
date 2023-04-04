@@ -78,7 +78,7 @@ class BadArgument(ApplicationCommandException):
     pass
 
 
-class TimerNotFound(Exception):
+class TimerNotFound(BaseException):
     """An exception raised when a timer is not found.
 
     This inherits from :class:`BotException`
