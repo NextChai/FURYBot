@@ -179,7 +179,36 @@ class GamedayMemberPanel(BaseView):
 
     @property
     def embed(self) -> discord.Embed:
-        ...
+        """:class:`discord.Embed`: The embed representing this panel."""
+        discord_member = self.member.discord
+        gameday_member = self.member.gameday
+
+        team = gameday_member.team
+        if team is None:
+            raise RuntimeError('Gameday member does not have a team.')
+
+        embed = team.embed(
+            title=f'{discord_member.display_name} Gameday Management',
+            description=f'Use the buttons below to manage {discord_member.mention}\'s gameday.',
+        )
+
+        if gameday_member.is_attending:
+            embed.add_field(name='Attendance', value='Member has attended this gameday.', inline=False)
+        else:
+            embed.add_field(
+                name='Attendance',
+                value=f'This member is not attending this gameday.\n`Reason`: {gameday_member.reason}',
+                inline=False,
+            )
+
+        if gameday_member.is_temporary_sub:
+            embed.add_field(
+                name='Temporary Sub',
+                value=f'This member is a temporary sub, meaning that after this gameday is over they '
+                'will automatically be removed from the team\'s sub roster.',
+            )
+
+        return embed
 
     @discord.ui.button(label='Toggle Is Temporary Sub')
     async def toggle_is_temporary_sub(
