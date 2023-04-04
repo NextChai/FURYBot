@@ -41,8 +41,9 @@ from .types import *
 from .ui import *
 
 if TYPE_CHECKING:
-    import discord
     import datetime
+
+    import discord
 
     BV = TypeVar('BV', bound='discord.ui.View')
     ButtonCallback = Callable[[BV, discord.Interaction[Any], discord.ui.Button[BV]], Coroutine[Any, Any, Any]]

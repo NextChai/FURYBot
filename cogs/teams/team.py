@@ -31,13 +31,12 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union,
 import discord
 from typing_extensions import Self
 
-
 from utils import QueryBuilder, human_join
 
 if TYPE_CHECKING:
-    from bot import FuryBot, ConnectionType
+    from bot import ConnectionType, FuryBot
 
-    from .gamedays_rewritten.gameday import GamedayBucket
+    from .gamedays.gameday import GamedayBucket
     from .practices import Practice
     from .scrims import Scrim
 

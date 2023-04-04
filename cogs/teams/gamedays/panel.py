@@ -25,31 +25,28 @@ from __future__ import annotations
 
 import datetime
 import re
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, NamedTuple, Tuple, Union
 
 import discord
-import pytz
 from typing_extensions import Self, Unpack
 
-from utils import AfterModal, BaseView, BaseViewKwargs, MultiSelector, default_button_doc_string, find_home
-from utils.ui.select import UserSelect
+from utils import AfterModal, BaseView, MultiSelector, human_timestamp, image_from_urls, image_to_file
+from utils.ui.select import SelectOneOfMany, UserSelect
 
-from .gameday import GamedayBucket, Weekday, get_next_gameday_time
+from .gameday import Gameday, GamedayBucket, GamedayImage, GamedayMember, GamedayTime, Weekday
 
 if TYPE_CHECKING:
     from bot import FuryBot
-
-    from ..team import Team
-    from .gameday import Gameday, GamedayMember
+    from utils import BaseViewKwargs
 
 WEEKDAY_TIME_REGEX = re.compile(
     r'(?P<weekday>\w+)(?:\s+)(?P<hour>[0-9]{1,})\:(?P<minute>[0-9]+)(?:\s+)?(?P<am_pm>AM|PM)?', re.IGNORECASE
 )
 
-EST = pytz.timezone("Us/Eastern")
+GamedayMemberInformation = NamedTuple('GamedayMemberInformation', [('gameday', GamedayMember), ('discord', discord.Member)])
 
 
-def parse_time_and_date(value: str) -> Tuple[Optional[Weekday], Optional[datetime.time]]:
+def parse_time_and_date(value: str) -> Union[Tuple[None, None], Tuple[Weekday, datetime.time]]:
     match = WEEKDAY_TIME_REGEX.match(value.lower())
     if not match:
         return None, None
@@ -70,38 +67,477 @@ def parse_time_and_date(value: str) -> Tuple[Optional[Weekday], Optional[datetim
     return (weekday_enum, time)
 
 
-class CreateGamedayBucketPanel(BaseView):
-    def __init__(self, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+class SelectGameday(MultiSelector['GamedayBucketPanel', 'Gameday']):
+    def __init__(self, *, parent: GamedayBucketPanel) -> None:
+        super().__init__(
+            parent=parent,
+            items=list(parent.bucket.get_gamedays()),
+            per_page=5,
+            modal_title='Choose Gameday',
+            modal_item=discord.ui.TextInput(
+                label='Enter Gameday ID',
+                placeholder='Enter the Gameday ID you chose from the embed.',
+            ),
+        )
+
+    def create_embed(self, gamedays: List[Gameday]) -> discord.Embed:
+        team = self.parent.bucket.team
+        assert team  # We can not get here without a team
+
+        embed = team.embed(
+            title=f'Select A Gameday',
+            description='Use the "Choose Gameday" button to type in the ID of the gameday you want to manage.',
+        )
+
+        now = discord.utils.utcnow()
+        for gameday in gamedays:
+            metadata: List[str] = [f'`ID`: {gameday.id}']
+
+            verbage = 'Starts At' if gameday.starts_at > now else 'Started At'
+            metadata.append(
+                f'`{verbage}`: {discord.utils.format_dt(gameday.starts_at, "F")} ({discord.utils.format_dt(gameday.starts_at, "R")})'
+            )
+
+            if gameday.ended_at is not None:
+                metadata.append(
+                    f'`Ended At`: {discord.utils.format_dt(gameday.ended_at, "F")} ({discord.utils.format_dt(gameday.ended_at, "R")})'
+                )
+            else:
+                metadata.append('`Status`: Gameday has not ended.')
+
+            # Add some info about the members playing
+            mentions: List[str] = []
+            for member in gameday.get_members():
+                if member.is_attending:
+                    mentions.append(member.mention)
+                else:
+                    mentions.append(f'~~{member.mention}~~')
+
+            if mentions:
+                metadata.append(f'`Members`: {", ".join(mentions)}')
+
+            embed.add_field(name=f'Gameday {gameday.id}', value='\n'.join(metadata), inline=False)
+
+        return embed
+
+    def hash_item(self, gameday: Gameday) -> str:
+        return str(gameday.id)
+
+    async def on_item_chosen(self, interaction: discord.Interaction[FuryBot], item: Gameday) -> None:
+        view = self.parent.create_child(GamedayPanel, gameday=item)
+        return await interaction.response.edit_message(view=view, embed=view.embed)
+
+
+class SelectGamedayTime(MultiSelector['GamedayTimeManagementPanel', 'GamedayTime']):
+    def __init__(self, *, parent: GamedayTimeManagementPanel):
+        super().__init__(
+            parent=parent,
+            items=list(parent.gameday_times.values()),
+            per_page=10,
+            modal_title='Choose Gameday Time',
+            modal_item=discord.ui.TextInput(
+                label='Enter Gameday Time ID',
+                placeholder='Enter the Gameday Time ID you chose from the embed.',
+            ),
+        )
+
+    def create_embed(self, gamedays: List[GamedayTime]) -> discord.Embed:
+        ...
+
+    def hash_item(self, gameday: GamedayTime) -> str:
+        return str(gameday.id)
+
+    async def on_item_chosen(
+        self, interaction: discord.Interaction[FuryBot], item: GamedayTime
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        view = self.parent.create_child(ManageGamedayTime, gameday_time=item)
+        return await interaction.edit_original_response(view=view, embed=view.embed)
+
+
+class GamedayImagePanel(BaseView):
+    def __init__(self, gameday_image: GamedayImage, **kwargs: Unpack[BaseViewKwargs]) -> None:
         super().__init__(**kwargs)
-        self.team: Team = team
+        self.gameday_image: GamedayImage = gameday_image
 
     @property
     def embed(self) -> discord.Embed:
-        embed = self.team.embed(
-            title='What is a Gameday Bucket?',
-            description=f'A gameday bucket is how you can track this team\'s gamedays against other teams. '
-            'Each team can have one gameday bucket. After setup, during a given scheduled esports game day, '
-            'the bot will help the team members track their wins and losses against other teams to neatly '
-            'organize the information to the team\'s captains for easy viewing. Statistics can be created from this as well as'
-            'tracking the teams overall performance.',
+        team = self.gameday_image.team
+        if team is None:
+            raise ValueError('GamedayImage does not have a team.')
+
+        embed = team.embed(
+            title=f'Manage Gameday Image {self.gameday_image.id}',
+            description='Use the buttons below to manage this gameday image.',
+        )
+
+        embed.set_image(url=self.gameday_image.url)
+
+        embed.add_field(name='Uploader', value=f'<@{self.gameday_image.uploader_id}>', inline=False)
+        embed.add_field(name='Uploaded At', value=human_timestamp(self.gameday_image.uploaded_at), inline=False)
+
+        return embed
+
+    async def _change_uploader_after(
+        self, interaction: discord.Interaction[FuryBot], members: List[Union[discord.Member, discord.User]]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        member = members[0]
+
+        async with self.bot.safe_connection() as connection:
+            await self.gameday_image.edit(connection, uploader_id=member.id)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Change Uploader')
+    async def change_uploader(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        UserSelect(
+            after=self._change_uploader_after,
+            parent=self,
+            placeholder='Select a member to change the uploader to.',
+        )
+        return await interaction.response.edit_message(view=self)
+
+    @discord.ui.button(label='Delete Image', style=discord.ButtonStyle.danger)
+    async def delete(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            await self.gameday_image.delete(connection=connection)
+
+        gameday = self.gameday_image.gameday
+        if gameday is None:
+            raise RuntimeError('Gameday does not exist.')
+
+        panel = GamedayImagesPanel(gameday=gameday, target=interaction)
+        return await interaction.edit_original_response(view=panel, embed=panel.embed)
+
+
+class GamedayImagesPanel(BaseView):
+    def __init__(self, gameday: Gameday, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+        self.gameday: Gameday = gameday
+        self.images: Dict[int, GamedayImage] = gameday.images
+
+    @property
+    def embed(self) -> discord.Embed:
+        team = self.gameday.team
+        if team is None:
+            raise RuntimeError('Gameday does not have a team.')
+
+        embed = team.embed(title='Gameday Images', description=f'This gameday has {len(self.images)} images attached to it.')
+
+        for image in self.images.values():
+            image_metadata = [
+                f'**ID**: {image.id}',
+                f'**URL**: [Click here]({image.url})',
+                f'**Uploaded by**: <@{image.uploader_id}>',
+                f'**UPloaded at:** {human_timestamp(image.uploaded_at)}',
+            ]
+            embed.add_field(name=f'Image {image.id}', value='\n'.join(image_metadata), inline=False)
+
+        return embed
+
+    async def _manage_image_after(
+        self, interaction: discord.Interaction[FuryBot], selected_images: List[str]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        selected_image_id = int(selected_images[0])
+        selected_image = self.images[selected_image_id]
+
+        panel = self.create_child(GamedayImagePanel, gameday_image=selected_image)
+        return await interaction.edit_original_response(embed=panel.embed, view=panel)
+
+    @discord.ui.button(label='Manage Image')
+    async def manage_image(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        SelectOneOfMany(
+            self,
+            options=[
+                discord.SelectOption(
+                    label=f'{image.id}-{image.uploader_id}-{image.uploaded_at}',
+                    value=str(image.id),
+                )
+                for image in self.images.values()
+            ],
+            after=self._manage_image_after,
+            placeholder='Select a Gameday Image...',
+        )
+        return await interaction.response.edit_message(view=self)
+
+    @discord.ui.button(label='View All Images')
+    async def view_all_images(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        await interaction.response.defer()
+
+        image = await image_from_urls(
+            self.bot, urls=[i.url for i in self.images.values()], images_per_row=3, frame_width=1920, normalize_images=True
+        )
+        file = image_to_file(image, filename='gameday_images.png', description='The merged image for all gameday images.')
+
+        await interaction.followup.send(
+            file=file, content='You can view each image indivudually using the "Manage Image" button.'
+        )
+
+
+class GamedayMemberPanel(BaseView):
+    def __init__(self, member: GamedayMemberInformation, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+        self.member: GamedayMemberInformation = member
+
+    @property
+    def embed(self) -> discord.Embed:
+        """:class:`discord.Embed`: The embed representing this panel."""
+        discord_member = self.member.discord
+        gameday_member = self.member.gameday
+
+        team = gameday_member.team
+        if team is None:
+            raise RuntimeError('Gameday member does not have a team.')
+
+        embed = team.embed(
+            title=f'{discord_member.display_name} Gameday Management',
+            description=f'Use the buttons below to manage {discord_member.mention}\'s gameday.',
+        )
+
+        if gameday_member.is_attending:
+            embed.add_field(name='Attendance', value='Member has attended this gameday.', inline=False)
+        else:
+            embed.add_field(
+                name='Attendance',
+                value=f'This member is not attending this gameday.\n`Reason`: {gameday_member.reason}',
+                inline=False,
+            )
+
+        if gameday_member.is_temporary_sub:
+            embed.add_field(
+                name='Temporary Sub',
+                value=f'This member is a temporary sub, meaning that after this gameday is over they '
+                'will automatically be removed from the team\'s sub roster.',
+            )
+
+        return embed
+
+    @discord.ui.button(label='Toggle Is Temporary Sub')
+    async def toggle_is_temporary_sub(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            await self.member.gameday.edit(connection=connection, is_temporary_sub=not self.member.gameday.is_temporary_sub)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Remove Member From Gameday')
+    async def remove_member_from_gameday(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        """A button to remove this member from the gameday."""
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            await self.member.gameday.delete(connection=connection)
+
+        gameday = self.member.gameday.gameday
+        assert gameday
+
+        panel = GamedayPanel(gameday, target=interaction)
+        return await interaction.edit_original_response(view=panel, embed=panel.embed)
+
+    async def _edit_reason_after(
+        self, interaction: discord.Interaction[FuryBot], reason_input: discord.ui.TextInput[AfterModal]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            await self.member.gameday.edit(connection=connection, reason=reason_input.value)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Edit Reason')
+    async def edit_reason(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        """A button to edit the reason for this member not coming to this gameday."""
+        modal = AfterModal(
+            self.bot,
+            self._edit_reason_after,
+            discord.ui.TextInput(
+                label='New Reason',
+                style=discord.TextStyle.long,
+                placeholder='Enter the new reason for this member not coming to this gameday.',
+                max_length=2000,
+            ),
+            title='Change Reason',
+            timeout=None,
+        )
+        return await interaction.response.send_modal(modal)
+
+
+class GamedayPanel(BaseView):
+    def __init__(self, gameday: Gameday, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+        self.gameday = gameday
+
+    @property
+    def embed(self) -> discord.Embed:
+        embed = self.bot.Embed(
+            title='Gameday Management',
+            description=f'Use the buttons below to manage the gameday {self.gameday.id}.',
+        )
+
+        stars_ends_info: List[str] = [
+            f'**Starts at**: {human_timestamp(self.gameday.starts_at)}',
+            f'**Ends at**: {human_timestamp(self.gameday.ended_at) if self.gameday.ended_at else "This gameday has not ended."}',
+        ]
+        embed.add_field(
+            name='Starts and Ends',
+            value='\n'.join(stars_ends_info),
+            inline=False,
+        )
+
+        member_mentions = ', '.join(member.mention for member in self.gameday.get_members())
+        embed.add_field(
+            name='Attending Members', value=member_mentions or 'No members have joined this gameday yet.', inline=False
+        )
+
+        image_hyperlinks = ', '.join(
+            f'[image-{count}]({image.url})' for count, image in enumerate(self.gameday.images.values(), start=1)
+        )
+        embed.add_field(
+            name='Images', value=image_hyperlinks or 'No supporting images have been added to this gameday.', inline=False
         )
 
         embed.add_field(
-            name='What is so gain from this?',
-            value=f'When you have a Gameday bucket added to a given team, the team will automatically recieve '
-            'notifications a day in advance of the scheduled gameday to remind them. The bot will have the '
-            'team members mark their attendance, and if needed, can automatically find sub replacements '
-            'for the team.',
+            name='Automatic Sub Finding',
+            value=f'Automatic sub finding is {"enabled" if self.gameday.automatic_sub_finding else "disabled"}.',
+            inline=False,
+        )
+
+        attendance_voting_info: List[str] = [
+            f'Voting Starts At: {human_timestamp(self.gameday.voting.starts_at)}',
+            f'Voting Ends At: {human_timestamp(self.gameday.voting.ends_at)}',
+        ]
+
+        embed.add_field(
+            name='Attendance Voting Information',
+            value='\n'.join(attendance_voting_info),
         )
 
         return embed
 
-    async def _get_gametime_after(
-        self,
-        interaction: discord.Interaction[FuryBot],
-        weekday_time_input: discord.ui.TextInput[AfterModal],
-        members_per_team_input: discord.ui.TextInput[AfterModal],
-        best_of_input: discord.ui.TextInput[AfterModal],
+    async def _manage_member_after(
+        self, interaction: discord.Interaction[FuryBot], members: List[Union[discord.Member, discord.User]]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        member = members[0]
+        assert isinstance(member, discord.Member)
+
+        gameday_member = self.gameday.get_member(member.id)
+        if gameday_member is None:
+            await interaction.followup.send(f'{member.mention} is not a member of this gameday.', ephemeral=True)
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        information = GamedayMemberInformation(gameday=gameday_member, discord=member)
+        view = self.create_child(GamedayMemberPanel, member=information)
+        return await interaction.edit_original_response(view=view, embed=view.embed)
+
+    @discord.ui.button(label='Manage Member')
+    async def manage_members(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        UserSelect(
+            after=self._manage_member_after,
+            parent=self,
+            placeholder='Select a member to manage.',
+        )
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    async def _add_members_to_gameday_after(
+        self, interaction: discord.Interaction[FuryBot], members: List[Union[discord.Member, discord.User]]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            for member in members:
+                if not isinstance(member, discord.Member):
+                    continue
+
+                await GamedayMember.create(
+                    self.bot,
+                    connection=connection,
+                    member_id=member.id,
+                    team_id=self.gameday.team_id,
+                    guild_id=self.gameday.guild_id,
+                    bucket_id=self.gameday.bucket_id,
+                    gameday_id=self.gameday.id,
+                    reason=None,
+                )
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Add Members To Gameday')
+    async def add_member_to_gameday(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        UserSelect(
+            after=self._add_members_to_gameday_after,
+            parent=self,
+            placeholder='Select members to add to this gameday.',
+        )
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Skip This Gameday (bye week)')
+    async def skip_gameday(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        # Instead of legit skipping it let's just reschedule it for the next week lol
+        await interaction.response.defer()
+
+        if self.gameday.ended_at:
+            await interaction.followup.send('This gameday has already ended.', ephemeral=True)
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        offset = datetime.timedelta(days=7)
+        async with self.bot.safe_connection() as connection:
+            await self.gameday.edit(
+                connection=connection,
+                starts_at=self.gameday.starts_at + offset,
+                voting_starts_at=self.gameday.voting.starts_at + offset,
+                voting_ends_at=self.gameday.voting.ends_at + offset,
+            )
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Manage Images')
+    async def manage_images(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        ...
+
+
+class ManageGamedayTime(BaseView):
+    def __init__(self, gameday_time: GamedayTime, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+        self.gameday_time = gameday_time
+
+    @property
+    def embed(self) -> discord.Embed:
+        embed = self.bot.Embed(
+            title='Manage Gameday Time',
+            description='Use the buttons below to manage this gameday time.',
+        )
+        embed.add_field(name='Weekday', value=self.gameday_time.weekday.name.title(), inline=False)
+        embed.add_field(name='Starts At', value=self.gameday_time.starts_at.strftime('%I:%M %p'), inline=False)
+        return embed
+
+    async def _edit_gameday_time_after(
+        self, interaction: discord.Interaction[FuryBot], weekday_time_input: discord.ui.TextInput[AfterModal]
     ) -> discord.InteractionMessage:
         await interaction.response.defer()
 
@@ -130,349 +566,160 @@ class CreateGamedayBucketPanel(BaseView):
         assert weekday
         assert time
 
-        try:
-            members_per_team = int(members_per_team_input.value)
-        except ValueError:
-            await interaction.followup.send(
-                'You did not enter a valid number of members per team. Feel free to try again.', ephemeral=True
-            )
-            return await interaction.edit_original_response(view=self, embed=self.embed)
+        # Let's make sure a gameday with this time and weekday doesn't exist already
+        bucket = self.gameday_time.bucket
+        if bucket is None:
+            raise RuntimeError('Gameday time does not have a bucket.')
 
-        try:
-            best_of = int(best_of_input.value)
-        except ValueError:
-            await interaction.followup.send(
-                'You did not enter a valid number of games to play in a match. Feel free to try again.', ephemeral=True
-            )
-            return await interaction.edit_original_response(view=self, embed=self.embed)
+        for game_time in bucket.gameday_times.values():
+            if game_time.weekday == weekday and game_time.starts_at == time:
+                await interaction.followup.send(
+                    f'There is already a gameday time for {weekday.name.title()} at {time.strftime("%I:%M %p")}.',
+                    ephemeral=True,
+                )
+                return await interaction.edit_original_response(view=self, embed=self.embed)
 
-        # We can create a bucket now!
-        bucket = await GamedayBucket.create(
+        # Let's edit this gametime's weekday and time, then update any gamedays that have not started
+        # that use this gameday time.
+        async with self.bot.safe_connection() as connection:
+            await self.gameday_time.edit(connection=connection, weekday=weekday, starts_at=time)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Edit Gameday Time and Weekday', style=discord.ButtonStyle.green)
+    async def edit_gameday_time(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        modal = AfterModal(
             self.bot,
-            guild_id=self.team.guild_id,
-            team_id=self.team.id,
-            members_on_team=members_per_team,
-            weekday=weekday,
-            game_time=time,
-            best_of=best_of,
-            automatic_sub_finding=False,
+            self._edit_gameday_time_after,
+            discord.ui.TextInput(
+                label='New Weekday and Time', placeholder='Format: Weekday Hour:Minute AM/PM. Example: Wednesday 4:00 PM'
+            ),
+            title='Change Gameday Time and Weekday',
+            timeout=None,
         )
+        return await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label='Delete Gameday Time', style=discord.ButtonStyle.red)
+    async def delete_gameday_time(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            await self.gameday_time.delete(connection=connection)
+
+        # Let's *try* and find the bucket from this gameday time
+        bucket = self.gameday_time.bucket
+        if bucket is None:
+            raise ValueError('Gameday time has no bucket.')
 
         view = GamedayBucketPanel(bucket, target=interaction)
-        return await interaction.edit_original_response(embed=view.embed, view=view)
+        return await interaction.edit_original_response(view=view, embed=view.embed)
 
-    @discord.ui.button(label='Create Gameday Bucket', style=discord.ButtonStyle.green)
-    async def create_gameday_bucket(
+
+class GamedayTimeManagementPanel(BaseView):
+    def __init__(self, bucket: GamedayBucket, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+        self.bucket: GamedayBucket = bucket
+        self.gameday_times: Dict[int, GamedayTime] = bucket.gameday_times
+
+    @property
+    def embed(self) -> discord.Embed:
+        team = self.bucket.team
+        if team is None:
+            raise ValueError('Gameday bucket has no team.')
+
+        embed = team.embed(title=f'Game Time Management')
+
+        for gameday_time in self.gameday_times.values():
+            metadata = [
+                f'**ID**: {gameday_time.id}',
+                f'**Time**: {gameday_time.starts_at.strftime("%I:%M %p")}',
+                f'**Wekday**: {gameday_time.weekday.name.title()}',
+            ]
+            embed.add_field(name=f'Gameday Time {gameday_time.id}', value='\n'.join(metadata), inline=False)
+
+        return embed
+
+    async def _create_new_gametime_after(
+        self,
+        interaction: discord.Interaction,
+        weekday_time_input: discord.ui.TextInput[AfterModal],
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        try:
+            weekday, time = parse_time_and_date(weekday_time_input.value)
+        except KeyError:
+            await interaction.followup.send(
+                'This is not a valid weekday. An example would be `Tuesday 5:00 PM`. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+        except ValueError as exc:
+            await interaction.followup.send(
+                f'You did not enter a valid time. {str(exc).capitalize()}. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        if not weekday and not time:
+            await interaction.followup.send(
+                'This is not a valid time and date. An example would be `Wednesday 4:00 PM`. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        assert weekday
+        assert time
+
+        # Let's make sure a gameday with this time and weekday doesn't exist already
+        for game_time in self.gameday_times.values():
+            if game_time.weekday == weekday and game_time.starts_at == time:
+                await interaction.followup.send(
+                    f'There is already a gameday time for {weekday.name.title()} at {time.strftime("%I:%M %p")}.',
+                    ephemeral=True,
+                )
+                return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        # Let's create a new gametime, this will spawn the gameday and timers
+        # accordingly.
+        async with self.bot.safe_connection() as connection:
+            await GamedayTime.create(
+                self.bot,
+                connection=connection,
+                guild_id=self.bucket.guild_id,
+                team_id=self.bucket.team_id,
+                bucket_id=self.bucket.id,
+                weekday=weekday,
+                starts_at=time,
+            )
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Create New Gameday Time', style=discord.ButtonStyle.green)
+    async def create_new_gameday_time(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> None:
         modal = AfterModal(
             self.bot,
-            self._get_gametime_after,
+            self._create_new_gametime_after,
             discord.ui.TextInput(
                 label='Enter Time and Date.',
                 placeholder='Format: Weekday Hour:Minute AM/PM. Example: Wednesday 4:00 PM',
                 required=True,
             ),
-            discord.ui.TextInput(
-                label='Members On a Team During a Match',
-                placeholder='How many members play on a team during a match?',
-            ),
-            discord.ui.TextInput(
-                label="Best of?", placeholder='What is the best of? Example: 5 (first team to get to 3 wins)'
-            ),
-            title='Create Gameday Bucket',
+            title='Create Gameday Time',
             timeout=None,
         )
-
         return await interaction.response.send_modal(modal)
 
-
-class SelectGameday(MultiSelector['GamedayBucketPanel', 'Gameday']):
-    def __init__(self, *, parent: GamedayBucketPanel) -> None:
-        super().__init__(
-            parent=parent,
-            items=list(parent.bucket.get_gamedays().values()),
-            per_page=5,
-            modal_title='Choose Gameday',
-            modal_item=discord.ui.TextInput(
-                label='Enter Gameday ID',
-                placeholder='Enter the Gameday ID you selected from the embed.',
-            ),
-        )
-
-    def create_embed(self, gamedays: List[Gameday]) -> discord.Embed:
-        embed = self.parent.bucket.team.embed(
-            title=f'Select A Gameday',
-            description='Use the "Choose Gameday" button to type in the ID of the gameday you want to manage.',
-        )
-
-        now = discord.utils.utcnow()
-        for gameday in gamedays:
-            metadata: List[str] = [f'`ID`: {gameday.id}']
-
-            verbage = 'Starts At' if gameday.started_at > now else 'Started At'
-            metadata.append(
-                f'`{verbage}`: {discord.utils.format_dt(gameday.started_at, "F")} ({discord.utils.format_dt(gameday.started_at, "R")})'
-            )
-
-            if gameday.ended_at is not None:
-                metadata.append(
-                    f'`Ended At`: {discord.utils.format_dt(gameday.ended_at, "F")} ({discord.utils.format_dt(gameday.ended_at, "R")})'
-                )
-            else:
-                metadata.append('`Status`: Gameday has not ended.')
-
-            # Add some info about the members playing
-            members = gameday.get_members()
-            mentions: List[str] = []
-            for member in members.values():
-                if member.is_attending:
-                    mentions.append(member.mention)
-                else:
-                    mentions.append(f'~~{member.mention}~~')
-
-            if mentions:
-                metadata.append(f'`Members`: {", ".join(mentions)}')
-
-            embed.add_field(name=f'Gameday {gameday.id}', value='\n'.join(metadata), inline=False)
-
-        return embed
-
-    def hash_item(self, gameday: Gameday) -> str:
-        return str(gameday.id)
-
-    async def on_item_chosen(self, interaction: discord.Interaction[FuryBot], item: Gameday) -> Any:
-        view = self.parent.create_child(GamedayPanel, gameday=item)
-        return await interaction.response.edit_message(view=view, embed=view.embed)
-
-
-class GamedayMemberPanel(BaseView):
-    """Represents the management panel for a given gameday member.
-
-    Parameters
-    Attributes
-    ----------
-    member: :class:`GamedayMember`
-        The member you want to edit and manage.
-    """
-
-    def __init__(self, member: GamedayMember, discord_member: discord.Member, **kwargs: Unpack[BaseViewKwargs]) -> None:
-        super().__init__(**kwargs)
-        self.member: GamedayMember = member
-        self.discord_member: discord.Member = discord_member
-
-    @property
-    def embed(self) -> discord.Embed:
-        """:class:`discord.Embed`: The embed representing this panel."""
-        embed = self.member.team.embed(
-            title=f'{self.discord_member.display_name} Gameday Management',
-            description=f'Use the buttons below to manage {self.discord_member.mention}\'s gameday.',
-        )
-
-        if self.member.is_attending:
-            embed.add_field(name='Attendance', value='Member has attended this gameday.', inline=False)
-        else:
-            embed.add_field(
-                name='Attendance',
-                value=f'This member is not attending this gameday.\n`Reason`: {self.member.reason}',
-                inline=False,
-            )
-
-        if self.member.is_temporary_sub:
-            embed.add_field(
-                name='Temporary Sub',
-                value=f'This member is a temporary sub, meaning that after this gameday is over they '
-                'will automatically be removed from the team\'s sub roster.',
-            )
-
-        return embed
-
-    @discord.ui.button(label='Toggle Is Temporary Sub')
-    @default_button_doc_string
-    async def toggle_is_temporary_sub(
+    @discord.ui.button(label='Manage Existing Gameday Time')
+    async def manage_existing_gameday_time(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> discord.InteractionMessage:
-        """A button to toggle whether this member is a temporary sub or not."""
-        await interaction.response.defer()
-
-        await self.member.edit(is_temporary_sub=not self.member.is_temporary_sub)
-
-        return await interaction.edit_original_response(view=self, embed=self.embed)
-
-    async def _edit_reason_after(
-        self, interaction: discord.Interaction[FuryBot], reason_input: discord.ui.TextInput[AfterModal]
-    ) -> discord.InteractionMessage:
-        await interaction.response.defer()
-
-        await self.member.edit(reason=reason_input.value)
-
-        return await interaction.edit_original_response(view=self, embed=self.embed)
-
-    @discord.ui.button(label='Edit Reason')
-    @default_button_doc_string
-    async def edit_reason(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """A button to edit the reason for this member not coming to this gameday."""
-        modal = AfterModal(
-            self.bot,
-            self._edit_reason_after,
-            discord.ui.TextInput(
-                label='New Reason',
-                style=discord.TextStyle.long,
-                placeholder='Enter the new reason for this member not coming to this gameday.',
-                max_length=2000,
-            ),
-            title='Change Reason',
-            timeout=None,
-        )
-        return await interaction.response.send_modal(modal)
-
-    @discord.ui.button(label='Remove Member From Gameday')
-    @default_button_doc_string
-    async def remove_member_from_gameday(
-        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> discord.InteractionMessage:
-        """A button to remove this member from the gameday."""
-        await interaction.response.defer()
-
-        await self.member.delete()
-
-        gameday = self.member.gameday
-        assert gameday
-
-        panel = GamedayPanel(gameday, target=interaction)
-        image = await gameday.merge_gameday_images()
-        return await interaction.edit_original_response(view=panel, embed=panel.embed, attachments=[image] if image else [])
-
-
-class GamedayPanel(BaseView):
-    """Represents the management panel for a given gameday.
-
-    Parameters
-    Attributes
-    ----------
-    gameday: :class:`Gameday`
-        The gameday you want to edit and manage.
-    """
-
-    def __init__(self, gameday: Gameday, **kwargs: Unpack[BaseViewKwargs]) -> None:
-        super().__init__(**kwargs)
-        self.gameday: Gameday = gameday
-
-    @property
-    def embed(self) -> discord.Embed:
-        """:class:`discord.Embed`: The embed representing this panel."""
-        team = self.gameday.team
-        embed = team.embed(
-            title=f'{discord.utils.format_dt(self.gameday.started_at, "F")} Gameday',
-            description=f'Use the buttons below to manage this gameday.',
-        )
-
-        if self.gameday.ended_at is not None:
-            embed.add_field(
-                name='Ended At',
-                value=discord.utils.format_dt(self.gameday.ended_at, "F"),
-                inline=False,
-            )
-        else:
-            # If we're past the start time of this gameday then it's in progress
-            now = discord.utils.utcnow()
-            if now > self.gameday.started_at:
-                embed.add_field(
-                    name='In Progress',
-                    value=f'We are past the start time and this gameday has no set end time so '
-                    'it is currently in progress.',
-                    inline=False,
-                )
-
-        embed.add_field(
-            name='Score',
-            value=f'**{team.display_name} Wins**: {self.gameday.wins}\n**Opposing Team Wins**: {self.gameday.losses}',
-            inline=False,
-        )
-
-        self.gameday.inject_metadata_into_embed(embed)
-
-        return embed
-
-    async def _manage_memnber_after(
-        self, interaction: discord.Interaction[FuryBot], users: List[Union[discord.Member, discord.User]]
-    ) -> discord.InteractionMessage:
-        await interaction.response.defer()
-
-        member = users[0]
-        assert isinstance(member, discord.Member)
-
-        gameday_member = self.gameday.get_member(member.id)
-        if gameday_member is None:
-            await interaction.followup.send(f'{member.mention} is not involved in this gameday.', ephemeral=True)
-            return await interaction.edit_original_response(view=self, embed=self.embed)
-
-        view = self.create_child(GamedayMemberPanel, member=gameday_member, discord_member=member)
-        return await interaction.edit_original_response(view=view, embed=view.embed)
-
-    @discord.ui.button(label='Manage Member')
-    @default_button_doc_string
-    async def manage_members(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """A button to launch a view that manages a member of this gameday."""
-        UserSelect(self._manage_memnber_after, self)
-
-    async def _change_score_after(
-        self,
-        interaction: discord.Interaction[FuryBot],
-        wins_input: discord.ui.TextInput[AfterModal],
-        losses_input: discord.ui.TextInput[AfterModal],
-    ) -> discord.InteractionMessage:
-        await interaction.response.defer()
-
-        wins = wins_input.value
-        losses = losses_input.value
-
-        if wins and not wins.isdigit():
-            await interaction.followup.send(f'The wins input must be a number, not {wins!r}.', ephemeral=True)
-            return await interaction.edit_original_response(view=self, embed=self.embed)
-
-        if losses and not losses.isdigit():
-            await interaction.followup.send(f'The losses input must be a number, not {losses!r}.', ephemeral=True)
-            return await interaction.edit_original_response(view=self, embed=self.embed)
-
-        await self.gameday.edit(
-            wins=int(wins) if wins else discord.utils.MISSING,
-            losses=int(losses) if losses else discord.utils.MISSING,
-        )
-
-        # TODO: Need to update the embed here for the current scoreboard
-        raise NotImplementedError
-
-        return await interaction.edit_original_response(view=self, embed=self.embed)
-
-    @discord.ui.button(label='Change Score')
-    @default_button_doc_string
-    async def change_score(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """A button to launch a model that changes the score of this gameday."""
-        modal = AfterModal(
-            self.bot,
-            self._change_score_after,
-            discord.ui.TextInput(label=f'Wins', placeholder='Enter the number of wins to set the score to.'),
-            discord.ui.TextInput(label='Losses', placeholder='Enter the number of losses to set the score to.'),
-            timeout=None,
-            title=f'Change Game Score',
-        )
-        return await interaction.response.send_modal(modal)
-
-    # TODO: Is this neatly possible or needed?
-    # @discord.ui.button(label='Change Start Time')
-    # @default_button_doc_string
-    # async def change_start_time(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-    #     """A button to launch a model that changes the start time of this gameday."""
-    #
-    #     ...
-
-    # TODO; Same with this?
-    # @discord.ui.button(label='Change End Time')
-    # @default_button_doc_string
-    # async def change_end_time(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-    #    """A button to launch a model that changes the end time of this gameday."""
-    #    ...
+    ) -> None:
+        selector = SelectGamedayTime(parent=self)
+        await selector.launch(interaction)
 
 
 class GamedayBucketPanel(BaseView):
@@ -492,211 +739,60 @@ class GamedayBucketPanel(BaseView):
 
     @property
     def embed(self) -> discord.Embed:
-        """:class:`discord.Embed`: The embed representing this panel."""
         team = self.bucket.team
+        if team is None:
+            raise ValueError('The bucket must have a team to create an embed.')
 
         embed = team.embed(
-            title=f'{team.display_name} Gameday Bucket Panel',
-            description=f'Use the buttons below to manage this team\'s gameday bucket.',
-        )
-        embed.add_field(
-            name='Total Gamedays',
-            value=f'I see **{len(self.bucket.get_gamedays())}** gamedays in this bucket.',
-            inline=False,
+            title=f'{team.display_name} Bucket Management',
+            description='Use the buttons below to manage this bucket.',
         )
 
         embed.add_field(
-            name='Gameday Scheduled For',
-            value=f'Every Gameday is scheduled for {self.bucket.weekday.name} at {self.bucket.game_time.strftime("%I:%M.%S %p")}',
+            name='Gameday Times',
+            value='\n'.join(
+                f'{gametime.weekday.name.title()}s at {gametime.starts_at.strftime("%I:%M.%S %p")}'
+                for gametime in self.bucket.gameday_times.values()
+            )
+            or 'No gameday times have been set for this bucket.',
             inline=False,
         )
 
-        embed.add_field(
-            name='Team Size',
-            value=self.bucket.members_on_team,
-        )
-        embed.add_field(
-            name='Best Of',
-            value=f'{self.bucket.best_of} games',
-        )
+        automatic_sub_channel_fmt: str
+        automatic_sub_finding_channel = self.bucket.automatic_sub_finding_channel
+
+        if automatic_sub_finding_channel is not None:
+            automatic_sub_channel_fmt = f'{automatic_sub_finding_channel.mention} is used to find subs for this bucket.'
+        else:
+            if self.bucket.automatic_sub_finding_channel_id is not None:
+                automatic_sub_channel_fmt = (
+                    'I could not find the channel to use for automatic sub finding. Did it get deleted?'
+                )
+            else:
+                automatic_sub_channel_fmt = 'There is no channel set for automatic sub finding.'
+
+        embed.add_field(name='Automatic Sub Finding Channel', value=automatic_sub_channel_fmt, inline=False)
+
         embed.add_field(
             name='Automatic Sub Finding',
-            value=f'Automatic Sub Finding is {"enabled" if self.bucket.automatic_sub_finding else "disabled"}.',
+            value=f'Automatic sub finding when possible is **{"enabled" if self.bucket.automatic_sub_finding_if_possible else "disabled"}**. '
+            'Note that, at times, it is not possible to use automatic sub finding. This is only because a moderator has changed a gameday\'s '
+            'settings 24 hours before the gameday.',
+            inline=False,
         )
 
         return embed
+
+    @discord.ui.button(label='Manage Gameday Times', style=discord.ButtonStyle.green)
+    async def manage_gameday_times(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        await interaction.response.defer()
+
+        view = self.create_child(GamedayTimeManagementPanel, bucket=self.bucket)
+
+        return await interaction.response.edit_message(view=view, embed=view.embed)
 
     @discord.ui.button(label='Manage A Gameday', style=discord.ButtonStyle.primary)
     async def manage_a_gameday(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """A button to launch a view that manages all gamedays in this bucket."""
         selector = SelectGameday(parent=self)
         await selector.launch(interaction)
-
-    @discord.ui.button(label='Toggle Automatic Sub Finding')
-    @default_button_doc_string
-    async def toggle_automatic_sub_finding(
-        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> discord.InteractionMessage:
-        """Toggles this bucket's automatic sub finding."""
-        await interaction.response.defer()
-
-        await self.bucket.edit(
-            automatic_sub_finding=not self.bucket.automatic_sub_finding,
-        )
-
-        return await interaction.edit_original_response(view=self, embed=self.embed)
-
-    async def _set_team_size_after(
-        self, interaction: discord.Interaction[FuryBot], size_input: discord.ui.TextInput[AfterModal]
-    ) -> discord.InteractionMessage:
-        await interaction.response.defer()
-
-        try:
-            size = int(size_input.value)
-        except ValueError:
-            await interaction.followup.send('This is not a valid number. Please try again.', ephemeral=True)
-            return await interaction.edit_original_response(view=self, embed=self.embed)
-
-        await self.bucket.edit(members_on_team=size)
-
-        return await interaction.edit_original_response(view=self, embed=self.embed)
-
-    @discord.ui.button(label='Set Team Size')
-    @default_button_doc_string
-    async def set_team_size(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """Sets this bucket's team size."""
-        modal = AfterModal(
-            self.bot,
-            self._set_team_size_after,
-            discord.ui.TextInput(label='Enter Team Size', placeholder='Enter the new size of the team on game days.'),
-            title='Set New Team Size',
-            timeout=None,
-        )
-        return await interaction.response.send_modal(modal)
-
-    async def _set_best_of_after(
-        self, interaction: discord.Interaction[FuryBot], best_input: discord.ui.TextInput[AfterModal]
-    ) -> discord.InteractionMessage:
-        await interaction.response.defer()
-
-        try:
-            best_of = int(best_input.value)
-        except ValueError:
-            await interaction.followup.send('This is not a valid number. Please try again.', ephemeral=True)
-            return await interaction.edit_original_response(view=self, embed=self.embed)
-
-        await self.bucket.edit(best_of=best_of)
-
-        return await interaction.edit_original_response(view=self, embed=self.embed)
-
-    @discord.ui.button(label='Set Best Of')
-    @default_button_doc_string
-    async def set_best_of(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """Sets this bucket's best of."""
-        modal = AfterModal(
-            self.bot,
-            self._set_team_size_after,
-            discord.ui.TextInput(label='Enter Best Of', placeholder='Enter the new best for game days.'),
-            title='Set New Best Of',
-            timeout=None,
-        )
-        return await interaction.response.send_modal(modal)
-
-    async def _change_time_and_date_after(
-        self,
-        interaction: discord.Interaction[FuryBot],
-        weekday_time_input: discord.ui.TextInput[AfterModal],
-    ) -> discord.InteractionMessage:
-        await interaction.response.defer()
-
-        try:
-            weekday, time = parse_time_and_date(weekday_time_input.value)
-        except KeyError:
-            await interaction.followup.send(
-                'This is not a valid weekday. An example would be `Tuesday 5:00 PM`. Feel free to try again.',
-                ephemeral=True,
-            )
-            return await interaction.edit_original_response(view=self, embed=self.embed)
-        except ValueError as exc:
-            await interaction.followup.send(
-                f'You did not enter a valid time. {str(exc).capitalize()}. Feel free to try again.',
-                ephemeral=True,
-            )
-            return await interaction.edit_original_response(view=self, embed=self.embed)
-
-        if not weekday and not time:
-            await interaction.followup.send(
-                'This is not a valid time and date. An example would be `Wednesday 4:00 PM`. Feel free to try again.',
-                ephemeral=True,
-            )
-            return await interaction.edit_original_response(view=self, embed=self.embed)
-
-        # The fucntion can either return None, None or a weekday and time.
-        # If it returns None, None, then the user did not enter a valid time and date.
-        # if it raises, the parsing failed.
-        # So if we get here, we know that the parsing succeeded.
-        assert weekday
-        assert time
-
-        await self.bucket.edit(weekday=weekday, game_time=time)
-
-        # We need to edit the next gamedays's time and date as well so that it is correct and dispatches as the correct time.
-        next_gameday = self.bucket.next_gameday
-        if next_gameday is not None:
-            next_gameday_time = get_next_gameday_time(weekday=weekday, game_time=time)
-            await next_gameday.reschedule(starts_at=next_gameday_time)
-
-        return await interaction.edit_original_response(view=self, embed=self.embed)
-
-    @discord.ui.button(label='Change Gameday Time and Date')
-    @default_button_doc_string
-    async def change_gameday_time_and_date(
-        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> None:
-        """Changes this bucket's gameday time and date."""
-        modal = AfterModal(
-            self.bot,
-            self._change_time_and_date_after,
-            discord.ui.TextInput(
-                label='Enter Time and Date.',
-                placeholder='Format: Weekday Hour:Minute AM/PM. Example: Wednesday 4:00 PM',
-                required=True,
-            ),
-            title='Change Gameday Time and Date',
-            timeout=None,
-        )
-        return await interaction.response.send_modal(modal)
-
-    async def _delete_bucket_after(
-        self, interaction: discord.Interaction[FuryBot], confirm_input: discord.ui.TextInput[AfterModal]
-    ) -> discord.InteractionMessage:
-        await interaction.response.defer()
-
-        if confirm_input.value.lower() != 'confirm':
-            await interaction.followup.send('Aborting.', ephemeral=True)
-            return await interaction.edit_original_response(view=self, embed=self.embed)
-
-        await self.bucket.delete()
-
-        home = find_home(self)
-        assert home
-
-        return await interaction.edit_original_response(view=home, embed=home.embed)
-
-    @discord.ui.button(label='Delete Bucket', style=discord.ButtonStyle.danger)
-    @default_button_doc_string
-    async def delete_bucket(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """Deletes this bucket."""
-        modal = AfterModal(
-            self.bot,
-            self._delete_bucket_after,
-            discord.ui.TextInput(
-                label='Are you sure you want to delete this bucket?',
-                placeholder='Type "confirm" to delete this bucket.',
-                required=True,
-            ),
-            title='Delete Bucket',
-            timeout=None,
-        )
-
-        return await interaction.response.send_modal(modal)

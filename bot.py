@@ -54,7 +54,7 @@ from typing_extensions import Concatenate, Self
 
 from cogs.images import ApproveOrDenyImage, ImageRequest
 from cogs.teams import Team
-from cogs.teams.gamedays_rewritten import GamedayBucket
+from cogs.teams.gamedays import GamedayBucket
 from cogs.teams.practices import Practice
 from cogs.teams.scrims import Scrim, ScrimStatus
 from utils import (
@@ -781,8 +781,9 @@ class FuryBot(commands.Bot):
             bucket = GamedayBucket(bot=self, **dict(row))
             self.add_gameday_bucket(bucket)
 
-            gamedays = await bucket.fetch_gamedays(self, bucket.id, connection=connection)
+            gamedays = await bucket.fetch_gamedays(connection=connection)
             for gameday in gamedays:
+                await gameday.setup(connection=connection)
                 bucket.add_gameday(gameday)
 
     # Hooks

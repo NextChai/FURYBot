@@ -1,66 +1,70 @@
-""" 
-The MIT License (MIT)
-
-Copyright (c) 2020-present NextChai
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-"""
 from __future__ import annotations
 
 import dataclasses
 import datetime
 import enum
-import math
-from typing import TYPE_CHECKING, Dict, List, Mapping, NamedTuple, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Dict, List, NamedTuple, Optional, Type, Union
 
 import discord
 import pytz
 from typing_extensions import Self
 
-from utils import QueryBuilder, Timer, image_from_urls, image_to_file
-
-from .persistent.scoreboard import ScoreboardPanel
+from utils import QueryBuilder
+from utils.errors import TimerNotFound
 
 if TYPE_CHECKING:
-    from bot import FuryBot, ConnectionType
+    from bot import ConnectionType, FuryBot
+    from cogs.teams.team import Team
+    from utils.timers import Timer
 
-from utils.bases import Teamable, TeamMemberable
+MISSING = discord.utils.MISSING
 
-__all__: Tuple[str, ...] = (
-    'GamedayBucket',
-    'Gameday',
-    'Weekday',
+VotingTimes = NamedTuple(
+    'VotingTimes', [('start', datetime.datetime), ('end', datetime.datetime), ('can_use_automatic_sub_finding', bool)]
 )
 
 EST = pytz.timezone('US/Eastern')
-MISSING = discord.utils.MISSING
 
 
-def _get_attendance_voting_start_time(gameday_starts_at: datetime.datetime) -> datetime.datetime:
-    # Let's go to midnight (12:00am) then subtract 9 hours to get to 11am EST time.
+def _determine_default_voting_times(gameday_starts_at: datetime.datetime) -> VotingTimes:
     midnight = gameday_starts_at.replace(hour=0, minute=0, second=0, microsecond=0)
-    return midnight - datetime.timedelta(hours=9)
+
+    voting_start_time = midnight - datetime.timedelta(hours=9)
+    voting_end_time = voting_start_time + datetime.timedelta(hours=5)
+
+    return VotingTimes(start=voting_start_time, end=voting_end_time, can_use_automatic_sub_finding=True)
 
 
-def _get_attendance_voting_end_time(gameday_starts_at: datetime.datetime) -> datetime.datetime:
-    # Let's go to midnight (12:00am) then subtract 4 hours to get to 4pm EST time.
-    return _get_attendance_voting_start_time(gameday_starts_at) + datetime.timedelta(hours=5)
+def determine_comfy_voting_times(gameday_starts_at: datetime.datetime) -> VotingTimes:
+    now = discord.utils.utcnow()
+
+    time_until_gameday = gameday_starts_at - now
+
+    if gameday_starts_at < now:
+        # This time is already in the past, we need to raise an error
+        raise ValueError('Gameday starts at a time in the past')
+
+    # If there's less than 24 hours until the gameday, start the voting now and then end it N minutes before the gameday starts
+    if time_until_gameday < datetime.timedelta(hours=24):
+        if time_until_gameday < datetime.timedelta(hours=6):
+            # There's less than 6 hours, start it now and end it 5 minutes before the gameday starts
+            return VotingTimes(
+                start=now, end=gameday_starts_at - datetime.timedelta(minutes=5), can_use_automatic_sub_finding=False
+            )
+
+        # There's more than 6 hours, start it now and end it 1 hour before the gameday starts
+        return VotingTimes(
+            start=now, end=gameday_starts_at - datetime.timedelta(hours=1), can_use_automatic_sub_finding=False
+        )
+
+    # Let's check if now is before the default voting start time. If it is, we use the defaults.
+    default_voting_times = _determine_default_voting_times(gameday_starts_at)
+
+    if default_voting_times.start > now:
+        return default_voting_times
+
+    # If we're here, it means that the default voting times have already passed. So we can start it now and wend it 5 hours from now
+    return VotingTimes(start=now, end=now + datetime.timedelta(hours=5), can_use_automatic_sub_finding=True)
 
 
 def get_next_gameday_time(*, weekday: Weekday, game_time: datetime.time) -> datetime.datetime:
@@ -84,32 +88,9 @@ def get_next_gameday_time(*, weekday: Weekday, game_time: datetime.time) -> date
     return utc_datetime
 
 
-votingtimes = NamedTuple(
-    'votingtimes', [('start', datetime.datetime), ('end', datetime.datetime), ('disable_automatic_sub_finding', bool)]
-)
+class Weekday(enum.IntEnum):
+    """Represents a weekday."""
 
-
-def determine_voting_times(starts_at: datetime.datetime) -> votingtimes:
-    disable_automatic_sub_finding = False
-    now = discord.utils.utcnow()
-    hours_until_gameday_starts = (starts_at - now).total_seconds() / 3600
-    if hours_until_gameday_starts < 24:
-        # Less than 24 hours, we need to start the voting process now
-        voting_start_at = now
-        voting_end_at = now + datetime.timedelta(hours=5)
-
-        if hours_until_gameday_starts > 7:
-            # There's less than 6 hours, so we need to disable automatic sub finding
-            disable_automatic_sub_finding = True
-    else:
-        # More than 24 hours, we can start the voting process at the normal time
-        voting_start_at = _get_attendance_voting_start_time(starts_at)
-        voting_end_at = _get_attendance_voting_end_time(starts_at)
-
-    return votingtimes(start=voting_start_at, end=voting_end_at, disable_automatic_sub_finding=disable_automatic_sub_finding)
-
-
-class Weekday(enum.Enum):
     monday = 1
     tuesday = 2
     wednesday = 3
@@ -120,72 +101,56 @@ class Weekday(enum.Enum):
 
 
 @dataclasses.dataclass()
-class GamedayMember(TeamMemberable):
-    """Represents a member who has confirmed or not confirmed that they will be attending a gameday.
-
-    A temporary sub is one found in a chat, such as a sub-finding channel, that shouldn't remain on the team after the game is over.
-    This sub will be auto-removed from the team after 1 hour of the gameday coming to an end.
-    """
-
+class GamedayMember:
     bot: FuryBot
 
     id: int
     member_id: int
     team_id: int
     guild_id: int
+    bucket_id: int
     gameday_id: int
-
-    # Determines if the member has confirmed that they will be attending the gameday.
     reason: Optional[str]
-
-    is_temporary_sub: bool = False
-
-    def __eq__(self, __o: object) -> bool:
-        return isinstance(__o, self.__class__) and self.member_id == __o.member_id
-
-    def __ne__(self, __o: object) -> bool:
-        return not self.__eq__(__o)
-
-    def __hash__(self) -> int:
-        return hash(self.member_id)
-
-    def _get_bot(self) -> FuryBot:
-        return self.bot
-
-    def _get_guild_id(self) -> int:
-        return self.guild_id
-
-    def _get_team_id(self) -> int:
-        return self.team_id
-
-    def _get_member_id(self) -> int:
-        return self.member_id
+    is_temporary_sub: bool
 
     @classmethod
     async def create(
         cls: Type[Self],
-        user: Union[discord.Member, discord.User],
-        gameday: Gameday,
+        bot: FuryBot,
         *,
-        is_temporary_sub: bool = False,
+        connection: ConnectionType,
+        member_id: int,
+        team_id: int,
+        guild_id: int,
+        bucket_id: int,
+        gameday_id: int,
         reason: Optional[str] = None,
     ) -> Self:
-        bot = gameday.bot
-        async with bot.safe_connection() as connection:
-            data = await connection.fetchrow(
-                'INSERT INTO teams.gameday_members(gameday_id, team_id, member_id, guild_id, is_temporary_sub, reason) '
-                'VALUES($1, $2, $3, $4, $5, $6) '
-                'RETURNING *',
-                gameday.id,
-                gameday.team_id,
-                user.id,
-                gameday.guild_id,
-                is_temporary_sub,
-                reason,
-            )
-            assert data
+        bucket = bot.get_gameday_bucket(guild_id, team_id)
+        if bucket is None:
+            raise ValueError('Cannot add member to a non-existing bucket.')
 
-        self = cls(bot, **dict(data))
+        gameday = bucket.get_gameday(gameday_id)
+        if gameday is None:
+            raise ValueError('Cannot add member to a non-existing gameday.')
+
+        query = """
+            INSERT INTO teams.gameday_members (
+                member_id,
+                team_id,
+                guild_id,
+                bucket_id,
+                gameday_id,
+                reason
+            )
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *
+            """
+
+        data = await connection.fetchrow(query, member_id, team_id, guild_id, bucket_id, gameday_id, reason)
+        assert data
+
+        self = cls(bot=bot, **dict(data))
         gameday.add_member(self)
 
         return self
@@ -195,723 +160,1002 @@ class GamedayMember(TeamMemberable):
         return not bool(self.reason)
 
     @property
+    def bucket(self) -> Optional[GamedayBucket]:
+        return self.bot.get_gameday_bucket(self.guild_id, self.team_id)
+
+    @property
     def gameday(self) -> Optional[Gameday]:
-        team = self.team
-        bucket = team.get_gameday_bucket()
+        bucket = self.bucket
         if bucket is None:
-            return
+            return None
 
         return bucket.get_gameday(self.gameday_id)
 
-    async def delete(self) -> None:
-        bot = self.bot
-        async with bot.safe_connection() as connection:
-            await connection.execute(
-                'DELETE FROM teams.gameday_members WHERE id = $1',
-                self.id,
-            )
+    @property
+    def team(self) -> Optional[Team]:
+        return self.bot.get_team(self.guild_id, self.team_id)
+
+    @property
+    def mention(self) -> str:
+        return f'<@{self.member_id}>'
+
+    async def delete(self, *, connection: ConnectionType) -> None:
+        query = """
+            DELETE FROM teams.gameday_members
+            WHERE id = $1
+            """
+
+        await connection.execute(query, self.id)
+
+        if self.is_temporary_sub:
+            team = self.team
+            if team and (team_member := team.get_member(self.member_id)):
+                await team.remove_team_member(team_member)
 
         gameday = self.gameday
-        if gameday is not None:
-            gameday.remove_member(self.member_id)
+        if gameday is None:
+            return
 
-    async def edit(self, *, is_temporary_sub: bool = MISSING, reason: str = MISSING) -> None:
-        query = QueryBuilder('teams.gameday_members')
-        query.add_condition('id', self.id)
+        gameday.remove_member(self.id)
 
-        if is_temporary_sub is not MISSING:
-            query.add_arg('is_temporary_sub', is_temporary_sub)
-            self.is_temporary_sub = is_temporary_sub
+    async def edit(self, connection: ConnectionType, *, reason: str = MISSING, is_temporary_sub: bool = MISSING) -> None:
+        builder = QueryBuilder('teams.gameday_members')
+        builder.add_condition('id', self.id)
 
         if reason is not MISSING:
-            query.add_arg('reason', reason)
+            builder.add_arg('reason', reason)
             self.reason = reason
 
-        async with self.bot.safe_connection() as connection:
-            await query(connection)
+        if is_temporary_sub is not MISSING:
+            builder.add_arg('is_temporary_sub', is_temporary_sub)
+            self.is_temporary_sub = is_temporary_sub
+
+        await builder(connection)
 
 
 @dataclasses.dataclass()
-class GamedayImage(Teamable):
+class GamedayImage:
     bot: FuryBot
+
     id: int
-    gameday_id: int
-    team_id: int
     guild_id: int
-    image_url: str
+    team_id: int
+    gameday_id: int
+    bucket_id: int
+    url: str
     uploader_id: int
     uploaded_at: datetime.datetime
 
-    def _get_bot(self) -> FuryBot:
-        return self.bot
-
-    def _get_guild_id(self) -> int:
-        return self.guild_id
-
-    def _get_team_id(self) -> int:
-        return self.team_id
-
-    @property
-    def bucket(self) -> GamedayBucket:
-        bucket = self.bot.get_gameday_bucket(self.guild_id, self.team_id)
-        assert bucket is not None
-        return bucket
-
     @classmethod
     async def create(
         cls: Type[Self],
-        gameday: Gameday,
-        *,
-        image_url: str,
-        uploader_id: int,
-        uploaded_at: datetime.datetime,
-    ) -> Self:
-        async with gameday.bot.safe_connection() as connection:
-            data = await connection.fetchrow(
-                'INSERT INTO teams.gameday_images(gameday_id, team_id, guild_id, image_url, uploader_id, uploaded_at) '
-                'VALUES($1, $2, $3, $4, $5, $6) '
-                'RETURNING *',
-                gameday.id,
-                gameday.team_id,
-                gameday.guild_id,
-                image_url,
-                uploader_id,
-                uploaded_at,
-            )
-            assert data
-
-        image = GamedayImage(gameday.bot, **dict(data))
-        gameday.add_image(image)
-
-        return image
-
-
-class Gameday(Teamable):
-    """Represents a gameday for a given team. A gameday is where a team gets together in order to play their e-sports games.
-
-    A gameday is made up of rounds, which are represented by the :class:`Round` class. A gameday is made up of a total number of rounds,
-    which is determined by the gameday bucket.
-
-    Gameday Flow
-    ------------
-    - Members will get a notification a day in advance at 11am EST to remind them they have a gameday coming up. Members will chose yes or no to attending.
-    If they chose no then they'll be required to provide a reason for not attending.
-
-        - Once all members have voted, or the team has been filled, the team's captain(s) will be notified. This has a 5 hour timeout.
-
-        - If all team members have voted and the team is not filled, or 5 hours have passed, the bot will spawn one of two responses.
-
-            - If auto sub finding is enabled, the client will make an effort to find a replacement for N members required to fill the team
-            using the specified sub role and sub channel. If the team has dedicated subs, the bot will look for those subs first (with a timeout of 3 hours),
-            then extend the search to the sub role and sub channel excluding the subs the bot already tried to recruit.
-
-            - If auto sub finding is disabled, the client will notify the team's captain(s) that the team is not filled and that they need to find a replacement.
-
-    - 4 hours before the scheduled gameday, the bot will send a reminder to all members that have agreed to attend the gameday.
-
-        - If the team has not been filled by this point, the bot will notify the team's captain(s) that the team is not filled and
-        that they need to find a replacement. This notification to the captain will be regardless of the auto sub finding setting.
-
-    - During the gameday, the bot will send a scoreboard to the team's text-channel. After each round of the gameday, a member of the team
-    will be required to update the scoreboard. They can either press the "Win" or "Loss" button on the scoreboard to update it.
-
-        - Optionally, team members can upload an in-game screenshot of each round to have for proof in case of an issue. This will be achieveed
-        via the `/gameday upload <attachment: Attachment>` command. **We will encourage members to do this, but it will not be required.**
-
-    - After a winner has been decided, the bot will gather the in-game screenshots, if applicable, and merge them to be sent in the final notification.
-    This notification will mention the team's captain(s) that their gameday is over.
-    """
-
-    def __init__(
-        self,
-        /,
-        *,
         bot: FuryBot,
+        *,
+        connection: ConnectionType,
+        guild_id: int,
+        team_id: int,
+        gameday_id: int,
         bucket_id: int,
-        id: int,
-        guild_id: int,
-        team_id: int,
-        started_at: datetime.datetime,
-        wins: int,
-        losses: int,
-        ended_at: Optional[datetime.datetime] = None,
-        members: Dict[int, GamedayMember] = {},
-        attendance_voting_message_id: Optional[int] = None,
-        scoreboard_message_id: Optional[int] = None,
-        images: List[GamedayImage] = [],
-        attendance_voting_start: datetime.datetime,
-        attendance_voting_end: datetime.datetime,
-        attendance_voting_start_timer_id: Optional[int] = None,
-        attendance_voting_end_timer_id: Optional[int] = None,
-        gameday_start_timer_id: Optional[int] = None,
-    ) -> None:
-        self.bot: FuryBot = bot
-        self.id: int = id
-        self.guild_id: int = guild_id
-        self.team_id: int = team_id
-        self.started_at: datetime.datetime = started_at
-        self.ended_at: Optional[datetime.datetime] = ended_at
-        self.bucket_id: int = bucket_id
-
-        # Wins and losses for the team for the given game.
-        self.wins: int = wins
-        self.losses: int = losses
-
-        self._members: Dict[int, GamedayMember] = members
-
-        # The message ID of the advance gameday notification message, also known as the panel
-        # that determines who is and isn't coming to the gameday.
-        self.attendance_voting_message_id: Optional[int] = attendance_voting_message_id
-        self.attendance_voting_start: datetime.datetime = attendance_voting_start
-        self.attendance_voting_end: datetime.datetime = attendance_voting_end
-
-        self.scoreboard_message_id: Optional[int] = scoreboard_message_id
-        self.scoreboard: ScoreboardPanel = ScoreboardPanel(self)
-
-        if self.scoreboard_message_id and self.ongoing:
-            bot.add_view(self.scoreboard, message_id=self.scoreboard_message_id)
-
-        self.images: List[GamedayImage] = images
-
-        self.attendance_voting_start_timer_id: Optional[int] = attendance_voting_start_timer_id
-        self.attendance_voting_end_timer_id: Optional[int] = attendance_voting_end_timer_id
-        self.gameday_start_timer_id: Optional[int] = gameday_start_timer_id
-
-    def _get_bot(self) -> FuryBot:
-        return self.bot
-
-    def _get_guild_id(self) -> int:
-        return self.guild_id
-
-    def _get_team_id(self) -> int:
-        return self.team_id
-
-    @classmethod
-    async def create(
-        cls: Type[Self],
-        bot: FuryBot,
-        *,
-        gameday_bucket_id: int,
-        guild_id: int,
-        team_id: int,
-        starts_at: datetime.datetime,
+        url: str,
+        uploader_id: int,
+        uploaded_at: datetime.datetime = discord.utils.utcnow(),
     ) -> Self:
-        # If there's under 24 hours but greater than 6 hours until the gameday starts, we can start the voting process now with automatic sub finding enabled
-        # If there's under 24 hours but less than 5 hours until the gameday starts, we can start the vorint process now with automatic sub finding disabled.
-        # If there's more than 24 hours BUT the normal voting start time is in the past, we start it now and set it to end 5 hours from now.
+        bucket = bot.get_gameday_bucket(guild_id, team_id)
+        if bucket is None:
+            raise ValueError('Cannot add image to a non-existing bucket.')
 
-        voting = determine_voting_times(starts_at)
+        gameday = bucket.get_gameday(gameday_id)
+        if gameday is None:
+            raise ValueError('Cannot add image to a non-existing gameday.')
 
-        async with bot.safe_connection() as connection:
-            data = await connection.fetchrow(
-                'INSERT INTO teams.gamedays (bucket_id, guild_id, team_id, started_at, attendance_voting_start, attendance_voting_end) '
-                'VALUES ($1, $2, $3, $4, $5, $6) '
-                'RETURNING *',
-                gameday_bucket_id,
+        query = """
+            INSERT INTO teams.gameday_images (
                 guild_id,
                 team_id,
-                starts_at,
-                voting.start,
-                voting.end,
+                gameday_id,
+                bucket_id,
+                url,
+                uploader_id,
+                uploaded_at
             )
-            assert data
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *
+            """
+
+        data = await connection.fetchrow(query, guild_id, team_id, gameday_id, bucket_id, url, uploader_id, uploaded_at)
+        assert data
 
         self = cls(bot=bot, **dict(data))
-        self.bucket.add_gameday(self)
-
-        if voting.disable_automatic_sub_finding and self.bucket.automatic_sub_finding is True:
-            # We have a condition where we need to disable automatic sub finding
-            await self.bucket.edit(automatic_sub_finding=False)
-
-        # Let's spawn some tasks to start this gameday here
-        timer_manager = self.bot.timer_manager
-        if timer_manager is not None:
-            # Create a timer for when the gameday starts.
-            default_timer_args = (guild_id, team_id, gameday_bucket_id, self.id)
-
-            gameday_start = await timer_manager.create_timer(starts_at, 'gameday_start', *default_timer_args)
-
-            attendance_voting_start = await timer_manager.create_timer(
-                self.attendance_voting_start, 'attendance_voting_start', *default_timer_args
-            )
-            attendance_voting_end = await timer_manager.create_timer(
-                self.attendance_voting_end, 'attendance_voting_end', *default_timer_args
-            )
-
-            await self.edit(
-                attendance_voting_start_timer_id=attendance_voting_start.id,
-                attendance_voting_end_timer_id=attendance_voting_end.id,
-                gameday_start_timer_id=gameday_start.id,
-            )
+        gameday.add_image(self)
 
         return self
 
-    @classmethod
-    async def fetch_members(
-        cls: Type[Self], bot: FuryBot, gameday_id: int, *, connection: ConnectionType
-    ) -> Dict[int, GamedayMember]:
-        data = await connection.fetch(
-            'SELECT * FROM teams.gameday_members WHERE gameday_id = $1',
-            gameday_id,
-        )
-
-        return {row['member_id']: GamedayMember(bot=bot, **dict(row)) for row in data}
-
-    @classmethod
-    async def fetch_images(
-        cls: Type[Self], bot: FuryBot, gameday_id: int, *, connection: ConnectionType
-    ) -> List[GamedayImage]:
-        data = await connection.fetch('SELECT * FROM teams.gameday_images WHERE gameday_id = $1', gameday_id)
-
-        return [GamedayImage(bot=bot, **dict(row)) for row in data]
+    @property
+    def bucket(self) -> Optional[GamedayBucket]:
+        return self.bot.get_gameday_bucket(self.guild_id, self.team_id)
 
     @property
-    def subs_needed(self) -> int:
-        return self.bucket.members_on_team - len(self.get_members())
-
-    @property
-    def bucket(self) -> GamedayBucket:
-        bucket = self.bot.get_gameday_bucket(self.guild_id, self.team_id)
-        assert bucket is not None
-        return bucket
-
-    @property
-    def is_full(self) -> bool:
-        return self.subs_needed <= 0
-
-    @property
-    def ongoing(self) -> bool:
-        return not bool(self.ended_at)
-
-    def add_member(self, member: GamedayMember) -> None:
-        self._members[member.member_id] = member
-
-    def remove_member(self, member_id: int) -> None:
-        self._members.pop(member_id, None)
-
-    def get_member(self, member_id: int) -> Optional[GamedayMember]:
-        return self._members.get(member_id)
-
-    def get_members(self) -> Dict[int, GamedayMember]:
-        return self._members
-
-    def get_members_attending(self) -> Dict[int, GamedayMember]:
-        return {k: v for k, v in self._members.items() if v.is_attending}
-
-    def get_members_not_attending(self) -> Dict[int, GamedayMember]:
-        return {k: v for k, v in self._members.items() if not v.is_attending}
-
-    def add_image(self, image: GamedayImage) -> None:
-        self.images.append(image)
-
-    def remove_image(self, image: GamedayImage) -> None:
-        self.images.remove(image)
-
-    # A function to determine if the team has won or lost the gameday
-    # based on the score of the gameday and the bucket's "best_of" value.
-    def has_won(self) -> bool:
-        return self.wins >= self.bucket.best_of
-
-    def has_lost(self) -> bool:
-        return self.losses >= self.bucket.best_of
-
-    def inject_metadata_into_embed(self, embed: discord.Embed) -> None:
-        attending_members = self.get_members_attending()
-
-        members: List[str] = []
-        subs: List[str] = []
-        for attending_member in attending_members.values():
-            if attending_member.is_temporary_sub:
-                subs.append(f'- {attending_member.mention} (One-Time Sub)')
-                continue
-
-            team_member = self.team.get_member(attending_member.member_id)
-            assert team_member  # A member can only be in this list of they're on the team
-
-            if team_member.is_sub:
-                subs.append(f'- {attending_member.mention}')
-                continue
-
-            members.append(f'- {attending_member.mention}')
-
-        embed.add_field(
-            name='Attending Members',
-            value='\n'.join(members) or 'No members have selected themselves as attending.',
-            inline=False,
-        )
-
-        if subs:
-            embed.add_field(name='Attending Subs', value='\n'.join(subs), inline=False)
-
-        not_attending_formatted = '\n'.join(f'{m.mention}: {m.reason}' for m in self.get_members_not_attending().values())
-        embed.add_field(
-            name='Not Attending Members',
-            value=not_attending_formatted or 'No members have marked themselves as not attending.',
-            inline=False,
-        )
-
-        if self.images:
-            embed.set_image(url='attachment://gameday.png')
-
-    async def edit(
-        self,
-        *,
-        attendance_voting_message_id: int = MISSING,
-        wins: int = MISSING,
-        losses: int = MISSING,
-        ended_at: datetime.datetime = MISSING,
-        scoreboard_message_id: int = MISSING,
-        attendance_voting_start_timer_id: int = MISSING,
-        attendance_voting_end_timer_id: int = MISSING,
-        gameday_start_timer_id: int = MISSING,
-        started_at: datetime.datetime = MISSING,
-        attendance_voting_start: datetime.datetime = MISSING,
-        attendance_voting_end: datetime.datetime = MISSING,
-    ) -> None:
-        query_builder = QueryBuilder('teams.gamedays')
-        query_builder.add_condition('id', self.id)
-
-        if attendance_voting_message_id is not MISSING:
-            query_builder.add_arg('attendance_voting_message_id', attendance_voting_message_id)
-            self.attendance_voting_message_id = attendance_voting_message_id
-
-        if wins is not MISSING:
-            query_builder.add_arg('wins', wins)
-            self.wins = wins
-
-        if losses is not MISSING:
-            query_builder.add_arg('losses', losses)
-            self.losses = losses
-
-        if ended_at is not MISSING:
-            query_builder.add_arg('ended_at', ended_at)
-            self.ended_at = ended_at
-
-        if scoreboard_message_id is not MISSING:
-            query_builder.add_arg('scoreboard_message_id', scoreboard_message_id)
-            self.scoreboard_message_id = scoreboard_message_id
-
-        if attendance_voting_start_timer_id is not MISSING:
-            query_builder.add_arg('attendance_voting_start_timer_id', attendance_voting_start_timer_id)
-            self.attendance_voting_start_timer_id = attendance_voting_start_timer_id
-
-        if attendance_voting_end_timer_id is not MISSING:
-            query_builder.add_arg('attendance_voting_end_timer_id', attendance_voting_end_timer_id)
-            self.attendance_voting_end_timer_id = attendance_voting_end_timer_id
-
-        if gameday_start_timer_id is not MISSING:
-            query_builder.add_arg('gameday_start_timer_id', gameday_start_timer_id)
-            self.gameday_start_timer_id = gameday_start_timer_id
-
-        if started_at is not MISSING:
-            query_builder.add_arg('started_at', started_at)
-            self.started_at = started_at
-
-        if attendance_voting_start is not MISSING:
-            query_builder.add_arg('attendance_voting_start', attendance_voting_start)
-            self.attendance_voting_start = attendance_voting_start
-
-        if attendance_voting_end is not MISSING:
-            query_builder.add_arg('attendance_voting_end', attendance_voting_end)
-            self.attendance_voting_end = attendance_voting_end
-
-        async with self.bot.safe_connection() as connection:
-            await query_builder(connection)
-
-    async def delete(self) -> None:
-        async with self.bot.safe_connection() as connection:
-            await connection.execute('DELETE FROM teams.gamedays WHERE id = $1', self.id)
-
-            # Delete from timers where the id is in an array of timer ids.
-            timer_ids: List[int] = []
-
-            if self.attendance_voting_start_timer_id:
-                timer_ids.append(self.attendance_voting_start_timer_id)
-
-            if self.attendance_voting_end_timer_id:
-                timer_ids.append(self.attendance_voting_end_timer_id)
-
-            if self.gameday_start_timer_id:
-                timer_ids.append(self.gameday_start_timer_id)
-
-            if timer_ids:
-                await connection.execute(
-                    'DELETE FROM timers WHERE id = ANY($1)',
-                    timer_ids,
-                )
-
-        self.bucket.remove_gameday(self.id)
-
-    async def end(self, *, when: Optional[datetime.datetime] = None) -> None:
-        when = when or discord.utils.utcnow()
-
-        # And let's set the ended_at timestamp.
-        await self.edit(ended_at=when)
-
-        if self.scoreboard_message_id:
-            channel = self.team.text_channel
-            message = channel.get_partial_message(self.scoreboard_message_id)
-
-            await message.edit(view=None)
-
-            captain_mentions = ', '.join([r.mention for r in self.team.captain_roles])
-
-            # TODO: Maybe provide a better embed?
-            await message.reply(
-                content=f'{captain_mentions} The gameday has ended.',
-                allowed_mentions=discord.AllowedMentions(roles=True),
-            )
-
-        # We need to schedule the next gameday. It's a week from the given start time
-        # We use this helper method in case the gameday has been changed during its lifetime.
-        next_gameday_starts_at = get_next_gameday_time(weekday=self.bucket.weekday, game_time=self.bucket.game_time)
-        await Gameday.create(
-            self.bot,
-            gameday_bucket_id=self.bucket_id,
-            guild_id=self.guild_id,
-            team_id=self.team_id,
-            starts_at=next_gameday_starts_at,
-        )
-
-    async def merge_gameday_images(self) -> Optional[discord.File]:
-        if not self.images:
+    def gameday(self) -> Optional[Gameday]:
+        bucket = self.bucket
+        if bucket is None:
             return None
 
-        image = await image_from_urls(self.bot, [image.image_url for image in self.images], images_per_row=2)
-        file = image_to_file(image, filename='gameday.png', description='Gameday Images')
-        return file
+        return bucket.get_gameday(self.gameday_id)
 
-    async def reschedule(
+    @property
+    def team(self) -> Optional[Team]:
+        return self.bot.get_team(self.guild_id, self.team_id)
+
+    async def delete(self, *, connection: ConnectionType) -> None:
+        query = """
+            DELETE FROM teams.gameday_images
+            WHERE id = $1
+            """
+
+        await connection.execute(query, self.id)
+
+        gameday = self.gameday
+        if gameday is None:
+            return
+
+        gameday.remove_image(self.id)
+
+    async def edit(
         self,
+        connection: ConnectionType,
         *,
-        starts_at: datetime.datetime,
+        url: str = MISSING,
+        uploader_id: int = MISSING,
+        uploaded_at: datetime.datetime = MISSING,
     ) -> None:
-        voting_times = determine_voting_times(starts_at)
+        builder = QueryBuilder('teams.gameday_images')
+        builder.add_condition('id', self.id)
 
-        # We need to fetch all these timer records.
-        async with self.bot.safe_connection() as connection:
-            if self.attendance_voting_end_timer_id:
-                data = await connection.fetchrow(
-                    'SELECT * FROM timers WHERE id = $1',
-                    self.attendance_voting_end_timer_id,
-                )
-                assert data
+        if url is not MISSING:
+            builder.add_arg('url', url)
+            self.url = url
 
-                timer = Timer(record=data, bot=self.bot)
-                await timer.edit(expires=voting_times.end)
+        if uploader_id is not MISSING:
+            builder.add_arg('uploader_id', uploader_id)
+            self.uploader_id = uploader_id
 
-            if self.attendance_voting_start_timer_id:
-                data = await connection.fetchrow(
-                    'SELECT * FROM timers WHERE id = $1',
-                    self.attendance_voting_start_timer_id,
-                )
-                assert data
+        if uploaded_at is not MISSING:
+            builder.add_arg('uploaded_at', uploaded_at)
+            self.uploaded_at = uploaded_at
 
-                timer = Timer(record=data, bot=self.bot)
-                await timer.edit(expires=voting_times.start)
-
-            if self.gameday_start_timer_id:
-                data = await connection.fetchrow(
-                    'SELECT * FROM timers WHERE id = $1',
-                    self.gameday_start_timer_id,
-                )
-                assert data
-
-                timer = Timer(record=data, bot=self.bot)
-                await timer.edit(expires=starts_at)
-
-            # Now we need to edit the gameday record.
-            await self.edit(
-                started_at=starts_at,
-                attendance_voting_start=voting_times.start,
-                attendance_voting_end=voting_times.end,
-            )
-
-        if voting_times.disable_automatic_sub_finding:
-            await self.bucket.edit(automatic_sub_finding=False)
+        await builder(connection)
 
 
-class GamedayBucket(Teamable):
-    """Represents the gameday bucket for a given team. Every team
-    has a gameday bucket, which is used to determine when a team should
-    be playing together for their e-sports games.
-
+@dataclasses.dataclass()
+class GamedayScoreReport:
     bot: FuryBot
-        The bot instance.
-    team: Team
-        The team instance.
+
     id: int
-        The ID of the gameday bucket.
-    weekday: int
-        The day of the week this game is played on.
-    game_time: datetime.time
-        The time of day this game is played at.
-    members_on_team: int
-        The number of members that can be on a given team. For example,
-        for Rocket League it is 3.
-    best_of: int
-        Represents the best of X rounds that are played in a given gameday. So for example,
-        if best_of is 3, then the team that wins 2 rounds first wins the gameday.
-    """
-
-    def __init__(
-        self,
-        /,
-        *,
-        bot: FuryBot,
-        team_id: int,
-        guild_id: int,
-        id: int,
-        weekday: int,
-        game_time: datetime.time,
-        members_on_team: int,
-        best_of: int,
-        automatic_sub_finding: bool,
-    ) -> None:
-        self.bot: FuryBot = bot
-        self.team_id: int = team_id
-        self.guild_id: int = guild_id
-        self.id: int = id
-
-        self.weekday: Weekday = Weekday(weekday)
-        self.game_time: datetime.time = game_time
-
-        self.members_on_team: int = members_on_team
-        self.best_of: int = best_of
-        self.automatic_sub_finding: bool = automatic_sub_finding
-
-        self._gamedays: Dict[int, Gameday] = {}
-
-    def _get_bot(self) -> FuryBot:
-        return self.bot
-
-    def _get_guild_id(self) -> int:
-        return self.guild_id
-
-    def _get_team_id(self) -> int:
-        return self.team_id
+    guild_id: int
+    team_id: int
+    bucket_id: int
+    gameday_id: int
+    text: str
+    reported_by_id: int
+    reported_at: datetime.datetime
 
     @classmethod
     async def create(
         cls: Type[Self],
         bot: FuryBot,
         *,
+        connection: ConnectionType,
         guild_id: int,
         team_id: int,
-        members_on_team: int,
-        weekday: Weekday,
-        game_time: datetime.time,
-        best_of: int,
-        automatic_sub_finding: bool = True,
+        bucket_id: int,
+        gameday_id: int,
+        text: str,
+        reported_by_id: int,
+        reported_at: datetime.datetime = discord.utils.utcnow(),
     ) -> Self:
-        async with bot.safe_connection() as connection:
-            data = await connection.fetchrow(
-                'INSERT INTO teams.gameday_buckets (team_id, guild_id, weekday, game_time, members_on_team, best_of, automatic_sub_finding) '
-                'VALUES($1, $2, $3, $4, $5, $6, $7) '
-                'RETURNING *',
-                team_id,
+        bucket = bot.get_gameday_bucket(guild_id, team_id)
+        if bucket is None:
+            raise ValueError('Cannot add score report to a non-existing bucket.')
+
+        gameday = bucket.get_gameday(gameday_id)
+        if gameday is None:
+            raise ValueError('Cannot add score report to a non-existing gameday.')
+
+        query = """
+            INSERT INTO teams.gameday_score_reports (
                 guild_id,
-                weekday.value,
-                game_time,
-                members_on_team,
-                best_of,
-                automatic_sub_finding,
+                team_id,
+                bucket_id,
+                gameday_id,
+                text,
+                reported_by_id,
+                reported_at
             )
-            assert data
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETRNING *
+            """
+
+        data = await connection.fetchrow(query, guild_id, team_id, bucket_id, gameday_id, text, reported_by_id, reported_at)
+        assert data
 
         self = cls(bot=bot, **dict(data))
-        bot.add_gameday_bucket(self)
-
-        # Let's create the first gameday as well for this bucket which will start
-        # the cycle of timers.
-        gameday_time = get_next_gameday_time(weekday=weekday, game_time=game_time)
-        await Gameday.create(bot, gameday_bucket_id=self.id, guild_id=guild_id, team_id=team_id, starts_at=gameday_time)
+        gameday.add_score_report(self)
 
         return self
 
+    @property
+    def reported_by(self) -> Optional[discord.User]:
+        return self.bot.get_user(self.reported_by_id)
+
+    @property
+    def bucket(self) -> Optional[GamedayBucket]:
+        return self.bot.get_gameday_bucket(self.guild_id, self.team_id)
+
+    @property
+    def gameday(self) -> Optional[Gameday]:
+        bucket = self.bucket
+        if bucket is None:
+            return None
+
+        return bucket.get_gameday(self.gameday_id)
+
+    @property
+    def team(self) -> Optional[Team]:
+        return self.bot.get_team(self.guild_id, self.team_id)
+
+    async def delete(self, *, connection: ConnectionType) -> None:
+        query = """
+            DELETE FROM teams.gameday_score_reports
+            WHERE id = $1
+            """
+
+        await connection.execute(query, self.id)
+
+        gameday = self.gameday
+        if gameday is None:
+            return
+
+        gameday.remove_score_report(self.id)
+
+    async def edit(
+        self,
+        connection: ConnectionType,
+        *,
+        text: str = MISSING,
+        reported_by_id: int = MISSING,
+        reported_at: datetime.datetime = MISSING,
+    ) -> None:
+        builder = QueryBuilder('teams.gameday_score_reports')
+        builder.add_condition('id', self.id)
+
+        if text is not MISSING:
+            builder.add_arg('text', text)
+            self.text = text
+
+        if reported_by_id is not MISSING:
+            builder.add_arg('reported_by_id', reported_by_id)
+            self.reported_by_id = reported_by_id
+
+        if reported_at is not MISSING:
+            builder.add_arg('reported_at', reported_at)
+            self.reported_at = reported_at
+
+        await builder(connection)
+
+    async def fetch_reported_by(self) -> discord.User:
+        return await self.bot.fetch_user(self.reported_by_id)
+
+
+@dataclasses.dataclass()
+class GamedayAttendanceVoting:
+    bot: FuryBot
+
+    guild_id: int
+    team_id: int
+    bucket_id: int
+    gameday_id: int
+    starts_at: datetime.datetime
+    ends_at: datetime.datetime
+    starts_at_timer_id: Optional[int] = None
+    ends_at_timer_id: Optional[int] = None
+    message_id: Optional[int] = None
+
     @classmethod
-    async def fetch_gamedays(
-        cls: Type[Self], bot: FuryBot, gameday_bucket_id: int, *, connection: ConnectionType
-    ) -> List[Gameday]:
-        gamedays: List[Gameday] = []
-        data = await connection.fetch('SELECT * FROM teams.gamedays WHERE bucket_id = $1', gameday_bucket_id)
-
-        for row in data:
-            members = await Gameday.fetch_members(bot=bot, gameday_id=row['id'], connection=connection)
-            images = await Gameday.fetch_images(bot=bot, gameday_id=row['id'], connection=connection)
-            gameday = Gameday(bot=bot, members=members, images=images, **dict(row))
-            gamedays.append(gameday)
-
-        return gamedays
-
-    @property
-    def wins_needed(self) -> int:
-        return math.ceil(self.best_of / 2)
-
-    @property
-    def ongoing_gameday(self) -> Optional[Gameday]:
-        return discord.utils.find(
-            lambda gameday: gameday.ongoing and gameday.started_at < discord.utils.utcnow(), self._gamedays.values()
+    def from_data(
+        cls: Type[Self],
+        bot: FuryBot,
+        *,
+        guild_id: int,
+        team_id: int,
+        bucket_id: int,
+        gameday_id: int,
+        starts_at: datetime.datetime,
+        ends_at: datetime.datetime,
+        starts_at_timer_id: Optional[int],
+        ends_at_timer_id: Optional[int],
+        message_id: Optional[int] = None,
+    ) -> Self:
+        return cls(
+            bot=bot,
+            guild_id=guild_id,
+            team_id=team_id,
+            bucket_id=bucket_id,
+            gameday_id=gameday_id,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            starts_at_timer_id=starts_at_timer_id,
+            ends_at_timer_id=ends_at_timer_id,
+            message_id=message_id,
         )
 
     @property
-    def next_gameday(self) -> Optional[Gameday]:
-        return discord.utils.find(lambda gameday: gameday.started_at > discord.utils.utcnow(), self._gamedays.values())
+    def bucket(self) -> Optional[GamedayBucket]:
+        return self.bot.get_gameday_bucket(self.guild_id, self.team_id)
 
-    def get_gamedays(self) -> Mapping[int, Gameday]:
-        return self._gamedays
+    @property
+    def gameday(self) -> Optional[Gameday]:
+        bucket = self.bucket
+        if bucket is None:
+            return None
 
-    def get_gameday(self, gameday_id: int) -> Optional[Gameday]:
-        return self._gamedays.get(gameday_id)
+        return bucket.get_gameday(self.gameday_id)
 
-    def add_gameday(self, gameday: Gameday) -> None:
-        self._gamedays[gameday.id] = gameday
+    @property
+    def team(self) -> Optional[Team]:
+        return self.bot.get_team(self.guild_id, self.team_id)
 
-    def remove_gameday(self, gameday_id: int) -> None:
-        self._gamedays.pop(gameday_id, None)
+    @property
+    def message(self) -> Optional[discord.Message]:
+        if self.message_id is None:
+            return
+
+        return discord.utils.find(lambda m: m.id == self.message_id, self.bot.cached_messages)
+
+    async def fetch_message(self) -> Optional[discord.Message]:
+        if self.message_id is None:
+            return
+
+        team = self.team
+        if team is None:
+            return
+
+        return await team.text_channel.fetch_message(self.message_id)
+
+    async def fetch_starts_at_timer(self, *, connection: Optional[ConnectionType] = None) -> Optional[Timer]:
+        timer_manager = self.bot.timer_manager
+        if timer_manager is None:
+            return None
+
+        if self.starts_at_timer_id is None:
+            return None
+
+        return await timer_manager.fetch_timer(self.starts_at_timer_id, connection=connection)
+
+    async def fetch_ends_at_timer(self, *, connection: Optional[ConnectionType] = None) -> Optional[Timer]:
+        timer_manager = self.bot.timer_manager
+        if timer_manager is None:
+            return None
+
+        if self.ends_at_timer_id is None:
+            return None
+
+        return await timer_manager.fetch_timer(self.ends_at_timer_id, connection=connection)
+
+
+@dataclasses.dataclass()
+class Gameday:
+    def __init__(
+        self,
+        bot: FuryBot,
+        *,
+        members: Dict[int, GamedayMember],
+        images: Dict[int, GamedayImage],
+        score_reports: Dict[int, GamedayScoreReport],
+        id: int,
+        guild_id: int,
+        team_id: int,
+        bucket_id: int,
+        starts_at: datetime.datetime,
+        ended_at: Optional[datetime.datetime] = None,
+        automatic_sub_finding: bool,
+        voting_starts_at: datetime.datetime,
+        voting_ends_at: datetime.datetime,
+        gameday_time_id: int,
+        voting_starts_at_timer_id: Optional[int] = None,
+        voting_ends_at_timer_id: Optional[int] = None,
+        starts_at_timer_id: Optional[int] = None,
+        voting_message_id: Optional[int] = None,
+    ) -> None:
+        self.bot: FuryBot = bot
+
+        self.members: Dict[int, GamedayMember] = members
+        self.images: Dict[int, GamedayImage] = images
+        self.score_reports: Dict[int, GamedayScoreReport] = score_reports
+
+        self.id: int = id
+        self.guild_id: int = guild_id
+        self.team_id: int = team_id
+        self.bucket_id: int = bucket_id
+        self.starts_at: datetime.datetime = starts_at
+        self.ended_at: Optional[datetime.datetime] = ended_at
+        self.automatic_sub_finding: bool = automatic_sub_finding
+        self.starts_at_timer_id: Optional[int] = starts_at_timer_id
+        self.gameday_time_id: int = gameday_time_id
+
+        self.voting = GamedayAttendanceVoting.from_data(
+            self.bot,
+            guild_id=guild_id,
+            team_id=team_id,
+            bucket_id=bucket_id,
+            gameday_id=self.id,
+            starts_at=voting_starts_at,
+            ends_at=voting_ends_at,
+            starts_at_timer_id=voting_starts_at_timer_id,
+            ends_at_timer_id=voting_ends_at_timer_id,
+            message_id=voting_message_id,
+        )
+
+    @classmethod
+    async def create(
+        cls: Type[Self],
+        bot: FuryBot,
+        *,
+        connection: ConnectionType,
+        guild_id: int,
+        team_id: int,
+        bucket_id: int,
+        gameday_time_id: int,
+        starts_at: datetime.datetime,
+    ) -> Self:
+
+        bucket = bot.get_gameday_bucket(guild_id, team_id)
+        if bucket is None:
+            raise ValueError(f"Bucket {bucket_id} does not exist")
+
+        voting = determine_comfy_voting_times(starts_at)
+
+        query = """
+            INSERT INTO teams.gamedays (
+                guild_id,
+                team_id, 
+                bucket_id, 
+                starts_at,
+                automatic_sub_finding, 
+                voting_starts_at,
+                voting_ends_at,
+                gameday_time_id
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *
+            """
+
+        data = await connection.fetchrow(
+            query,
+            guild_id,
+            team_id,
+            bucket_id,
+            starts_at,
+            voting.can_use_automatic_sub_finding,
+            voting.start,
+            voting.end,
+            gameday_time_id,
+        )
+        assert data
+
+        self = cls(bot=bot, members={}, images={}, score_reports={}, **dict(data))
+        bucket.add_gameday(self)
+
+        # We need to spawn the timers here to dispatch the events
+        timer_manager = bot.timer_manager
+        if timer_manager:  # This will be Not none in non-development environments
+            default_timer_args = (guild_id, team_id, bucket_id, self.id)
+            gameday_start_timer = await timer_manager.create_timer(starts_at, 'gameday_start', *default_timer_args)
+
+            voting_start_timer = await timer_manager.create_timer(voting.start, 'gameday_voting_start', *default_timer_args)
+            voting_end_timer = await timer_manager.create_timer(voting.end, 'gameday_voting_end', *default_timer_args)
+
+            await self.edit(
+                connection,
+                voting_starts_at_timer_id=voting_start_timer.id,
+                voting_ends_at_timer_id=voting_end_timer.id,
+                starts_at_timer_id=gameday_start_timer.id,
+            )
+
+        return self
+
+    @property
+    def bucket(self) -> Optional[GamedayBucket]:
+        return self.bot.get_gameday_bucket(self.guild_id, self.team_id)
+
+    @property
+    def team(self) -> Optional[Team]:
+        return self.bot.get_team(self.guild_id, self.team_id)
+
+    @property
+    def time(self) -> Optional[GamedayTime]:
+        bucket = self.bucket
+        if bucket is None:
+            return
+
+        return bucket.get_gameday_time(self.gameday_time_id)
+
+    def add_score_report(self, report: GamedayScoreReport) -> None:
+        self.score_reports[report.id] = report
+
+    def remove_score_report(self, report_id: int, /) -> Optional[GamedayScoreReport]:
+        return self.score_reports.pop(report_id, None)
+
+    def get_score_report(self, report_id: int, /) -> Optional[GamedayScoreReport]:
+        return self.score_reports.get(report_id)
+
+    def add_member(self, member: GamedayMember) -> None:
+        self.members[member.id] = member
+
+    def remove_member(self, member_id: int, /) -> Optional[GamedayMember]:
+        return self.members.pop(member_id, None)
+
+    def get_member(self, member_id: int) -> Optional[GamedayMember]:
+        return self.members.get(member_id)
+
+    def get_members(self) -> List[GamedayMember]:
+        return list(self.members.values())
+
+    def add_image(self, image: GamedayImage, /) -> None:
+        self.images[image.id] = image
+
+    def remove_image(self, image_id: int, /) -> Optional[GamedayImage]:
+        return self.images.pop(image_id, None)
+
+    def get_image(self, image_id: int, /) -> Optional[GamedayImage]:
+        return self.images.get(image_id)
+
+    async def fetch_members(self, *, connection: ConnectionType) -> List[GamedayMember]:
+        query = """
+            SELECT *
+            FROM teams.gameday_members
+            WHERE gameday_id = $1
+            """
+
+        data = await connection.fetch(query, self.id)
+        return [GamedayMember(self.bot, **dict(row)) for row in data]
+
+    async def fetch_images(self, *, connection: ConnectionType) -> List[GamedayImage]:
+        query = """
+            SELECT *
+            FROM teams.gameday_images
+            WHERE gameday_id = $1
+            """
+
+        data = await connection.fetch(query, self.id)
+        return [GamedayImage(self.bot, **dict(row)) for row in data]
+
+    async def fetch_score_reports(self, *, connection: ConnectionType) -> List[GamedayScoreReport]:
+        query = """
+            SELECT *
+            FROM teams.gameday_score_reports
+            WHERE gameday_id = $1
+            """
+
+        data = await connection.fetch(query, self.id)
+        return [GamedayScoreReport(self.bot, **dict(row)) for row in data]
+
+    async def setup(self, *, connection: ConnectionType) -> None:
+        members = await self.fetch_members(connection=connection)
+        for member in members:
+            self.add_member(member)
+
+        images = await self.fetch_images(connection=connection)
+        for image in images:
+            self.add_image(image)
+
+        scores = await self.fetch_score_reports(connection=connection)
+        for score in scores:
+            self.add_score_report(score)
+
+    async def delete(self, *, connection: ConnectionType) -> None:
+        query = """
+            DELETE FROM teams.gamedays
+            WHERE id = $1
+            """
+
+        await connection.execute(query, self.id)
+
+        bucket = self.bucket
+        if bucket is None:
+            return
+
+        # We need to fetch the timers here to delete them
+        timer_coros = [self.fetch_starts_at_timer, self.voting.fetch_starts_at_timer, self.voting.fetch_ends_at_timer]
+
+        for coro in timer_coros:
+            try:
+                timer = await coro(connection=connection)
+            except TimerNotFound:
+                pass
+            else:
+                if timer is not None:
+                    await timer.delete(connection=connection)
+
+        if self.ended_at is None and self.starts_at < discord.utils.utcnow():
+            # This gameday has not ended yet, so we need to remove any messages that were created
+            # and any members from the team that were added as temporary subs
+            voting_message = self.voting.message or await self.voting.fetch_message()
+            if voting_message is not None:
+                await voting_message.delete()
+
+            # Remove all temporary subs but keep them in the voice channels
+            # until the gameday ends
+            team = self.team
+            if team is not None:
+                for member in self.members.values():
+                    if member.is_temporary_sub and (team_member := team.get_member(member.member_id)):
+                        await team.remove_team_member(team_member, force_voice_disconnect=False)
+
+        bucket.remove_gameday(self.id)
+
+    async def fetch_starts_at_timer(self, *, connection: Optional[ConnectionType] = None) -> Optional[Timer]:
+        timer_manager = self.bot.timer_manager
+        if timer_manager is None:
+            return None
+
+        if self.starts_at_timer_id is None:
+            return None
+
+        return await timer_manager.fetch_timer(self.starts_at_timer_id, connection=connection)
+
+    async def edit(
+        self,
+        connection: ConnectionType,
+        *,
+        starts_at: datetime.datetime = MISSING,
+        automatic_sub_finding: bool = MISSING,
+        voting_starts_at: datetime.datetime = MISSING,
+        voting_ends_at: datetime.datetime = MISSING,
+        voting_starts_at_timer_id: int = MISSING,
+        voting_ends_at_timer_id: int = MISSING,
+        voting_message_id: int = MISSING,
+        starts_at_timer_id: int = MISSING,
+        ended_at: datetime.datetime = MISSING,
+    ) -> None:
+        builder = QueryBuilder('teams.gamedays')
+        builder.add_condition('id', self.id)
+
+        if starts_at is not MISSING:
+            builder.add_arg('starts_at', starts_at)
+            self.starts_at = starts_at
+
+        if automatic_sub_finding is not MISSING:
+            builder.add_arg('automatic_sub_finding', automatic_sub_finding)
+            self.automatic_sub_finding = automatic_sub_finding
+
+        if voting_starts_at is not MISSING:
+            builder.add_arg('voting_starts_at', voting_starts_at)
+            self.voting.starts_at = voting_starts_at
+
+        if voting_ends_at is not MISSING:
+            builder.add_arg('voting_ends_at', voting_ends_at)
+            self.voting.ends_at = voting_ends_at
+
+        if voting_starts_at_timer_id is not MISSING:
+            builder.add_arg('voting_starts_at_timer_id', voting_starts_at_timer_id)
+            self.voting.starts_at_timer_id = voting_starts_at_timer_id
+
+        if voting_ends_at_timer_id is not MISSING:
+            builder.add_arg('voting_ends_at_timer_id', voting_ends_at_timer_id)
+            self.voting.ends_at_timer_id = voting_ends_at_timer_id
+
+        if voting_message_id is not MISSING:
+            builder.add_arg('voting_message_id', voting_message_id)
+            self.voting.message_id = voting_message_id
+
+        if starts_at_timer_id is not MISSING:
+            builder.add_arg('starts_at_timer_id', starts_at_timer_id)
+            self.starts_at_timer_id = starts_at_timer_id
+
+        if ended_at is not MISSING:
+            builder.add_arg('ended_at', ended_at)
+            self.ended_at = ended_at
+
+        if self.bot.timer_manager:
+            updating_timers = [
+                (starts_at, self.fetch_starts_at_timer),
+                (voting_starts_at, self.voting.fetch_starts_at_timer),
+                (voting_ends_at, self.voting.fetch_ends_at_timer),
+            ]
+
+            for new_datetime, coro in updating_timers:
+                if new_datetime is MISSING:
+                    continue
+
+                try:
+                    timer = await coro(connection=connection)
+                except TimerNotFound:
+                    continue
+                else:
+                    if timer is not None:
+                        await timer.edit(expires=new_datetime)
+
+        await builder(connection)
+
+
+@dataclasses.dataclass()
+class GamedayTime:
+    def __init__(
+        self,
+        bot: FuryBot,
+        *,
+        id: int,
+        guild_id: int,
+        team_id: int,
+        bucket_id: int,
+        weekday: Union[int, Weekday],
+        starts_at: datetime.time,
+    ) -> None:
+        self.bot: FuryBot = bot
+
+        self.id = id
+        self.guild_id = guild_id
+        self.team_id = team_id
+        self.bucket_id = bucket_id
+        self.weekday: Weekday = weekday if isinstance(weekday, Weekday) else Weekday(weekday)
+        self.starts_at = starts_at
+
+    @classmethod
+    async def create(
+        cls: Type[Self],
+        bot: FuryBot,
+        *,
+        connection: ConnectionType,
+        guild_id: int,
+        team_id: int,
+        bucket_id: int,
+        weekday: Weekday,
+        starts_at: datetime.time,
+    ) -> Self:
+        bucket = bot.get_gameday_bucket(guild_id, team_id)
+        if bucket is None:
+            raise ValueError(f'Bucket {bucket_id} does not exist')
+
+        query = """
+            INSERT INTO teams.gameday_times (guild_id, team_id, bucket_id, weekday, starts_at)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
+        """
+
+        data = await connection.fetchrow(query, guild_id, team_id, bucket_id, weekday.value, starts_at)
+        assert data
+
+        self = cls(bot, **dict(data))
+        bucket.add_gameday_time(self)
+
+        # Let's spawn a new instance of Gameday for the next gameday with this time
+        next_gameday_starts_at = get_next_gameday_time(weekday=self.weekday, game_time=self.starts_at)
+        await Gameday.create(
+            bot,
+            connection=connection,
+            guild_id=guild_id,
+            team_id=team_id,
+            bucket_id=bucket_id,
+            starts_at=next_gameday_starts_at,
+            gameday_time_id=self.id,
+        )
+
+        return self
+
+    @property
+    def bucket(self) -> Optional[GamedayBucket]:
+        return self.bot.get_gameday_bucket(self.guild_id, self.team_id)
+
+    @property
+    def team(self) -> Optional[Team]:
+        return self.bot.get_team(self.guild_id, self.team_id)
 
     async def edit(
         self,
         *,
+        connection: ConnectionType,
         weekday: Weekday = MISSING,
-        game_time: datetime.time = MISSING,
-        members_on_team: int = MISSING,
-        best_of: int = MISSING,
-        automatic_sub_finding: bool = MISSING,
+        starts_at: datetime.time = MISSING,
     ) -> None:
-        query_builder = QueryBuilder('teams.gameday_buckets')
-        query_builder.add_arg('id', self.id)
+        builder = QueryBuilder('teams.gameday_times')
+        builder.add_condition('id', self.id)
 
         if weekday is not MISSING:
-            query_builder.add_arg('weekday', weekday.value)
+            builder.add_arg('weekday', weekday.value)
             self.weekday = weekday
 
-        if game_time is not MISSING:
-            query_builder.add_arg('game_time', game_time)
-            self.game_time = game_time
+        if starts_at is not MISSING:
+            builder.add_arg('starts_at', starts_at)
+            self.starts_at = starts_at
 
-        if members_on_team is not MISSING:
-            query_builder.add_arg('members_on_team', members_on_team)
-            self.members_on_team = members_on_team
+        if weekday is not MISSING or starts_at is not MISSING:
+            # We need to update all the gamedays that have this time.
 
-        if best_of is not MISSING:
-            query_builder.add_arg('best_of', best_of)
-            self.best_of = best_of
+            weekday = weekday if weekday is not MISSING else self.weekday
+            starts_at = starts_at if starts_at is not MISSING else self.starts_at
 
-        if automatic_sub_finding is not MISSING:
-            query_builder.add_arg('automatic_sub_finding', automatic_sub_finding)
-            self.automatic_sub_finding = automatic_sub_finding
+            # We need to edit all the gamedays that have this time.
+            bucket = self.bucket
+            if bucket is None:
+                raise ValueError(f'Bucket {self.bucket_id} does not exist')
 
-        await query_builder(self.bot)
+            now = discord.utils.utcnow()
+            for gameday in bucket.gamedays.values():
+                if gameday.gameday_time_id != self.id:
+                    continue
 
-    async def delete(self) -> None:
-        async with self.bot.safe_connection() as connection:
-            await connection.execute('DELETE FROM teams.gameday_buckets WHERE id = $1', self.id)
+                if now > gameday.voting.starts_at:
+                    # Don't want to edit a gameday that has already started its process.
+                    continue
 
-            # We need to delete all timers that contain this gameday bucket
-            # The timer args are: (guild_id, team_id, gameday_bucket_id, gameday_id), so we need to check the 3rd
-            # element for the bucket ID and delete all timers that match. Remember that the args in a JSONB field
-            # named extra: {"args": [guild_id, team_id, gameday_bucket_id, gameday_id], "kwargs": {}}
-            await connection.execute('DELETE FROM timers WHERE extra->>\'args\' LIKE $1', f'%{self.id}%')
+                new_starts_at = get_next_gameday_time(weekday=weekday, game_time=starts_at)
+                voting = determine_comfy_voting_times(new_starts_at)
+
+                await gameday.edit(
+                    connection,
+                    starts_at=new_starts_at,
+                    voting_starts_at=voting.start,
+                    voting_ends_at=voting.end,
+                    automatic_sub_finding=voting.can_use_automatic_sub_finding,
+                )
+
+                # Some timers may need to be updated as well, so let's do that.
+                timers = [
+                    (gameday.voting.fetch_starts_at_timer, voting.start),
+                    (gameday.voting.fetch_ends_at_timer, voting.end),
+                    (gameday.fetch_starts_at_timer, new_starts_at),
+                ]
+                for timer_coro, new_time in timers:
+                    try:
+                        timer = await timer_coro(connection=connection)
+                    except TimerNotFound:
+                        continue
+                    else:
+                        if timer is not None:
+                            await timer.edit(expires=new_time)
+
+        await builder(connection)
+
+    async def delete(self, *, connection: ConnectionType) -> None:
+        query = """
+            DELETE FROM teams.gameday_times WHERE id = $1
+        """
+
+        await connection.execute(query, self.id)
+
+        bucket = self.bucket
+        if bucket is None:
+            return
+
+        # Delete all gamedays that have this time that do not have an ended_at
+        gamedays = bucket.get_gamedays_with_time(self.id)
+        for gameday in gamedays:
+            if gameday.ended_at is None:
+                await gameday.delete(connection=connection)
+
+        bucket.remove_gameday_time(self.id)
+
+
+@dataclasses.dataclass()
+class GamedayBucket:
+    bot: FuryBot
+
+    gamedays: Dict[int, Gameday]
+    id: int
+    guild_id: int
+    team_id: int
+    gameday_times: Dict[int, GamedayTime]
+    automatic_sub_finding_channel_id: Optional[int]
+    automatic_sub_finding_if_possible: bool
+
+    @classmethod
+    async def create(
+        cls: Type[Self],
+        bot: FuryBot,
+        *,
+        connection: ConnectionType,
+        guild_id: int,
+        team_id: int,
+        automatic_sub_finding_if_possible: bool = False,
+        automatic_sub_finding_channel_id: Optional[int] = None,
+    ) -> Self:
+        query = """
+            INSERT INTO teams.gameday_buckets (guild_id, team_id, automatic_sub_finding_if_possible, automatic_sub_finding_channel_id)
+            VALUES ($1, $2, $3, $4)
+            RETURNING *
+        """
+
+        data = await connection.fetchrow(
+            query, guild_id, team_id, automatic_sub_finding_if_possible, automatic_sub_finding_channel_id
+        )
+        assert data
+
+        self = cls(bot, **dict(data))
+        bot.add_gameday_bucket(self)
+
+        return self
+
+    @property
+    def team(self) -> Optional[Team]:
+        return self.bot.get_team(self.guild_id, self.team_id)
+
+    @property
+    def guild(self) -> Optional[discord.Guild]:
+        return self.bot.get_guild(self.guild_id)
+
+    @property
+    def automatic_sub_finding_channel(self) -> Optional[discord.abc.GuildChannel]:
+        if self.automatic_sub_finding_channel_id is None:
+            return
+
+        guild = self.guild
+        if guild is None:
+            return
+
+        return guild.get_channel(self.automatic_sub_finding_channel_id)
+
+    def add_gameday(self, gameday: Gameday) -> None:
+        self.gamedays[gameday.id] = gameday
+
+    def remove_gameday(self, gameday_id: int) -> Optional[Gameday]:
+        self.gamedays.pop(gameday_id, None)
+
+    def get_gameday(self, gameday_id: int) -> Optional[Gameday]:
+        return self.gamedays.get(gameday_id)
+
+    def get_gamedays(self) -> List[Gameday]:
+        return list(self.gamedays.values())
+
+    def get_gamedays_with_time(self, gameday_time_id: int, /) -> List[Gameday]:
+        return [gameday for gameday in self.gamedays.values() if gameday.gameday_time_id == gameday_time_id]
+
+    def add_gameday_time(self, gameday_time: GamedayTime) -> None:
+        self.gameday_times[gameday_time.id] = gameday_time
+
+    def remove_gameday_time(self, gameday_time_id: int) -> Optional[GamedayTime]:
+        return self.gameday_times.pop(gameday_time_id, None)
+
+    def get_gameday_time(self, gameday_time_id: int) -> Optional[GamedayTime]:
+        return self.gameday_times.get(gameday_time_id)
+
+    def get_gameday_times(self) -> List[GamedayTime]:
+        return list(self.gameday_times.values())
+
+    async def delete(self, *, connection: ConnectionType) -> None:
+        query = """
+            DELETE FROM teams.gameday_buckets WHERE id = $1
+        """
+
+        await connection.execute(query, self.id)
 
         self.bot.remove_gameday_bucket(self.guild_id, self.team_id)
+
+    async def fetch_gamedays(self, *, connection: ConnectionType) -> List[Gameday]:
+        query = """
+            SELECT *
+            FROM teams.gamedays
+            WHERE bucket_id = $1
+        """
+
+        data = await connection.fetch(query, self.id)
+        return [Gameday(self.bot, **dict(row)) for row in data]
+
+    async def fetch_gameday_times(self, *, connection: ConnectionType) -> List[GamedayTime]:
+        query = """
+            SELECT *
+            FROM teams.gameday_times
+            WHERE bucket_id = $1
+        """
+
+        data = await connection.fetch(query, self.id)
+        return [GamedayTime(self.bot, **dict(row)) for row in data]
+
+    async def setup(self, *, connection: ConnectionType) -> None:
+        gamedays = await self.fetch_gamedays(connection=connection)
+        for gameday in gamedays:
+            await gameday.setup(connection=connection)
+            self.add_gameday(gameday)
+
+        times = await self.fetch_gameday_times(connection=connection)
+        for time in times:
+            self.add_gameday_time(time)
