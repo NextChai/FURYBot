@@ -28,3 +28,33 @@ from typing import TYPE_CHECKING, Tuple
 import discord
 from discord.ext import commands
 from discord import app_commands
+
+from utils import BaseCog
+
+if TYPE_CHECKING:
+    from bot import FuryBot
+
+__all__: Tuple[str, ...] = ('GamedayEventListener', 'GamedayCommands')
+
+
+class GamedayEventListener(BaseCog):
+    @commands.Cog.listener('on_gameday_start_timer_complete')
+    async def on_gameday_start(self, guild_id: int, team_id: int, bucket_id: int, gameday_id: int) -> None:
+        ...
+
+    @commands.Cog.listener('on_gameday_voting_start_timer_complete')
+    async def on_gameday_voting_start(self, guild_id: int, team_id: int, bucket_id: int, gameday_id: int) -> None:
+        ...
+
+    @commands.Cog.listener('on_gameday_voting_end_timer_complete')
+    async def on_gameday_voting_end(self, guild_id: int, team_id: int, bucket_id: int, gameday_id: int) -> None:
+        ...
+
+
+class GamedayCommands(BaseCog):
+
+    gameday = app_commands.Group(name='gameday', description='Commands related to gamedays.')
+
+    @gameday.command(name='upload')
+    async def gameday_upload(self, interaction: discord.Interaction[FuryBot], image: discord.Attachment) -> None:
+        ...

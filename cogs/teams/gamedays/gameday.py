@@ -1116,6 +1116,18 @@ class GamedayBucket:
             return
 
         return guild.get_channel(self.automatic_sub_finding_channel_id)
+    
+    @property
+    def ongoing_gameday(self) -> Optional[Gameday]:
+        # Return the gameday that is currently ongoing. An ongoing
+        # gameday is one that has a starts_at time but does not have an ended_at time,
+        # and the starts_at time is now or in the past.
+        now = discord.utils.utcnow()
+        
+        return discord.utils.find(
+            lambda gameday: gameday.ended_at is None and gameday.starts_at <= now,
+            self.get_gamedays()
+        )
 
     def add_gameday(self, gameday: Gameday) -> None:
         self.gamedays[gameday.id] = gameday
