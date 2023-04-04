@@ -30,12 +30,13 @@ from typing import TYPE_CHECKING, Dict, List, NamedTuple, Tuple, Union
 import discord
 from typing_extensions import Self, Unpack
 
-from utils import BaseView, MultiSelector, AfterModal, human_timestamp
-from utils.ui.select import UserSelect
+from utils import BaseView, MultiSelector, AfterModal, human_timestamp, image_from_urls, image_to_file
+from utils.ui.select import SelectOneOfMany, UserSelect
 
 from .gameday import (
     Gameday,
     GamedayBucket,
+    GamedayImage,
     GamedayMember,
     GamedayTime,
     Weekday,
@@ -163,13 +164,130 @@ class SelectGamedayTime(MultiSelector['GamedayTimeManagementPanel', 'GamedayTime
 
 
 class GamedayImagePanel(BaseView):
-    def __init__(self, gameday: Gameday, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, gameday_image: GamedayImage, **kwargs: Unpack[BaseViewKwargs]) -> None:
         super().__init__(**kwargs)
-        self.gameday: Gameday = gameday
+        self.gameday_image: GamedayImage = gameday_image
 
     @property
     def embed(self) -> discord.Embed:
-        ...
+        team = self.gameday_image.team
+        if team is None:
+            raise ValueError('GamedayImage does not have a team.')
+
+        embed = team.embed(
+            title=f'Manage Gameday Image {self.gameday_image.id}',
+            description='Use the buttons below to manage this gameday image.',
+        )
+
+        embed.set_image(url=self.gameday_image.url)
+
+        embed.add_field(name='Uploader', value=f'<@{self.gameday_image.uploader_id}>', inline=False)
+        embed.add_field(name='Uploaded At', value=human_timestamp(self.gameday_image.uploaded_at), inline=False)
+
+        return embed
+
+    async def _change_uploader_after(
+        self, interaction: discord.Interaction[FuryBot], members: List[Union[discord.Member, discord.User]]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        member = members[0]
+
+        async with self.bot.safe_connection() as connection:
+            await self.gameday_image.edit(connection, uploader_id=member.id)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Change Uploader')
+    async def change_uploader(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        UserSelect(
+            after=self._change_uploader_after,
+            parent=self,
+            placeholder='Select a member to change the uploader to.',
+        )
+        return await interaction.response.edit_message(view=self)
+
+    @discord.ui.button(label='Delete Image', style=discord.ButtonStyle.danger)
+    async def delete(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            await self.gameday_image.delete(connection=connection)
+
+        gameday = self.gameday_image.gameday
+        if gameday is None:
+            raise RuntimeError('Gameday does not exist.')
+
+        panel = GamedayImagesPanel(gameday=gameday, target=interaction)
+        return await interaction.edit_original_response(view=panel, embed=panel.embed)
+
+
+class GamedayImagesPanel(BaseView):
+    def __init__(self, gameday: Gameday, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+        self.gameday: Gameday = gameday
+        self.images: Dict[int, GamedayImage] = gameday.images
+
+    @property
+    def embed(self) -> discord.Embed:
+        team = self.gameday.team
+        if team is None:
+            raise RuntimeError('Gameday does not have a team.')
+
+        embed = team.embed(title='Gameday Images', description=f'This gameday has {len(self.images)} images attached to it.')
+
+        for image in self.images.values():
+            image_metadata = [
+                f'**ID**: {image.id}',
+                f'**URL**: [Click here]({image.url})',
+                f'**Uploaded by**: <@{image.uploader_id}>',
+                f'**UPloaded at:** {human_timestamp(image.uploaded_at)}',
+            ]
+            embed.add_field(name=f'Image {image.id}', value='\n'.join(image_metadata), inline=False)
+
+        return embed
+
+    async def _manage_image_after(
+        self, interaction: discord.Interaction[FuryBot], selected_images: List[str]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        selected_image_id = int(selected_images[0])
+        selected_image = self.images[selected_image_id]
+
+        panel = self.create_child(GamedayImagePanel, gameday_image=selected_image)
+        return await interaction.edit_original_response(embed=panel.embed, view=panel)
+
+    @discord.ui.button(label='Manage Image')
+    async def manage_image(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        SelectOneOfMany(
+            self,
+            options=[
+                discord.SelectOption(
+                    label=f'{image.id}-{image.uploader_id}-{image.uploaded_at}',
+                    value=str(image.id),
+                )
+                for image in self.images.values()
+            ],
+            after=self._manage_image_after,
+            placeholder='Select a Gameday Image...',
+        )
+        return await interaction.response.edit_message(view=self)
+
+    @discord.ui.button(label='View All Images')
+    async def view_all_images(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        await interaction.response.defer()
+
+        image = await image_from_urls(
+            self.bot, urls=[i.url for i in self.images.values()], images_per_row=3, frame_width=1920, normalize_images=True
+        )
+        file = image_to_file(image, filename='gameday_images.png', description='The merged image for all gameday images.')
+
+        await interaction.followup.send(
+            file=file, content='You can view each image indivudually using the "Manage Image" button.'
+        )
 
 
 class GamedayMemberPanel(BaseView):
