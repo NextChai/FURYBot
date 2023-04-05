@@ -31,12 +31,14 @@ dotenv.load_dotenv()
 import asyncio
 import logging
 import os
+import sentry_sdk
 from typing import TYPE_CHECKING
 
 import aiohttp
 import discord
 
 from bot import FuryBot
+from utils import RUNNING_DEVELOPMENT
 
 if TYPE_CHECKING:
     import asyncpg
@@ -46,6 +48,17 @@ _log = logging.getLogger(__name__)
 os.environ['JISHAKU_NO_UNDERSCORE'] = 'true'
 os.environ['JISHAKU_NO_DM_TRACEBACK'] = 'true'
 os.environ['JISHAKU_RETAIN'] = 'true'
+
+sentry_sdk.init(
+    dsn=os.environ['SENTRY_DSN'],
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for performance monitoring.
+    # We recommend adjusting this value in production.
+    traces_sample_rate=1.0,
+    environment='development' if RUNNING_DEVELOPMENT else 'production',
+)
+
+division_by_zero = 1 / 0
 
 
 async def main() -> None:
