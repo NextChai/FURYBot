@@ -94,7 +94,8 @@ CREATE TABLE IF NOT EXISTS teams.gameday_buckets(
     guild_id BIGINT,
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     automatic_sub_finding_if_possible BOOLEAN DEFAULT TRUE,
-    automatic_sub_finding_channel_id BIGINT -- Can be None
+    automatic_sub_finding_channel_id BIGINT, -- Can be None
+    per_team INTEGER -- Amount of members per team on a game day
 );
 
 CREATE TABLE IF NOT EXISTS teams.gameday_times (

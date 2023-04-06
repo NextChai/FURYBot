@@ -57,6 +57,7 @@ from cogs.teams import Team
 from cogs.teams.gamedays import GamedayBucket
 from cogs.teams.practices import Practice
 from cogs.teams.scrims import Scrim, ScrimStatus
+from cogs.teams.gamedays.persistent.voting import AttendanceVotingView
 from utils import (
     BYPASS_SETUP_HOOK,
     BYPASS_SETUP_HOOK_CACHE_LOADING,
@@ -785,6 +786,10 @@ class FuryBot(commands.Bot):
             for gameday in gamedays:
                 await gameday.setup(connection=connection)
                 bucket.add_gameday(gameday)
+
+    @cache_loader('GAMEDAY_PERSISTENT_VIEWS')
+    async def _cache_setup_gameday_persistent_views(self, connection: ConnectionType) -> None:
+        self.add_view(AttendanceVotingView(timeout=None))
 
     # Hooks
     async def setup_hook(self) -> None:

@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import datetime
 import enum
@@ -482,6 +483,7 @@ class GamedayAttendanceVoting:
     starts_at_timer_id: Optional[int] = None
     ends_at_timer_id: Optional[int] = None
     message_id: Optional[int] = None
+    lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock)
 
     @classmethod
     def from_data(
@@ -533,6 +535,18 @@ class GamedayAttendanceVoting:
             return
 
         return discord.utils.find(lambda m: m.id == self.message_id, self.bot.cached_messages)
+
+    @property
+    def has_votes_needed(self) -> bool:
+        bucket = self.bucket
+        if bucket is None:
+            raise ValueError('Bucket not found')
+
+        gameday = self.gameday
+        if gameday is None:
+            raise ValueError('Gameday not found')
+
+        return len(gameday.attending_members) == bucket.per_team
 
     async def fetch_message(self) -> Optional[discord.Message]:
         if self.message_id is None:
@@ -702,6 +716,10 @@ class Gameday:
 
         return bucket.get_gameday_time(self.gameday_time_id)
 
+    @property
+    def attending_members(self) -> List[GamedayMember]:
+        return [member for member in self.members.values() if member.is_attending]
+
     def add_score_report(self, report: GamedayScoreReport) -> None:
         self.score_reports[report.id] = report
 
@@ -731,6 +749,20 @@ class Gameday:
 
     def get_image(self, image_id: int, /) -> Optional[GamedayImage]:
         return self.images.get(image_id)
+
+    async def create_member(
+        self, member_id: int, *, reason: Optional[str] = None, connection: ConnectionType
+    ) -> GamedayMember:
+        return await GamedayMember.create(
+            self.bot,
+            connection=connection,
+            member_id=member_id,
+            team_id=self.team_id,
+            guild_id=self.guild_id,
+            bucket_id=self.bucket_id,
+            gameday_id=self.id,
+            reason=reason,
+        )
 
     async def fetch_members(self, *, connection: ConnectionType) -> List[GamedayMember]:
         query = """
@@ -1070,6 +1102,7 @@ class GamedayBucket:
     gameday_times: Dict[int, GamedayTime]
     automatic_sub_finding_channel_id: Optional[int]
     automatic_sub_finding_if_possible: bool
+    per_team: int
 
     @classmethod
     async def create(
@@ -1116,18 +1149,15 @@ class GamedayBucket:
             return
 
         return guild.get_channel(self.automatic_sub_finding_channel_id)
-    
+
     @property
     def ongoing_gameday(self) -> Optional[Gameday]:
         # Return the gameday that is currently ongoing. An ongoing
         # gameday is one that has a starts_at time but does not have an ended_at time,
         # and the starts_at time is now or in the past.
         now = discord.utils.utcnow()
-        
-        return discord.utils.find(
-            lambda gameday: gameday.ended_at is None and gameday.starts_at <= now,
-            self.get_gamedays()
-        )
+
+        return discord.utils.find(lambda gameday: gameday.ended_at is None and gameday.starts_at <= now, self.get_gamedays())
 
     def add_gameday(self, gameday: Gameday) -> None:
         self.gamedays[gameday.id] = gameday
