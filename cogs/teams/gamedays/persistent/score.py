@@ -22,6 +22,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
+from typing_extensions import Self
 
 import discord
 
@@ -29,8 +30,17 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..gameday import Gameday
+    from bot import FuryBot
 
 
 class ScoreReportView(discord.ui.View):
     def create_embed(self, gameday: Gameday) -> None:
+        ...
+
+    @discord.ui.button(label='Report Score', style=discord.ButtonStyle.green, custom_id='score-report-view:report-score')
+    async def report_score(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        ...
+
+    @discord.ui.button(label='Mark Gameday as Complete', custom_id='score-report-view:mark-complete')
+    async def mark_complete(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         ...
