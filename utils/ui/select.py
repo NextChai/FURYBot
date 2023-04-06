@@ -163,7 +163,6 @@ class RelaySelect(Generic[T, ViewMixinT], CleanupSelectHelper[ViewMixinT], disco
 
 
 class ChannelSelect(
-    Generic[ViewMixinT],
     RelaySelect[Union[AppCommandChannel, AppCommandThread], ViewMixinT],
     discord.ui.ChannelSelect[ViewMixinT],
 ):
@@ -191,7 +190,6 @@ class RoleSelect(Generic[ViewMixinT], RelaySelect[discord.Role, ViewMixinT], dis
 
 
 class UserSelect(
-    Generic[ViewMixinT],
     RelaySelect[Union[discord.Member, discord.User], ViewMixinT],
     discord.ui.UserSelect[ViewMixinT],
 ):
@@ -210,7 +208,6 @@ class UserSelect(
 
 
 class MentionableSelect(
-    Generic[ViewMixinT],
     RelaySelect[Union[discord.Member, discord.User, discord.Role], ViewMixinT],
     discord.ui.MentionableSelect[ViewMixinT],
 ):
