@@ -141,8 +141,24 @@ class SelectGamedayTime(MultiSelector['GamedayTimeManagementPanel', 'GamedayTime
             ),
         )
 
-    def create_embed(self, gamedays: List[GamedayTime]) -> discord.Embed:
-        ...
+    def create_embed(self, gameday_times: List[GamedayTime]) -> discord.Embed:
+        team = self.parent.bucket.team
+        if team is None:
+            raise RuntimeError('Gameday bucket has no team.')
+
+        embed = team.embed(title='Select A Gameday Time')
+
+        for gameday_time in gameday_times:
+
+            metadata = [
+                f'**ID**: {gameday_time.id}',
+                f'**Weekday**: {gameday_time.weekday.name}',
+                f'**Time**: {gameday_time.starts_at.strftime("%I:%M %p")}',
+            ]
+
+            embed.add_field(name=f'Time {gameday_time.id}', value='\n'.join(metadata), inline=False)
+
+        return embed
 
     def hash_item(self, gameday: GamedayTime) -> str:
         return str(gameday.id)
