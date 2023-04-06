@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Iterable, List, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Iterable, List, Optional, Tuple, TypeVar
 
 from .bases import *
 from .cog import *
@@ -96,7 +96,9 @@ def human_timestamp(dt: datetime.datetime) -> str:
     return f'{discord.utils.format_dt(dt, "F")} ({discord.utils.format_dt(dt, "R")})'
 
 
-def human_join(iterable: Iterable[Any], /, *, last: str = 'and', delimiter: str = ',') -> str:
+def human_join(
+    iterable: Iterable[Any], /, *, last: str = 'and', delimiter: str = ',', additional: Optional[str] = None
+) -> str:
     """Joins an iterable of strings into a human readable string.
 
     Parameters
@@ -114,11 +116,18 @@ def human_join(iterable: Iterable[Any], /, *, last: str = 'and', delimiter: str 
         The human readable string.
     """
     items = list(iterable)
+
+    finished: str
     if len(items) == 0:
-        return ''
+        finished = ''
     elif len(items) == 1:
-        return items[0]
+        finished = items[0]
     elif len(items) == 2:
-        return f'{items[0]} {last} {items[1]}'
+        finished = f'{items[0]} {last} {items[1]}'
     else:
-        return f'{delimiter.join(items[:-1])}, {last} {items[-1]}'
+        finished = f'{delimiter.join(items[:-1])}, {last} {items[-1]}'
+
+    if additional:
+        finished += f' {additional}'
+
+    return finished

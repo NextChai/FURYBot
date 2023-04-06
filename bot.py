@@ -243,6 +243,8 @@ class FuryBot(commands.Bot):
 
         # Mapping[guild_id, Mapping[team_id, GameBucket]]
         self._team_gameday_buckets: Dict[int, Dict[int, GamedayBucket]] = {}
+        
+        self.attendance_voting_view: Optional[AttendanceVotingView] = None
 
         super().__init__(
             command_prefix=commands.when_mentioned_or('fury.'),
@@ -789,7 +791,8 @@ class FuryBot(commands.Bot):
 
     @cache_loader('GAMEDAY_PERSISTENT_VIEWS')
     async def _cache_setup_gameday_persistent_views(self, connection: ConnectionType) -> None:
-        self.add_view(AttendanceVotingView(timeout=None))
+        self.attendance_voting_view = AttendanceVotingView(timeout=None)
+        self.add_view(self.attendance_voting_view)
 
     # Hooks
     async def setup_hook(self) -> None:

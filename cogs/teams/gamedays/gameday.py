@@ -684,7 +684,7 @@ class Gameday:
         # We need to spawn the timers here to dispatch the events
         timer_manager = bot.timer_manager
         if timer_manager:  # This will be Not none in non-development environments
-            default_timer_args = (guild_id, team_id, bucket_id, self.id)
+            default_timer_args = (guild_id, team_id, self.id)
             gameday_start_timer = await timer_manager.create_timer(starts_at, 'gameday_start', *default_timer_args)
 
             voting_start_timer = await timer_manager.create_timer(voting.start, 'gameday_voting_start', *default_timer_args)

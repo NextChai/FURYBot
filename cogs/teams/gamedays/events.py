@@ -23,31 +23,73 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Tuple
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils import BaseCog
+from utils import BaseCog, human_join
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
 __all__: Tuple[str, ...] = ('GamedayEventListener', 'GamedayCommands')
 
+_log = logging.getLogger(__name__)
+
 
 class GamedayEventListener(BaseCog):
     @commands.Cog.listener('on_gameday_start_timer_complete')
-    async def on_gameday_start(self, guild_id: int, team_id: int, bucket_id: int, gameday_id: int) -> None:
+    async def on_gameday_start(self, guild_id: int, team_id: int, gameday_id: int) -> None:
         ...
 
     @commands.Cog.listener('on_gameday_voting_start_timer_complete')
-    async def on_gameday_voting_start(self, guild_id: int, team_id: int, bucket_id: int, gameday_id: int) -> None:
-        ...
+    async def on_gameday_voting_start(self, guild_id: int, team_id: int, gameday_id: int) -> None:
+        guild = self.bot.get_guild(guild_id)
+        if guild is None:
+            _log.debug('Guild %s not found.', guild_id)
+            return
+
+        team = self.bot.get_team(team_id, guild_id)
+        if team is None:
+            _log.debug('Team %s not found.', team_id)
+            return
+
+        bucket = team.get_gameday_bucket()
+        if bucket is None:
+            _log.debug('Gameday bucket not found.')
+            return
+
+        gameday = bucket.get_gameday(gameday_id)
+        if gameday is None:
+            _log.debug('Gameday %s not found.', gameday_id)
+            return
+
+        # We need to send the view to the channel!
+        view = self.bot.attendance_voting_view
+        if view is None:
+            _log.debug('Attendance voting view not found.')
+            return
+
+        embed = view.create_embed(gameday)
+        channel = team.text_channel
+
+        team_member_mentions = human_join(
+            (m.mention for m in team.main_roster), additional='please confirm your attendance for the upcoming gameday.'
+        )
+
+        message = await channel.send(embed=embed, view=view, content=team_member_mentions)
+
+        async with self.bot.safe_connection() as connection:
+            await gameday.edit(
+                connection=connection,
+                voting_message_id=message.id,
+            )
 
     @commands.Cog.listener('on_gameday_voting_end_timer_complete')
-    async def on_gameday_voting_end(self, guild_id: int, team_id: int, bucket_id: int, gameday_id: int) -> None:
+    async def on_gameday_voting_end(self, guild_id: int, team_id: int, gameday_id: int) -> None:
         ...
 
 
