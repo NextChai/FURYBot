@@ -36,7 +36,7 @@ from utils import QueryBuilder, human_join
 if TYPE_CHECKING:
     from bot import ConnectionType, FuryBot
 
-    from .gamedays.gameday import GamedayBucket, Gameday
+    from .gamedays.gameday import Gameday, GamedayBucket
     from .practices import Practice
     from .scrims import Scrim
 

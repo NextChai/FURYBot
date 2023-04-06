@@ -22,3 +22,15 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
+
+import discord
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..gameday import Gameday
+
+
+class ScoreReportView(discord.ui.View):
+    def create_embed(self, gameday: Gameday) -> None:
+        ...

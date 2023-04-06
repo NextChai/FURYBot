@@ -25,15 +25,17 @@ from __future__ import annotations
 
 import datetime
 from typing import TYPE_CHECKING, Dict, Optional
-from typing_extensions import Self
 
 import discord
-from utils import human_join, human_timestamp, TimerNotFound, AfterModal
+from typing_extensions import Self
+
+from utils import AfterModal, TimerNotFound, human_join, human_timestamp
 
 if TYPE_CHECKING:
-    from ..gameday import Gameday, GamedayMember
-    from ...team import TeamMember
     from bot import FuryBot
+
+    from ...team import TeamMember
+    from ..gameday import Gameday, GamedayMember
 
 
 class AttendanceVotingView(discord.ui.View):

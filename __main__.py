@@ -31,11 +31,11 @@ dotenv.load_dotenv()
 import asyncio
 import logging
 import os
-import sentry_sdk
 from typing import TYPE_CHECKING
 
 import aiohttp
 import discord
+import sentry_sdk
 
 from bot import FuryBot
 from utils import RUNNING_DEVELOPMENT

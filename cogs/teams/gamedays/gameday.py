@@ -33,8 +33,7 @@ import discord
 import pytz
 from typing_extensions import Self
 
-from utils import QueryBuilder
-from utils.errors import TimerNotFound
+from utils import QueryBuilder, TimerNotFound, image_from_urls, image_to_file
 
 if TYPE_CHECKING:
     from bot import ConnectionType, FuryBot
@@ -749,6 +748,15 @@ class Gameday:
 
     def get_image(self, image_id: int, /) -> Optional[GamedayImage]:
         return self.images.get(image_id)
+
+    async def merge_images(self) -> Optional[discord.File]:
+        if not self.images:
+            return
+
+        image = await image_from_urls(
+            self.bot, urls=[i.url for i in self.images.values()], images_per_row=3, frame_width=1920, normalize_images=True
+        )
+        return image_to_file(image, filename='gameday_images.png', description='The merged image for all gameday images.')
 
     async def create_member(
         self, member_id: int, *, reason: Optional[str] = None, connection: ConnectionType
