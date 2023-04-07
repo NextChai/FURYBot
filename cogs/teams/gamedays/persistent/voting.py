@@ -47,9 +47,9 @@ class AttendanceVotingView(discord.ui.View):
             raise ValueError('Gameday is missing a team.')
 
         embed = team.embed(
-            title='Voting Complete!',
-            description='This gameday has reached the required amount of votes to confirm this gameday. Within 5 minutes '
-            'this gameday will be confirmed, you will recieve another message in this channel when this happens.',
+            title='Gameday Voting Confirmed',
+            description='This gameday has reached the required amount of votes to confirm this gameday. There is no further '
+            'actions required from you.',
         )
 
         attending_members: Dict[int, GamedayMember] = {}
@@ -78,7 +78,13 @@ class AttendanceVotingView(discord.ui.View):
             raise ValueError('Gameday is missing a team.')
 
         if gameday.voting.has_votes_needed:
-            return self.create_voting_done_embed(gameday)
+            embed = self.create_voting_done_embed(gameday)
+            embed.set_footer(
+                text='Because this gameday has reached the end of voting before it naturally ends, I\'ve '
+                'scheduled the voting to end in 5 minutes, you\'ll get another message here shortly.'
+            )
+
+            return embed
 
         embed = team.embed(
             title=f'Gameday Attendance Voting For {human_timestamp(gameday.starts_at)} gameday.',
