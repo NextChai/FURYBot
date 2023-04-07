@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS teams.gameday_times (
     guild_id BIGINT,
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     bucket_id INTEGER REFERENCES teams.gameday_buckets(id) ON DELETE CASCADE,
-    satrts_at TIME
+    starts_at TIME
 );
 
 CREATE TABLE IF NOT EXISTS teams.gamedays (

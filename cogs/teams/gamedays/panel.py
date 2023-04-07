@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import datetime
 import re
-from typing import TYPE_CHECKING, Dict, List, NamedTuple, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, NamedTuple, Optional, Tuple, Union
 
 import discord
 from typing_extensions import Self, Unpack
@@ -38,6 +38,7 @@ from .gameday import Gameday, GamedayBucket, GamedayImage, GamedayMember, Gameda
 if TYPE_CHECKING:
     from bot import FuryBot
     from utils import BaseViewKwargs
+    from ..team import Team
 
 WEEKDAY_TIME_REGEX = re.compile(
     r'(?P<weekday>\w+)(?:\s+)(?P<hour>[0-9]{1,})\:(?P<minute>[0-9]+)(?:\s+)?(?P<am_pm>AM|PM)?', re.IGNORECASE
@@ -812,3 +813,46 @@ class GamedayBucketPanel(BaseView):
         """A button to launch a view that manages all gamedays in this bucket."""
         selector = SelectGameday(parent=self)
         await selector.launch(interaction)
+
+
+class CreateGamedayBucketView(BaseView):
+    def __init__(self, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+
+        self.team: Team = team
+
+        self.weekday: Optional[Weekday] = None
+        self.time: Optional[datetime.time] = None
+        self.per_team: Optional[int] = None
+
+        self.automatic_sub_finding_channel_id: Optional[int] = None
+        self.automatic_sub_finding_if_possible: bool = False
+
+    @property
+    def embed(self) -> discord.Embed:
+        embed = self.team.embed(
+            title='Create Gameday Bucket', description='Use the buttons below to create a gameday bucket.'
+        )
+
+        embed.add_field(
+            name='First Gameday Schedule',
+            value='A gameday bucket needs to have at least one gameday scheduled. If you want to add more gamedays, you can do so later but '
+            'for now, you need to set one gameday. The gameday\'s time and date will be used to determine gameday voting times and other '
+            'events automatically, so put the time and weekday that the team is scheduled to play on.\n\n'
+            f'**Weekday**: {self.weekday.name.title() if self.weekday else "Not set."}\n'
+            f'**Time**: {self.time.strftime("%I:%M %p") if self.time else "Not set."}',
+            inline=False
+        )
+
+        automatic_sub_finding_channel_mention = (
+            f'<#{self.automatic_sub_finding_channel_id}>' if self.automatic_sub_finding_channel_id else 'Not set.'
+        )
+        embed.add_field(
+            name='Automatic Sub Finding If Possible',
+            value='If this is enabled, subs will be automatically found for gamedays if possible. Let\'s say a '
+            f'**Enabled**: {self.automatic_sub_finding_if_possible}\n '
+            f'**Automtic Sub Finding Channel**: {automatic_sub_finding_channel_mention}',
+            inline=False,
+        )
+
+        return embed

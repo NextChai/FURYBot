@@ -588,7 +588,9 @@ class TeamView(BaseView):
         if confirm_input.value.lower() != 'delete':
             return await interaction.response.send_message('Aborted as `delete` was not typed.', ephemeral=True)
 
-        await self.team.delete()
+        async with self.bot.safe_connection() as connection:
+            await self.team.delete(connection=connection)
+
         return await interaction.response.edit_message(content='This team has been deleted.', view=None, embed=None)
 
     @discord.ui.button(label='Customization')

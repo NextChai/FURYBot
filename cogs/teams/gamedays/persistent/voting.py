@@ -158,12 +158,6 @@ class AttendanceVotingView(discord.ui.View):
             )
             return None
 
-        if team_member.is_sub:
-            await interaction.response.send_message(
-                'You are a sub! At this time, voting is only open to main team roster members.', ephemeral=True
-            )
-            return None
-
         bucket = team.get_gameday_bucket()
         if bucket is None:
             await interaction.response.send_message('This team has no gameday bucket, you can not use this!', ephemeral=True)
@@ -188,6 +182,25 @@ class AttendanceVotingView(discord.ui.View):
                 'This gameday has already reached the required amount of votes to confirm this gameday.', ephemeral=True
             )
             return None
+
+        if team_member.is_sub:
+            # If all team members on the main roster have voted, we can skip this check
+            # and allow all subs to vote.
+            main_roster_ids = {member.member_id for member in team.main_roster}
+            all_main_roster_members_voted = all(
+                (member.member_id in main_roster_ids for member in valid_gameday.members.values())
+            )
+
+            # TODO: Dynamically check if the sub could vote based on whether or not all available
+            # main roster members could even finish the gameday per team rules..?
+
+            if not all_main_roster_members_voted:
+                await interaction.response.send_message(
+                    'You are a sub! At this time, voting is only open to the members on the main roster of the team. After all '
+                    'the team\'s main roster has voted, you can use this voting message to mark yourself as attending in their place.',
+                    ephemeral=True,
+                )
+                return None
 
         gameday_member = valid_gameday.get_member(interaction.user.id)
         if gameday_member is not None:

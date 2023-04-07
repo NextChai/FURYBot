@@ -581,7 +581,7 @@ class Team:
 
         return member_absences.most_common()
 
-    async def get_practice_rank(self) -> int:
+    def get_practice_rank(self) -> int:
         """|coro|
 
         Gets the rank of this team in the practice leaderboard.
