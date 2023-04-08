@@ -58,8 +58,6 @@ sentry_sdk.init(
     environment='development' if RUNNING_DEVELOPMENT else 'production',
 )
 
-division_by_zero = 1 / 0
-
 
 async def main() -> None:
     discord.utils.setup_logging()

@@ -52,7 +52,7 @@ class GamedayEventListener(BaseCog):
             _log.debug('Guild %s not found.', guild_id)
             return
 
-        team = self.bot.get_team(team_id, guild_id)
+        team = self.bot.get_team(team_id, guild_id=guild_id)
         if team is None:
             _log.debug('Team %s not found.', team_id)
             return
@@ -95,7 +95,7 @@ class GamedayEventListener(BaseCog):
             _log.debug('Guild %s not found.', guild_id)
             return
 
-        team = self.bot.get_team(team_id, guild_id)
+        team = self.bot.get_team(team_id, guild_id=guild_id)
         if team is None:
             _log.debug('Team %s not found.', team_id)
             return

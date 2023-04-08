@@ -136,7 +136,7 @@ class TeamTransformer(app_commands.Transformer):
         if not guild:
             raise AutocompleteValidationException('This command can only be used in a server.')
 
-        team = interaction.client.get_team(value, guild.id)
+        team = interaction.client.get_team(value, guild_id=guild.id)
         if team is None:
             raise AutocompleteValidationException('User did not select a valid team.')
 

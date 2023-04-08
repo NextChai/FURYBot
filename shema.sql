@@ -103,7 +103,8 @@ CREATE TABLE IF NOT EXISTS teams.gameday_times (
     guild_id BIGINT,
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     bucket_id INTEGER REFERENCES teams.gameday_buckets(id) ON DELETE CASCADE,
-    starts_at TIME
+    starts_at TIME,
+    weekday INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS teams.gamedays (
@@ -120,7 +121,7 @@ CREATE TABLE IF NOT EXISTS teams.gamedays (
     gameday_time_id INTEGER REFERENCES teams.gameday_times(id) ON DELETE CASCADE,
     voting_starts_at_timer_id INTEGER REFERENCES timers(id), -- Can be none
     voting_ends_at_timer_id INTEGER REFERENCES timers(id), -- Can be none
-    voting_message_id BIGINT,
+    voting_message_id BIGINT
 );
 
 CREATE TABLE IF NOT EXISTS teams.gameday_score_reports (
@@ -131,7 +132,7 @@ CREATE TABLE IF NOT EXISTS teams.gameday_score_reports (
     gameday_id INTEGER REFERENCES teams.gamedays(id) ON DELETE CASCADE,
     text TEXT,
     reported_by_id BIGINT,
-    reported_at TIMESTAMP WITH TIME ZONE,
+    reported_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE IF NOT EXISTS teams.gameday_images (
@@ -142,7 +143,7 @@ CREATE TABLE IF NOT EXISTS teams.gameday_images (
     gameday_id INTEGER REFERENCES teams.gamedays(id) ON DELETE CASCADE,
     url TEXT,
     uploader_id BIGINT,
-    uploaded_at TIMESTAMP WITH TIME ZONE,
+    uploaded_at TIMESTAMP WITH TIME ZONE
 );
 
 

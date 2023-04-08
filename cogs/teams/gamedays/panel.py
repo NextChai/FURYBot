@@ -868,7 +868,7 @@ class CreateGamedayBucketView(BaseView):
         )
         embed.add_field(
             name='Automatic Sub Finding If Possible',
-            value='If this is enabled, subs will be automatically found for gamedays if possible. Let\'s say a '
+            value='If this is enabled, subs will be automatically found for gamedays if possible.\n\n'
             f'**Enabled**: {self.automatic_sub_finding_if_possible}\n '
             f'**Automtic Sub Finding Channel**: {automatic_sub_finding_channel_mention}',
             inline=False,

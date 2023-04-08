@@ -54,7 +54,7 @@ class Teamable(Guildable, Protocol):
 
     @property
     def team(self) -> Team:
-        team = self._get_bot().get_team(self._get_team_id(), self._get_guild_id())
+        team = self._get_bot().get_team(self._get_team_id(), guild_id=self._get_guild_id())
         assert team
         return team
 

@@ -196,7 +196,7 @@ class GamedayMember:
 
     @property
     def team(self) -> Optional[Team]:
-        return self.bot.get_team(self.guild_id, self.team_id)
+        return self.bot.get_team(self.team_id, guild_id=self.guild_id)
 
     @property
     def mention(self) -> str:
@@ -307,7 +307,7 @@ class GamedayImage:
 
     @property
     def team(self) -> Optional[Team]:
-        return self.bot.get_team(self.guild_id, self.team_id)
+        return self.bot.get_team(self.team_id, guild_id=self.guild_id)
 
     async def delete(self, *, connection: ConnectionType) -> None:
         query = """
@@ -424,7 +424,7 @@ class GamedayScoreReport:
 
     @property
     def team(self) -> Optional[Team]:
-        return self.bot.get_team(self.guild_id, self.team_id)
+        return self.bot.get_team(self.team_id, guild_id=self.guild_id)
 
     async def delete(self, *, connection: ConnectionType) -> None:
         query = """
@@ -526,7 +526,7 @@ class GamedayAttendanceVoting:
 
     @property
     def team(self) -> Optional[Team]:
-        return self.bot.get_team(self.guild_id, self.team_id)
+        return self.bot.get_team(self.team_id, guild_id=self.guild_id)
 
     @property
     def message(self) -> Optional[discord.Message]:
@@ -705,7 +705,7 @@ class Gameday:
 
     @property
     def team(self) -> Optional[Team]:
-        return self.bot.get_team(self.guild_id, self.team_id)
+        return self.bot.get_team(self.team_id, guild_id=self.guild_id)
 
     @property
     def time(self) -> Optional[GamedayTime]:
@@ -1015,7 +1015,7 @@ class GamedayTime:
 
     @property
     def team(self) -> Optional[Team]:
-        return self.bot.get_team(self.guild_id, self.team_id)
+        return self.bot.get_team(self.team_id, guild_id=self.guild_id)
 
     async def edit(
         self,
@@ -1138,14 +1138,14 @@ class GamedayBucket:
         )
         assert data
 
-        self = cls(bot, **dict(data))
+        self = cls(bot, gamedays={}, gameday_times={}, **dict(data))
         bot.add_gameday_bucket(self)
 
         return self
 
     @property
     def team(self) -> Optional[Team]:
-        return self.bot.get_team(self.guild_id, self.team_id)
+        return self.bot.get_team(self.team_id, guild_id=self.guild_id)
 
     @property
     def guild(self) -> Optional[discord.Guild]:

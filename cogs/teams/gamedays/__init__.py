@@ -23,6 +23,14 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from .events import *
+from .cogs import *
 from .gameday import *
 from .panel import *
+
+if TYPE_CHECKING:
+    from bot import FuryBot
+
+
+async def setup(bot: FuryBot) -> None:
+    await bot.add_cog(GamedayEventListener(bot))
+    await bot.add_cog(GamedayCommands(bot))

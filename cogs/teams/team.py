@@ -80,7 +80,7 @@ class TeamMember:
     @property
     def team(self) -> Team:
         """:class:`Team`: The team that this member is on."""
-        team = self.bot.get_team(self.team_id, self.guild_id)
+        team = self.bot.get_team(self.team_id, guild_id=self.guild_id)
         assert team
         return team
 

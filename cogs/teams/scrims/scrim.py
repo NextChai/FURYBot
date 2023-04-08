@@ -193,14 +193,14 @@ class Scrim:
     @property
     def home_team(self) -> Team:
         """:class:`Team`: The home team."""
-        team = self.bot.get_team(self.home_id, self.guild_id)
+        team = self.bot.get_team(self.home_id, guild_id=self.guild_id)
         assert team
         return team
 
     @property
     def away_team(self) -> Team:
         """:class:`Team`: The away team."""
-        team = self.bot.get_team(self.away_id, self.guild_id)
+        team = self.bot.get_team(self.away_id, guild_id=self.guild_id)
         assert team
         return team
 

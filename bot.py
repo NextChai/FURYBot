@@ -379,7 +379,7 @@ class FuryBot(commands.Bot):
         """
         return list(self._team_cache.get(guild_id, {}).values())
 
-    def get_team(self, team_id: int, guild_id: int, /) -> Optional[Team]:
+    def get_team(self, team_id: int, /, *, guild_id: int) -> Optional[Team]:
         """Get a team from a guild.
 
         Parameters
