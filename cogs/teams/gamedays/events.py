@@ -187,4 +187,4 @@ class GamedayCommands(BaseCog):
 
     @gameday.command(name='upload')
     async def gameday_upload(self, interaction: discord.Interaction[FuryBot], image: discord.Attachment) -> None:
-        ...
+        raise NotImplementedError('Gameday upload not implemented yet.')

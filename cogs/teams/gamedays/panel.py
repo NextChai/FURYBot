@@ -28,10 +28,20 @@ import re
 from typing import TYPE_CHECKING, Dict, List, NamedTuple, Optional, Tuple, Union
 
 import discord
+from discord import app_commands
 from typing_extensions import Self, Unpack
 
-from utils import AfterModal, BaseView, MultiSelector, human_timestamp, image_from_urls, image_to_file
-from utils.ui.select import SelectOneOfMany, UserSelect
+from utils import (
+    AfterModal,
+    BaseView,
+    MultiSelector,
+    human_timestamp,
+    image_from_urls,
+    image_to_file,
+    SelectOneOfMany,
+    UserSelect,
+    ChannelSelect,
+)
 
 from .gameday import Gameday, GamedayBucket, GamedayImage, GamedayMember, GamedayTime, Weekday
 
@@ -841,7 +851,15 @@ class CreateGamedayBucketView(BaseView):
             'events automatically, so put the time and weekday that the team is scheduled to play on.\n\n'
             f'**Weekday**: {self.weekday.name.title() if self.weekday else "Not set."}\n'
             f'**Time**: {self.time.strftime("%I:%M %p") if self.time else "Not set."}',
-            inline=False
+            inline=False,
+        )
+
+        embed.add_field(
+            name='Per Team',
+            value='At times, there are a different amount of members on a team than there are members '
+            'that play during game days. For example, if a team has 10 members but only 5 of them play on '
+            'game days, you set the per team value to 5.\n\n'
+            f'**Per Team**: {self.per_team or "Not set."}',
         )
 
         automatic_sub_finding_channel_mention = (
@@ -856,3 +874,165 @@ class CreateGamedayBucketView(BaseView):
         )
 
         return embed
+
+    async def _first_gameday_schedule_after(
+        self, interaction: discord.Interaction[FuryBot], weekday_time_input: discord.ui.TextInput[AfterModal]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        try:
+            weekday, time = parse_time_and_date(weekday_time_input.value)
+        except KeyError:
+            await interaction.followup.send(
+                'This is not a valid weekday. An example would be `Tuesday 5:00 PM`. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+        except ValueError as exc:
+            await interaction.followup.send(
+                f'You did not enter a valid time. {str(exc).capitalize()}. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        if not weekday and not time:
+            await interaction.followup.send(
+                'This is not a valid time and date. An example would be `Wednesday 4:00 PM`. Feel free to try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        assert weekday
+        assert time
+
+        self.weekday = weekday
+        self.time = time
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Set First Gameday Schedule', style=discord.ButtonStyle.green)
+    async def set_first_gameday_schedule(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> None:
+        """A button to launch a view that allows the user to set the first gameday schedule."""
+        modal = AfterModal(
+            self.bot,
+            self._first_gameday_schedule_after,
+            discord.ui.TextInput(
+                label='Weekday and Time', placeholder='Format: Weekday Hour:Minute AM/PM. Example: Wednesday 4:00 PM'
+            ),
+            title='Set First Gameday Time and Weekday',
+            timeout=None,
+        )
+
+        await interaction.response.send_modal(modal)
+
+    # An after callback for setting the per_team field. It will try and convert the text input's
+    # value to an int and assign it.
+    async def _per_team_after(
+        self, interaction: discord.Interaction[FuryBot], per_team_input: discord.ui.TextInput[AfterModal]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        try:
+            self.per_team = int(per_team_input.value)
+        except ValueError:
+            await interaction.followup.send('This is not a valid number. Feel free to try again.', ephemeral=True)
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    # A button to set the per_team field
+    @discord.ui.button(label='Set Per Team', style=discord.ButtonStyle.green)
+    async def set_per_team(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        """A button to launch a view that allows the user to set the per_team field."""
+        modal = AfterModal(
+            self.bot,
+            self._per_team_after,
+            discord.ui.TextInput(label='Amount of Members Per Team', placeholder='Format: Number. Example: 3'),
+            title='Set Per Team',
+            timeout=None,
+        )
+
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label='Toggle Automatic Sub Finding If Possible', style=discord.ButtonStyle.green)
+    async def toggle_automatic_sub_finding_if_possible(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        """A button to toggle automatic sub finding if possible."""
+        await interaction.response.defer()
+        self.automatic_sub_finding_if_possible = not self.automatic_sub_finding_if_possible
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    async def _set_automatic_sub_finding_channel_after(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        channels: List[Union[app_commands.AppCommandChannel, app_commands.AppCommandThread]],
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        channel = channels[0]
+        self.automatic_sub_finding_channel_id = channel.id
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Set Automatic Sub Finding Channel', style=discord.ButtonStyle.green)
+    async def set_automatic_sub_finding_channel(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        """A button to launch a view that allows the user to set the automatic sub finding channel."""
+        await interaction.response.defer()
+
+        ChannelSelect(self._set_automatic_sub_finding_channel_after, self, channel_types=[discord.ChannelType.text])
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Finalize', style=discord.ButtonStyle.green)
+    async def finalize(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        if self.weekday is None:
+            # This also means that self.time is None
+            await interaction.followup.send(
+                'Whoops! You did not set the first gameday schedule. Please do so with the "Set First Gameday Schedule" button '
+                'before finalizing.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+        
+        assert self.time is not None
+
+        if self.per_team is None:
+            await interaction.followup.send(
+                'Whoops! You did not set the per team field. Please do so with the "Set Per Team" button before finalizing.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        # Let's create the Gameday Bucket.
+        async with self.bot.safe_connection() as connection:
+            bucket = await GamedayBucket.create(
+                self.bot,
+                connection=connection,
+                guild_id=self.team.guild_id,
+                team_id=self.team.id,
+                automatic_sub_finding_if_possible=self.automatic_sub_finding_if_possible,
+                automatic_sub_finding_channel_id=self.automatic_sub_finding_channel_id,
+            )
+
+            # Create the first bucket time as well
+            await GamedayTime.create(
+                self.bot,
+                connection=connection,
+                guild_id=bucket.guild_id,
+                team_id=bucket.team_id,
+                bucket_id=bucket.id,
+                weekday=self.weekday,
+                starts_at=self.time,
+            )
+
+        panel = GamedayBucketPanel(bucket=bucket, target=interaction)
+        return await interaction.edit_original_response(embed=panel.embed, view=panel)

@@ -31,8 +31,7 @@ from typing_extensions import Self, Unpack
 
 from utils import AfterModal, BaseView, BaseViewKwargs, RoleSelect, SelectOneOfMany, UserSelect, default_button_doc_string
 
-# from .gamedays import CreateGamedayBucketPanel, GamedayBucketPanel
-from .gamedays import GamedayBucketPanel
+from .gamedays import GamedayBucketPanel, CreateGamedayBucketView
 from .practices.panel import PracticeMemberStatistics, TeamPracticesPanel
 from .scrims.panel import TeamScrimsPanel
 from .team import TeamMember
@@ -642,10 +641,8 @@ class TeamView(BaseView):
         bucket = self.team.get_gameday_bucket()
 
         if bucket is None:
-            raise NotImplementedError('Gameday bucket creation is not yet implemented.')
-            # We need to create a new bucket.
-            # child = self.create_child(CreateGamedayBucketPanel, self.team)
-            # return await interaction.response.edit_message(embed=child.embed, view=child)
+            child = self.create_child(CreateGamedayBucketView, self.team)
+            return await interaction.response.edit_message(embed=child.embed, view=child)
 
         view = self.create_child(GamedayBucketPanel, bucket)
         return await interaction.response.edit_message(embed=view.embed, view=view)
