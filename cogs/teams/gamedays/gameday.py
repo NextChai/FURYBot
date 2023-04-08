@@ -718,7 +718,7 @@ class Gameday:
     @property
     def attending_members(self) -> List[GamedayMember]:
         return [member for member in self.members.values() if member.is_attending]
-    
+
     @property
     def not_attending_members(self) -> List[GamedayMember]:
         return [member for member in self.members.values() if not member.is_attending]

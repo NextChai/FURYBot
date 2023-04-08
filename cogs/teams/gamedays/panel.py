@@ -34,13 +34,13 @@ from typing_extensions import Self, Unpack
 from utils import (
     AfterModal,
     BaseView,
+    ChannelSelect,
     MultiSelector,
+    SelectOneOfMany,
+    UserSelect,
     human_timestamp,
     image_from_urls,
     image_to_file,
-    SelectOneOfMany,
-    UserSelect,
-    ChannelSelect,
 )
 
 from .gameday import Gameday, GamedayBucket, GamedayImage, GamedayMember, GamedayTime, Weekday
@@ -48,6 +48,7 @@ from .gameday import Gameday, GamedayBucket, GamedayImage, GamedayMember, Gameda
 if TYPE_CHECKING:
     from bot import FuryBot
     from utils import BaseViewKwargs
+
     from ..team import Team
 
 WEEKDAY_TIME_REGEX = re.compile(
@@ -1002,7 +1003,7 @@ class CreateGamedayBucketView(BaseView):
                 ephemeral=True,
             )
             return await interaction.edit_original_response(view=self, embed=self.embed)
-        
+
         assert self.time is not None
 
         if self.per_team is None:

@@ -31,7 +31,7 @@ from typing_extensions import Self, Unpack
 
 from utils import AfterModal, BaseView, BaseViewKwargs, RoleSelect, SelectOneOfMany, UserSelect, default_button_doc_string
 
-from .gamedays import GamedayBucketPanel, CreateGamedayBucketView
+from .gamedays import CreateGamedayBucketView, GamedayBucketPanel
 from .practices.panel import PracticeMemberStatistics, TeamPracticesPanel
 from .scrims.panel import TeamScrimsPanel
 from .team import TeamMember
