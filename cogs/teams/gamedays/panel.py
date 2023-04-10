@@ -103,19 +103,19 @@ class SelectGameday(MultiSelector['GamedayBucketPanel', 'Gameday']):
 
         now = discord.utils.utcnow()
         for gameday in gamedays:
-            metadata: List[str] = [f'`ID`: {gameday.id}']
+            metadata: List[str] = [f'**ID**: {gameday.id}']
 
             verbage = 'Starts At' if gameday.starts_at > now else 'Started At'
             metadata.append(
-                f'`{verbage}`: {discord.utils.format_dt(gameday.starts_at, "F")} ({discord.utils.format_dt(gameday.starts_at, "R")})'
+                f'**{verbage}**: {discord.utils.format_dt(gameday.starts_at, "F")} ({discord.utils.format_dt(gameday.starts_at, "R")})'
             )
 
             if gameday.ended_at is not None:
                 metadata.append(
-                    f'`Ended At`: {discord.utils.format_dt(gameday.ended_at, "F")} ({discord.utils.format_dt(gameday.ended_at, "R")})'
+                    f'**Ended At**: {discord.utils.format_dt(gameday.ended_at, "F")} ({discord.utils.format_dt(gameday.ended_at, "R")})'
                 )
             else:
-                metadata.append('`Status`: Gameday has not ended.')
+                metadata.append('**Status**: Gameday has not ended.')
 
             # Add some info about the members playing
             mentions: List[str] = []
@@ -126,7 +126,7 @@ class SelectGameday(MultiSelector['GamedayBucketPanel', 'Gameday']):
                     mentions.append(f'~~{member.mention}~~')
 
             if mentions:
-                metadata.append(f'`Members`: {", ".join(mentions)}')
+                metadata.append(f'**Members**: {", ".join(mentions)}')
 
             embed.add_field(name=f'Gameday {gameday.id}', value='\n'.join(metadata), inline=False)
 
@@ -332,7 +332,7 @@ class GamedayMemberPanel(BaseView):
         )
 
         if gameday_member.is_attending:
-            embed.add_field(name='Attendance', value='Member has attended this gameday.', inline=False)
+            embed.add_field(name='Attendance', value='Member is marked as attending for this gameday.', inline=False)
         else:
             embed.add_field(
                 name='Attendance',
@@ -345,6 +345,12 @@ class GamedayMemberPanel(BaseView):
                 name='Temporary Sub',
                 value=f'This member is a temporary sub, meaning that after this gameday is over they '
                 'will automatically be removed from the team\'s sub roster.',
+            )
+        else:
+            embed.add_field(
+                name='Temporary Sub',
+                value='This member is not a temporary sub. Teamporary subs only get added to a roster from '
+                'the automatic sub finding system.',
             )
 
         return embed
@@ -381,8 +387,12 @@ class GamedayMemberPanel(BaseView):
     ) -> discord.InteractionMessage:
         await interaction.response.defer()
 
+        value: Optional[str] = reason_input.value
+        if not value:
+            value = None
+
         async with self.bot.safe_connection() as connection:
-            await self.member.gameday.edit(connection=connection, reason=reason_input.value)
+            await self.member.gameday.edit(connection=connection, reason=value)
 
         return await interaction.edit_original_response(view=self, embed=self.embed)
 
@@ -395,8 +405,10 @@ class GamedayMemberPanel(BaseView):
             discord.ui.TextInput(
                 label='New Reason',
                 style=discord.TextStyle.long,
-                placeholder='Enter the new reason for this member not coming to this gameday.',
+                placeholder='Enter the new reason for this member not coming to this gameday. Add nothing '
+                'to remove the reason.',
                 max_length=2000,
+                required=False,
             ),
             title='Change Reason',
             timeout=None,
@@ -812,12 +824,14 @@ class GamedayBucketPanel(BaseView):
         return embed
 
     @discord.ui.button(label='Manage Gameday Times', style=discord.ButtonStyle.green)
-    async def manage_gameday_times(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+    async def manage_gameday_times(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
         await interaction.response.defer()
 
         view = self.create_child(GamedayTimeManagementPanel, bucket=self.bucket)
 
-        return await interaction.response.edit_message(view=view, embed=view.embed)
+        return await interaction.edit_original_response(view=view, embed=view.embed)
 
     @discord.ui.button(label='Manage A Gameday', style=discord.ButtonStyle.primary)
     async def manage_a_gameday(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
@@ -1022,6 +1036,7 @@ class CreateGamedayBucketView(BaseView):
                 team_id=self.team.id,
                 automatic_sub_finding_if_possible=self.automatic_sub_finding_if_possible,
                 automatic_sub_finding_channel_id=self.automatic_sub_finding_channel_id,
+                per_team=self.per_team,
             )
 
             # Create the first bucket time as well

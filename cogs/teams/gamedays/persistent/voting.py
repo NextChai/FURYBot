@@ -62,11 +62,15 @@ class AttendanceVotingView(discord.ui.View):
                 not_attending_members[member.id] = member
 
         embed.add_field(
-            name='Attending Members', value=human_join((m.mention for m in attending_members.values())), inline=False
+            name='Attending Members',
+            value=human_join((m.mention for m in attending_members.values()))
+            or 'No members have marked themselves as attending.',
+            inline=False,
         )
         embed.add_field(
             name='Not Attending Members',
-            value='\n'.join(f'{member.mention}: {member.reason}' for member in not_attending_members.values()),
+            value='\n'.join(f'{member.mention}: {member.reason}' for member in not_attending_members.values())
+            or 'No members have marked themselves as not attending.',
             inline=False,
         )
 
@@ -97,9 +101,9 @@ class AttendanceVotingView(discord.ui.View):
 
         for member in gameday.members.values():
             if member.is_attending:
-                attending_members[member.id] = member
+                attending_members[member.member_id] = member
             else:
-                not_attending_members[member.id] = member
+                not_attending_members[member.member_id] = member
 
         waiting_on_members: Dict[int, TeamMember] = {
             team_member.member_id: team_member
@@ -219,50 +223,48 @@ class AttendanceVotingView(discord.ui.View):
 
         await interaction.response.defer()
 
-        async with gameday.voting.lock:
-            # Double check again to see if voting is filled
+        # Double check again to see if voting is filled
+        if gameday.voting.has_votes_needed:
+            await interaction.followup.send(
+                'This gameday has already reached the required amount of votes to confirm this gameday. At this time '
+                'you can not do this action.',
+                ephemeral=True,
+            )
+            return
+
+        async with interaction.client.safe_connection() as connection:
+            await gameday.create_member(interaction.user.id, connection=connection)
+
+            embed = self.create_embed(gameday)
+
             if gameday.voting.has_votes_needed:
-                await interaction.followup.send(
-                    'This gameday has already reached the required amount of votes to confirm this gameday. At this time '
-                    'you can not do this action.',
-                    ephemeral=True,
-                )
-                return
-
-            async with interaction.client.safe_connection() as connection:
-                await gameday.create_member(interaction.user.id, connection=connection)
-
-                embed = self.create_embed(gameday)
-
-                if gameday.voting.has_votes_needed:
-                    # We need to edit the timer so it expires in 5 minutes.
-                    try:
-                        voting_ends_at_timer = await gameday.voting.fetch_ends_at_timer(connection=connection)
-                    except TimerNotFound:
-                        pass
-                    else:
-                        if voting_ends_at_timer is not None:
-                            await voting_ends_at_timer.edit(expires=interaction.created_at + datetime.timedelta(minutes=5))
-
-                    await interaction.edit_original_response(embed=embed, view=None)
+                # We need to edit the timer so it expires in 5 minutes.
+                try:
+                    voting_ends_at_timer = await gameday.voting.fetch_ends_at_timer(connection=connection)
+                except TimerNotFound:
+                    pass
                 else:
-                    await interaction.edit_original_response(embed=embed)
+                    if voting_ends_at_timer is not None:
+                        await voting_ends_at_timer.edit(expires=interaction.created_at + datetime.timedelta(minutes=5))
+
+                await interaction.edit_original_response(embed=embed, view=None)
+            else:
+                await interaction.edit_original_response(embed=embed)
 
     async def _not_attend_after(
         self, interaction: discord.Interaction[FuryBot], reason_input: discord.ui.TextInput[AfterModal], *, gameday: Gameday
     ) -> discord.InteractionMessage:
         await interaction.response.defer()
 
-        async with gameday.voting.lock:
-            if gameday.voting.has_votes_needed:
-                await interaction.followup.send(
-                    'This gameday has already reached the required amount of votes to confirm this gameday. At this time '
-                    'this action does not matter.',
-                    ephemeral=True,
-                )
+        if gameday.voting.has_votes_needed:
+            await interaction.followup.send(
+                'This gameday has already reached the required amount of votes to confirm this gameday. At this time '
+                'this action does not matter.',
+                ephemeral=True,
+            )
 
-            async with interaction.client.safe_connection() as connection:
-                await gameday.create_member(interaction.user.id, reason=reason_input.value, connection=connection)
+        async with interaction.client.safe_connection() as connection:
+            await gameday.create_member(interaction.user.id, reason=reason_input.value, connection=connection)
 
         embed = self.create_embed(gameday)
         return await interaction.edit_original_response(embed=embed)

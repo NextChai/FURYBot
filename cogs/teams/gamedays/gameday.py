@@ -23,7 +23,6 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import asyncio
 import dataclasses
 import datetime
 import enum
@@ -70,10 +69,17 @@ def determine_comfy_voting_times(gameday_starts_at: datetime.datetime) -> Voting
     # If there's less than 24 hours until the gameday, start the voting now and then end it N minutes before the gameday starts
     if time_until_gameday < datetime.timedelta(hours=24):
         if time_until_gameday < datetime.timedelta(hours=6):
+
+            # If gameday starts at - voting_ends_at returns something that is before now, we need to edit the voting_ends_offset
+            # so that it's not in the past
+            voting_ends_offset = datetime.timedelta(minutes=5)
+            if gameday_starts_at - voting_ends_offset < now:
+                # Determine a new voting_ends_offset that ensures that voting ends time is in the future
+                # and ends before the gameday starts
+                voting_ends_offset = gameday_starts_at - now
+
             # There's less than 6 hours, start it now and end it 5 minutes before the gameday starts
-            return VotingTimes(
-                start=now, end=gameday_starts_at - datetime.timedelta(minutes=5), can_use_automatic_sub_finding=False
-            )
+            return VotingTimes(start=now, end=gameday_starts_at - voting_ends_offset, can_use_automatic_sub_finding=False)
 
         # There's more than 6 hours, start it now and end it 1 hour before the gameday starts
         return VotingTimes(
@@ -221,7 +227,9 @@ class GamedayMember:
 
         gameday.remove_member(self.id)
 
-    async def edit(self, connection: ConnectionType, *, reason: str = MISSING, is_temporary_sub: bool = MISSING) -> None:
+    async def edit(
+        self, connection: ConnectionType, *, reason: Optional[str] = MISSING, is_temporary_sub: bool = MISSING
+    ) -> None:
         builder = QueryBuilder('teams.gameday_members')
         builder.add_condition('id', self.id)
 
@@ -482,7 +490,6 @@ class GamedayAttendanceVoting:
     starts_at_timer_id: Optional[int] = None
     ends_at_timer_id: Optional[int] = None
     message_id: Optional[int] = None
-    lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock)
 
     @classmethod
     def from_data(
@@ -584,9 +591,9 @@ class Gameday:
         self,
         bot: FuryBot,
         *,
-        members: Dict[int, GamedayMember],
-        images: Dict[int, GamedayImage],
-        score_reports: Dict[int, GamedayScoreReport],
+        members: Dict[int, GamedayMember] = {},
+        images: Dict[int, GamedayImage] = {},
+        score_reports: Dict[int, GamedayScoreReport] = {},
         id: int,
         guild_id: int,
         team_id: int,
@@ -733,7 +740,7 @@ class Gameday:
         return self.score_reports.get(report_id)
 
     def add_member(self, member: GamedayMember) -> None:
-        self.members[member.id] = member
+        self.members[member.member_id] = member
 
     def remove_member(self, member_id: int, /) -> Optional[GamedayMember]:
         return self.members.pop(member_id, None)
@@ -1107,14 +1114,15 @@ class GamedayTime:
 class GamedayBucket:
     bot: FuryBot
 
-    gamedays: Dict[int, Gameday]
     id: int
     guild_id: int
     team_id: int
-    gameday_times: Dict[int, GamedayTime]
     automatic_sub_finding_channel_id: Optional[int]
     automatic_sub_finding_if_possible: bool
     per_team: int
+
+    gameday_times: Dict[int, GamedayTime] = dataclasses.field(default_factory=dict)
+    gamedays: Dict[int, Gameday] = dataclasses.field(default_factory=dict)
 
     @classmethod
     async def create(
@@ -1126,15 +1134,16 @@ class GamedayBucket:
         team_id: int,
         automatic_sub_finding_if_possible: bool = False,
         automatic_sub_finding_channel_id: Optional[int] = None,
+        per_team: int,
     ) -> Self:
         query = """
-            INSERT INTO teams.gameday_buckets (guild_id, team_id, automatic_sub_finding_if_possible, automatic_sub_finding_channel_id)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO teams.gameday_buckets (guild_id, team_id, automatic_sub_finding_if_possible, automatic_sub_finding_channel_id, per_team)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING *
         """
 
         data = await connection.fetchrow(
-            query, guild_id, team_id, automatic_sub_finding_if_possible, automatic_sub_finding_channel_id
+            query, guild_id, team_id, automatic_sub_finding_if_possible, automatic_sub_finding_channel_id, per_team
         )
         assert data
 
@@ -1236,3 +1245,28 @@ class GamedayBucket:
         times = await self.fetch_gameday_times(connection=connection)
         for time in times:
             self.add_gameday_time(time)
+
+    async def edit(
+        self,
+        *,
+        connection: ConnectionType,
+        per_team: int = MISSING,
+        automatic_sub_finding_if_possible: bool = MISSING,
+        automatic_sub_finding_channel_id: Optional[int] = MISSING,
+    ) -> None:
+        builder = QueryBuilder('teams.gameday_buckets')
+        builder.add_condition('id', self.id)
+
+        if per_team is not MISSING:
+            builder.add_arg('per_team', per_team)
+            self.per_team = per_team
+
+        if automatic_sub_finding_if_possible is not MISSING:
+            builder.add_arg('automatic_sub_finding_if_possible', automatic_sub_finding_if_possible)
+            self.automatic_sub_finding_if_possible = automatic_sub_finding_if_possible
+
+        if automatic_sub_finding_channel_id is not MISSING:
+            builder.add_arg('automatic_sub_finding_channel_id', automatic_sub_finding_channel_id)
+            self.automatic_sub_finding_channel_id = automatic_sub_finding_channel_id
+
+        await builder(connection=connection)

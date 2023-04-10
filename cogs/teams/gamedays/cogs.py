@@ -38,6 +38,7 @@ if TYPE_CHECKING:
 __all__: Tuple[str, ...] = ('GamedayEventListener', 'GamedayCommands')
 
 _log = logging.getLogger(__name__)
+_log.setLevel(logging.DEBUG)
 
 
 class GamedayEventListener(BaseCog):
@@ -80,7 +81,9 @@ class GamedayEventListener(BaseCog):
             (m.mention for m in team.main_roster), additional='please confirm your attendance for the upcoming gameday.'
         )
 
-        message = await channel.send(embed=embed, view=view, content=team_member_mentions)
+        message = await channel.send(
+            embed=embed, view=view, content=team_member_mentions, allowed_mentions=discord.AllowedMentions(users=True)
+        )
 
         async with self.bot.safe_connection() as connection:
             await gameday.edit(

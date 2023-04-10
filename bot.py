@@ -784,10 +784,7 @@ class FuryBot(commands.Bot):
             bucket = GamedayBucket(bot=self, **dict(row))
             self.add_gameday_bucket(bucket)
 
-            gamedays = await bucket.fetch_gamedays(connection=connection)
-            for gameday in gamedays:
-                await gameday.setup(connection=connection)
-                bucket.add_gameday(gameday)
+            await bucket.setup(connection=connection)
 
     @cache_loader('GAMEDAY_PERSISTENT_VIEWS')
     async def _cache_setup_gameday_persistent_views(self, connection: ConnectionType) -> None:

@@ -24,6 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import os
+import discord
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Iterable, List, Optional, Tuple, TypeVar
 
 from .bases import *
@@ -42,8 +43,6 @@ from .ui import *
 
 if TYPE_CHECKING:
     import datetime
-
-    import discord
 
     BV = TypeVar('BV', bound='discord.ui.View')
     ButtonCallback = Callable[[BV, discord.Interaction[Any], discord.ui.Button[BV]], Coroutine[Any, Any, Any]]
@@ -130,4 +129,4 @@ def human_join(
     if additional:
         finished += f' {additional}'
 
-    return finished
+    return finished.strip()

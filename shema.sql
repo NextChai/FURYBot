@@ -115,12 +115,12 @@ CREATE TABLE IF NOT EXISTS teams.gamedays (
     starts_at TIMESTAMP WITH TIME ZONE,
     ended_at TIMESTAMP WITH TIME ZONE, -- Can be None
     automatic_sub_finding BOOLEAN DEFAULT FALSE,
-    starts_at_timer_id INTEGER REFERENCES timers(id), -- Can be none
+    starts_at_timer_id INTEGER, -- Can be none
     voting_starts_at TIMESTAMP WITH TIME ZONE,
     voting_ends_at TIMESTAMP WITH TIME ZONE,
     gameday_time_id INTEGER REFERENCES teams.gameday_times(id) ON DELETE CASCADE,
-    voting_starts_at_timer_id INTEGER REFERENCES timers(id), -- Can be none
-    voting_ends_at_timer_id INTEGER REFERENCES timers(id), -- Can be none
+    voting_starts_at_timer_id INTEGER, -- Can be none
+    voting_ends_at_timer_id INTEGER, -- Can be none
     voting_message_id BIGINT
 );
 
@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS teams.gameday_members (
     member_id BIGINT,
     team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     bucket_id INTEGER REFERENCES teams.gameday_buckets(id) ON DELETE CASCADE,
+    guild_id BIGINT,
     gameday_id INTEGER REFERENCES teams.gamedays(id) ON DELETE CASCADE,
     reason TEXT, -- Can be None
     is_temporary_sub BOOLEAN DEFAULT FALSE,
@@ -162,8 +163,8 @@ CREATE TABLE IF NOT EXISTS timers(
     precise BOOLEAN DEFAULT TRUE,
     event TEXT,
     extra JSONB,
-    created TIMESTAMP,
-    expires TIMESTAMP
+    created TIMESTAMP WITH TIME ZONE,
+    expires TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE IF NOT EXISTS timer_storage(
@@ -171,8 +172,8 @@ CREATE TABLE IF NOT EXISTS timer_storage(
     precise BOOLEAN,
     event TEXT,
     extra JSONB,
-    created TIMESTAMP,
-    expires TIMESTAMP
+    created TIMESTAMP WITH TIME ZONE,
+    expires TIMESTAMP WITH TIME ZONE,
 );
 
 CREATE TABLE IF NOT EXISTS image_requests (

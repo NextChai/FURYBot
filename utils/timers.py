@@ -51,6 +51,7 @@ T = TypeVar('T')
 MISSING = discord.utils.MISSING
 
 _log = logging.getLogger(__name__)
+_log.setLevel(logging.DEBUG)
 
 
 class Timer:
@@ -158,6 +159,8 @@ class Timer:
         connection : Optional[ConnectionType]
             An optional connection to use.
         """
+        _log.debug('Moving timer %s into storage.', self.id)
+
         # Inserting data into the database.
         query = 'INSERT INTO timer_storage (event, extra, created, expires, precise) VALUES($1, $2, $3, $4, $5)'
         args = (self.event, self._extra, self.created_at, self.expires, self.precise)
@@ -203,11 +206,16 @@ class Timer:
         builder.add_condition('id', self.id)
 
         if expires is not MISSING:
+            expires = expires.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+
             builder.add_arg('expires', expires)
             self.expires = expires
 
         async with self.bot.safe_connection() as connection:
             await builder(connection)
+
+        if self.bot.timer_manager:
+            self.bot.timer_manager.restart_task()
 
 
 class TimerManager:
@@ -252,7 +260,7 @@ class TimerManager:
         Optional[:class:`Timer`]
             The timer that is expired and should be dispatched.
         """
-        query = f"SELECT * FROM timers WHERE (expires IS NOT NULL AND expires < (CURRENT_DATE + $1::interval)) ORDER BY expires LIMIT 1;"
+        query = f"SELECT * FROM timers WHERE (expires IS NOT NULL AND expires < (timezone('utc', NOW()) + $1::interval)) ORDER BY expires LIMIT 1;"
         con = connection or self.bot.pool
 
         record = await con.fetchrow(query, datetime.timedelta(days=days))
@@ -294,14 +302,20 @@ class TimerManager:
         timer: :class:`Timer`
             The timer to dispatch.
         """
+
+        _log.debug('Calling timer %s', timer.id)
+
         try:
             await timer.delete()
         except TimerNotFound:
             # We don't want to call a
             # timer that was deleted.
+            _log.debug('Timer %s was deleted before it could be dispatched.', timer.id)
             return
 
         await timer.move_to_storage(self.bot)
+
+        _log.debug('Dispatching timer %s to event %s', timer.id, timer.event_name)
 
         if timer.precise:
             self.bot.dispatch(timer.event_name, *timer.args, **timer.kwargs)
@@ -320,6 +334,8 @@ class TimerManager:
         Please note if you use this class, you need to cancel the task when you're done
         with it.
         """
+        await self.bot.wait_until_ready()
+
         try:
             while not self.bot.is_closed():
                 # can only asyncio.sleep for up to ~48 days reliably
@@ -330,16 +346,22 @@ class TimerManager:
                     _log.warning('Timer was supposted to be here, but isn\'t.. oh no.')
                     return
 
-                now = datetime.datetime.utcnow()
+                _log.debug('Got timer %s to call next.', timer.id)
+
+                now = discord.utils.utcnow()
                 if timer.expires >= now:
                     to_sleep = (timer.expires - now).total_seconds()
+                    _log.debug('Sleeping for %s seconds', to_sleep)
                     await asyncio.sleep(to_sleep)
 
+                _log.debug('Calling call timer.')
                 await self.call_timer(timer)
         except asyncio.CancelledError:
             raise
         except (OSError, discord.ConnectionClosed, asyncpg.PostgresConnectionError):
             self.restart_task()
+        except Exception as e:
+            _log.exception('Exception in dispatch_timers: %s', e, exc_info=e)
 
     async def create_timer(
         self,
@@ -373,8 +395,8 @@ class TimerManager:
         await self.bot.wait_until_ready()
 
         # Remove timezone information since the database does not deal with it
-        when = when.astimezone(datetime.timezone.utc).replace(tzinfo=None)
-        now = (now or discord.utils.utcnow()).astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        when = when.astimezone(datetime.timezone.utc)
+        now = (now or discord.utils.utcnow()).astimezone(datetime.timezone.utc)
 
         delta = (when - now).total_seconds()
         query = f"""INSERT INTO timers (event, extra, expires, created, precise)
