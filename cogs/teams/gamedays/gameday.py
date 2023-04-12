@@ -1024,6 +1024,14 @@ class GamedayTime:
     def team(self) -> Optional[Team]:
         return self.bot.get_team(self.team_id, guild_id=self.guild_id)
 
+    @property
+    def gamedays(self) -> List[Gameday]:
+        bucket = self.bucket
+        if bucket is None:
+            return []
+
+        return [gameday for gameday in bucket.gamedays.values() if gameday.gameday_time_id == self.id]
+
     async def edit(
         self,
         *,
@@ -1058,8 +1066,12 @@ class GamedayTime:
                 if gameday.gameday_time_id != self.id:
                     continue
 
-                if now > gameday.voting.starts_at:
-                    # Don't want to edit a gameday that has already started its process.
+                # continue if the gameday started in the past
+                if gameday.starts_at < now:
+                    continue
+
+                if gameday.ended_at is not None:
+                    # This gameday has already ended, there is no need to edit it.
                     continue
 
                 new_starts_at = get_next_gameday_time(weekday=weekday, game_time=starts_at)
@@ -1087,6 +1099,20 @@ class GamedayTime:
                     else:
                         if timer is not None:
                             await timer.edit(expires=new_time)
+
+                # Let's update the message as well
+                view = self.bot.attendance_voting_view
+                if view is not None:
+                    try:
+                        voting_message = await gameday.voting.fetch_message()
+                    except discord.NotFound:
+                        continue
+                    else:
+                        if voting_message is None:
+                            continue
+                        
+                        embed = view.create_embed(gameday)
+                        await voting_message.edit(embed=embed)
 
         await builder(connection)
 

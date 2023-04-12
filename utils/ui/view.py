@@ -407,15 +407,18 @@ class MultiSelector(Generic[BaseViewT, T], abc.ABC):
         self.parent: BaseViewT = parent
         self._original_children: List[discord.ui.Item[BaseViewT]] = parent.children
 
-        parent.clear_items()
-        parent.add_item(_PageManagerButton(parent=self, action='decrement'))
-        parent.add_item(_PageManagerButton(parent=self, action='increment'))
-        parent.add_item(_ChooseItemButton(parent=self))
-
         self.items_mapping: Dict[Hashable, T] = {self.hash_item(item): item for item in items}
         self.pages = [items[i : i + per_page] for i in range(0, len(items), per_page)]
         self.per_page: int = per_page
         self.current_page: int = 0
+
+        parent.clear_items()
+
+        if len(self.pages) >= 1:
+            parent.add_item(_PageManagerButton(parent=self, action='decrement'))
+            parent.add_item(_PageManagerButton(parent=self, action='increment'))
+
+        parent.add_item(_ChooseItemButton(parent=self))
 
     @property
     def total_pages(self) -> int:

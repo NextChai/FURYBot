@@ -49,7 +49,7 @@ class AttendanceVotingView(discord.ui.View):
         embed = team.embed(
             title='Gameday Voting Confirmed',
             description='This gameday has reached the required amount of votes to confirm this gameday. There is no further '
-            'actions required from you.',
+            f'actions required from you. This gameday is scheduled to start at {human_timestamp(gameday.starts_at)}.',
         )
 
         attending_members: Dict[int, GamedayMember] = {}
@@ -247,7 +247,7 @@ class AttendanceVotingView(discord.ui.View):
                     if voting_ends_at_timer is not None:
                         await voting_ends_at_timer.edit(expires=interaction.created_at + datetime.timedelta(minutes=5))
 
-                await interaction.edit_original_response(embed=embed, view=None)
+                await interaction.edit_original_response(embed=embed, view=None, content=None)
             else:
                 await interaction.edit_original_response(embed=embed)
 

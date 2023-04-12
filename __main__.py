@@ -56,6 +56,7 @@ sentry_sdk.init(
     # We recommend adjusting this value in production.
     traces_sample_rate=1.0,
     environment='development' if RUNNING_DEVELOPMENT else 'production',
+    ignore_errors=[KeyboardInterrupt],
 )
 
 

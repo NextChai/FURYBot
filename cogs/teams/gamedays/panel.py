@@ -624,6 +624,24 @@ class ManageGamedayTime(BaseView):
         async with self.bot.safe_connection() as connection:
             await self.gameday_time.edit(connection=connection, weekday=weekday, starts_at=time)
 
+        # A filter for the bucket's gamedays that ensure that
+        # 1. the gameday did not start yet
+        # 2. The gameday uses the current gameday time
+        # 3. The gameday is not already ended
+        def filter_gameday(gameday: Gameday) -> bool:
+            return (
+                gameday.starts_at > discord.utils.utcnow()
+                and gameday.gameday_time_id == self.gameday_time.id
+                and not gameday.ended_at
+            )
+
+        edited_gamedays = len(list(filter(filter_gameday, bucket.gamedays.values())))
+        await interaction.followup.send(
+            f'I edited {edited_gamedays} gamedays under this gameday time to the new time, {weekday.name.title()} {time.strftime("%I:%M %p")}. Any gamedays in the past did '
+            'not get edited.',
+            ephemeral=True,
+        )
+
         return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Edit Gameday Time and Weekday', style=discord.ButtonStyle.green)
@@ -676,8 +694,16 @@ class GamedayTimeManagementPanel(BaseView):
                 f'**ID**: {gameday_time.id}',
                 f'**Time**: {gameday_time.starts_at.strftime("%I:%M %p")}',
                 f'**Wekday**: {gameday_time.weekday.name.title()}',
+                f'**Total Gamedays Under This Time**: {len(gameday_time.gamedays)}',
             ]
+
             embed.add_field(name=f'Gameday Time {gameday_time.id}', value='\n'.join(metadata), inline=False)
+
+        if not embed.fields:
+            embed.add_field(
+                name='No Gameday Times',
+                value=f'Use the "Create New Gameday Time" button below to create a game time and weekday for this team.',
+            )
 
         return embed
 
@@ -725,7 +751,7 @@ class GamedayTimeManagementPanel(BaseView):
         # Let's create a new gametime, this will spawn the gameday and timers
         # accordingly.
         async with self.bot.safe_connection() as connection:
-            await GamedayTime.create(
+            gameday_time = await GamedayTime.create(
                 self.bot,
                 connection=connection,
                 guild_id=self.bucket.guild_id,
@@ -735,12 +761,22 @@ class GamedayTimeManagementPanel(BaseView):
                 starts_at=time,
             )
 
+        await interaction.followup.send(
+            f'I\'ve created the new gameday time for {weekday.name.title()} at {time.strftime("%I:%M %p")}. Additionally, the first gameday has been created '
+            f'for this time, it\'s scheduled to start at {human_timestamp(gameday_time.gamedays[0].starts_at)}.',
+            ephemeral=True,
+        )
         return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Create New Gameday Time', style=discord.ButtonStyle.green)
     async def create_new_gameday_time(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> None:
+        if len(self.gameday_times) >= 15:
+            return await interaction.response.send_message(
+                'You cannot have more than 15 gameday times. Please delete one before creating a new one.', ephemeral=True
+            )
+
         modal = AfterModal(
             self.bot,
             self._create_new_gametime_after,
@@ -758,6 +794,11 @@ class GamedayTimeManagementPanel(BaseView):
     async def manage_existing_gameday_time(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> None:
+        if not self.gameday_times:
+            return await interaction.response.send_message(
+                'You cannot manage a gameday time if you do not have any gameday times.', ephemeral=True
+            )
+
         selector = SelectGamedayTime(parent=self)
         await selector.launch(interaction)
 
@@ -811,8 +852,6 @@ class GamedayBucketPanel(BaseView):
             else:
                 automatic_sub_channel_fmt = 'There is no channel set for automatic sub finding.'
 
-        embed.add_field(name='Automatic Sub Finding Channel', value=automatic_sub_channel_fmt, inline=False)
-
         embed.add_field(
             name='Automatic Sub Finding',
             value=f'Automatic sub finding when possible is **{"enabled" if self.bucket.automatic_sub_finding_if_possible else "disabled"}**. '
@@ -820,6 +859,8 @@ class GamedayBucketPanel(BaseView):
             'settings 24 hours before the gameday.',
             inline=False,
         )
+
+        embed.add_field(name='Automatic Sub Finding Channel', value=automatic_sub_channel_fmt, inline=False)
 
         return embed
 
@@ -836,6 +877,12 @@ class GamedayBucketPanel(BaseView):
     @discord.ui.button(label='Manage A Gameday', style=discord.ButtonStyle.primary)
     async def manage_a_gameday(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """A button to launch a view that manages all gamedays in this bucket."""
+        if not self.bucket.gamedays:
+            return await interaction.response.send_message(
+                'There are no gamedays in this bucket. If you want to create one, you can create a gameady time first.',
+                ephemeral=True,
+            )
+
         selector = SelectGameday(parent=self)
         await selector.launch(interaction)
 
