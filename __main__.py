@@ -27,7 +27,6 @@ import dotenv
 
 dotenv.load_dotenv()
 
-
 import asyncio
 import logging
 import os
@@ -49,6 +48,12 @@ os.environ['JISHAKU_NO_UNDERSCORE'] = 'true'
 os.environ['JISHAKU_NO_DM_TRACEBACK'] = 'true'
 os.environ['JISHAKU_RETAIN'] = 'true'
 
+# functions_to_trace = list(parse_initial_extensions(initial_extensions))
+# functions_to_trace.append('bot')
+#
+# utils_modules = [e.replace('\\', '.').replace('.py', '') for e in glob.glob("utils/*.py")]
+# functions_to_trace.extend(utils_modules)
+
 sentry_sdk.init(
     dsn=os.environ['SENTRY_DSN'],
     # Set traces_sample_rate to 1.0 to capture 100%
@@ -57,6 +62,7 @@ sentry_sdk.init(
     traces_sample_rate=1.0,
     environment='development' if RUNNING_DEVELOPMENT else 'production',
     ignore_errors=[KeyboardInterrupt],
+    # functions_to_trace=list(parse_initial_extensions(initial_extensions)),
 )
 
 

@@ -74,6 +74,18 @@ START_TIMER_MANAGER: bool = _parse_environ_boolean(
 )
 
 
+def parse_initial_extensions(extensions: Iterable[str]) -> Iterable[str]:
+    if RUNNING_DEVELOPMENT:
+        # When running development, the user can prefix extensions they'd like to ignore loading
+        # using the `.env` file. So to allow a user to ignore something, they can do: `IGNORE_EXTENSIONS=ext1,ext2`
+        if USE_CUSTOM_INITIAL_EXTENSIONS:
+            extensions = INITIAL_EXTENSIONS
+
+        return tuple(ext for ext in extensions if ext not in IGNORE_EXTENSIONS)
+
+    return extensions
+
+
 def default_button_doc_string(func: ButtonCallback[BV]) -> ButtonCallback[BV]:
     default_doc = """
     |coro|

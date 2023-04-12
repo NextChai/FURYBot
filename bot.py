@@ -61,15 +61,13 @@ from cogs.teams.scrims import Scrim, ScrimStatus
 from utils import (
     BYPASS_SETUP_HOOK,
     BYPASS_SETUP_HOOK_CACHE_LOADING,
-    IGNORE_EXTENSIONS,
-    INITIAL_EXTENSIONS,
     RUNNING_DEVELOPMENT,
     START_TIMER_MANAGER,
-    USE_CUSTOM_INITIAL_EXTENSIONS,
     ErrorHandler,
     LinkFilter,
     TimerManager,
     _parse_environ_boolean,
+    parse_initial_extensions,
 )
 
 if TYPE_CHECKING:
@@ -796,16 +794,7 @@ class FuryBot(commands.Bot):
         if BYPASS_SETUP_HOOK:
             return
 
-        extensions_to_load = initial_extensions
-        if RUNNING_DEVELOPMENT:
-            # When running development, the user can prefix extensions they'd like to ignore loading
-            # using the `.env` file. So to allow a user to ignore something, they can do: `IGNORE_EXTENSIONS=ext1,ext2`
-            if USE_CUSTOM_INITIAL_EXTENSIONS:
-                filter_extensions = INITIAL_EXTENSIONS
-            else:
-                filter_extensions = initial_extensions
-
-            extensions_to_load = tuple(ext for ext in filter_extensions if ext not in IGNORE_EXTENSIONS)
+        extensions_to_load = parse_initial_extensions(initial_extensions)
 
         await asyncio.gather(*(self.load_extension(ext) for ext in extensions_to_load))
 
