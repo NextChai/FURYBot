@@ -1116,7 +1116,7 @@ class GamedayTime:
 
         await builder(connection)
 
-    async def delete(self, *, connection: ConnectionType) -> None:
+    async def delete(self, *, connection: ConnectionType) -> List[Gameday]:
         query = """
             DELETE FROM teams.gameday_times WHERE id = $1
         """
@@ -1125,15 +1125,19 @@ class GamedayTime:
 
         bucket = self.bucket
         if bucket is None:
-            return
+            return []
 
         # Delete all gamedays that have this time that do not have an ended_at
         gamedays = bucket.get_gamedays_with_time(self.id)
+        removed_gamedays: List[Gameday] = []
         for gameday in gamedays:
             if gameday.ended_at is None:
                 await gameday.delete(connection=connection)
+                removed_gamedays.append(gameday)
 
         bucket.remove_gameday_time(self.id)
+        
+        return removed_gamedays
 
 
 @dataclasses.dataclass()

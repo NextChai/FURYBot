@@ -223,7 +223,7 @@ class BaseView(discord.ui.View, abc.ABC):
         The context of the help command.
     timeout: Optional[:class:`float`]
         The amount of time in seconds before the view times out. Defaults
-        to ``120.0``.
+        to ``360.0``.
     parent: Optional[:class:`discord.ui.View`]
         The parent of this view. Defaults to ``None``.
 
@@ -259,7 +259,7 @@ class BaseView(discord.ui.View, abc.ABC):
         self.parent: Optional[BaseView] = kwargs.get('parent')
         self.target: TargetType = target
         self.guild: discord.Guild = target.guild
-        super().__init__(timeout=kwargs.get('timeout', 120))
+        super().__init__(timeout=kwargs.get('timeout', 360))
 
     def _add_menu_children(self) -> None:
         if self.parent is not None:

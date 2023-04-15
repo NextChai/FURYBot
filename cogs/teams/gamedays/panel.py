@@ -667,12 +667,17 @@ class ManageGamedayTime(BaseView):
         await interaction.response.defer()
 
         async with self.bot.safe_connection() as connection:
-            await self.gameday_time.delete(connection=connection)
+            removed_gamedays = await self.gameday_time.delete(connection=connection)
 
         # Let's *try* and find the bucket from this gameday time
         bucket = self.gameday_time.bucket
         if bucket is None:
             raise ValueError('Gameday time has no bucket.')
+
+        # Let's get the total number of gamedays that were deleted using that time
+        await interaction.followup.send(
+            f'I deleted this gameday time and the {len(removed_gamedays)} gamedays associated with it.', ephemeral=True
+        )
 
         view = GamedayBucketPanel(bucket, target=interaction)
         return await interaction.edit_original_response(view=view, embed=view.embed)
