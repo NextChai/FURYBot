@@ -121,7 +121,8 @@ CREATE TABLE IF NOT EXISTS teams.gamedays (
     gameday_time_id INTEGER REFERENCES teams.gameday_times(id) ON DELETE CASCADE,
     voting_starts_at_timer_id INTEGER, -- Can be none
     voting_ends_at_timer_id INTEGER, -- Can be none
-    voting_message_id BIGINT
+    voting_message_id BIGINT,   -- Can be none
+    score_message_id BIGINT -- Can be none
 );
 
 CREATE TABLE IF NOT EXISTS teams.gameday_score_reports (

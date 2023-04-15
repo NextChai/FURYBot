@@ -46,6 +46,34 @@ class GamedayEventListener(BaseCog):
     async def on_gameday_start(self, guild_id: int, team_id: int, gameday_id: int) -> None:
         _log.debug('Gameday start event triggered for guild %s, team %s, gameday %s.', guild_id, team_id, gameday_id)
 
+        guild = self.bot.get_guild(guild_id)
+        if guild is None:
+            _log.debug('Guild %s not found.', guild_id)
+            return
+
+        team = self.bot.get_team(team_id, guild_id=guild_id)
+        if team is None:
+            _log.debug('Team %s not found.', team_id)
+            return
+
+        bucket = team.get_gameday_bucket()
+        if bucket is None:
+            _log.debug('Gameday bucket not found.')
+            return
+
+        gameday = bucket.get_gameday(gameday_id)
+        if gameday is None:
+            _log.debug('Gameday %s not found.', gameday_id)
+            return
+
+        view = self.bot.score_report_view
+        if view is None:
+            _log.debug('Score report view not found.')
+            return
+
+        # Let's create the embed and send it to the channel
+        embed, attachments = await view.create_sender_information(gameday)
+
     @commands.Cog.listener('on_gameday_voting_start_timer_complete')
     async def on_gameday_voting_start(self, guild_id: int, team_id: int, gameday_id: int) -> None:
         guild = self.bot.get_guild(guild_id)

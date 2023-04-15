@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 import discord
 from typing_extensions import Self
 
-from utils import AfterModal
+from utils import AfterModal, human_join, human_timestamp
 
 from ..gameday import GamedayScoreReport
 
@@ -39,8 +39,47 @@ if TYPE_CHECKING:
 
 
 class ScoreReportView(discord.ui.View):
-    async def create_sender_inforamtion(self, gameday: Gameday) -> Tuple[discord.Embed, List[discord.File]]:
-        ...
+    async def interaction_check(self, interaction: discord.Interaction[FuryBot]) -> Optional[bool]:
+        assert interaction.guild_id
+        assert interaction.channel_id
+
+        team = interaction.client.get_team_from_channel(interaction.channel_id, interaction.guild_id)
+        if team is None:
+            return await interaction.response.send_message('I was unable to locate a team for this channel.', ephemeral=True)
+
+        team_member = team.get_member(interaction.user.id)
+        if team_member is None:
+            return await interaction.response.send_message('You are not a member of this team.', ephemeral=True)
+
+        return True
+
+    async def create_sender_information(self, gameday: Gameday) -> Tuple[discord.Embed, List[discord.File]]:
+        team = gameday.team
+        if team is None:
+            raise ValueError('Gameday has no team.')
+
+        report_texts = '\n'.join(
+            f'- {report.text} (Reported by <@{report.reported_by_id}>)' for report in gameday.score_reports.values()
+        )
+
+        description = f'Below shows all the score reports for the current gameday. This gameday started at {human_timestamp(gameday.starts_at)}'
+        if gameday.has_ended:
+            assert gameday.ended_at
+            description += f' and ended at {human_timestamp(gameday.ended_at)}.'
+        else:
+            description = f' and is currently in progress.'
+
+        embed = team.embed(
+            title=f'Gameday Score Report',
+            description=f'{description}\n\n{report_texts}',
+        )
+
+        file = await gameday.merge_images()
+        if file is not None:
+            embed.set_image(url=f'attachment://{file.filename}')
+
+        attachments = [file] if file is not None else []
+        return embed, attachments
 
     async def _find_gameday_from_interaction(self, interaction: discord.Interaction[FuryBot]) -> Optional[Gameday]:
         await interaction.response.defer()
@@ -55,8 +94,12 @@ class ScoreReportView(discord.ui.View):
             await interaction.followup.send('I was unable to locate a team for this channel.', ephemeral=True)
             return
 
-        ongoing_gameday = team.ongoing_gameday
-        if ongoing_gameday is None:
+        ongoing_gameday = discord.utils.find(
+            lambda g: g.score_message_id is not None
+            and g.score_message_id == (interaction.message and interaction.message.id),
+            team.ongoing_gamedays,
+        )
+        if not ongoing_gameday:
             await interaction.followup.send('There is no ongoing gameday for this team.', ephemeral=True)
             return
 
@@ -82,7 +125,7 @@ class ScoreReportView(discord.ui.View):
 
         await interaction.followup.send('Your score report has been successfully submitted.', ephemeral=True)
 
-        embed, attachments = await self.create_sender_inforamtion(gameday)
+        embed, attachments = await self.create_sender_information(gameday)
         return await interaction.edit_original_response(embed=embed, attachments=attachments)
 
     @discord.ui.button(label='Report Score', style=discord.ButtonStyle.green, custom_id='score-report-view:report-score')
@@ -114,8 +157,21 @@ class ScoreReportView(discord.ui.View):
         if gameday is None:
             return
 
+        team = gameday.team
+        if team is None:
+            raise ValueError('Gameday has no team.')
+
         async with interaction.client.safe_connection() as connection:
             await gameday.edit(connection=connection, ended_at=interaction.created_at)
 
-        embed, attachments = await self.create_sender_inforamtion(gameday)
-        await interaction.edit_original_response(view=None, embed=embed, attachments=attachments)
+        embed, attachments = await self.create_sender_information(gameday)
+
+        await interaction.delete_original_response()
+        await interaction.followup.send(
+            embed=embed,
+            files=attachments,
+            content=human_join(
+                (r.mention for r in team.captain_roles), additional='please review the score for this given gameday.'
+            ),
+            allowed_mentions=discord.AllowedMentions(roles=True),
+        )

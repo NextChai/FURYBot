@@ -400,12 +400,12 @@ class Team:
         return sum(practice_points)
 
     @property
-    def ongoing_gameday(self) -> Optional[Gameday]:
+    def ongoing_gamedays(self) -> List[Gameday]:
         bucket = self.get_gameday_bucket()
         if bucket is None:
-            return
+            return []
 
-        return bucket.ongoing_gameday
+        return bucket.ongoing_gamedays
 
     def get_gameday_bucket(self, /) -> Optional[GamedayBucket]:
         """Optional[:class:`GamedayBucket`]: Gets the gameday bucket for this team."""

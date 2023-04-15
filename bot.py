@@ -56,6 +56,7 @@ from cogs.images import ApproveOrDenyImage, ImageRequest
 from cogs.teams import Team
 from cogs.teams.gamedays import GamedayBucket
 from cogs.teams.gamedays.persistent.voting import AttendanceVotingView
+from cogs.teams.gamedays.persistent.score import ScoreReportView
 from cogs.teams.practices import Practice
 from cogs.teams.scrims import Scrim, ScrimStatus
 from utils import (
@@ -243,6 +244,7 @@ class FuryBot(commands.Bot):
         self._team_gameday_buckets: Dict[int, Dict[int, GamedayBucket]] = {}
 
         self.attendance_voting_view: Optional[AttendanceVotingView] = None
+        self.score_report_view: Optional[ScoreReportView] = None
 
         super().__init__(
             command_prefix=commands.when_mentioned_or('fury.'),
@@ -788,6 +790,8 @@ class FuryBot(commands.Bot):
     async def _cache_setup_gameday_persistent_views(self, connection: ConnectionType) -> None:
         self.attendance_voting_view = AttendanceVotingView(timeout=None)
         self.add_view(self.attendance_voting_view)
+
+        self.score_report_view = ScoreReportView(timeout=None)
 
     # Hooks
     async def setup_hook(self) -> None:

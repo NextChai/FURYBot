@@ -608,6 +608,7 @@ class Gameday:
         voting_ends_at_timer_id: Optional[int] = None,
         starts_at_timer_id: Optional[int] = None,
         voting_message_id: Optional[int] = None,
+        score_message_id: Optional[int] = None,
     ) -> None:
         self.bot: FuryBot = bot
 
@@ -624,6 +625,8 @@ class Gameday:
         self.automatic_sub_finding: bool = automatic_sub_finding
         self.starts_at_timer_id: Optional[int] = starts_at_timer_id
         self.gameday_time_id: int = gameday_time_id
+        
+        self.score_message_id: Optional[int] = score_message_id
 
         self.voting = GamedayAttendanceVoting.from_data(
             self.bot,
@@ -729,6 +732,10 @@ class Gameday:
     @property
     def not_attending_members(self) -> List[GamedayMember]:
         return [member for member in self.members.values() if not member.is_attending]
+
+    @property
+    def has_ended(self):
+        return bool(self.ended_at)
 
     def add_score_report(self, report: GamedayScoreReport) -> None:
         self.score_reports[report.id] = report
@@ -890,6 +897,7 @@ class Gameday:
         voting_message_id: int = MISSING,
         starts_at_timer_id: int = MISSING,
         ended_at: datetime.datetime = MISSING,
+        score_message_id: int = MISSING,
     ) -> None:
         builder = QueryBuilder('teams.gamedays')
         builder.add_condition('id', self.id)
@@ -929,6 +937,10 @@ class Gameday:
         if ended_at is not MISSING:
             builder.add_arg('ended_at', ended_at)
             self.ended_at = ended_at
+            
+        if score_message_id is not MISSING:
+            builder.add_arg('score_message_id', score_message_id)
+            self.score_message_id = score_message_id
 
         if self.bot.timer_manager:
             updating_timers = [
@@ -1110,7 +1122,7 @@ class GamedayTime:
                     else:
                         if voting_message is None:
                             continue
-                        
+
                         embed = view.create_embed(gameday)
                         await voting_message.edit(embed=embed)
 
@@ -1136,7 +1148,7 @@ class GamedayTime:
                 removed_gamedays.append(gameday)
 
         bucket.remove_gameday_time(self.id)
-        
+
         return removed_gamedays
 
 
@@ -1202,13 +1214,13 @@ class GamedayBucket:
         return guild.get_channel(self.automatic_sub_finding_channel_id)
 
     @property
-    def ongoing_gameday(self) -> Optional[Gameday]:
-        # Return the gameday that is currently ongoing. An ongoing
-        # gameday is one that has a starts_at time but does not have an ended_at time,
-        # and the starts_at time is now or in the past.
+    def ongoing_gamedays(self) -> List[Gameday]:
         now = discord.utils.utcnow()
 
-        return discord.utils.find(lambda gameday: gameday.ended_at is None and gameday.starts_at <= now, self.get_gamedays())
+        def _check(gameday: Gameday) -> bool:
+            return gameday.ended_at is None and gameday.starts_at <= now
+
+        return list(filter(_check, self.get_gamedays()))
 
     def add_gameday(self, gameday: Gameday) -> None:
         self.gamedays[gameday.id] = gameday
