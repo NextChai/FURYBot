@@ -23,7 +23,6 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import datetime
 from typing import TYPE_CHECKING, Dict, Optional
 
 import discord
@@ -85,7 +84,7 @@ class AttendanceVotingView(discord.ui.View):
             embed = self.create_voting_done_embed(gameday)
             embed.set_footer(
                 text='Because this gameday has reached the end of voting before it naturally ends, I\'ve '
-                'scheduled the voting to end in 1 minute, you\'ll get another message here shortly.'
+                'scheduled the voting to end soon, you\'ll get another message here shortly.'
             )
 
             return embed
@@ -245,7 +244,7 @@ class AttendanceVotingView(discord.ui.View):
                     pass
                 else:
                     if voting_ends_at_timer is not None:
-                        await voting_ends_at_timer.edit(expires=interaction.created_at + datetime.timedelta(minutes=1))
+                        await voting_ends_at_timer.edit(expires=interaction.created_at)
 
                 await interaction.edit_original_response(embed=embed, view=None, content=None)
             else:
