@@ -206,8 +206,6 @@ class Timer:
         builder.add_condition('id', self.id)
 
         if expires is not MISSING:
-            expires = expires.astimezone(datetime.timezone.utc).replace(tzinfo=None)
-
             builder.add_arg('expires', expires)
             self.expires = expires
 
