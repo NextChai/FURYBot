@@ -73,7 +73,10 @@ def parse_time_and_date(value: str) -> Union[Tuple[None, None], Tuple[Weekday, d
 
     if am_pm.lower() == 'pm':
         # Add 12 to the hour if it's PM to move into the 24 hour clock
-        hour += 12
+
+        # If we're at 12 PM, we don't want to add 12 to it
+        if hour != 12:
+            hour += 12
 
     time = datetime.time(hour=hour, minute=minute)
     return (weekday_enum, time)
@@ -893,8 +896,6 @@ class CreateGamedayBucketView(BaseView):
 
         self.team: Team = team
 
-        self.weekday: Optional[Weekday] = None
-        self.time: Optional[datetime.time] = None
         self.per_team: Optional[int] = None
 
         self.automatic_sub_finding_channel_id: Optional[int] = None
@@ -904,16 +905,6 @@ class CreateGamedayBucketView(BaseView):
     def embed(self) -> discord.Embed:
         embed = self.team.embed(
             title='Create Gameday Bucket', description='Use the buttons below to create a gameday bucket.'
-        )
-
-        embed.add_field(
-            name='First Gameday Schedule',
-            value='A gameday bucket needs to have at least one gameday scheduled. If you want to add more gamedays, you can do so later but '
-            'for now, you need to set one gameday. The gameday\'s time and date will be used to determine gameday voting times and other '
-            'events automatically, so put the time and weekday that the team is scheduled to play on.\n\n'
-            f'**Weekday**: {self.weekday.name.title() if self.weekday else "Not set."}\n'
-            f'**Time**: {self.time.strftime("%I:%M %p") if self.time else "Not set."}',
-            inline=False,
         )
 
         embed.add_field(
@@ -936,58 +927,6 @@ class CreateGamedayBucketView(BaseView):
         )
 
         return embed
-
-    async def _first_gameday_schedule_after(
-        self, interaction: discord.Interaction[FuryBot], weekday_time_input: discord.ui.TextInput[AfterModal]
-    ) -> discord.InteractionMessage:
-        await interaction.response.defer()
-
-        try:
-            weekday, time = parse_time_and_date(weekday_time_input.value)
-        except KeyError:
-            await interaction.followup.send(
-                'This is not a valid weekday. An example would be `Tuesday 5:00 PM`. Feel free to try again.',
-                ephemeral=True,
-            )
-            return await interaction.edit_original_response(view=self, embed=self.embed)
-        except ValueError as exc:
-            await interaction.followup.send(
-                f'You did not enter a valid time. {str(exc).capitalize()}. Feel free to try again.',
-                ephemeral=True,
-            )
-            return await interaction.edit_original_response(view=self, embed=self.embed)
-
-        if not weekday and not time:
-            await interaction.followup.send(
-                'This is not a valid time and date. An example would be `Wednesday 4:00 PM`. Feel free to try again.',
-                ephemeral=True,
-            )
-            return await interaction.edit_original_response(view=self, embed=self.embed)
-
-        assert weekday
-        assert time
-
-        self.weekday = weekday
-        self.time = time
-
-        return await interaction.edit_original_response(view=self, embed=self.embed)
-
-    @discord.ui.button(label='Set First Gameday Schedule', style=discord.ButtonStyle.green)
-    async def set_first_gameday_schedule(
-        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> None:
-        """A button to launch a view that allows the user to set the first gameday schedule."""
-        modal = AfterModal(
-            self.bot,
-            self._first_gameday_schedule_after,
-            discord.ui.TextInput(
-                label='Weekday and Time', placeholder='Format: Weekday Hour:Minute AM/PM. Example: Wednesday 4:00 PM'
-            ),
-            title='Set First Gameday Time and Weekday',
-            timeout=None,
-        )
-
-        await interaction.response.send_modal(modal)
 
     # An after callback for setting the per_team field. It will try and convert the text input's
     # value to an int and assign it.
@@ -1056,17 +995,6 @@ class CreateGamedayBucketView(BaseView):
     ) -> discord.InteractionMessage:
         await interaction.response.defer()
 
-        if self.weekday is None:
-            # This also means that self.time is None
-            await interaction.followup.send(
-                'Whoops! You did not set the first gameday schedule. Please do so with the "Set First Gameday Schedule" button '
-                'before finalizing.',
-                ephemeral=True,
-            )
-            return await interaction.edit_original_response(view=self, embed=self.embed)
-
-        assert self.time is not None
-
         if self.per_team is None:
             await interaction.followup.send(
                 'Whoops! You did not set the per team field. Please do so with the "Set Per Team" button before finalizing.',
@@ -1084,17 +1012,6 @@ class CreateGamedayBucketView(BaseView):
                 automatic_sub_finding_if_possible=self.automatic_sub_finding_if_possible,
                 automatic_sub_finding_channel_id=self.automatic_sub_finding_channel_id,
                 per_team=self.per_team,
-            )
-
-            # Create the first bucket time as well
-            await GamedayTime.create(
-                self.bot,
-                connection=connection,
-                guild_id=bucket.guild_id,
-                team_id=bucket.team_id,
-                bucket_id=bucket.id,
-                weekday=self.weekday,
-                starts_at=self.time,
             )
 
         panel = GamedayBucketPanel(bucket=bucket, target=interaction)
