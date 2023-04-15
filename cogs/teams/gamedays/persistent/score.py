@@ -113,3 +113,9 @@ class ScoreReportView(discord.ui.View):
         gameday = await self._find_gameday_from_interaction(interaction)
         if gameday is None:
             return
+
+        async with interaction.client.safe_connection() as connection:
+            await gameday.edit(connection=connection, ended_at=interaction.created_at)
+
+        embed, attachments = await self.create_sender_inforamtion(gameday)
+        await interaction.edit_original_response(view=None, embed=embed, attachments=attachments)
