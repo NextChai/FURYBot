@@ -24,8 +24,9 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import os
-import discord
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Iterable, List, Optional, Tuple, TypeVar
+
+import discord
 
 from .bases import *
 from .cog import *

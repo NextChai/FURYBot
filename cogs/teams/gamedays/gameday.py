@@ -625,7 +625,7 @@ class Gameday:
         self.automatic_sub_finding: bool = automatic_sub_finding
         self.starts_at_timer_id: Optional[int] = starts_at_timer_id
         self.gameday_time_id: int = gameday_time_id
-        
+
         self.score_message_id: Optional[int] = score_message_id
 
         self.voting = GamedayAttendanceVoting.from_data(
@@ -937,7 +937,7 @@ class Gameday:
         if ended_at is not MISSING:
             builder.add_arg('ended_at', ended_at)
             self.ended_at = ended_at
-            
+
         if score_message_id is not MISSING:
             builder.add_arg('score_message_id', score_message_id)
             self.score_message_id = score_message_id

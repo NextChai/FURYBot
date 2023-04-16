@@ -234,7 +234,6 @@ class AttendanceVotingView(discord.ui.View):
         async with interaction.client.safe_connection() as connection:
             await gameday.create_member(interaction.user.id, connection=connection)
 
-
             if gameday.voting.has_votes_needed:
                 # We need to edit the timer so it expires in 5 minutes.
                 try:
@@ -244,7 +243,7 @@ class AttendanceVotingView(discord.ui.View):
                 else:
                     if voting_ends_at_timer is not None:
                         await voting_ends_at_timer.edit(expires=interaction.created_at)
-                        
+
                 await interaction.delete_original_response()
             else:
                 embed = self.create_embed(gameday)

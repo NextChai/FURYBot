@@ -66,9 +66,35 @@ class GamedayEventListener(BaseCog):
             _log.debug('Gameday %s not found.', gameday_id)
             return
 
-        raise NotImplementedError(
-            'Did not impelment what happens if the gameday does not have the required amount of players.'
-        )
+        if not gameday.voting.has_votes_needed:
+            bucket = team.get_gameday_bucket()
+            if bucket is None:
+                _log.debug('Gameday bucket not found.')
+                return
+
+            # Oh no, we don't have enough players to start the gameday!
+            # We need to send an information embed to the channel.
+            embed = team.embed(
+                title='Gameday Start Failed',
+                description='This gameday did not start as it does not have the minimum amount of '
+                f'players required to start. This gameday is missing **{bucket.per_team - len(gameday.attending_members)} votes**.',
+            )
+            embed.add_field(
+                name='Attending Members', value=human_join((m.mention for m in gameday.attending_members)), inline=False
+            )
+            embed.add_field(
+                name='Not Attending Members',
+                value=human_join((m.mention for m in gameday.not_attending_members)),
+            )
+
+            mentions = [*(m.mention for m in gameday.attending_members), *(m.mention for m in team.captain_roles)]
+            await team.text_channel.send(
+                embed=embed,
+                content=human_join(mentions, additional='Gameday start failed!'),
+                allowed_mentions=discord.AllowedMentions(users=True),
+            )
+
+            return
 
         view = self.bot.score_report_view
         if view is None:
