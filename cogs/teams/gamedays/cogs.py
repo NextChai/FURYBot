@@ -66,6 +66,10 @@ class GamedayEventListener(BaseCog):
             _log.debug('Gameday %s not found.', gameday_id)
             return
 
+        raise NotImplementedError(
+            'Did not impelment what happens if the gameday does not have the required amount of players.'
+        )
+
         view = self.bot.score_report_view
         if view is None:
             _log.debug('Score report view not found.')
@@ -73,6 +77,19 @@ class GamedayEventListener(BaseCog):
 
         # Let's create the embed and send it to the channel
         embed, attachments = await view.create_sender_information(gameday)
+        message = await team.text_channel.send(
+            embed=embed,
+            view=view,
+            files=attachments,
+            content=human_join((m.mention for m in gameday.attending_members), additional='your gameday has started!'),
+            allowed_mentions=discord.AllowedMentions(users=True),
+        )
+
+        async with self.bot.safe_connection() as connection:
+            await gameday.edit(
+                connection=connection,
+                score_message_id=message.id,
+            )
 
     @commands.Cog.listener('on_gameday_voting_start_timer_complete')
     async def on_gameday_voting_start(self, guild_id: int, team_id: int, gameday_id: int) -> None:
