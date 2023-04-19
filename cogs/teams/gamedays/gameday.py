@@ -403,7 +403,7 @@ class GamedayScoreReport:
                 reported_at
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETRNING *
+            RETURNING *
             """
 
         data = await connection.fetchrow(query, guild_id, team_id, bucket_id, gameday_id, text, reported_by_id, reported_at)
@@ -984,7 +984,7 @@ class GamedayTime:
         self.team_id = team_id
         self.bucket_id = bucket_id
         self.weekday: Weekday = weekday if isinstance(weekday, Weekday) else Weekday(weekday)
-        self.starts_at = starts_at
+        self.starts_at: datetime.time = starts_at
 
     @classmethod
     async def create(

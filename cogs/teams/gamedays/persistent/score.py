@@ -22,6 +22,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
+import functools
 
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
@@ -30,12 +31,10 @@ from typing_extensions import Self
 
 from utils import AfterModal, human_join, human_timestamp
 
-from ..gameday import GamedayScoreReport
+from ..gameday import GamedayScoreReport, get_next_gameday_time, Gameday
 
 if TYPE_CHECKING:
     from bot import FuryBot
-
-    from ..gameday import Gameday
 
 
 class ScoreReportView(discord.ui.View):
@@ -67,7 +66,7 @@ class ScoreReportView(discord.ui.View):
             assert gameday.ended_at
             description += f' and ended at {human_timestamp(gameday.ended_at)}.'
         else:
-            description = f' and is currently in progress.'
+            description += f' and is currently in progress.'
 
         embed = team.embed(
             title=f'Gameday Score Report',
@@ -81,8 +80,17 @@ class ScoreReportView(discord.ui.View):
         attachments = [file] if file is not None else []
         return embed, attachments
 
-    async def _find_gameday_from_interaction(self, interaction: discord.Interaction[FuryBot]) -> Optional[Gameday]:
-        await interaction.response.defer()
+    async def _find_gameday_from_interaction(
+        self, interaction: discord.Interaction[FuryBot], defer: bool = True
+    ) -> Optional[Gameday]:
+        if defer is True:
+            await interaction.response.defer()
+
+        sender = (
+            functools.partial(interaction.followup.send, ephemeral=True)
+            if interaction.response.is_done()
+            else functools.partial(interaction.response.send_message, ephemeral=True)
+        )
 
         bot = interaction.client
 
@@ -91,7 +99,7 @@ class ScoreReportView(discord.ui.View):
 
         team = bot.get_team_from_channel(interaction.channel_id, interaction.guild_id)
         if team is None:
-            await interaction.followup.send('I was unable to locate a team for this channel.', ephemeral=True)
+            await sender(content='I was unable to locate a team for this channel.')
             return
 
         ongoing_gameday = discord.utils.find(
@@ -100,7 +108,7 @@ class ScoreReportView(discord.ui.View):
             team.ongoing_gamedays,
         )
         if not ongoing_gameday:
-            await interaction.followup.send('There is no ongoing gameday for this team.', ephemeral=True)
+            await sender(content='There is no ongoing gameday for this team.')
             return
 
         return ongoing_gameday
@@ -130,7 +138,7 @@ class ScoreReportView(discord.ui.View):
 
     @discord.ui.button(label='Report Score', style=discord.ButtonStyle.green, custom_id='score-report-view:report-score')
     async def report_score(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        gameday = await self._find_gameday_from_interaction(interaction)
+        gameday = await self._find_gameday_from_interaction(interaction, defer=False)
         if gameday is None:
             return
 
@@ -140,8 +148,7 @@ class ScoreReportView(discord.ui.View):
             discord.ui.TextInput(
                 label='Enter The Score',
                 style=discord.TextStyle.long,
-                placeholder='Enter the score of the game in any format you\'d like, the bot will '
-                'not try to parse it, it\'s up for this team\'s captain to do that.',
+                placeholder='Enter the score of the game in any format you\'d like.',
             ),
             title='Enter Gameday Score',
             timeout=None,
@@ -164,14 +171,32 @@ class ScoreReportView(discord.ui.View):
         async with interaction.client.safe_connection() as connection:
             await gameday.edit(connection=connection, ended_at=interaction.created_at)
 
+            # Let's create next week's gameday.
+            gameday_time = gameday.time
+            if gameday_time is not None:  # Could have been deleted, so we need to check.
+                next_gameday_time = get_next_gameday_time(weekday=gameday_time.weekday, game_time=gameday_time.starts_at)
+                await Gameday.create(
+                    bot=interaction.client,
+                    connection=connection,
+                    guild_id=gameday.guild_id,
+                    team_id=gameday.team_id,
+                    bucket_id=gameday.bucket_id,
+                    gameday_time_id=gameday_time.id,
+                    starts_at=next_gameday_time,
+                )
+
         embed, attachments = await self.create_sender_information(gameday)
 
-        await interaction.delete_original_response()
+        captain_mentions = (r.mention for r in team.captain_roles)
+        content = (
+            human_join(captain_mentions, additional='please review the score for this given gameday.')
+            if captain_mentions
+            else ''
+        )
+
         await interaction.followup.send(
             embed=embed,
             files=attachments,
-            content=human_join(
-                (r.mention for r in team.captain_roles), additional='please review the score for this given gameday.'
-            ),
+            content=content,
             allowed_mentions=discord.AllowedMentions(roles=True),
         )

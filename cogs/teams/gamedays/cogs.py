@@ -107,8 +107,15 @@ class GamedayEventListener(BaseCog):
             embed=embed,
             view=view,
             files=attachments,
-            content=human_join((m.mention for m in gameday.attending_members), additional='your gameday has started!'),
+        )
+
+        await message.reply(
+            content=human_join(
+                (m.mention for m in gameday.attending_members),
+                additional='your gameday has started! This message will automatically delete in 60 seconds.',
+            ),
             allowed_mentions=discord.AllowedMentions(users=True),
+            delete_after=60,
         )
 
         async with self.bot.safe_connection() as connection:
@@ -195,9 +202,10 @@ class GamedayEventListener(BaseCog):
                 _log.debug('Voting message not found, message ID is none.')
                 return
 
-        await message.edit(view=None)
-
         captain_mentions = (c.mention for c in team.captain_roles)
+        captain_mention_content = (
+            human_join(captain_mentions, additional='please note the following:') if captain_mentions else None
+        )
 
         # Now we need to do one of X things:
         # 1. If the voting has ended and the team is filled, send an embed to the team channel
@@ -214,7 +222,7 @@ class GamedayEventListener(BaseCog):
             embed = view.create_voting_done_embed(gameday)
             await message.reply(
                 embed=embed,
-                content=human_join(captain_mentions, additional='please note the following:'),
+                content=captain_mention_content,
                 allowed_mentions=discord.AllowedMentions(roles=True),
             )
             return
@@ -250,7 +258,7 @@ class GamedayEventListener(BaseCog):
 
             await message.reply(
                 embed=embed,
-                content=human_join(captain_mentions, additional='please note the following:'),
+                content=captain_mention_content,
                 allowed_mentions=discord.AllowedMentions(roles=True),
             )
 

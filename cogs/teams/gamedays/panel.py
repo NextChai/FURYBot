@@ -837,6 +837,8 @@ class GamedayBucketPanel(BaseView):
             description='Use the buttons below to manage this bucket.',
         )
 
+        embed.add_field(name='Per Team', value=self.bucket.per_team)
+
         embed.add_field(
             name='Gameday Times',
             value='\n'.join(
@@ -872,7 +874,7 @@ class GamedayBucketPanel(BaseView):
 
         return embed
 
-    @discord.ui.button(label='Manage Gameday Times', style=discord.ButtonStyle.green)
+    @discord.ui.button(label='Manage Gameday Times')
     async def manage_gameday_times(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
@@ -882,7 +884,7 @@ class GamedayBucketPanel(BaseView):
 
         return await interaction.edit_original_response(view=view, embed=view.embed)
 
-    @discord.ui.button(label='Manage A Gameday', style=discord.ButtonStyle.primary)
+    @discord.ui.button(label='Manage A Gameday')
     async def manage_a_gameday(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """A button to launch a view that manages all gamedays in this bucket."""
         if not self.bucket.gamedays:
@@ -893,6 +895,43 @@ class GamedayBucketPanel(BaseView):
 
         selector = SelectGameday(parent=self)
         await selector.launch(interaction)
+
+    async def _change_per_team_after(
+        self, interaction: discord.Interaction[FuryBot], per_team_input: discord.ui.TextInput[AfterModal]
+    ) -> discord.InteractionMessage:
+        """A callback that is called after the user has entered a new per team value."""
+        await interaction.response.defer()
+
+        try:
+            new_per_team = int(per_team_input.value)
+        except ValueError:
+            await interaction.followup.send('The per team value must be an integer.', ephemeral=True)
+            return await interaction.edit_original_response(embed=self.embed, view=self)
+
+        if new_per_team < 0:
+            await interaction.followup.send('The per team must be greater than 0.', ephemeral=True)
+            return await interaction.edit_original_response(embed=self.embed, view=self)
+
+        async with self.bot.safe_connection() as connection:
+            await self.bucket.edit(connection=connection, per_team=new_per_team)
+
+        return await interaction.edit_original_response(embed=self.embed)
+
+    @discord.ui.button(label='Change Per Team')
+    async def change_per_team(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        """A button to launch a modal that allows the user to change the per team value."""
+        modal = AfterModal(
+            self.bot,
+            self._change_per_team_after,
+            discord.ui.TextInput(
+                label='Enter Per Team',
+                placeholder='Enter the per team value.',
+                required=True,
+            ),
+            title='Change Per Team',
+            timeout=None,
+        )
+        return await interaction.response.send_modal(modal)
 
 
 class CreateGamedayBucketView(BaseView):

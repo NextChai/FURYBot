@@ -792,6 +792,7 @@ class FuryBot(commands.Bot):
         self.add_view(self.attendance_voting_view)
 
         self.score_report_view = ScoreReportView(timeout=None)
+        self.add_view(self.score_report_view)
 
     # Hooks
     async def setup_hook(self) -> None:
