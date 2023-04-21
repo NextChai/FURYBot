@@ -23,12 +23,17 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import Tuple
 
-__all__: Tuple[str, ...] = ('MemberNotOnTeam',)
+class TeamException(Exception):
+    """The base exception all team exceptions inherit from."""
 
-
-class MemberNotOnTeam(Exception):
+class MemberNotOnTeam(TeamException):
     """Exception raised when a member is not on a team."""
 
     pass
+
+
+class TeamDeleted(TeamException):
+    def __init__(self, *, team_id: int) -> None:
+        super().__init__(f'Team with id {team_id} has been deleted.', team_id)
+        self.team_id: int = team_id

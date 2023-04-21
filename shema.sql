@@ -122,8 +122,12 @@ CREATE TABLE IF NOT EXISTS teams.gamedays (
     voting_starts_at_timer_id INTEGER, -- Can be none
     voting_ends_at_timer_id INTEGER, -- Can be none
     voting_message_id BIGINT,   -- Can be none
-    score_message_id BIGINT -- Can be none
+    score_message_id BIGINT, -- Can be none
+    sub_finder_starts_at TIMESTAMP WITH TIME ZONE, -- Can be none
+    sub_finder_ends_at TIMESTAMP WITH TIME ZONE, -- Can be none
+    sub_finder_ends_at_timer_id INTEGER -- Can be none
 );
+
 
 CREATE TABLE IF NOT EXISTS teams.gameday_score_reports (
     id BIGSERIAL PRIMARY KEY,
