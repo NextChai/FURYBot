@@ -22,8 +22,8 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
-import functools
 
+import functools
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import discord
@@ -31,7 +31,7 @@ from typing_extensions import Self
 
 from utils import AfterModal, human_join, human_timestamp
 
-from ..gameday import GamedayScoreReport, get_next_gameday_time, Gameday
+from ..gameday import Gameday, GamedayScoreReport, get_next_gameday_time
 
 if TYPE_CHECKING:
     from bot import FuryBot

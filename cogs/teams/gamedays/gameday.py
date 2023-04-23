@@ -120,16 +120,18 @@ def get_next_gameday_time(*, weekday: Weekday, game_time: datetime.time) -> date
 
     return utc_datetime
 
+
 def determine_comfy_sub_finding_times(*, starts_at: datetime.datetime, now: datetime.datetime) -> SubFindingTimes:
     time_until_gameday_starts = starts_at - now
-    
+
     if time_until_gameday_starts < datetime.timedelta(hours=1):
-        # We know the moderator did something bad here, so return a sub finding time that shows 
+        # We know the moderator did something bad here, so return a sub finding time that shows
         # the sub finder can not be used.
         return SubFindingTimes(start=now, end=now, can_use_automatic_sub_finding=False)
 
     thirty_mins_before_starts_at = starts_at - datetime.timedelta(minutes=30)
     return SubFindingTimes(start=now, end=thirty_mins_before_starts_at, can_use_automatic_sub_finding=True)
+
 
 class Weekday(enum.IntEnum):
     """Represents a weekday."""
@@ -657,7 +659,7 @@ class Gameday:
             ends_at_timer_id=voting_ends_at_timer_id,
             message_id=voting_message_id,
         )
-        
+
         self.sub_finder_starts_at: Optional[datetime.datetime] = sub_finder_starts_at
         self.sub_finder_ends_at: Optional[datetime.datetime] = sub_finder_ends_at
         self.sub_finder_ends_at_timer_id: Optional[int] = sub_finder_ends_at_timer_id
@@ -757,13 +759,13 @@ class Gameday:
     @property
     def has_ended(self):
         return bool(self.ended_at)
-    
+
     @property
     def subs_needed(self) -> int:
         bucket = self.bucket
         if bucket is None:
             raise ValueError("Gameday has no bucket")
-        
+
         return bucket.per_team - len(self.attending_members)
 
     def add_score_report(self, report: GamedayScoreReport) -> None:
@@ -875,7 +877,12 @@ class Gameday:
             return
 
         # We need to fetch the timers here to delete them
-        timer_coros = [self.fetch_starts_at_timer, self.voting.fetch_starts_at_timer, self.voting.fetch_ends_at_timer, self.fetch_sub_finder_ends_at_timer]
+        timer_coros = [
+            self.fetch_starts_at_timer,
+            self.voting.fetch_starts_at_timer,
+            self.voting.fetch_ends_at_timer,
+            self.fetch_sub_finder_ends_at_timer,
+        ]
 
         for coro in timer_coros:
             try:
@@ -912,7 +919,7 @@ class Gameday:
             return None
 
         return await timer_manager.fetch_timer(self.starts_at_timer_id, connection=connection)
-    
+
     async def fetch_sub_finder_ends_at_timer(self, *, connection: Optional[ConnectionType] = None) -> Optional[Timer]:
         timer_manager = self.bot.timer_manager
         if timer_manager is None:
@@ -983,15 +990,15 @@ class Gameday:
         if score_message_id is not MISSING:
             builder.add_arg('score_message_id', score_message_id)
             self.score_message_id = score_message_id
-            
+
         if sub_finder_starts_at is not MISSING:
             builder.add_arg('sub_finder_starts_at', sub_finder_starts_at)
             self.sub_finder_starts_at = sub_finder_starts_at
-        
+
         if sub_finder_ends_at is not MISSING:
             builder.add_arg('sub_finder_ends_at', sub_finder_ends_at)
             self.sub_finder_ends_at = sub_finder_ends_at
-        
+
         if sub_finder_timer_id is not MISSING:
             builder.add_arg('sub_finder_timer_id', sub_finder_timer_id)
             self.sub_finder_timer_id = sub_finder_timer_id
@@ -1001,7 +1008,7 @@ class Gameday:
                 (starts_at, self.fetch_starts_at_timer),
                 (voting_starts_at, self.voting.fetch_starts_at_timer),
                 (voting_ends_at, self.voting.fetch_ends_at_timer),
-                (sub_finder_ends_at, self.fetch_sub_finder_ends_at_timer)
+                (sub_finder_ends_at, self.fetch_sub_finder_ends_at_timer),
             ]
 
             for new_datetime, coro in updating_timers:
@@ -1266,7 +1273,7 @@ class GamedayBucket:
         if guild is None:
             return
 
-        return guild.get_channel(self.automatic_sub_finding_channel_id) # type: ignore
+        return guild.get_channel(self.automatic_sub_finding_channel_id)  # type: ignore
 
     @property
     def ongoing_gamedays(self) -> List[Gameday]:

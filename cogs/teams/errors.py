@@ -27,6 +27,7 @@ from __future__ import annotations
 class TeamException(Exception):
     """The base exception all team exceptions inherit from."""
 
+
 class MemberNotOnTeam(TeamException):
     """Exception raised when a member is not on a team."""
 
