@@ -54,16 +54,18 @@ os.environ['JISHAKU_RETAIN'] = 'true'
 # utils_modules = [e.replace('\\', '.').replace('.py', '') for e in glob.glob("utils/*.py")]
 # functions_to_trace.extend(utils_modules)
 
-sentry_sdk.init(
-    dsn=os.environ['SENTRY_DSN'],
-    # Set traces_sample_rate to 1.0 to capture 100%
-    # of transactions for performance monitoring.
-    # We recommend adjusting this value in production.
-    traces_sample_rate=1.0,
-    environment='development' if RUNNING_DEVELOPMENT else 'production',
-    ignore_errors=[KeyboardInterrupt],
-    # functions_to_trace=list(parse_initial_extensions(initial_extensions)),
-)
+sentry_sdk_dsn = os.environ.get('SENTRY_DSN')
+if sentry_sdk_dsn is not None:
+    sentry_sdk.init(
+        dsn=os.environ['SENTRY_DSN'],
+        # Set traces_sample_rate to 1.0 to capture 100%
+        # of transactions for performance monitoring.
+        # We recommend adjusting this value in production.
+        traces_sample_rate=1.0,
+        environment='development' if RUNNING_DEVELOPMENT else 'production',
+        ignore_errors=[KeyboardInterrupt],
+        # functions_to_trace=list(parse_initial_extensions(initial_extensions)),
+    )
 
 
 async def main() -> None:

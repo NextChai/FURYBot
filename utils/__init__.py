@@ -68,7 +68,7 @@ BYPASS_SETUP_HOOK: bool = _parse_environ_boolean('BYPASS_SETUP_HOOK', false_if_n
 BYPASS_SETUP_HOOK_CACHE_LOADING: bool = _parse_environ_boolean('BYPASS_SETUP_HOOK_CACHE_LOADING', false_if_none=True)
 USE_CUSTOM_INITIAL_EXTENSIONS: bool = _parse_environ_boolean('USE_CUSTOM_INITIAL_EXTENSIONS', false_if_none=True)
 
-INITIAL_EXTENSIONS: List[str] = os.environ.get('INITIAL_EXTENSIONS', '').split(',')
+INITIAL_EXTENSIONS: List[str] = [e.strip() for e in os.environ.get('INITIAL_EXTENSIONS', '').split(',')]
 IGNORE_EXTENSIONS: List[str] = os.environ.get('IGNORE_EXTENSIONS', '').split(',')
 
 START_TIMER_MANAGER: bool = _parse_environ_boolean(

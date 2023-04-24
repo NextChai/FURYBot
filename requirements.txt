@@ -16,3 +16,6 @@ fuzzywuzzy
 sentry-sdk
 aiofile
 trieregex
+numpy
+Pillow
+python-Levenshtein
