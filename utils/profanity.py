@@ -20,17 +20,19 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import re
-from typing import Iterable, Iterator, Optional, Tuple
+from typing import Iterable, Iterator, List, Optional, Tuple
+
 import aiofile
-import trieregex 
+import trieregex
 
 __all__: Tuple[str, ...] = ('GuildProfanityFinder',)
+
 
 class GuildProfanityFinder:
     """Represents a guild bound profanity filter. Optionally, a Guild ID can not be passed
     to the constructor, and it will be set to None. When it is None, this means the guild does
     not have a custom profanity filter, and the default one will be used.
-    
+
     Parameters
     Attributes
     ----------
@@ -40,33 +42,39 @@ class GuildProfanityFinder:
         The guild ID of the guild bound profanity filter. ``None`` for globally
         bound meaning it's the default profanity filter.
     """
+
     def __init__(self, pattern: re.Pattern[str], *, guild_id: Optional[int] = None) -> None:
         self.pattern: re.Pattern[str] = pattern
         self.guild_id: Optional[int] = guild_id
-        
+
     @classmethod
-    async def get_default_pattern(cls) -> re.Pattern[str]:
+    async def get_default_words(cls) -> List[str]:
         async with aiofile.async_open('static/profane_words.txt') as f:
             raw_words = await f.read()
-        
+
         # Let's split them by ','
         words = raw_words.split(',')
-        
+
+        return words
+
+    @classmethod
+    async def get_default_pattern(cls) -> re.Pattern[str]:
+        words = await cls.get_default_words()
         return cls.create_pattern_from_words(words)
 
     @classmethod
     def create_pattern_from_words(cls, words: Iterable[str]) -> re.Pattern[str]:
         tre = trieregex.TrieRegEx(*words)
         return re.compile(f'\\b{tre.regex()}\\b', re.IGNORECASE)
-    
+
     def finditer(self, string: str) -> Iterator[re.Match[str]]:
         """Finds all matches of the pattern in the string.
-        
+
         Parameters
         ----------
         string: :class:`str`
             The string to find matches in.
-            
+
         Returns
         -------
         :class:`re.Match`

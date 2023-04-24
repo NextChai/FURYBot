@@ -65,11 +65,11 @@ from utils import (
     RUNNING_DEVELOPMENT,
     START_TIMER_MANAGER,
     ErrorHandler,
+    GuildProfanityFinder,
     LinkFilter,
     TimerManager,
     _parse_environ_boolean,
     parse_initial_extensions,
-    GuildProfanityFinder
 )
 
 if TYPE_CHECKING:
@@ -245,9 +245,9 @@ class FuryBot(commands.Bot):
 
         self.attendance_voting_view: Optional[AttendanceVotingView] = None
         self.score_report_view: Optional[ScoreReportView] = None
-        
+
         self.global_profanity_finder: Optional[GuildProfanityFinder] = None
-        
+
         # Mapping[guild_id, GuildProfanityFinder]
         self.guild_profanity_finders: Dict[int, GuildProfanityFinder] = {}
 
@@ -331,18 +331,18 @@ class FuryBot(commands.Bot):
             embed.set_author(name=author.name, icon_url=author.display_avatar.url)
 
         return embed
-    
+
     # Management for custom profanity filters
     def get_profanity_finder(self, guild_id: int, /) -> Optional[GuildProfanityFinder]:
         custom_finder = self.guild_profanity_finders.get(guild_id, None)
         if custom_finder is not None:
             return custom_finder
-        
+
         return self.global_profanity_finder
 
     def add_custom_prodanity_finder(self, guild_id: int, finder: GuildProfanityFinder, /):
         self.guild_profanity_finders[guild_id] = finder
-    
+
     def remove_custom_profanity_finder(self, guild_id: int, /) -> Optional[GuildProfanityFinder]:
         return self.guild_profanity_finders.pop(guild_id, None)
 
@@ -817,7 +817,7 @@ class FuryBot(commands.Bot):
     async def _cache_setup_profanity_filter(self, connection: ConnectionType) -> None:
         pattern = await GuildProfanityFinder.get_default_pattern()
         self.global_profanity_finder = GuildProfanityFinder(pattern, guild_id=None)
-        
+
     # Hooks
     async def setup_hook(self) -> None:
         if BYPASS_SETUP_HOOK:

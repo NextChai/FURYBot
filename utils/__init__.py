@@ -36,12 +36,12 @@ from .error_handler import *
 from .errors import *
 from .images import *
 from .link import *
+from .profanity import *
 from .query import *
 from .time import *
 from .timers import *
 from .types import *
 from .ui import *
-from .profanity import *
 
 if TYPE_CHECKING:
     import datetime

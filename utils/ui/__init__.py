@@ -26,3 +26,4 @@ from __future__ import annotations
 from .modal import *
 from .select import *
 from .view import *
+from .paginator import *
