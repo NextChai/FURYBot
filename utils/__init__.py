@@ -41,6 +41,7 @@ from .time import *
 from .timers import *
 from .types import *
 from .ui import *
+from .profanity import *
 
 if TYPE_CHECKING:
     import datetime
