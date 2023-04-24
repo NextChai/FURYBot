@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS teams.scrims (
     away_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     home_message_id BIGINT,
     away_message_id BIGINT,
-    status scrim_status,
+    status teams.scrim_status,
     home_voter_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
     away_voter_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
     away_confirm_anyways_voter_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
@@ -160,5 +160,5 @@ CREATE TABLE IF NOT EXISTS teams.gameday_members (
     guild_id BIGINT,
     gameday_id INTEGER REFERENCES teams.gamedays(id) ON DELETE CASCADE,
     reason TEXT, -- Can be None
-    is_temporary_sub BOOLEAN DEFAULT FALSE,
+    is_temporary_sub BOOLEAN DEFAULT FALSE
 );

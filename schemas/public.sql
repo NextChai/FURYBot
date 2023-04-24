@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS timer_storage(
     event TEXT,
     extra JSONB,
     created TIMESTAMP WITH TIME ZONE,
-    expires TIMESTAMP WITH TIME ZONE,
+    expires TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE IF NOT EXISTS image_requests (
@@ -24,6 +24,6 @@ CREATE TABLE IF NOT EXISTS image_requests (
     channel_id BIGINT,
     message_id BIGINT,
     -- For the persistent view, can be None
-    message TEXT,
+    message TEXT
     -- The message the user attached to the upload
 );
