@@ -45,6 +45,7 @@ from .ui import *
 
 if TYPE_CHECKING:
     import datetime
+    import asyncpg
 
     BV = TypeVar('BV', bound='discord.ui.View')
     ButtonCallback = Callable[[BV, discord.Interaction[Any], discord.ui.Button[BV]], Coroutine[Any, Any, Any]]
@@ -144,3 +145,4 @@ def human_join(
         finished += f' {additional}'
 
     return finished.strip()
+
