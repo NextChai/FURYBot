@@ -28,7 +28,15 @@ from typing import TYPE_CHECKING, Dict, List
 import discord
 from typing_extensions import Self, Unpack
 
-from utils import BaseView, BaseViewKwargs, GuildProfanityFinder, AfterModal, BaseButtonPaginator, human_join, human_timestamp
+from utils import (
+    BaseView,
+    BaseViewKwargs,
+    GuildProfanityFinder,
+    AfterModal,
+    BaseButtonPaginator,
+    human_join,
+    human_timestamp,
+)
 from utils.time import human_timedelta
 
 if TYPE_CHECKING:
@@ -36,7 +44,7 @@ if TYPE_CHECKING:
     import asyncpg
 
 
-class ProfanityPaginator(BaseButtonPaginator[asyncpg.Record]):
+class ProfanityPaginator(BaseButtonPaginator['asyncpg.Record']):
     async def format_page(self, entries: List[asyncpg.Record]) -> discord.Embed:
         assert self.bot
 
@@ -97,6 +105,7 @@ class CreateProfanityFilterPanel(BaseView):
         view = ProfanityPanel(rules={rule.id: rule}, target=interaction)
         return await interaction.edit_original_response(view=view, embed=view.embed)
 
+
 class ManageProfanityTargets(BaseView):
     def __init__(self, rules: Dict[int, discord.AutoModRule], **kwargs: Unpack[BaseViewKwargs]) -> None:
         super().__init__(**kwargs)
@@ -109,18 +118,17 @@ class ManageProfanityTargets(BaseView):
             description='Use the buttons below to manage the AutoMod Rules that contain all the profane terms. '
             'Optionally, you can manage all these in the Discord AutoMod settings, but if you have more than one '
             'AutoMod Rule it can get complicated. This panel affects all the AutoMod rules when you make a change '
-            'so you don\'t have to worry about that.'
+            'so you don\'t have to worry about that.',
         )
-        
+
         rules_names = human_join((rule.name for rule in self.rules.values()))
         embed.add_field(
-            name='Automod Rule(s)',
-            value=f'In total, there are **{len(self.rules)}** auto mod rules. {rules_names}'
+            name='Automod Rule(s)', value=f'In total, there are **{len(self.rules)}** auto mod rules. {rules_names}'
         )
-        
+
         for rule in self.rules.values():
             role_channel_mentions = [item.mention for item in [*rule.exempt_roles, *rule.exempt_channels]]
-            
+
             actions: List[str] = []
             for action in rule.actions:
                 if action.type is discord.AutoModRuleActionType.block_message:
@@ -130,55 +138,55 @@ class ManageProfanityTargets(BaseView):
                 elif action.type is discord.AutoModRuleActionType.timeout:
                     time_delta = human_timedelta(action.duration.total_seconds()) if action.duration else 'no time.'
                     actions.append(f'╰ Timeout user for {time_delta}')
-            
+
             actions_display = '\n'.join(actions) if actions else 'No actions.'
-            
+
             embed.add_field(
                 name=rule.name,
                 value=f'**Created At*:: {human_timestamp(discord.utils.snowflake_time(rule.id))}\n'
                 f'**Exempt Roles and Channels**: {human_join(role_channel_mentions) if role_channel_mentions else "No channels or roles."}\n '
-                f'**Actions**: {actions_display}'
+                f'**Actions**: {actions_display}',
             )
-            
+
         embed.add_field(
             name='What is Syncing?',
             value='Syncing will set all the Automod Allowed targets and actions to the first AutoMod action that was created first. '
             'This means that every AutoMod action will have the same allowed roles or channels. After you sync, you can add and '
-            'remove these channels and roles in bulk using the "Add Allowed Targets" and "Remove Allowed Targets" buttons below.'
+            'remove these channels and roles in bulk using the "Add Allowed Targets" and "Remove Allowed Targets" buttons below.',
         )
-        
+
         return embed
-    
+
     @discord.ui.button(label='Add Allowed Roles', row=0)
     async def add_allowed_target(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
         ...
-        
+
     @discord.ui.button(label='Remove Allowed Roles', row=0)
     async def remove_allowed_target(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
         ...
-        
+
     @discord.ui.button(label='Add Allowed Channels', row=1)
     async def add_allowed_channels(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
         ...
-        
+
     @discord.ui.button(label='Remove Allowed Channels', row=1)
     async def remove_allowed_channels(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
         ...
-        
+
     @discord.ui.button(label='Sync', row=2)
     async def sync(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
         ...
-    
+
 
 class ProfanityPanel(BaseView):
     def __init__(self, rules: Dict[int, discord.AutoModRule], **kwargs: Unpack[BaseViewKwargs]) -> None:
@@ -303,16 +311,12 @@ class ProfanityPanel(BaseView):
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
         await interaction.response.defer(thinking=True, ephemeral=True)
-        
+
         async with self.bot.safe_connection() as connection:
             all_words = await connection.fetch('SELECT * FROM profanity.words WHERE guild_id = $1', interaction.guild_id)
-        
-        paginator = ProfanityPaginator(
-            entries=all_words,
-            per_page=20,
-            target=interaction
-        )
-        
+
+        paginator = ProfanityPaginator(entries=all_words, per_page=20, target=interaction)
+
         embed = await paginator.embed()
         return await interaction.edit_original_response(embed=embed, view=paginator)
 
@@ -321,6 +325,6 @@ class ProfanityPanel(BaseView):
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
         await interaction.response.defer()
-        
+
         view = self.create_child(ManageProfanityTargets, rules=self.rules)
         return await interaction.edit_original_response(embed=view.embed, view=view)
