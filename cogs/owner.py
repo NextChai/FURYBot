@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import inspect
+import io
 import re
 import textwrap
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional, Tuple
@@ -33,7 +34,7 @@ from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional
 import discord
 from discord.ext import commands
 
-from utils import BaseCog, Context, human_timedelta, human_timestamp
+from utils import BaseCog, Context, human_timedelta, human_timestamp, make_table
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -172,6 +173,20 @@ class Owner(BaseCog):
 
             return await coro(query, *args)
 
+    async def _send_table(self, ctx: Context, table: str) -> discord.Message:
+        # If the first line of the table is more than 125 chars, we need to send it in a file.
+        comfy_discord_length = 100
+        first_line_length = len(table.split('\n')[0])
+
+        if first_line_length > comfy_discord_length:
+            # Send it in a .txt file
+            file = discord.File(
+                fp=io.BytesIO(table.encode('utf-8')), filename='result.txt', description='Result of the SQL query.'
+            )
+            return await ctx.send(file=file)
+
+        return await ctx.send(f'```{table}```')
+
     @commands.group(name='sql', description='Does a SQL query and returns the results.', invoke_without_command=True)
     async def sql(
         self,
@@ -192,22 +207,62 @@ class Owner(BaseCog):
             converter=SQLFlagConverter, description='The query you want to pass along.'
         ),
     ) -> Optional[discord.Message]:
-        query, args = query_args
+        async with ctx.typing():
+            query, args = query_args
 
-        result = await self._common_sql('execute', query, *args)
-        return await ctx.send(f'Executed query. Result: `{result}`')
+            result = await self._common_sql('execute', query, *args)
+            return await ctx.send(f'Executed query. Result: `{result}`')
 
     @sql.command(name='fetch', description='Fetches a given SQL query and returns the results.')
-    async def sql_fetch(self, ctx: Context, *, query: str) -> None:
-        ...
+    async def sql_fetch(
+        self,
+        ctx: Context,
+        *,
+        query_args: Tuple[str, List[Any]] = commands.parameter(
+            converter=SQLFlagConverter, description='The query you want to pass along.'
+        ),
+    ) -> discord.Message:
+        async with ctx.typing():
+            query, args = query_args
+
+            result = await self._common_sql('fetch', query, *args)
+
+            # Make a table from this result
+            table = make_table(rows=[list(dict(entry).values()) for entry in result], labels=list(dict(result[0]).keys()))
+
+            return await self._send_table(ctx, table)
 
     @sql.command(name='fetchrow', description='Fetches a given SQL query and returns the first row.')
-    async def sql_fetchrow(self, ctx: Context, *, query: str) -> None:
-        ...
+    async def sql_fetchrow(
+        self,
+        ctx: Context,
+        *,
+        query_args: Tuple[str, List[Any]] = commands.parameter(
+            converter=SQLFlagConverter, description='The query you want to pass along.'
+        ),
+    ) -> discord.Message:
+        async with ctx.typing():
+            query, args = query_args
+
+            result = await self._common_sql('fetchrow', query, *args)
+
+            table = make_table(rows=[list(dict(result).values())], labels=list(dict(result).keys()))
+            return await self._send_table(ctx, table)
 
     @sql.command(name='fetchval', description='Fetches a given SQL query and returns the first value.')
-    async def sql_fetchval(self, ctx: Context, *, query: str) -> None:
-        ...
+    async def sql_fetchval(
+        self,
+        ctx: Context,
+        *,
+        query_args: Tuple[str, List[Any]] = commands.parameter(
+            converter=SQLFlagConverter, description='The query you want to pass along.'
+        ),
+    ) -> discord.Message:
+        async with ctx.typing():
+            query, args = query_args
+
+            result = await self._common_sql('fetchval', query, *args)
+            return await ctx.send(f'`{result}`')
 
 
 async def setup(bot: FuryBot):

@@ -46,8 +46,6 @@ from .ui import *
 if TYPE_CHECKING:
     import datetime
 
-    import asyncpg
-
     BV = TypeVar('BV', bound='discord.ui.View')
     ButtonCallback = Callable[[BV, discord.Interaction[Any], discord.ui.Button[BV]], Coroutine[Any, Any, Any]]
 
@@ -146,3 +144,47 @@ def human_join(
         finished += f' {additional}'
 
     return finished.strip()
+
+
+def make_table(rows: List[List[Any]], labels: Optional[List[str]] = None, centered: bool = False) -> str:
+    if labels is None:
+        labels = []
+
+    # Compute the column widths.
+    col_widths: List[int] = []
+    for i, col in enumerate(zip(*rows)):
+        label_width = len(labels[i]) if i < len(labels) else 0
+        col_widths.append(max(len(str(cell)) for cell in col) + 2)  # Add 2 for padding
+        col_widths[-1] = max(col_widths[-1], label_width + 2) if labels else col_widths[-1]
+
+    # Construct the top border.
+    top_border = "┌" + "┬".join("─" * width for width in col_widths) + "┐\n"
+
+    # Construct the header row.
+    if labels:
+        header_row = "│" + "│".join(f" {str(label).center(width - 2)} " for label, width in zip(labels, col_widths)) + "│\n"
+        middle_border = "├" + "┼".join("─" * width for width in col_widths) + "┤\n"
+    else:
+        header_row = ""
+        middle_border = ""
+
+    # Construct the data rows.
+    data_rows: List[str] = []
+    for row in rows:
+        data_row = (
+            "│"
+            + "│".join(
+                f" {str(cell).center(width - 2)} " if centered else f" {str(cell).ljust(width - 2)} "
+                for cell, width in zip(row, col_widths)
+            )
+            + "│\n"
+        )
+        data_rows.append(data_row)
+
+    # Construct the bottom border.
+    bottom_border = "└" + "┴".join("─" * width for width in col_widths) + "┘"
+
+    # Combine the components into the final table string.
+    table = top_border + header_row + middle_border + "".join(data_rows) + bottom_border
+
+    return table

@@ -34,12 +34,12 @@ from utils import (
     BaseButtonPaginator,
     BaseView,
     BaseViewKwargs,
+    ChannelSelect,
     GuildProfanityFinder,
-    human_join,
-    human_timestamp,
     RoleSelect,
+    human_join,
     human_timedelta,
-    ChannelSelect
+    human_timestamp,
 )
 
 if TYPE_CHECKING:
@@ -103,7 +103,11 @@ class CreateProfanityFilterPanel(BaseView):
                 type=discord.AutoModRuleTriggerType.keyword,
                 keyword_filter=default_words,
             ),
-            actions=[],
+            actions=[
+                discord.AutoModRuleAction(
+                    custom_message='Your message was blocked due to containing a profane term.',
+                )
+            ],
         )
 
         view = ProfanityPanel(rules={rule.id: rule}, target=interaction)
@@ -229,14 +233,10 @@ class ManageProfanityTargets(BaseView):
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
         await interaction.response.defer()
-        
-        RoleSelect(
-            after=self._perform_addition_on_rules,
-            parent=self
-        )
+
+        RoleSelect(after=self._perform_addition_on_rules, parent=self)
 
         return await interaction.edit_original_response(view=self)
-
 
     @discord.ui.button(label='Remove Allowed Roles', row=0)
     async def remove_allowed_roles(
@@ -244,10 +244,7 @@ class ManageProfanityTargets(BaseView):
     ) -> discord.InteractionMessage:
         await interaction.response.defer()
 
-        RoleSelect(
-            after=self._perform_subtraction_on_rules,
-            parent=self
-        )
+        RoleSelect(after=self._perform_subtraction_on_rules, parent=self)
 
         return await interaction.edit_original_response(view=self)
 
@@ -257,10 +254,7 @@ class ManageProfanityTargets(BaseView):
     ) -> discord.InteractionMessage:
         await interaction.response.defer()
 
-        ChannelSelect(
-            after=self._perform_addition_on_rules,
-            parent=self
-        )
+        ChannelSelect(after=self._perform_addition_on_rules, parent=self)
 
         return await interaction.edit_original_response(view=self)
 
@@ -270,10 +264,7 @@ class ManageProfanityTargets(BaseView):
     ) -> discord.InteractionMessage:
         await interaction.response.defer()
 
-        ChannelSelect(
-            after=self._perform_subtraction_on_rules,
-            parent=self
-        )
+        ChannelSelect(after=self._perform_subtraction_on_rules, parent=self)
 
         return await interaction.edit_original_response(view=self)
 
@@ -282,23 +273,24 @@ class ManageProfanityTargets(BaseView):
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
         await interaction.response.defer()
-        
+
         first_created_rule = sorted(self.rules.values(), key=lambda rule: discord.utils.snowflake_time(rule.id))[0]
-        
+
         allowed_role_ids = list(first_created_rule.exempt_role_ids)
         allowed_channel_ids = list(first_created_rule.exempt_channel_ids)
 
         for rule in self.rules.values():
             if rule == first_created_rule:
                 continue
-            
+
             rule = await rule.edit(
                 exempt_roles=[discord.Object(id=role_id) for role_id in allowed_role_ids],
                 exempt_channels=[discord.Object(id=channel_id) for channel_id in allowed_channel_ids],
             )
             self.rules[rule.id] = rule
-            
+
         return await interaction.edit_original_response(view=self, embed=self.embed)
+
 
 class ProfanityPanel(BaseView):
     def __init__(self, rules: Dict[int, discord.AutoModRule], **kwargs: Unpack[BaseViewKwargs]) -> None:
@@ -308,24 +300,34 @@ class ProfanityPanel(BaseView):
     @property
     def embed(self) -> discord.Embed:
         embed = self.bot.Embed(
-            title='Profanity Filter Management',
-            description='Use the buttons below to manage the custom profanity filter.'
+            title='Profanity Filter Management', description='Use the buttons below to manage the custom profanity filter.'
         )
-        
+
         embed.add_field(
             name='Custom Words Count',
             value=f'Through the **{len(self.rules)} AutoMod Custom Keyword Rules** this server has, there is a '
             f'total of **{len(self.all_words)} words**. You can use the buttons below to add, remove, or view '
-            'all the words.'
+            'all the words.',
+            inline=False,
         )
-        
+
         embed.add_field(
             name='Max Words',
             value=f'There is a max of 6 Discord AutoMod Custom Keyword Rules per server, each of which '
             'having a maximum of 1,000 words. This means, in total, you can have a maximum of 6,000 words. You '
-            'should not need more than this, but if you do, please contact the developer.'
+            'should not need more than this, but if you do, please contact the developer.',
+            inline=False,
         )
-        
+
+        embed.add_field(
+            name='Manage Targets',
+            value='A target is a channel or role that is exempt from the profanity filter. This means that '
+            'the profanity filter will not apply to messages sent in the target channel or by the target role. '
+            'To bulk edit these across all your AutoMod Custom Keyword Rules, use the "Manage Targets" button '
+            'below.',
+            inline=False,
+        )
+
         return embed
 
     @property
@@ -376,7 +378,11 @@ class ProfanityPanel(BaseView):
                         type=discord.AutoModRuleTriggerType.keyword,
                         keyword_filter=chunk,
                     ),
-                    actions=[],
+                    actions=[
+                        discord.AutoModRuleAction(
+                            custom_message='Your message was blocked due to containing a profane term.',
+                        )
+                    ],
                 )
                 self.rules[rule.id] = rule
 

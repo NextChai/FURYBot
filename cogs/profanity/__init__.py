@@ -44,6 +44,7 @@ class Profanity(BaseCog):
     )
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.guild_only()
+    @app_commands.checks.bot_has_permissions(manage_guild=True)
     async def profanity(self, interaction: discord.Interaction[FuryBot]) -> discord.InteractionMessage:
         assert interaction.guild
 
@@ -81,7 +82,7 @@ class Profanity(BaseCog):
 
             now = discord.utils.utcnow()
             await connection.executemany(
-                'INSERT INTO profanity.words(settings_id, automod_rule_id, word, added_at) ' 'VALUES ($1, $2, $3, $4)',
+                'INSERT INTO profanity.words(settings_id, automod_rule_id, word, added_at) VALUES ($1, $2, $3, $4) ON CONFLICT (word) DO NOTHING',
                 [(settings_data['id'], rule.id, word, now) for word in rule.trigger.keyword_filter],
             )
 
