@@ -380,26 +380,29 @@ class AddActions(BaseView):
     ) -> discord.InteractionMessage:
         await interaction.response.defer()
 
-        short_time_re = ShortTime.compiled
-        match = short_time_re.match(timeout_input.value)
+        if not timeout_input.value:
+            time = None
+        else:            
+            short_time_re = ShortTime.compiled
+            match = short_time_re.match(timeout_input.value)
 
-        if not match:
-            await interaction.followup.send(
-                f'Invalid time format. Please try again.',
-                ephemeral=True,
-            )
-            return await interaction.edit_original_response(view=self, embed=self.embed)
+            if not match:
+                await interaction.followup.send(
+                    f'Invalid time format. Please try again.',
+                    ephemeral=True,
+                )
+                return await interaction.edit_original_response(view=self, embed=self.embed)
 
-        data = {k: int(v) for k, v in match.groupdict(default=0).items()}
+            data = {k: int(v) for k, v in match.groupdict(default=0).items()}
 
-        time = datetime.timedelta(**data)
+            time = datetime.timedelta(**data)
 
-        if time > datetime.timedelta(days=28):
-            await interaction.followup.send(
-                f'Time must be less than 28 days.',
-                ephemeral=True,
-            )
-            return await interaction.edit_original_response(view=self, embed=self.embed)
+            if time > datetime.timedelta(days=28):
+                await interaction.followup.send(
+                    f'Time must be less than 28 days.',
+                    ephemeral=True,
+                )
+                return await interaction.edit_original_response(view=self, embed=self.embed)
 
         action = discord.AutoModRuleAction(duration=time)
 
@@ -421,10 +424,21 @@ class AddActions(BaseView):
     @discord.ui.button(label='Set Timeout Action')
     async def set_timeout_action(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> discord.InteractionMessage:
-        await interaction.response.defer()
-
-        return await interaction.edit_original_response(view=self)
+    ) -> None:
+        modal = AfterModal(
+            self.bot,
+            self._set_timeout_action,
+            discord.ui.TextInput(
+                label='Timeout Duration',
+                style=discord.TextStyle.long,
+                max_length=150,
+                placeholder='Enter the timeout duration. Leave blank to disable.',
+                required=False,
+            ),
+            title='Add Timeout Action',
+            timeout=None,
+        )
+        return await interaction.response.send_modal(modal)
 
 
 class ManageActions(BaseView):
