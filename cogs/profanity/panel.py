@@ -144,11 +144,11 @@ class AdditionSubtractionView(BaseView):
             allowed_role_ids.extend(role.id for role in roles)
             allowed_channel_ids.extend(channel.id for channel in channels)
 
-            rule = await rule.edit(
+            new_rule = await rule.edit(
                 exempt_roles=[discord.Object(id=role_id) for role_id in allowed_role_ids],
                 exempt_channels=[discord.Object(id=channel_id) for channel_id in allowed_channel_ids],
             )
-            self.rules[rule.id] = rule
+            self.rules[new_rule.id] = new_rule
 
         return await interaction.edit_original_response(view=self, embed=self.embed)
 
@@ -178,11 +178,11 @@ class AdditionSubtractionView(BaseView):
                 if channel.id in allowed_channel_ids:
                     allowed_channel_ids.remove(channel.id)
 
-            rule = await rule.edit(
+            new_rule = await rule.edit(
                 exempt_roles=[discord.Object(id=role_id) for role_id in allowed_role_ids],
                 exempt_channels=[discord.Object(id=channel_id) for channel_id in allowed_channel_ids],
             )
-            self.rules[rule.id] = rule
+            self.rules[new_rule.id] = new_rule
 
         return await interaction.edit_original_response(view=self, embed=self.embed)
 
@@ -267,7 +267,7 @@ class ManageProfanityChannelTarget(AdditionSubtractionView):
         return await interaction.edit_original_response(view=self)
 
 
-class AddActions(BaseView):
+class ChangeActions(BaseView):
     def __init__(self, rules: Dict[int, discord.AutoModRule], **kwargs: Unpack[BaseViewKwargs]) -> None:
         super().__init__(**kwargs)
         self.rules: Dict[int, discord.AutoModRule] = rules
@@ -275,7 +275,7 @@ class AddActions(BaseView):
     @property
     def embed(self) -> discord.Embed:
         embed = self.bot.Embed(
-            title='Set AutoMod Rule Actions',
+            title='Change AutoMod Rule Actions',
             description='Use the buttons below to set actions to the AutoMod rule when a member sends a profane message.',
         )
 
@@ -301,24 +301,23 @@ class AddActions(BaseView):
     ) -> discord.InteractionMessage:
         await interaction.response.defer()
 
-        action = discord.AutoModRuleAction(custom_message=None if not message_input.value else message_input.value)
+        new_action = discord.AutoModRuleAction(custom_message=None if not message_input.value else message_input.value)
 
         for rule in self.rules.values():
-            rule_actions = rule.actions
-            if discord.AutoModRuleActionType.block_message not in {action.type for action in rule_actions}:
-                rule_actions.append(action)
-            else:
-                for index, rule_action in enumerate(rule_actions):
-                    if type(rule_action) is discord.AutoModRuleAction:
-                        rule_actions[index] = action
-                        break
+            rule_actions = rule.actions.copy()
+            
+            for action in rule_actions:
+                if action.type is discord.AutoModRuleActionType.block_message:
+                    rule_actions.remove(action)
+            
+            rule_actions.append(new_action)
 
-            rule = await rule.edit(actions=rule_actions)
-            self.rules[rule.id] = rule
+            new_rule = await rule.edit(actions=rule_actions)
+            self.rules[new_rule.id] = new_rule
 
         return await interaction.edit_original_response(view=self, embed=self.embed)
 
-    @discord.ui.button(label='Set Block Message Action')
+    @discord.ui.button(label='Change Block Message Action')
     async def set_block_message_action(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> None:
@@ -329,8 +328,7 @@ class AddActions(BaseView):
                 label='Custom Message',
                 style=discord.TextStyle.long,
                 max_length=150,
-                placeholder='Enter the custom message to send when a member sends a profane message. Leave blank to use the default message.',
-                required=False,
+                placeholder='Send a custom profane warning msg.',
             ),
             title='Add Block Message Action',
             timeout=None,
@@ -344,24 +342,23 @@ class AddActions(BaseView):
     ) -> discord.InteractionMessage:
         await interaction.response.defer()
 
-        action = discord.AutoModRuleAction(channel_id=channels[0].id)
+        new_action = discord.AutoModRuleAction(channel_id=channels[0].id)
 
         for rule in self.rules.values():
-            rule_actions = rule.actions
-            if discord.AutoModRuleActionType.send_alert_message not in {action.type for action in rule_actions}:
-                rule_actions.append(action)
-            else:
-                for index, rule_action in enumerate(rule_actions):
-                    if type(rule_action) is discord.AutoModRuleAction:
-                        rule_actions[index] = action
-                        break
+            rule_actions = rule.actions.copy()
+            
+            for action in rule_actions:
+                if action.type is discord.AutoModRuleActionType.send_alert_message:
+                    rule_actions.remove(action)
+            
+            rule_actions.append(new_action)
 
-            rule = await rule.edit(actions=rule_actions)
-            self.rules[rule.id] = rule
+            new_rule = await rule.edit(actions=rule_actions)
+            self.rules[new_rule.id] = new_rule
 
         return await interaction.edit_original_response(view=self, embed=self.embed)
 
-    @discord.ui.button(label='Set Send Alert Message Action')
+    @discord.ui.button(label='Change Send Alert Message Action')
     async def set_send_alert_message_action(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
@@ -394,6 +391,8 @@ class AddActions(BaseView):
                 return await interaction.edit_original_response(view=self, embed=self.embed)
 
             data = {k: int(v) for k, v in match.groupdict(default=0).items()}
+            data.pop('years', None)
+            data.pop('months', None)
 
             time = datetime.timedelta(**data)
 
@@ -404,24 +403,23 @@ class AddActions(BaseView):
                 )
                 return await interaction.edit_original_response(view=self, embed=self.embed)
 
-        action = discord.AutoModRuleAction(duration=time)
+        new_action = discord.AutoModRuleAction(duration=time)
 
         for rule in self.rules.values():
-            rule_actions = rule.actions
-            if discord.AutoModRuleActionType.timeout not in {action.type for action in rule_actions}:
-                rule_actions.append(action)
-            else:
-                for index, rule_action in enumerate(rule_actions):
-                    if type(rule_action) is discord.AutoModRuleAction:
-                        rule_actions[index] = action
-                        break
+            rule_actions = rule.actions.copy()
 
-            rule = await rule.edit(actions=rule_actions)
-            self.rules[rule.id] = rule
+            for action in rule_actions:
+                if action.type is discord.AutoModRuleActionType.timeout:
+                    rule_actions.remove(action)
+            
+            rule_actions.append(new_action)
+
+            new_rule = await rule.edit(actions=rule_actions)
+            self.rules[new_rule.id] = new_rule
 
         return await interaction.edit_original_response(view=self, embed=self.embed)
 
-    @discord.ui.button(label='Set Timeout Action')
+    @discord.ui.button(label='Change Timeout Action')
     async def set_timeout_action(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> None:
@@ -432,8 +430,7 @@ class AddActions(BaseView):
                 label='Timeout Duration',
                 style=discord.TextStyle.long,
                 max_length=150,
-                placeholder='Enter the timeout duration. Leave blank to disable.',
-                required=False,
+                placeholder='Enter the timeout duration. For ex: "5 minutes 30 seconds".',
             ),
             title='Add Timeout Action',
             timeout=None,
@@ -473,9 +470,13 @@ class ManageActions(BaseView):
 
         return embed
 
-    @discord.ui.button(label='Add Actions')
-    async def add_action(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        ...
+    @discord.ui.button(label='Change Actions')
+    async def add_action(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> discord.InteractionMessage:
+        await interaction.response.defer()
+        
+        view = self.create_child(ChangeActions, self.rules)
+        
+        return await interaction.edit_original_response(embed=view.embed, view=view)
 
     async def remove_actions_after(
         self, interaction: discord.Interaction[FuryBot], values: List[str]
@@ -485,15 +486,17 @@ class ManageActions(BaseView):
         actions_to_remove = {discord.AutoModRuleActionType[value] for value in values}
 
         for rule in self.rules.values():
+            if len(rule.actions) == 1:
+                continue
 
-            rule_actions = rule.actions
+            rule_actions = rule.actions.copy()
             for action in rule_actions:
                 if action.type in actions_to_remove:
                     rule_actions.remove(action)
 
             if rule_actions != rule.actions:
-                rule = await rule.edit(actions=rule_actions)
-                self.rules[rule.id] = rule
+                new_rule = await rule.edit(actions=rule_actions)
+                self.rules[new_rule.id] = new_rule
 
         return await interaction.edit_original_response(embed=self.embed, view=self)
 
@@ -580,7 +583,7 @@ class ManageProfanityTargets(BaseView):
         )
 
         return embed
-
+    
     @discord.ui.button(label='Manage Exempt Roles')
     async def manage_exempt_roles(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
@@ -598,6 +601,15 @@ class ManageProfanityTargets(BaseView):
 
         view = self.create_child(ManageProfanityChannelTarget, rules=self.rules)
         return await interaction.edit_original_response(view=view, embed=view.embed)
+    
+    @discord.ui.button(label='Manage Actions')
+    async def manage_actions(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        view = self.create_child(ManageActions, rules=self.rules)
+        return await interaction.edit_original_response(view=view, embed=view.embed)
 
     @discord.ui.button(label='Sync')
     async def sync(
@@ -614,12 +626,13 @@ class ManageProfanityTargets(BaseView):
             if rule == first_created_rule:
                 continue
 
-            rule = await rule.edit(
+            new_rule = await rule.edit(
                 exempt_roles=[discord.Object(id=role_id) for role_id in allowed_role_ids],
                 exempt_channels=[discord.Object(id=channel_id) for channel_id in allowed_channel_ids],
             )
-            self.rules[rule.id] = rule
+            self.rules[new_rule.id] = new_rule
 
+        await interaction.followup.send('Synced all the AutoMod rules.', ephemeral=True)
         return await interaction.edit_original_response(view=self, embed=self.embed)
 
 
@@ -696,8 +709,8 @@ class ProfanityPanel(BaseView):
             words = words[total_keywords_available:]
 
             # Now we can edit the automod rule and add these words
-            rule = await rule.edit(trigger=discord.AutoModTrigger(keyword_filter=existing_keywords + words_to_insert))
-            self.rules[rule.id] = rule
+            new_rule = await rule.edit(trigger=discord.AutoModTrigger(keyword_filter=existing_keywords + words_to_insert))
+            self.rules[new_rule.id] = new_rule
 
         if words:
             # We need to create a new rule and add the remaining words
@@ -762,8 +775,8 @@ class ProfanityPanel(BaseView):
             # Now we can remove these words from the existing_keywords
             new_existing_keywords = [word for word in existing_keywords if word not in existing_keywords_to_remove]
 
-            rule = await rule.edit(trigger=discord.AutoModTrigger(keyword_filter=new_existing_keywords))
-            self.rules[rule.id] = rule
+            new_rule = await rule.edit(trigger=discord.AutoModTrigger(keyword_filter=new_existing_keywords))
+            self.rules[new_rule.id] = new_rule
 
         await interaction.followup.send(
             f'Removed a total of {total_words_deleted} words from the profanity filter across {len(self.rules)} automod rules.',
