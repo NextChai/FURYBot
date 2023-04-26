@@ -37,8 +37,10 @@ from utils import (
     GuildProfanityFinder,
     human_join,
     human_timestamp,
+    RoleSelect,
+    human_timedelta,
+    ChannelSelect
 )
-from utils.time import human_timedelta
 
 if TYPE_CHECKING:
     import asyncpg
@@ -162,7 +164,7 @@ class ManageProfanityTargets(BaseView):
     async def _perform_addition_on_rules(
         self,
         interaction: discord.Interaction[FuryBot],
-        targets: List[Union[discord.Role, app_commands.AppCommandChannel, app_commands.AppCommandThread]],
+        targets: Union[List[discord.Role], List[Union[app_commands.AppCommandChannel, app_commands.AppCommandThread]]],
     ) -> None:
         await interaction.response.defer()
 
@@ -191,7 +193,7 @@ class ManageProfanityTargets(BaseView):
     async def _perform_subtraction_on_rules(
         self,
         interaction: discord.Interaction[FuryBot],
-        targets: List[Union[discord.Role, app_commands.AppCommandChannel, app_commands.AppCommandThread]],
+        targets: Union[List[discord.Role], List[Union[app_commands.AppCommandChannel, app_commands.AppCommandThread]]],
     ) -> None:
         await interaction.response.defer()
 
@@ -226,32 +228,77 @@ class ManageProfanityTargets(BaseView):
     async def add_allowed_roles(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
-        ...
+        await interaction.response.defer()
+        
+        RoleSelect(
+            after=self._perform_addition_on_rules,
+            parent=self
+        )
+
+        return await interaction.edit_original_response(view=self)
+
 
     @discord.ui.button(label='Remove Allowed Roles', row=0)
     async def remove_allowed_roles(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
-        ...
+        await interaction.response.defer()
+
+        RoleSelect(
+            after=self._perform_subtraction_on_rules,
+            parent=self
+        )
+
+        return await interaction.edit_original_response(view=self)
 
     @discord.ui.button(label='Add Allowed Channels', row=1)
     async def add_allowed_channels(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
-        ...
+        await interaction.response.defer()
+
+        ChannelSelect(
+            after=self._perform_addition_on_rules,
+            parent=self
+        )
+
+        return await interaction.edit_original_response(view=self)
 
     @discord.ui.button(label='Remove Allowed Channels', row=1)
     async def remove_allowed_channels(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
-        ...
+        await interaction.response.defer()
+
+        ChannelSelect(
+            after=self._perform_subtraction_on_rules,
+            parent=self
+        )
+
+        return await interaction.edit_original_response(view=self)
 
     @discord.ui.button(label='Sync', row=2)
     async def sync(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
-        ...
+        await interaction.response.defer()
+        
+        first_created_rule = sorted(self.rules.values(), key=lambda rule: discord.utils.snowflake_time(rule.id))[0]
+        
+        allowed_role_ids = list(first_created_rule.exempt_role_ids)
+        allowed_channel_ids = list(first_created_rule.exempt_channel_ids)
 
+        for rule in self.rules.values():
+            if rule == first_created_rule:
+                continue
+            
+            rule = await rule.edit(
+                exempt_roles=[discord.Object(id=role_id) for role_id in allowed_role_ids],
+                exempt_channels=[discord.Object(id=channel_id) for channel_id in allowed_channel_ids],
+            )
+            self.rules[rule.id] = rule
+            
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
 class ProfanityPanel(BaseView):
     def __init__(self, rules: Dict[int, discord.AutoModRule], **kwargs: Unpack[BaseViewKwargs]) -> None:
@@ -260,7 +307,26 @@ class ProfanityPanel(BaseView):
 
     @property
     def embed(self) -> discord.Embed:
-        raise NotImplementedError
+        embed = self.bot.Embed(
+            title='Profanity Filter Management',
+            description='Use the buttons below to manage the custom profanity filter.'
+        )
+        
+        embed.add_field(
+            name='Custom Words Count',
+            value=f'Through the **{len(self.rules)} AutoMod Custom Keyword Rules** this server has, there is a '
+            f'total of **{len(self.all_words)} words**. You can use the buttons below to add, remove, or view '
+            'all the words.'
+        )
+        
+        embed.add_field(
+            name='Max Words',
+            value=f'There is a max of 6 Discord AutoMod Custom Keyword Rules per server, each of which '
+            'having a maximum of 1,000 words. This means, in total, you can have a maximum of 6,000 words. You '
+            'should not need more than this, but if you do, please contact the developer.'
+        )
+        
+        return embed
 
     @property
     def all_words(self) -> List[str]:
