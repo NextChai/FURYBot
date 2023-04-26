@@ -5,7 +5,7 @@ CREATE SCHEMA IF NOT EXISTS profanity;
 CREATE TABLE IF NOT EXISTS profanity.settings (
     id SERIAL PRIMARY KEY,
     guild_id BIGINT,
-    automod_rule_id BIGINT UNIQUE
+    automod_rule_id BIGINT
 );
 
 

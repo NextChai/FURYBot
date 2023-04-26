@@ -94,7 +94,7 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
         # Let's search for any flags passed to this argument and remove them.
         # After, we could only be left with our SQL statement.
         flags = FLAG_REGEX.findall(argument)
-        converted_flags: Dict[str, str] = {}
+        converted_flags: Dict[str, Any] = {}
 
         for (flag_name, flag_content, code_block_content) in flags:
             flag_full_name = f'--{flag_name}={flag_content}'
@@ -139,7 +139,7 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
         for bracket_content in brackets:
             existing_flag = converted_flags.get(bracket_content, discord.utils.MISSING)
             if existing_flag is not discord.utils.MISSING:
-                query = query.replace(f'{{{bracket_content}}}', existing_flag)
+                query = query.replace(f'{{{bracket_content}}}', str(existing_flag))
                 continue
 
             # This is a code block, we can convert it and replace it with the result.
@@ -148,7 +148,7 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
             except Exception as exc:
                 raise commands.BadArgument(f'Failed to convert bracket code block "{bracket_content}".') from exc
 
-            query = query.replace(f'{{{bracket_content}}}', converted)
+            query = query.replace(f'{{{bracket_content}}}', str(converted))
 
         return query, [arg for i in range(1, len(converted_args) + 1) if (arg := converted_args.get(i, None))]
 
@@ -200,7 +200,11 @@ class Owner(BaseCog):
         async with ctx.typing():
             query, args = query_args
 
-            result = await self._common_sql('execute', query, *args)
+            try:
+                result = await self._common_sql('execute', query, *args)
+            except Exception as exc:
+                return await ctx.send(f'Failed to execute query. Error: `{exc}`')
+                
             return await ctx.send(f'Executed query. Result: `{result}`')
 
     @sql.command(name='fetch', description='Fetches a given SQL query and returns the results.')
@@ -215,7 +219,10 @@ class Owner(BaseCog):
         async with ctx.typing():
             query, args = query_args
 
-            result = await self._common_sql('fetch', query, *args)
+            try:
+                result = await self._common_sql('fetch', query, *args)
+            except Exception as exc:
+                return await ctx.send(f'Failed to execute query. Error: `{exc}`')
 
             if not result:
                 return await ctx.send(f'`{result}`')
@@ -237,7 +244,11 @@ class Owner(BaseCog):
         async with ctx.typing():
             query, args = query_args
 
-            result = await self._common_sql('fetchrow', query, *args)
+            try:
+                result = await self._common_sql('fetchrow', query, *args)
+            except Exception as exc:
+                return await ctx.send(f'Failed to execute query. Error: `{exc}`')
+            
             if not result:
                 return await ctx.send(f'`{result}`')
 
@@ -256,7 +267,11 @@ class Owner(BaseCog):
         async with ctx.typing():
             query, args = query_args
 
-            result = await self._common_sql('fetchval', query, *args)
+            try:
+                result = await self._common_sql('fetchval', query, *args)
+            except Exception as exc:
+                return await ctx.send(f'Failed to execute query. Error: `{exc}`')
+            
             return await ctx.send(f'`{result}`')
 
 

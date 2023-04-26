@@ -99,6 +99,8 @@ class CreateProfanityFilterPanel(BaseView):
 
         default_words = await GuildProfanityFinder.get_default_words()
 
+        # We don't need to enter this into the DB because it's already done
+        # by the event listeners
         rule = await interaction.guild.create_automod_rule(
             name='FuryBot Profanity Filter 1',
             event_type=discord.AutoModRuleEventType.message_send,
@@ -115,41 +117,35 @@ class CreateProfanityFilterPanel(BaseView):
         )
         
         # Also need to create the default profanity filter discord provides
-        default_rule = await interaction.guild.create_automod_rule(
-            name='Discord Profanity Filter',
-            event_type=discord.AutoModRuleEventType.message_send,
-            trigger=discord.AutoModTrigger(
-                type=discord.AutoModRuleTriggerType.keyword_preset,
-                presets=discord.AutoModPresets.all(),
-            ),
-            actions=[
-                discord.AutoModRuleAction(
-                    custom_message='Your message was blocked due to containing a profane term.',
-                )
-            ],
-            enabled=True
-        )
-        
-        async with self.bot.safe_connection() as connection:
-            settings_data = await connection.fetchrow(
-                'INSERT INTO profanity.settings (guild_id, automod_rule_id) VALUES ($1, $2) RETURNING *',
-                interaction.guild.id,
-                rule.id
+        try:
+            default_rule = await interaction.guild.create_automod_rule(
+                name='Discord Profanity Filter',
+                event_type=discord.AutoModRuleEventType.message_send,
+                trigger=discord.AutoModTrigger(
+                    type=discord.AutoModRuleTriggerType.keyword_preset,
+                    presets=discord.AutoModPresets.all(),
+                ),
+                actions=[
+                    discord.AutoModRuleAction(
+                        custom_message='Your message was blocked due to containing a profane term.',
+                    )
+                ],
+                enabled=True
             )
-            assert settings_data
-            
-            await connection.executemany(
-                'INSERT INTO profanity.words(settings_id, automod_rule_id, word, added_at) VALUES ($1, $2, $3, $4) ON CONFLICT (word) DO NOTHING',
-                [(settings_data['id'], rule.id, word, interaction.created_at) for word in default_words],
-            )
-            
-            await connection.execute(
-                'INSERT INTO profanity.settings (guild_id, automod_rule_id) VALUES ($1, $2) RETURNING *',
-                interaction.guild.id,
-                default_rule.id
+        except discord.HTTPException:
+            # This was already created, so we can fetch it.
+            rules = await interaction.guild.fetch_automod_rules()
+            default_rule = discord.utils.find(
+                lambda rule: rule.trigger.type is discord.AutoModRuleTriggerType.keyword_preset,
+                rules
             )
         
-        view = ProfanityPanel(rules={rule.id: rule, default_rule.id: default_rule}, target=interaction)
+        mapping = {rule.id: rule}
+        
+        if default_rule is not None:
+            mapping[default_rule.id] = default_rule
+        
+        view = ProfanityPanel(rules=mapping, target=interaction)
         return await interaction.edit_original_response(view=view, embed=view.embed)
 
 
@@ -899,7 +895,7 @@ class ProfanityPanel(BaseView):
                 interaction.guild_id,
             )
 
-        paginator = ProfanityPaginator(entries=all_words, per_page=20, target=interaction)
+        paginator = ProfanityPaginator(entries=all_words, per_page=15, target=interaction)
 
         embed = await paginator.embed()
         return await interaction.edit_original_response(embed=embed, view=paginator)
