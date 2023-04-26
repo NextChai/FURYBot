@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from bot import FuryBot
 
 # Monkey patch mins and secs into the units
-units: Any = parsedatetime.pdtLocales['en_US'].units  # type: ignore
+units: Any = parsedatetime.pdtLocales['en_US'].units
 units['minutes'].append('mins')
 units['seconds'].append('secs')
 
@@ -95,14 +95,14 @@ class ShortTime:
     __slots__: Tuple[str, ...] = ('dt',)
 
     compiled = re.compile(
-        """
-        (?:(?P<years>[0-9])(?:years?|y))?             # e.g. 2y
-        (?:(?P<months>[0-9]{1,2})(?:months?|mo))?     # e.g. 2months
-        (?:(?P<weeks>[0-9]{1,4})(?:weeks?|w))?        # e.g. 10w
-        (?:(?P<days>[0-9]{1,5})(?:days?|d))?          # e.g. 14d
-        (?:(?P<hours>[0-9]{1,5})(?:hours?|h))?        # e.g. 12h
-        (?:(?P<minutes>[0-9]{1,5})(?:minutes?|m))?    # e.g. 10m
-        (?:(?P<seconds>[0-9]{1,5})(?:seconds?|s))?    # e.g. 15s
+        r"""
+        (?:(?P<years>[0-9])(?:\s)?(?:years?|y))?             # e.g. 2y
+        (?:(?P<months>[0-9]{1,2})(?:\s)?(?:months?|mo))?     # e.g. 2months
+        (?:(?P<weeks>[0-9]{1,4})(?:\s)?(?:weeks?|w))?        # e.g. 10w
+        (?:(?P<days>[0-9]{1,5})(?:\s)?(?:days?|d))?          # e.g. 14d
+        (?:(?P<hours>[0-9]{1,5})(?:\s)?(?:hours?|h))?        # e.g. 12h
+        (?:(?P<minutes>[0-9]{1,5})(?:\s)?(?:minutes?|m))?    # e.g. 10m
+        (?:(?P<seconds>[0-9]{1,5})(?:\s)?(?:seconds?|s))?    # e.g. 15s
         """,
         re.VERBOSE,
     )
@@ -158,7 +158,7 @@ class HumanTime:
 
     __slots__: Tuple[str, ...] = ('dt', '_past')
 
-    calendar: Any = parsedatetime.Calendar(version=parsedatetime.VERSION_CONTEXT_STYLE)  # type: ignore
+    calendar: Any = parsedatetime.Calendar(version=parsedatetime.VERSION_CONTEXT_STYLE)
 
     def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None) -> None:
         now = now or datetime.datetime.utcnow()
@@ -333,7 +333,7 @@ class TimeTransformer(app_commands.Transformer):
         if not status.hasTime:
             dt = dt.replace(hour=now.hour, minute=now.minute, second=now.second, microsecond=now.microsecond)
 
-        if status.accuracy == parsedatetime.pdtContext.ACU_HALFDAY:  # type: ignore
+        if status.accuracy == parsedatetime.pdtContext.ACU_HALFDAY:
             dt = dt.replace(day=now.day + 1)
 
         result.dt = dt.replace(tzinfo=datetime.timezone.utc)

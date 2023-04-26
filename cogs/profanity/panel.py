@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import datetime
 from typing import TYPE_CHECKING, Dict, List, Union
 
 import discord
@@ -37,11 +38,12 @@ from utils import (
     ChannelSelect,
     GuildProfanityFinder,
     RoleSelect,
+    SelectOneOfMany,
+    ShortTime,
     human_join,
     human_timedelta,
     human_timestamp,
 )
-from utils.ui.select import SelectOneOfMany
 
 if TYPE_CHECKING:
     import asyncpg
@@ -375,8 +377,46 @@ class AddActions(BaseView):
 
     async def _set_timeout_action(
         self, interaction: discord.Interaction[FuryBot], timeout_input: discord.ui.TextInput[AfterModal]
-    ) -> None:
-        ...
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        short_time_re = ShortTime.compiled
+        match = short_time_re.match(timeout_input.value)
+
+        if not match:
+            await interaction.followup.send(
+                f'Invalid time format. Please try again.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        data = {k: int(v) for k, v in match.groupdict(default=0).items()}
+
+        time = datetime.timedelta(**data)
+
+        if time > datetime.timedelta(days=28):
+            await interaction.followup.send(
+                f'Time must be less than 28 days.',
+                ephemeral=True,
+            )
+            return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        action = discord.AutoModRuleAction(duration=time)
+
+        for rule in self.rules.values():
+            rule_actions = rule.actions
+            if discord.AutoModRuleActionType.timeout not in {action.type for action in rule_actions}:
+                rule_actions.append(action)
+            else:
+                for index, rule_action in enumerate(rule_actions):
+                    if type(rule_action) is discord.AutoModRuleAction:
+                        rule_actions[index] = action
+                        break
+
+            rule = await rule.edit(actions=rule_actions)
+            self.rules[rule.id] = rule
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Set Timeout Action')
     async def set_timeout_action(
