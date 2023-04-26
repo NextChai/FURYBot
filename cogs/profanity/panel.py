@@ -113,8 +113,43 @@ class CreateProfanityFilterPanel(BaseView):
             ],
             enabled=True,
         )
-
-        view = ProfanityPanel(rules={rule.id: rule}, target=interaction)
+        
+        # Also need to create the default profanity filter discord provides
+        default_rule = await interaction.guild.create_automod_rule(
+            name='Discord Profanity Filter',
+            event_type=discord.AutoModRuleEventType.message_send,
+            trigger=discord.AutoModTrigger(
+                type=discord.AutoModRuleTriggerType.keyword_preset,
+                presets=discord.AutoModPresets.all(),
+            ),
+            actions=[
+                discord.AutoModRuleAction(
+                    custom_message='Your message was blocked due to containing a profane term.',
+                )
+            ],
+            enabled=True
+        )
+        
+        async with self.bot.safe_connection() as connection:
+            settings_data = await connection.fetchrow(
+                'INSERT INTO profanity.settings (guild_id, automod_rule_id) VALUES ($1, $2) RETURNING *',
+                interaction.guild.id,
+                rule.id
+            )
+            assert settings_data
+            
+            await connection.executemany(
+                'INSERT INTO profanity.words(settings_id, automod_rule_id, word, added_at) VALUES ($1, $2, $3, $4) ON CONFLICT (word) DO NOTHING',
+                [(settings_data['id'], rule.id, word, interaction.created_at) for word in default_words],
+            )
+            
+            await connection.execute(
+                'INSERT INTO profanity.settings (guild_id, automod_rule_id) VALUES ($1, $2) RETURNING *',
+                interaction.guild.id,
+                default_rule.id
+            )
+        
+        view = ProfanityPanel(rules={rule.id: rule, default_rule.id: default_rule}, target=interaction)
         return await interaction.edit_original_response(view=view, embed=view.embed)
 
 
@@ -305,11 +340,11 @@ class ChangeActions(BaseView):
 
         for rule in self.rules.values():
             rule_actions = rule.actions.copy()
-            
+
             for action in rule_actions:
                 if action.type is discord.AutoModRuleActionType.block_message:
                     rule_actions.remove(action)
-            
+
             rule_actions.append(new_action)
 
             new_rule = await rule.edit(actions=rule_actions)
@@ -346,11 +381,11 @@ class ChangeActions(BaseView):
 
         for rule in self.rules.values():
             rule_actions = rule.actions.copy()
-            
+
             for action in rule_actions:
                 if action.type is discord.AutoModRuleActionType.send_alert_message:
                     rule_actions.remove(action)
-            
+
             rule_actions.append(new_action)
 
             new_rule = await rule.edit(actions=rule_actions)
@@ -379,7 +414,7 @@ class ChangeActions(BaseView):
 
         if not timeout_input.value:
             time = None
-        else:            
+        else:
             short_time_re = ShortTime.compiled
             match = short_time_re.match(timeout_input.value)
 
@@ -411,7 +446,7 @@ class ChangeActions(BaseView):
             for action in rule_actions:
                 if action.type is discord.AutoModRuleActionType.timeout:
                     rule_actions.remove(action)
-            
+
             rule_actions.append(new_action)
 
             new_rule = await rule.edit(actions=rule_actions)
@@ -420,9 +455,7 @@ class ChangeActions(BaseView):
         return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Change Timeout Action')
-    async def set_timeout_action(
-        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> None:
+    async def set_timeout_action(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         modal = AfterModal(
             self.bot,
             self._set_timeout_action,
@@ -471,11 +504,13 @@ class ManageActions(BaseView):
         return embed
 
     @discord.ui.button(label='Change Actions')
-    async def add_action(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> discord.InteractionMessage:
+    async def add_action(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
         await interaction.response.defer()
-        
+
         view = self.create_child(ChangeActions, self.rules)
-        
+
         return await interaction.edit_original_response(embed=view.embed, view=view)
 
     async def remove_actions_after(
@@ -583,7 +618,7 @@ class ManageProfanityTargets(BaseView):
         )
 
         return embed
-    
+
     @discord.ui.button(label='Manage Exempt Roles')
     async def manage_exempt_roles(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
@@ -601,7 +636,7 @@ class ManageProfanityTargets(BaseView):
 
         view = self.create_child(ManageProfanityChannelTarget, rules=self.rules)
         return await interaction.edit_original_response(view=view, embed=view.embed)
-    
+
     @discord.ui.button(label='Manage Actions')
     async def manage_actions(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
@@ -693,44 +728,90 @@ class ProfanityPanel(BaseView):
         total_words_to_add = len(words)
 
         # Let's go through the rules and find ones that can hold any words
-        for rule in self.rules.values():
-            existing_keywords = rule.trigger.keyword_filter
+        async with self.bot.safe_connection() as connection:
+            for rule in self.rules.values():
+                if rule.trigger.type is discord.AutoModRuleTriggerType.keyword_preset:
+                    # This is a default rule, we can't edit it
+                    continue
+                
+                existing_keywords = rule.trigger.keyword_filter
 
-            if len(existing_keywords) == 1_000:
-                # This filter is maxxed
-                continue
+                if len(existing_keywords) == 1_000:
+                    # This filter is maxxed
+                    continue
 
-            total_keywords_available = 1_000 - len(existing_keywords)
+                total_keywords_available = 1_000 - len(existing_keywords)
 
-            # Let's get the words that can fit in this rule
-            words_to_insert = words[:total_keywords_available]
+                # Let's get the words that can fit in this rule
+                words_to_insert = words[:total_keywords_available]
 
-            # We can remove these from the list of words to insert
-            words = words[total_keywords_available:]
+                # We can remove these from the list of words to insert
+                words = words[total_keywords_available:]
 
-            # Now we can edit the automod rule and add these words
-            new_rule = await rule.edit(trigger=discord.AutoModTrigger(keyword_filter=existing_keywords + words_to_insert))
-            self.rules[new_rule.id] = new_rule
-
-        if words:
-            # We need to create a new rule and add the remaining words
-            for chunk in discord.utils.as_chunks(words, 1_000):
-                rule_number = len(self.rules) + 1
-                rule = await interaction.guild.create_automod_rule(
-                    name=f'FuryBot Profanity Filter {rule_number}',
-                    event_type=discord.AutoModRuleEventType.message_send,
-                    trigger=discord.AutoModTrigger(
-                        type=discord.AutoModRuleTriggerType.keyword,
-                        keyword_filter=chunk,
-                    ),
-                    actions=[
-                        discord.AutoModRuleAction(
-                            custom_message='Your message was blocked due to containing a profane term.',
-                        )
-                    ],
-                    enabled=True,
+                # Now we can edit the automod rule and add these words
+                new_rule = await rule.edit(trigger=discord.AutoModTrigger(keyword_filter=existing_keywords + words_to_insert))
+                self.rules[new_rule.id] = new_rule
+                
+                await connection.executemany(
+                    """
+                    INSERT INTO profanty.words (settings_id, automod_rule_id, word, added_at) 
+                    VALUES (
+                        (
+                            SELECT id FROM profanity.settings
+                            WHERE guild_id = $1
+                        ), 
+                        $2, 
+                        $3, 
+                        $4
+                    ) 
+                    ON CONFLICT DO NOTHING
+                    """,
+                    [
+                        (interaction.guild.id, new_rule.id, word, interaction.created_at)
+                        for word in words_to_insert
+                    ]
                 )
-                self.rules[rule.id] = rule
+
+            if words:
+                # We need to create a new rule and add the remaining words
+                for chunk in discord.utils.as_chunks(words, 1_000):
+                    rule_number = len(self.rules) + 1
+                    rule = await interaction.guild.create_automod_rule(
+                        name=f'FuryBot Profanity Filter {rule_number}',
+                        event_type=discord.AutoModRuleEventType.message_send,
+                        trigger=discord.AutoModTrigger(
+                            type=discord.AutoModRuleTriggerType.keyword,
+                            keyword_filter=chunk,
+                        ),
+                        actions=[
+                            discord.AutoModRuleAction(
+                                custom_message='Your message was blocked due to containing a profane term.',
+                            )
+                        ],
+                        enabled=True,
+                    )
+                    self.rules[rule.id] = rule
+                    
+                    await connection.executemany(
+                        """
+                        INSERT INTO profanty.words (settings_id, automod_rule_id, word, added_at) 
+                        VALUES (
+                            (
+                                SELECT id FROM profanity.settings
+                                WHERE guild_id = $1
+                            ), 
+                            $2, 
+                            $3, 
+                            $4
+                        ) 
+                        ON CONFLICT DO NOTHING
+                        """,
+                        [
+                            (interaction.guild.id, rule.id, word, interaction.created_at)
+                            for word in chunk
+                        ]
+                    )
+                        
 
         await interaction.followup.send(
             f'Added a total of {total_words_to_add} words to the profanity filter.', ephemeral=True
@@ -762,6 +843,10 @@ class ProfanityPanel(BaseView):
 
         total_words_deleted = 0
         for rule in self.rules.values():
+            if rule.trigger.type is discord.AutoModRuleTriggerType.keyword_preset:
+                # This is a default rule, we can't edit it
+                continue
+            
             existing_keywords = rule.trigger.keyword_filter
 
             # Let's remove any words from the existing_keywords that share common words with the words we want to remove

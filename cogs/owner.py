@@ -24,7 +24,6 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import asyncio
-import datetime
 import inspect
 import io
 import re
@@ -44,28 +43,13 @@ FLAG_REGEX = re.compile(
 )
 BRACKET_REGEX = re.compile(r'(?:(?:\{(?P<bracket_content>(?:.|\n)+?)\}))')
 ARG_REGEX = re.compile(
-    r'\$(?P<arg_number>\d+)=(?P<arg_content>(?:`{3}python\n(?P<arg_code_content>.*?)`{3}|\S+(?:(?:\r?\n(?!\$)\s*)+(?P<arg_text_content>.*?)\s*)?))(?=\s*\$|\Z)',
+    r'\$(?P<arg_number>\d+)(?:\s)?=(?:\s)?(?P<arg_content>(?:`{3}python\n(?P<arg_code_content>.*?)`{3}|\S+(?:(?:\r?\n(?!\$)\s*)+(?P<arg_text_content>.*?)\s*)?))(?=\s*\$|\Z)',
     re.MULTILINE | re.DOTALL,
 )
 CODEBLOCK_REGEX = re.compile(r'`{3}(?P<lang>[a-zA-z]*)\n?(?P<code>[^`]*)\n?`{3}')
 
 
 class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
-
-    # A method name to convert a string to something that psql can easily understand.
-    def convert_to_psql(self, item: Any) -> str:
-        if isinstance(item, str):
-            return f"'{item}'"
-        elif isinstance(item, datetime.datetime):
-            return f"'{item.isoformat()}'"
-        elif isinstance(item, datetime.date):
-            return f"'{item.isoformat()}'"
-        elif isinstance(item, datetime.time):
-            return f"'{item.isoformat()}'"
-        elif isinstance(item, bool):
-            return str(item).lower()
-
-        return str(item)
 
     async def convert_flag(self, ctx: Context, flag_content: str, is_code_blocked: bool) -> Any:
         env: Dict[str, Any] = {
@@ -124,7 +108,7 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
             except Exception as exc:
                 raise commands.BadArgument(f'Failed to convert flag "{flag_name}".') from exc
 
-            converted_flags[flag_name] = self.convert_to_psql(converted)
+            converted_flags[flag_name] = converted
 
         converted_args: Dict[int, Any] = {}
         args = ARG_REGEX.findall(argument)
@@ -140,7 +124,7 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
             except Exception as exc:
                 raise commands.BadArgument(f'Failed to convert arg "{arg_number}".') from exc
 
-            converted_args[int(arg_number)] = self.convert_to_psql(converted)
+            converted_args[int(arg_number)] = converted
 
         # We should only be left with the SQL statement now
         query = argument.strip()
@@ -164,7 +148,7 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
             except Exception as exc:
                 raise commands.BadArgument(f'Failed to convert bracket code block "{bracket_content}".') from exc
 
-            query = query.replace(f'{{{bracket_content}}}', self.convert_to_psql(converted))
+            query = query.replace(f'{{{bracket_content}}}', converted)
 
         return query, [arg for i in range(1, len(converted_args) + 1) if (arg := converted_args.get(i, None))]
 

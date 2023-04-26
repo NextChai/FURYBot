@@ -74,7 +74,7 @@ class Profanity(BaseCog):
         # Let's insert this into our DB
         async with self.bot.safe_connection() as connection:
             settings_data = await connection.fetchrow(
-                'INSERT INTO profanity.settings (guild_id, automod_rule_id) ' 'VALUES ($1, $2) ' 'RETURNING *',
+                'INSERT INTO profanity.settings (guild_id, automod_rule_id) VALUES ($1, $2) RETURNING *',
                 rule.guild.id,
                 rule.id,
             )
