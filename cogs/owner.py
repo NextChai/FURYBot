@@ -23,13 +23,12 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import datetime
 import asyncio
+import datetime
 import inspect
-
-import textwrap
 import re
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, Optional, Tuple, List
+import textwrap
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional, Tuple
 
 import discord
 from discord.ext import commands
@@ -45,12 +44,12 @@ FLAG_REGEX = re.compile(
 BRACKET_REGEX = re.compile(r'(?:(?:\{(?P<bracket_content>(?:.|\n)+?)\}))')
 ARG_REGEX = re.compile(
     r'\$(?P<arg_number>\d+)=(?P<arg_content>(?:`{3}python\n(?P<arg_code_content>.*?)`{3}|\S+(?:(?:\r?\n(?!\$)\s*)+(?P<arg_text_content>.*?)\s*)?))(?=\s*\$|\Z)',
-    re.MULTILINE | re.DOTALL
+    re.MULTILINE | re.DOTALL,
 )
 
 
 class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
-    
+
     # A method name to convert a string to something that psql can easily understand.
     def convert_to_psql(self, item: Any) -> str:
         if isinstance(item, str):
@@ -65,7 +64,7 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
             return str(item).lower()
 
         return str(item)
-    
+
     async def convert_flag(self, ctx: Context, flag_content: str, is_code_blocked: bool) -> Any:
         env: Dict[str, Any] = {
             'bot': ctx.bot,
@@ -89,10 +88,10 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
                 {return_keyword}{flag_content}
             """
         )
-        
+
         exec(wrapped_codeblock, env)
 
-        wrapped_function: Callable[[], Coroutine[Any, Any, Any]] = env['__wrapped_codeblock']  
+        wrapped_function: Callable[[], Coroutine[Any, Any, Any]] = env['__wrapped_codeblock']
 
         result = await wrapped_function()
 
@@ -113,7 +112,7 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
 
         for (flag_name, flag_content, code_block_content) in flags:
             flag_full_name = f'--{flag_name}={flag_content}'
-            
+
             # Remove the flag from the argument
             argument = argument.replace(flag_full_name, '')
 
@@ -124,7 +123,7 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
                 raise commands.BadArgument(f'Failed to convert flag "{flag_name}".') from exc
 
             converted_flags[flag_name] = self.convert_to_psql(converted)
-        
+
         converted_args: Dict[int, Any] = {}
         args = ARG_REGEX.findall(argument)
         for (arg_number, arg_content, code_block_content, *_) in args:
@@ -151,7 +150,7 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
             if existing_flag is not discord.utils.MISSING:
                 query = query.replace(f'{{{bracket_content}}}', existing_flag)
                 continue
-            
+
             # This is a code block, we can convert it and replace it with the result.
             try:
                 converted = await self.convert_flag(ctx, bracket_content, True)
@@ -175,9 +174,9 @@ class Owner(BaseCog):
 
     @commands.group(name='sql', description='Does a SQL query and returns the results.', invoke_without_command=True)
     async def sql(
-        self, 
-        ctx: Context, 
-        *, 
+        self,
+        ctx: Context,
+        *,
         query_args: Tuple[str, List[Any]] = commands.parameter(
             converter=SQLFlagConverter, description='The query you want to pass along.'
         ),
@@ -194,7 +193,7 @@ class Owner(BaseCog):
         ),
     ) -> Optional[discord.Message]:
         query, args = query_args
-        
+
         result = await self._common_sql('execute', query, *args)
         return await ctx.send(f'Executed query. Result: `{result}`')
 

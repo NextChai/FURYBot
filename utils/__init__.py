@@ -45,6 +45,7 @@ from .ui import *
 
 if TYPE_CHECKING:
     import datetime
+
     import asyncpg
 
     BV = TypeVar('BV', bound='discord.ui.View')
@@ -145,4 +146,3 @@ def human_join(
         finished += f' {additional}'
 
     return finished.strip()
-

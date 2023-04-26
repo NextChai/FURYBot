@@ -24,6 +24,6 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 from .modal import *
+from .paginator import *
 from .select import *
 from .view import *
-from .paginator import *

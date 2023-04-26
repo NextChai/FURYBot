@@ -23,25 +23,27 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING, Dict, List, Union
 
 import discord
+from discord import app_commands
 from typing_extensions import Self, Unpack
 
 from utils import (
+    AfterModal,
+    BaseButtonPaginator,
     BaseView,
     BaseViewKwargs,
     GuildProfanityFinder,
-    AfterModal,
-    BaseButtonPaginator,
     human_join,
     human_timestamp,
 )
 from utils.time import human_timedelta
 
 if TYPE_CHECKING:
-    from bot import FuryBot
     import asyncpg
+
+    from bot import FuryBot
 
 
 class ProfanityPaginator(BaseButtonPaginator['asyncpg.Record']):
@@ -157,14 +159,77 @@ class ManageProfanityTargets(BaseView):
 
         return embed
 
+    async def _perform_addition_on_rules(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        targets: List[Union[discord.Role, app_commands.AppCommandChannel, app_commands.AppCommandThread]],
+    ) -> None:
+        await interaction.response.defer()
+
+        for rule in self.rules.values():
+            roles = [target for target in targets if isinstance(target, discord.Role)]
+            channels = [
+                target
+                for target in targets
+                if isinstance(target, (app_commands.AppCommandChannel, app_commands.AppCommandThread))
+            ]
+
+            allowed_role_ids = list(rule.exempt_role_ids)
+            allowed_channel_ids = list(rule.exempt_channel_ids)
+
+            allowed_role_ids.extend(role.id for role in roles)
+            allowed_channel_ids.extend(channel.id for channel in channels)
+
+            rule = await rule.edit(
+                exempt_roles=[discord.Object(id=role_id) for role_id in allowed_role_ids],
+                exempt_channels=[discord.Object(id=channel_id) for channel_id in allowed_channel_ids],
+            )
+            self.rules[rule.id] = rule
+
+        await interaction.edit_original_response()
+
+    async def _perform_subtraction_on_rules(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        targets: List[Union[discord.Role, app_commands.AppCommandChannel, app_commands.AppCommandThread]],
+    ) -> None:
+        await interaction.response.defer()
+
+        for rule in self.rules.values():
+            roles = [target for target in targets if isinstance(target, discord.Role)]
+            channels = [
+                target
+                for target in targets
+                if isinstance(target, (app_commands.AppCommandChannel, app_commands.AppCommandThread))
+            ]
+
+            allowed_role_ids = list(rule.exempt_role_ids)
+            allowed_channel_ids = list(rule.exempt_channel_ids)
+
+            for role in roles:
+                if role.id in allowed_role_ids:
+                    allowed_role_ids.remove(role.id)
+
+            for channel in channels:
+                if channel.id in allowed_channel_ids:
+                    allowed_channel_ids.remove(channel.id)
+
+            rule = await rule.edit(
+                exempt_roles=[discord.Object(id=role_id) for role_id in allowed_role_ids],
+                exempt_channels=[discord.Object(id=channel_id) for channel_id in allowed_channel_ids],
+            )
+            self.rules[rule.id] = rule
+
+        await interaction.edit_original_response()
+
     @discord.ui.button(label='Add Allowed Roles', row=0)
-    async def add_allowed_target(
+    async def add_allowed_roles(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
         ...
 
     @discord.ui.button(label='Remove Allowed Roles', row=0)
-    async def remove_allowed_target(
+    async def remove_allowed_roles(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
         ...

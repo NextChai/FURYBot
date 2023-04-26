@@ -25,10 +25,10 @@ from __future__ import annotations
 
 import abc
 from typing import TYPE_CHECKING, Generic, List, Optional, Union
-from typing_extensions import Self, TypeAlias, TypeVar
 
 import discord
 from discord.ext import commands
+from typing_extensions import Self, TypeAlias, TypeVar
 
 if TYPE_CHECKING:
     from bot import FuryBot
