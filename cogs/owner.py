@@ -47,6 +47,7 @@ ARG_REGEX = re.compile(
     r'\$(?P<arg_number>\d+)=(?P<arg_content>(?:`{3}python\n(?P<arg_code_content>.*?)`{3}|\S+(?:(?:\r?\n(?!\$)\s*)+(?P<arg_text_content>.*?)\s*)?))(?=\s*\$|\Z)',
     re.MULTILINE | re.DOTALL,
 )
+CODEBLOCK_REGEX = re.compile(r'`{3}(?P<lang>[a-zA-z]*)\n?(?P<code>[^`]*)\n?`{3}')
 
 
 class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
@@ -144,6 +145,11 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
         # We should only be left with the SQL statement now
         query = argument.strip()
 
+        # If this is a codeblock we need to remove the codeblock formatting.
+        match = CODEBLOCK_REGEX.match(query)
+        if match is not None:
+            query = match.group('code')
+
         # Let's look for any brackets that point to a flag or an inlined bracket code block.
         brackets = BRACKET_REGEX.findall(query)
         for bracket_content in brackets:
@@ -154,7 +160,7 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
 
             # This is a code block, we can convert it and replace it with the result.
             try:
-                converted = await self.convert_flag(ctx, bracket_content, True)
+                converted = await self.convert_flag(ctx, bracket_content, False)
             except Exception as exc:
                 raise commands.BadArgument(f'Failed to convert bracket code block "{bracket_content}".') from exc
 
@@ -227,6 +233,9 @@ class Owner(BaseCog):
 
             result = await self._common_sql('fetch', query, *args)
 
+            if not result:
+                return await ctx.send(f'`{result}`')
+
             # Make a table from this result
             table = make_table(rows=[list(dict(entry).values()) for entry in result], labels=list(dict(result[0]).keys()))
 
@@ -245,6 +254,8 @@ class Owner(BaseCog):
             query, args = query_args
 
             result = await self._common_sql('fetchrow', query, *args)
+            if not result:
+                return await ctx.send(f'`{result}`')
 
             table = make_table(rows=[list(dict(result).values())], labels=list(dict(result).keys()))
             return await self._send_table(ctx, table)

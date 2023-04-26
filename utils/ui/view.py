@@ -262,14 +262,16 @@ class BaseView(discord.ui.View, abc.ABC):
         super().__init__(timeout=kwargs.get('timeout', 360))
 
     def _add_menu_children(self) -> None:
+        children_cls = {type(child) for child in self.children}
         if self.parent is not None:
-            self.add_item(GoBack(self.parent))
+            if GoBack not in children_cls:
+                self.add_item(GoBack(self.parent))
 
             home = find_home(self)
-            if home and home is not self.parent:
+            if home and home is not self.parent and GoHome not in children_cls:
                 self.add_item(GoHome(home))
 
-        if not any(isinstance(child, Stop) for child in self.children):
+        if Stop not in children_cls:
             self.add_item(Stop(self))
 
     @abc.abstractproperty

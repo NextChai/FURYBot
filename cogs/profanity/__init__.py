@@ -133,45 +133,17 @@ class Profanity(BaseCog):
         words_to_delete = [word for word in all_words if word not in rule_keywords]
         words_to_add = [word for word in rule_keywords if word not in all_words]
 
-        if words_to_delete or words_to_add:
-            query = """
-            WITH words_to_delete AS (
-                SELECT word
-                FROM profanity.words
-                WHERE automod_rule_id = $1
-                    AND word NOT IN ({0})
-            ), words_to_add AS (
-                SELECT unnest(ARRAY[{1}]) AS word
-                WHERE NOT EXISTS (
-                    SELECT 1
-                    FROM profanity.words
-                    WHERE automod_rule_id = $2
-                        AND word = unnest(ARRAY[{1}])
-                )
-            ), now AS (
-                SELECT timezone('utc', now()) AS added_at
-            )
-            DELETE FROM profanity.words
-            WHERE automod_rule_id = $2
-                AND word IN (SELECT word FROM words_to_delete)
-            RETURNING *,
-                'DELETE' AS action
-            UNION ALL
-            INSERT INTO profanity.words (settings_id, automod_rule_id, word, added_at)
-            SELECT {3}, $2, word, (SELECT added_at FROM now)
-            FROM words_to_add
-            RETURNING *,
-                'INSERT' AS action
-            ;
-            """.format(
-                ', '.join(['${}'.format(i + 2) for i in range(len(words_to_delete))]),
-                ', '.join(['${}'.format(i + len(words_to_delete) + 2) for i in range(len(words_to_add))]),
-                settings_id,
+        if words_to_delete:
+            # Delete all the words to delete
+            await connection.execute(
+                'DELETE FROM profanity.words WHERE automod_rule_id = $1 AND word = ANY($2::text[])', rule_id, words_to_delete
             )
 
-            values = [rule_id] + words_to_delete + words_to_add
-
-            await connection.execute(query, *values)
+        if words_to_add:
+            await connection.executemany(
+                'INSERT INTO profanity.words(settings_id, automod_rule_id, word, added_at) VALUES ($1, $2, $3, $4) ON CONFLICT (word) DO NOTHING',
+                [(settings_id, rule_id, word, discord.utils.utcnow()) for word in words_to_add],
+            )
 
     @commands.Cog.listener('on_automod_rule_update')
     async def on_automod_rule_update(self, rule: discord.AutoModRule):
