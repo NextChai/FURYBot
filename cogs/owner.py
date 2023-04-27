@@ -50,7 +50,6 @@ CODEBLOCK_REGEX = re.compile(r'`{3}(?P<lang>[a-zA-z]*)\n?(?P<code>[^`]*)\n?`{3}'
 
 
 class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
-
     async def convert_flag(self, ctx: Context, flag_content: str, is_code_blocked: bool) -> Any:
         env: Dict[str, Any] = {
             'bot': ctx.bot,
@@ -204,7 +203,7 @@ class Owner(BaseCog):
                 result = await self._common_sql('execute', query, *args)
             except Exception as exc:
                 return await ctx.send(f'Failed to execute query. Error: `{exc}`')
-                
+
             return await ctx.send(f'Executed query. Result: `{result}`')
 
     @sql.command(name='fetch', description='Fetches a given SQL query and returns the results.')
@@ -248,7 +247,7 @@ class Owner(BaseCog):
                 result = await self._common_sql('fetchrow', query, *args)
             except Exception as exc:
                 return await ctx.send(f'Failed to execute query. Error: `{exc}`')
-            
+
             if not result:
                 return await ctx.send(f'`{result}`')
 
@@ -271,7 +270,7 @@ class Owner(BaseCog):
                 result = await self._common_sql('fetchval', query, *args)
             except Exception as exc:
                 return await ctx.send(f'Failed to execute query. Error: `{exc}`')
-            
+
             return await ctx.send(f'`{result}`')
 
 
