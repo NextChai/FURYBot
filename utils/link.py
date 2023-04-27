@@ -19,22 +19,15 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import asyncio
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+import trieregex
+from urlextract.urlextract_core import URLExtract
 
 if TYPE_CHECKING:
-    from bot import FuryBot
-
-    # The urlextract lib does not have great type hints. To combat this, we'll create
-    # a dummy class that has the required arguments we need.
-    class URLExtract:
-        if TYPE_CHECKING:
-
-            def find_urls(self, text: str, /) -> List[str]:
-                ...
-
-else:
-    from urlextract import URLExtract
+    from bot import ConnectionType, FuryBot
 
 __all__: Tuple[str, ...] = ('LinkFilter',)
 
@@ -43,26 +36,34 @@ class LinkFilter(URLExtract):
     def __init__(self, bot: FuryBot, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.bot: FuryBot = bot
-        self._allowed_links: Dict[int, List[str]] = {}
+        self._allowed_links: Dict[int, re.Pattern[str]] = {}
 
-    async def get_links(self, text: str, /, *, guild_id: int) -> List[str]:
-        if not self._allowed_links.get(guild_id):
-            self._allowed_links[guild_id] = await self.fetch_allowed_links(guild_id)
+    async def load_allowed_links_cache(self, *, connection: ConnectionType) -> None:
+        data = await connection.fetch('SELECT * FROM links')
 
-        links = await self.bot.wrap(self.find_urls, text=text)
+        allowed_links: Dict[int, List[str]] = {}
+        for entry in data:
+            allowed_links.setdefault(entry['guild_id'], []).append(entry['link'])
 
-        allowed_links = self._allowed_links[guild_id]
-        for link in links:
-            if any([await self.bot.wrap(re.findall, allowed_link, link) for allowed_link in allowed_links]):
-                links.remove(link)
+        for guild_id, links in allowed_links.items():
+            tre = trieregex.TrieRegEx(*links)
+            self._allowed_links[guild_id] = re.compile(f'\\b{tre.regex()}\\b', re.IGNORECASE)
+
+    async def fetch_links(self, text: str, /, *, guild_id: Optional[int] = None) -> List[Tuple[str, Tuple[int, int]]]:
+        # to_thead here because it's I/O bound
+        links = await asyncio.to_thread(self.find_urls, text=text, check_dns=True, get_indices=True)
+
+        if guild_id is None:
+            return links
+            
+        allowed_links = self._allowed_links.get(guild_id)
+        if not allowed_links:
+            return links
+        
+        for link, (_start, _end) in links:
+            matches = await self.bot.wrap(allowed_links.findall, link)
+            if matches:
+                # We have a match, we need to remove it from the list
+                links.remove((link, (_start, _end)))
 
         return links
-
-    async def fetch_allowed_links(self, guild_id: int) -> List[str]:
-        async with self.bot.safe_connection() as connection:
-            data = await connection.fetchval('SELECT valid_links FROM infractions.settings WHERE guild_id = $1', guild_id)
-
-        if data:
-            return [l.lower() for l in data]
-
-        return []
