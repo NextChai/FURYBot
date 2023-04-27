@@ -39,7 +39,9 @@ class LinkFilter(URLExtract):
         self._allowed_links: Dict[int, re.Pattern[str]] = {}
 
     async def load_allowed_links_cache(self, *, connection: ConnectionType) -> None:
-        data = await connection.fetch('SELECT * FROM links')
+        data = await connection.fetch(
+            'SELECT *, (SELECT guild_id FROM links.settings WHERE id = settings_id) as guild_id FROM links.allowed_links'
+        )
 
         allowed_links: Dict[int, List[str]] = {}
         for entry in data:
@@ -55,11 +57,11 @@ class LinkFilter(URLExtract):
 
         if guild_id is None:
             return links
-            
+
         allowed_links = self._allowed_links.get(guild_id)
         if not allowed_links:
             return links
-        
+
         for link, (_start, _end) in links:
             matches = await self.bot.wrap(allowed_links.findall, link)
             if matches:

@@ -53,6 +53,7 @@ from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
 from cogs.images import ApproveOrDenyImage, ImageRequest
+from cogs.links import LinkSettings
 from cogs.teams import Team
 from cogs.teams.gamedays import GamedayBucket
 from cogs.teams.gamedays.persistent.score import ScoreReportView
@@ -89,7 +90,6 @@ if RUNNING_DEVELOPMENT:
     _log.setLevel(logging.DEBUG)
 
 initial_extensions: Tuple[str, ...] = (
-    'cogs.events.infractions',
     'cogs.events.notifier',
     'cogs.fun',
     'cogs.images',
@@ -251,6 +251,9 @@ class FuryBot(commands.Bot):
         # Mapping[guild_id, GuildProfanityFinder]
         self.guild_profanity_finders: Dict[int, GuildProfanityFinder] = {}
 
+        # Mapping[guild_id, LinkSettings]
+        self.link_settings: Dict[int, LinkSettings] = {}
+
         super().__init__(
             command_prefix=commands.when_mentioned_or('fury.'),
             help_command=None,
@@ -331,6 +334,19 @@ class FuryBot(commands.Bot):
             embed.set_author(name=author.name, icon_url=author.display_avatar.url)
 
         return embed
+
+    # Management for link settings
+    def get_link_setting(self, guild_id: int, /) -> Optional[LinkSettings]:
+        return self.link_settings.get(guild_id, None)
+
+    def remove_link_settings(self, guild_id: int, /) -> Optional[LinkSettings]:
+        return self.link_settings.pop(guild_id, None)
+
+    def add_link_settings(self, guild_id: int, settings: LinkSettings, /):
+        self.link_settings[guild_id] = settings
+
+    def get_link_settings(self) -> List[LinkSettings]:
+        return list(self.link_settings.values())
 
     # Management for custom profanity filters
     def get_profanity_finder(self, guild_id: int, /) -> Optional[GuildProfanityFinder]:
@@ -817,6 +833,27 @@ class FuryBot(commands.Bot):
     async def _cache_setup_profanity_filter(self, connection: ConnectionType) -> None:
         pattern = await GuildProfanityFinder.get_default_pattern()
         self.global_profanity_finder = GuildProfanityFinder(pattern, guild_id=None)
+
+    @cache_loader('LINKS')
+    async def _cache_setup_links(self, connection: ConnectionType) -> None:
+        await self.link_filter.load_allowed_links_cache(connection=connection)
+
+        settings = await connection.fetch('SELECT * FROM links.settings')
+        actions = await connection.fetch(
+            'SELECT *, (SELECT guild_id FROM links.settings WHERE id = settings_id) as guild_id FROM links.actions'
+        )
+
+        guild_data: Dict[int, Any] = {}
+
+        for setting in settings:
+            guild_data[setting['guild_id']] = dict(setting)
+
+        for action in actions:
+            guild_data[action['guild_id']].setdefault('actions', []).append(dict(action))
+
+        for guild_id, entry in guild_data.items():
+            settings = LinkSettings(bot=self, data=entry)
+            self.add_link_settings(guild_id, settings)
 
     # Hooks
     async def setup_hook(self) -> None:
