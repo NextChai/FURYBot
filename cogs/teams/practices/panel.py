@@ -194,7 +194,6 @@ class PracticeMemberPanel(BaseView):
         )
 
         for count, history in enumerate(self.member.history, start=1):
-
             left_at = (
                 history.left_at
                 and f'{discord.utils.format_dt(history.left_at, "T")} ({discord.utils.format_dt(history.left_at, "R")})'

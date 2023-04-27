@@ -41,12 +41,12 @@ class QueryBuilder:
     def query(self) -> str:
         arg_amount: int = 1
         conds: List[str] = []
-        for (predicate, _) in self._args:
+        for predicate, _ in self._args:
             conds.append(f"{predicate} = ${arg_amount}")
             arg_amount += 1
 
         clauses: List[str] = []
-        for (clause, _) in self._conds:
+        for clause, _ in self._conds:
             clauses.append(f"{clause} = ${arg_amount}")
             arg_amount += 1
 

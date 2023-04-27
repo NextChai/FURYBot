@@ -95,7 +95,7 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
         flags = FLAG_REGEX.findall(argument)
         converted_flags: Dict[str, Any] = {}
 
-        for (flag_name, flag_content, code_block_content) in flags:
+        for flag_name, flag_content, code_block_content in flags:
             flag_full_name = f'--{flag_name}={flag_content}'
 
             # Remove the flag from the argument
@@ -111,7 +111,7 @@ class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
 
         converted_args: Dict[int, Any] = {}
         args = ARG_REGEX.findall(argument)
-        for (arg_number, arg_content, code_block_content, *_) in args:
+        for arg_number, arg_content, code_block_content, *_ in args:
             full_arg_name = f'${arg_number}={arg_content}'
 
             # Remove the arg from the argument

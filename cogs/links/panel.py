@@ -23,34 +23,38 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import enum
-from typing import TYPE_CHECKING, Tuple
+import discord
+from typing_extensions import Unpack
 
-__all__: Tuple[str, ...] = ('ScrimStatus',)
+from utils import BaseView, BaseViewKwargs
 
-
-# Persistent views for team scrim confirmation from both
-class ScrimStatus(enum.Enum):
-    """
-    An enum to represent the status of a scrim.
-
-    pending_away: The away team has not yet confirmed the scrim.
-    scheduled: The scrim has been scheduled.
-    pending_host: The scrim is pending confirmation from the host.
-    """
-
-    pending_away = 'pending_away'
-    scheduled = 'scheduled'
-    pending_host = 'pending_host'
+from .settings import *
 
 
-from .events import *
-from .persistent import *
-from .scrim import *
+class CreateLinkSettings(BaseView):
+    def __init__(self, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
 
-if TYPE_CHECKING:
-    from bot import FuryBot
+    @property
+    def embed(self) -> discord.Embed:
+        ...
 
 
-async def setup(bot: FuryBot) -> None:
-    await bot.add_cog(ScrimEventListener(bot))
+class ManageLinkActions(BaseView):
+    def __init__(self, settings: LinkSettings, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+        self.settings: LinkSettings = settings
+
+    @property
+    def embed(self) -> discord.Embed:
+        ...
+
+
+class ManageLinkSettings(BaseView):
+    def __init__(self, settings: LinkSettings, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+        self.settings: LinkSettings = settings
+
+    @property
+    def embed(self) -> discord.Embed:
+        ...

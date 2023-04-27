@@ -23,10 +23,10 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import textwrap
 import logging
-from urllib.parse import urlparse
+import textwrap
 from typing import TYPE_CHECKING, List, Tuple
+from urllib.parse import urlparse
 
 import discord
 from discord import app_commands
@@ -34,7 +34,7 @@ from discord.ext import commands
 
 from utils import BaseCog
 
-from .actions import *
+from .settings import *
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -43,12 +43,11 @@ _log = logging.getLogger(__name__)
 
 
 class Links(BaseCog):
-    
     @app_commands.command(name='links')
     @app_commands.default_permissions(manage_messages=True)
     async def links(self, interaction: discord.Interaction[FuryBot]) -> None:
         raise NotImplementedError
-    
+
     def should_check_message(self, message: discord.Message) -> bool:
         if message.author.bot:
             return False
@@ -67,12 +66,11 @@ class Links(BaseCog):
     async def handle_found_links(
         self, message: discord.Message, settings: LinkSettings, links: List[Tuple[str, Tuple[int, int]]]
     ) -> None:
-
         for action in settings.actions:
             if action.type is LinkActionType.surpress:
                 await message.delete()
             elif action.type is LinkActionType.warn:
-                await message.channel.send(f'{message.author.mention}, {action.warn_message}')                
+                await message.channel.send(f'{message.author.mention}, {action.warn_message}')
             elif action.type is LinkActionType.mute:
                 if isinstance(message.author, discord.Member):
                     await message.author.timeout(action.delta, reason='Link Filter auto mute.')
@@ -80,30 +78,26 @@ class Links(BaseCog):
         notifier_channel = settings.notifier_channel
         if notifier_channel is None:
             return
-        
+
         assert not isinstance(message.channel, (discord.DMChannel, discord.PartialMessageable, discord.GroupChannel))
         assert isinstance(notifier_channel, discord.abc.Messageable)
-        
+
         embed = self.bot.Embed(
             title='Links Found',
             description=f'**{len(links)} links** have been found in a message posted by {message.author.mention} in '
-            f'{message.channel.mention}'
+            f'{message.channel.mention}',
         )
         embed.add_field(
-            name='Message Content',
-            value=textwrap.shorten(message.content, 1024, placeholder='...'),
-            inline=False
+            name='Message Content', value=textwrap.shorten(message.content, 1024, placeholder='...'), inline=False
         )
         embed.add_field(
             name='Links Found',
             value=textwrap.shorten(
-                '\n'.join([
-                    f'[{urlparse(link).netloc or link}]({link}) ({start}:{end})' for link, (start, end) in links
-                ]),
+                '\n'.join([f'[{urlparse(link).netloc or link}]({link}) ({start}:{end})' for link, (start, end) in links]),
                 1024,
-                placeholder='...'
+                placeholder='...',
             ),
-            inline=False
+            inline=False,
         )
 
         await notifier_channel.send(embed=embed)
@@ -131,12 +125,12 @@ class Links(BaseCog):
             return
 
         await self.handle_found_links(message, settings, links)
-        
+
     @commands.Cog.listener('on_message_edit')
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
         if not self.should_check_message(after):
             return
-        
+
         if before.content == after.content:
             return
 

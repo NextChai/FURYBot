@@ -575,7 +575,6 @@ class Team:
         member_absences: Counter[TeamMember] = Counter()
 
         for practice in self.practices:
-
             for member in practice.missing_members:
                 member_absences[member] += 1
 

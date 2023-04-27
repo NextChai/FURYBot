@@ -164,7 +164,6 @@ class SelectGamedayTime(MultiSelector['GamedayTimeManagementPanel', 'GamedayTime
         embed = team.embed(title='Select A Gameday Time')
 
         for gameday_time in gameday_times:
-
             metadata = [
                 f'**ID**: {gameday_time.id}',
                 f'**Weekday**: {gameday_time.weekday.name}',

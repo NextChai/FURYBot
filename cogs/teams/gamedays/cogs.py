@@ -264,7 +264,6 @@ class GamedayEventListener(BaseCog):
 
 
 class GamedayCommands(BaseCog):
-
     gameday = app_commands.Group(name='gameday', description='Commands related to gamedays.')
 
     @gameday.command(name='upload')

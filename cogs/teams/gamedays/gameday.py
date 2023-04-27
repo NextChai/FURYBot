@@ -73,7 +73,6 @@ def determine_comfy_voting_times(gameday_starts_at: datetime.datetime) -> Voting
     # If there's less than 24 hours until the gameday, start the voting now and then end it N minutes before the gameday starts
     if time_until_gameday < datetime.timedelta(hours=24):
         if time_until_gameday < datetime.timedelta(hours=6):
-
             # If gameday starts at - voting_ends_at returns something that is before now, we need to edit the voting_ends_offset
             # so that it's not in the past
             voting_ends_offset = datetime.timedelta(minutes=5)
@@ -676,7 +675,6 @@ class Gameday:
         gameday_time_id: int,
         starts_at: datetime.datetime,
     ) -> Self:
-
         bucket = bot.get_gameday_bucket(guild_id, team_id)
         if bucket is None:
             raise ValueError(f"Bucket {bucket_id} does not exist")

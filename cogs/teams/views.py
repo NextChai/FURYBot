@@ -583,7 +583,6 @@ class TeamView(BaseView):
     async def _delete_team_after(
         self, interaction: discord.Interaction[FuryBot], confirm_input: discord.ui.TextInput[AfterModal]
     ) -> None:
-
         if confirm_input.value.lower() != 'delete':
             return await interaction.response.send_message('Aborted as `delete` was not typed.', ephemeral=True)
 

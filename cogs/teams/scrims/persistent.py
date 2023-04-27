@@ -244,7 +244,6 @@ class AwayForceConfirm(discord.ui.View):
                 f'The scrim will start at {self.scrim.scheduled_for_formatted()}.',
             )
         else:
-
             embed = self.bot.Embed(
                 title='Vote to Force Confirm',
                 description='A member on this team would like to force confirm the scrim. '
@@ -359,7 +358,6 @@ class AwayConfirm(discord.ui.View):
             raise Exception('Scrim status did not transition correctly.')
 
         if scrim.status is ScrimStatus.pending_away:
-
             embed = self.bot.Embed(
                 title='Scrim Incoming!',
                 description=f'Team **{self.scrim.home_team.display_name}** would like to scrim your team on '

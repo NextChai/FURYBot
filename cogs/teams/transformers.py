@@ -114,7 +114,7 @@ class TeamTransformer(app_commands.Transformer):
         # Now let's create a list of choices for the user to select from.
         choices: List[app_commands.Choice[int]] = []
 
-        for (team_name, _) in similar:
+        for team_name, _ in similar:
             team = team_name_mapping[team_name]
             choices.append(app_commands.Choice(name=team.display_name, value=team.id))
 

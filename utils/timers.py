@@ -40,7 +40,6 @@ if TYPE_CHECKING:
 
 
 if TYPE_CHECKING:
-
     JSONValue = Union[str, int, float, bool, None, Dict[str, Any], List[Any]]
     JSONType = Union[JSONValue, Dict[str, JSONValue], List[JSONValue]]
 

@@ -878,4 +878,7 @@ class FuryBot(commands.Bot):
 
         async with self.safe_connection() as connection:
             for _, cache_loading_function in cache_loading_functions:
-                await cache_loading_function(connection=connection)
+                try:
+                    await cache_loading_function(connection=connection)
+                except Exception as exc:
+                    _log.warning(f'Failed to load cache entry {cache_loading_function.__name__}.', exc_info=exc)
