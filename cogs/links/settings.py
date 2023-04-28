@@ -38,6 +38,20 @@ if TYPE_CHECKING:
 MISSING = discord.utils.MISSING
 
 
+class AllowedLink:
+    def __init__(self, *, bot: FuryBot, data: Dict[str, Any]) -> None:
+        self.bot: FuryBot = bot
+        self.id: int = data['id']
+        self.settings_id: int = data['settings_id']
+        self.url: str = data['url']
+        self.added_at: datetime.datetime = data['added_at']
+        self.added_by_id: int = data['added_by_id']
+
+    @property
+    def added_by(self) -> Optional[discord.User]:
+        return self.bot.get_user(self.added_by_id)
+
+
 class LinkActionType(enum.Enum):
     warn = 'warn'
     mute = 'mute'
@@ -119,7 +133,8 @@ class LinkSettings:
         self.id: int = data['id']
         self.guild_id: int = data['guild_id']
         self.notifier_channel_id: Optional[int] = data['notifier_channel_id']
-        self.actions: List[LinkAction] = [LinkAction(bot=bot, data=action) for action in data['actions']]
+        self.actions: List[LinkAction] = []
+        self.allowed_links: List[AllowedLink] = []
 
     @classmethod
     async def create(
@@ -157,6 +172,18 @@ class LinkSettings:
             return None
 
         return guild.get_channel(self.notifier_channel_id)
+
+    def add_action(self, action: LinkAction) -> None:
+        self.actions.append(action)
+
+    def remove_action(self, action: LinkAction) -> None:
+        self.actions.remove(action)
+
+    def add_allowed_link(self, link: AllowedLink) -> None:
+        self.allowed_links.append(link)
+
+    def remove_allowed_link(self, link: AllowedLink) -> None:
+        self.allowed_links.remove(link)
 
     async def edit(self, *, connection: ConnectionType, notifier_channel_id: int = MISSING) -> None:
         builder = QueryBuilder('links.settings')

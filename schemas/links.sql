@@ -24,5 +24,5 @@ CREATE TABLE IF NOT EXISTS links.allowed_links (
     settings_id INTEGER REFERENCES links.settings(id),
     url TEXT,
     added_at TIMESTAMP WITH TIME ZONE,
-    added_by TEXT
+    added_by_id TEXT
 );

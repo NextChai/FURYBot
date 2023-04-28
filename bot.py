@@ -53,7 +53,7 @@ from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
 from cogs.images import ApproveOrDenyImage, ImageRequest
-from cogs.links import LinkSettings
+from cogs.links import LinkSettings, LinkAction, AllowedLink
 from cogs.teams import Team
 from cogs.teams.gamedays import GamedayBucket
 from cogs.teams.gamedays.persistent.score import ScoreReportView
@@ -836,8 +836,6 @@ class FuryBot(commands.Bot):
 
     @cache_loader('LINKS')
     async def _cache_setup_links(self, connection: ConnectionType) -> None:
-        await self.link_filter.load_allowed_links_cache(connection=connection)
-
         settings = await connection.fetch('SELECT * FROM links.settings')
         actions = await connection.fetch(
             'SELECT *, (SELECT guild_id FROM links.settings WHERE id = settings_id) as guild_id FROM links.actions'
@@ -848,12 +846,28 @@ class FuryBot(commands.Bot):
         for setting in settings:
             guild_data[setting['guild_id']] = dict(setting)
 
-        for action in actions:
-            guild_data[action['guild_id']].setdefault('actions', []).append(dict(action))
-
         for guild_id, entry in guild_data.items():
             settings = LinkSettings(bot=self, data=entry)
             self.add_link_settings(guild_id, settings)
+
+        for action in actions:
+            settings = self.get_link_setting(action['guild_id'])
+            assert settings
+
+            settings.add_action(LinkAction(bot=self, data=dict(action)))
+
+        allowed_links_data = await connection.fetch(
+            'SELECT *, (SELECT guild_id FROM links.settings WHERE id = settings_id) as guild_id FROM links.allowed_links'
+        )
+        for allowed_link_data in allowed_links_data:
+            settings = self.get_link_setting(allowed_link_data['guild_id'])
+            assert settings
+
+            settings.add_allowed_link(AllowedLink(bot=self, data=dict(allowed_link_data)))
+
+        # Now that out cache is full we can create the regex for each guild
+        # that will be used to check if a link is allowed or not.
+        self.link_filter.create_allowed_links_regex()
 
     # Hooks
     async def setup_hook(self) -> None:

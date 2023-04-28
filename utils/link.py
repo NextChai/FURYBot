@@ -27,7 +27,8 @@ import trieregex
 from urlextract.urlextract_core import URLExtract
 
 if TYPE_CHECKING:
-    from bot import ConnectionType, FuryBot
+    from bot import FuryBot
+    from cogs.links import LinkSettings
 
 __all__: Tuple[str, ...] = ('LinkFilter',)
 
@@ -38,18 +39,18 @@ class LinkFilter(URLExtract):
         self.bot: FuryBot = bot
         self._allowed_links: Dict[int, re.Pattern[str]] = {}
 
-    async def load_allowed_links_cache(self, *, connection: ConnectionType) -> None:
-        data = await connection.fetch(
-            'SELECT *, (SELECT guild_id FROM links.settings WHERE id = settings_id) as guild_id FROM links.allowed_links'
-        )
+    def build_regex_for_settings(self, settings: LinkSettings) -> None:
+        if not settings.allowed_links:
+            return
 
-        allowed_links: Dict[int, List[str]] = {}
-        for entry in data:
-            allowed_links.setdefault(entry['guild_id'], []).append(entry['link'])
+        links = [allowed_link.url for allowed_link in settings.allowed_links]
 
-        for guild_id, links in allowed_links.items():
-            tre = trieregex.TrieRegEx(*links)
-            self._allowed_links[guild_id] = re.compile(f'\\b{tre.regex()}\\b', re.IGNORECASE)
+        tre = trieregex.TrieRegEx(*links)
+        self._allowed_links[settings.guild_id] = re.compile(f'\\b{tre.regex()}\\b', re.IGNORECASE)
+
+    def create_allowed_links_regex(self) -> None:
+        for setting in self.bot.get_link_settings():
+            self.build_regex_for_settings(setting)
 
     async def fetch_links(self, text: str, /, *, guild_id: Optional[int] = None) -> List[Tuple[str, Tuple[int, int]]]:
         # to_thead here because it's I/O bound
