@@ -52,7 +52,7 @@ if TYPE_CHECKING:
 
 
 class ProfanityPaginator(BaseButtonPaginator['asyncpg.Record']):
-    async def format_page(self, entries: List[asyncpg.Record]) -> discord.Embed:
+    def format_page(self, entries: List[asyncpg.Record]) -> discord.Embed:
         assert self.bot
 
         embed = self.bot.Embed(
@@ -947,10 +947,8 @@ class ProfanityPanel(BaseView):
                 interaction.guild_id,
             )
 
-        paginator = ProfanityPaginator(entries=all_words, per_page=15, target=interaction)
-
-        embed = await paginator.embed()
-        return await interaction.edit_original_response(embed=embed, view=paginator)
+        paginator = self.create_child(ProfanityPaginator, entries=all_words, per_page=15)
+        return await interaction.edit_original_response(embed=paginator.embed, view=paginator)
 
     @discord.ui.button(label='Manage Targets')
     async def manage_rules(

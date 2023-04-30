@@ -53,7 +53,7 @@ from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
 from cogs.images import ApproveOrDenyImage, ImageRequest
-from cogs.links import LinkSettings, LinkAction, AllowedLink
+from cogs.links import AllowedLink, LinkAction, LinkSettings
 from cogs.teams import Team
 from cogs.teams.gamedays import GamedayBucket
 from cogs.teams.gamedays.persistent.score import ScoreReportView
@@ -336,14 +336,17 @@ class FuryBot(commands.Bot):
         return embed
 
     # Management for link settings
-    def get_link_setting(self, guild_id: int, /) -> Optional[LinkSettings]:
-        return self.link_settings.get(guild_id, None)
+    def get_link_setting(self, link_setting_id: int, /) -> Optional[LinkSettings]:
+        return self.link_settings.get(link_setting_id, None)
 
-    def remove_link_settings(self, guild_id: int, /) -> Optional[LinkSettings]:
-        return self.link_settings.pop(guild_id, None)
+    def get_link_setting_from_guild(self, guild_id: int, /) -> Optional[LinkSettings]:
+        return discord.utils.get(self.get_link_settings(), guild_id=guild_id)
 
-    def add_link_settings(self, guild_id: int, settings: LinkSettings, /):
-        self.link_settings[guild_id] = settings
+    def remove_link_settings(self, link_setting_id: int, /) -> Optional[LinkSettings]:
+        return self.link_settings.pop(link_setting_id, None)
+
+    def add_link_settings(self, settings: LinkSettings, /):
+        self.link_settings[settings.id] = settings
 
     def get_link_settings(self) -> List[LinkSettings]:
         return list(self.link_settings.values())
@@ -837,30 +840,21 @@ class FuryBot(commands.Bot):
     @cache_loader('LINKS')
     async def _cache_setup_links(self, connection: ConnectionType) -> None:
         settings = await connection.fetch('SELECT * FROM links.settings')
-        actions = await connection.fetch(
-            'SELECT *, (SELECT guild_id FROM links.settings WHERE id = settings_id) as guild_id FROM links.actions'
-        )
+        actions = await connection.fetch('SELECT * FROM links.actions')
 
-        guild_data: Dict[int, Any] = {}
-
-        for setting in settings:
-            guild_data[setting['guild_id']] = dict(setting)
-
-        for guild_id, entry in guild_data.items():
-            settings = LinkSettings(bot=self, data=entry)
-            self.add_link_settings(guild_id, settings)
+        for entry in settings:
+            settings = LinkSettings(bot=self, data=dict(entry))
+            self.add_link_settings(settings)
 
         for action in actions:
-            settings = self.get_link_setting(action['guild_id'])
+            settings = self.get_link_setting(action['settings_id'])
             assert settings
 
             settings.add_action(LinkAction(bot=self, data=dict(action)))
 
-        allowed_links_data = await connection.fetch(
-            'SELECT *, (SELECT guild_id FROM links.settings WHERE id = settings_id) as guild_id FROM links.allowed_links'
-        )
+        allowed_links_data = await connection.fetch('SELECT * FROM links.allowed_links')
         for allowed_link_data in allowed_links_data:
-            settings = self.get_link_setting(allowed_link_data['guild_id'])
+            settings = self.get_link_setting(allowed_link_data['settings_id'])
             assert settings
 
             settings.add_allowed_link(AllowedLink(bot=self, data=dict(allowed_link_data)))

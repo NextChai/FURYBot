@@ -34,7 +34,14 @@ if TYPE_CHECKING:
 
     from .view import BaseView
 
-__all__: Tuple[str, ...] = ('ChannelSelect', 'UserSelect', 'RoleSelect', 'MentionableSelect', 'SelectOneOfMany')
+__all__: Tuple[str, ...] = (
+    'ChannelSelect',
+    'UserSelect',
+    'RoleSelect',
+    'MentionableSelect',
+    'SelectOneOfMany',
+    'SelectEater',
+)
 
 T = TypeVar('T')
 P = ParamSpec('P')
@@ -223,3 +230,21 @@ class MentionableSelect(
         **kwargs: Any,
     ) -> None:
         super().__init__(after, parent, *args, **kwargs)
+
+
+class SelectEater(
+    RelaySelect[T, ViewMixinT],
+):
+    def __init__(
+        self, after: AfterCallback[T], parent: ViewMixinT, *args: RelaySelect[Any, ViewMixinT], **kwargs: Any
+    ) -> None:
+        # We're going to do a bit of "hackery". We're going to call super().__init__
+        # Then clear the children and add the relay select instances to the parent.
+        # This will allow us to add two children. When a callback is selected
+        # it'll readd the original parent children and call the shared callback between the relays.
+        super().__init__(after, parent, **kwargs)
+
+        parent.clear_items()
+
+        for relay_select in args:
+            parent.add_item(relay_select)

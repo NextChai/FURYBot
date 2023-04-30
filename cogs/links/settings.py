@@ -73,13 +73,12 @@ class LinkAction:
         *,
         bot: FuryBot,
         connection: ConnectionType,
-        guild_id: int,
         settings_id: int,
         type: LinkActionType,
         delta: Optional[datetime.timedelta] = None,
         warn_message: Optional[str] = None,
     ) -> Self:
-        settings = bot.get_link_setting(guild_id)
+        settings = bot.get_link_setting(settings_id)
         if settings is None:
             raise ValueError('No link settings found for guild_id')
 
@@ -99,7 +98,7 @@ class LinkAction:
 
     @property
     def settings(self) -> Optional[LinkSettings]:
-        return discord.utils.get(self.bot.get_link_settings(), id=self.settings_id)
+        return self.bot.get_link_setting(self.settings_id)
 
     async def edit(
         self,
@@ -125,6 +124,11 @@ class LinkAction:
             self.warn_message = warn_message
 
         await builder(connection)
+
+    async def delete(self, *, connection: ConnectionType) -> None:
+        await connection.execute('DELETE FROM links.actions WHERE id = $1', self.id)
+
+        raise NotImplementedError
 
 
 class LinkSettings:
@@ -154,7 +158,7 @@ class LinkSettings:
         assert data
 
         self = cls(bot=bot, data=dict(data))
-        bot.add_link_settings(guild_id, self)
+        bot.add_link_settings(self)
 
         return self
 
@@ -206,7 +210,6 @@ class LinkSettings:
         return await LinkAction.create(
             bot=self.bot,
             connection=connection,
-            guild_id=self.guild_id,
             settings_id=self.id,
             type=type,
             delta=delta,

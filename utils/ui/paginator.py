@@ -28,48 +28,22 @@ from typing import TYPE_CHECKING, Generic, List, Optional, Union
 
 import discord
 from discord.ext import commands
-from typing_extensions import Self, TypeAlias, TypeVar
+from typing_extensions import Self, TypeAlias, TypeVar, Unpack
+
+from .view import BaseView
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
+    from .view import BaseViewKwargs
 
 T = TypeVar('T')
 TargetType: TypeAlias = Union['discord.Interaction[FuryBot]', 'commands.Context[FuryBot]']
 
 
-class BaseButtonPaginator(Generic[T], discord.ui.View, abc.ABC):
+class BaseButtonPaginator(Generic[T], BaseView, abc.ABC):
     """The base implementation of a button paginator. This class should be inherited
     then the custom instance defined.
-
-    .. code-block:: python3
-
-        import discord
-        from discord import app_commands
-
-        # My custom bot subclass:
-        class MyBot(commands.Bot):
-            ...
-
-        class ThisPaginator(BaseButtonPaginator[int, MyBot]):
-            async def format_page(self, entries: List[int], /) -> discord.Embed:
-                embed = discord.Embed(title='Welcome to my paginator!!')
-                for index, entry in enumerate(entries):
-                    embed.add_field(name=str(index), value=entry)
-
-                embed.set_footer(text='Page {0.current_page}/{0.total_pages}'.format(self))
-
-                return embed
-
-
-        # And in a command as so:
-        @app_commands.command()
-        async def my_view_paginator(interaction: discord.Interaction[MyBot]) -> None:
-            # Create a new instance of our paginator.
-            view = ThisPaginator(entries=list(range(10)), target=interaction)
-
-            # Generate the first embed for the given page
-            embed = await view.embed()
-            await interaction.response.send_message(embed=embed, view=view)
 
     Parameters
     ----------
@@ -90,18 +64,12 @@ class BaseButtonPaginator(Generic[T], discord.ui.View, abc.ABC):
     """
 
     def __init__(
-        self, *, entries: List[T], per_page: int = 6, clamp_pages: bool = True, target: Optional[TargetType] = None
+        self, *, entries: List[T], per_page: int = 6, clamp_pages: bool = True, **kwargs: Unpack[BaseViewKwargs]
     ) -> None:
-        super().__init__(timeout=180)
+        super().__init__(**kwargs)
         self.entries: List[T] = entries
         self.per_page: int = per_page
         self.clamp_pages: bool = clamp_pages
-
-        self.target: Optional[TargetType] = target
-        self.author: Optional[Union[discord.User, discord.Member]] = target and (
-            target.user if isinstance(target, discord.Interaction) else target.author
-        )
-        self.bot: Optional[FuryBot] = target and (target.client if isinstance(target, discord.Interaction) else target.bot)
 
         self._current_page_index = 0
         self.pages = [entries[i : i + per_page] for i in range(0, len(entries), per_page)]
@@ -145,7 +113,8 @@ class BaseButtonPaginator(Generic[T], discord.ui.View, abc.ABC):
         """
         raise NotImplementedError('Subclass did not overwrite format_page coro.')
 
-    async def embed(self) -> discord.Embed:
+    @property
+    def embed(self) -> discord.Embed:
         """|coro|
 
         A helper function to get the embed for the current page.
@@ -155,7 +124,7 @@ class BaseButtonPaginator(Generic[T], discord.ui.View, abc.ABC):
         :class:`discord.Embed`
             The embed for the current page.
         """
-        return await discord.utils.maybe_coroutine(self.format_page, self.pages[self._current_page_index])
+        return self.format_page(self.pages[self._current_page_index])
 
     async def interaction_check(self, interaction: discord.Interaction[FuryBot], /) -> Optional[bool]:
         """|coro|
@@ -177,9 +146,6 @@ class BaseButtonPaginator(Generic[T], discord.ui.View, abc.ABC):
             The result of the interaction check. If this returns ``None`` then the interaction
             was responded to with an error message to the user.
         """
-        if self.target is None:
-            return True
-
         assert self.author
 
         # Ensure this is the correct invoker
@@ -224,8 +190,7 @@ class BaseButtonPaginator(Generic[T], discord.ui.View, abc.ABC):
 
         self._switch_page(-1)
 
-        embed = await self.embed()
-        return await interaction.edit_original_response(embed=embed)
+        return await interaction.edit_original_response(embed=self.embed)
 
     @discord.ui.button(emoji='\U000025b6', style=discord.ButtonStyle.blurple)
     async def on_arrow_forward(
@@ -246,8 +211,7 @@ class BaseButtonPaginator(Generic[T], discord.ui.View, abc.ABC):
 
         self._switch_page(1)
 
-        embed = await self.embed()
-        return await interaction.edit_original_response(embed=embed)
+        return await interaction.edit_original_response(embed=self.embed)
 
     @discord.ui.button(emoji='\U000023f9', style=discord.ButtonStyle.blurple)
     async def on_stop(

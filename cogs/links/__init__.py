@@ -109,7 +109,7 @@ class Links(BaseCog):
 
         assert message.guild
 
-        settings = self.bot.get_link_setting(message.guild.id)
+        settings = self.bot.get_link_setting_from_guild(message.guild.id)
         if settings is None:
             # This guild does not use the link filter
             return
@@ -136,7 +136,7 @@ class Links(BaseCog):
 
         assert after.guild
 
-        settings = self.bot.get_link_setting(after.guild.id)
+        settings = self.bot.get_link_setting_from_guild(after.guild.id)
         if settings is None:
             # This guild does not use the link filter
             return
