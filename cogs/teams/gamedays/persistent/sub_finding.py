@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, Type
 import discord
 from typing_extensions import Self, Unpack
 
-from utils import BaseView, BaseViewKwargs, default_button_doc_string, human_timestamp
+from utils import BaseView, BaseViewKwargs, default_button_doc_string, human_join, human_timestamp
 
 from ...errors import TeamDeleted
 from ..gameday import determine_comfy_sub_finding_times
@@ -39,6 +39,30 @@ if TYPE_CHECKING:
 
     from ...team import Team
     from ..gameday import Gameday
+
+
+def create_sub_finding_status_embed(gameday: Gameday) -> discord.Embed:
+    team = gameday.team
+    if team is None:
+        raise TeamDeleted(team_id=gameday.team_id)
+
+    embed = team.embed(
+        title='Automatic Sub Finding',
+        description='Below shows the current status of the automatic sub finding for this team.',
+    )
+
+    temporary_subs = [member for member in gameday.get_members() if member.is_temporary_sub]
+
+    embed.add_field(
+        name='Subs Found',
+        value=human_join((m.mention for m in temporary_subs))
+        if temporary_subs
+        else "No temporary subs have been found yet.",
+    )
+
+    # TODO: Add more here
+
+    return embed
 
 
 class ConfirmSubFinding(BaseView):
@@ -57,6 +81,30 @@ class ConfirmSubFinding(BaseView):
     @property
     def embed(self) -> discord.Embed:
         ...
+
+    @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green)
+    async def confirm(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        await interaction.response.defer()
+
+        # We need to add them to the gameday as a temporary member and then add them to the team.
+        async with self.bot.safe_connection() as connection:
+            await self.team.add_team_member(member_id=interaction.user.id, is_sub=True)
+            await self.gameday.create_member(member_id=interaction.user.id, connection=connection, is_temporary_sub=True)
+
+        await self.team.text_channel.send(
+            f'I\'ve added a temporary sub to this team for the upcoming gameday. Say hello to {interaction.user.mention}!'
+        )
+
+        await interaction.followup.send(
+            f'I\'ve added you as a sub to {self.team.display_name}, say hello to your temporary teammates in {self.team.text_channel.mention}!',
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label='Cancel', style=discord.ButtonStyle.red)
+    async def cancel(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+        await interaction.response.defer()
+        await interaction.followup.send('Cancelled sub finding.', ephemeral=True)
+        await interaction.delete_original_response()
 
 
 class SubFinder(discord.ui.View):
@@ -131,17 +179,18 @@ class SubFinder(discord.ui.View):
         self = cls(gameday=gameday)
         message = await sub_finding_channel.send(view=self, embed=self.embed)
 
+        team_message = await self.team.text_channel.send(embed=create_sub_finding_status_embed(self.gameday))
+
         # Let's create a timer for when the sub finder should end
         bot = gameday.bot
         timer_id = discord.utils.MISSING
         if bot.timer_manager:
             timer = await bot.timer_manager.create_timer(
                 comfy_sub_fiding_times.end,
-                'sub_finding_timer_end',
+                'sub_finding_end',
                 guild_id=gameday.guild_id,
                 team_id=gameday.team_id,
                 gameday_id=gameday.id,
-                sub_finding_message_id=message.id,
             )
             timer_id = timer.id
 
@@ -150,7 +199,9 @@ class SubFinder(discord.ui.View):
                 connection=connection,
                 sub_finder_starts_at=comfy_sub_fiding_times.start,
                 sub_finder_ends_at=comfy_sub_fiding_times.end,
-                sub_finder_timer_id=timer_id,
+                sub_finder_ends_at_timer_id=timer_id,
+                sub_finder_message_id=message.id,
+                sub_finder_update_message_id=team_message.id,
             )
 
         return self

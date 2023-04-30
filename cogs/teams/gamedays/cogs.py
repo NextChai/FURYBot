@@ -31,6 +31,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import BaseCog, human_join
+from .persistent.sub_finding import SubFinder
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -229,7 +230,15 @@ class GamedayEventListener(BaseCog):
 
         # We do not have enough votes, so we need to check for automatic sub finding and act accordingly.
         if gameday.automatic_sub_finding:
-            raise NotImplementedError('Can not launch automatic sub finding yet.')
+            try:
+                await SubFinder.create(gameday=gameday, now=discord.utils.utcnow())
+            except ValueError as exc:
+                embed = self.bot.Embed(title='Error With Automatic Sub Finding', description=f'Error: {exc}')
+                await team.text_channel.send(
+                    embed=embed,
+                    content=human_join((obj.mention for obj in [*team.captain_roles, *gameday.attending_members])),
+                )
+                return
         else:
             # We cannot do automatic sub finding, let's figure out why first. This cna be for one of two reasons:
             # 1. The bucket has it disabled
@@ -261,6 +270,10 @@ class GamedayEventListener(BaseCog):
                 content=captain_mention_content,
                 allowed_mentions=discord.AllowedMentions(roles=True),
             )
+            
+    @commands.Cog.listener('on_sub_finding_end_timer_complete')
+    async def on_sub_finding_end(self, *, guild_id: int, team_id: int, gameday_id: int) -> None:
+        ...
 
 
 class GamedayCommands(BaseCog):

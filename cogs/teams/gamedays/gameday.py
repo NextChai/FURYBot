@@ -169,6 +169,7 @@ class GamedayMember:
         bucket_id: int,
         gameday_id: int,
         reason: Optional[str] = None,
+        is_temporary_sub: bool = False,
     ) -> Self:
         bucket = bot.get_gameday_bucket(guild_id, team_id)
         if bucket is None:
@@ -185,13 +186,16 @@ class GamedayMember:
                 guild_id,
                 bucket_id,
                 gameday_id,
-                reason
+                reason,
+                is_temporary_sub
             )
-            VALUES ($1, $2, $3, $4, $5, $6)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
             """
 
-        data = await connection.fetchrow(query, member_id, team_id, guild_id, bucket_id, gameday_id, reason)
+        data = await connection.fetchrow(
+            query, member_id, team_id, guild_id, bucket_id, gameday_id, reason, is_temporary_sub
+        )
         assert data
 
         self = cls(bot=bot, **dict(data))
@@ -627,6 +631,10 @@ class Gameday:
         sub_finder_starts_at: Optional[datetime.datetime] = None,
         sub_finder_ends_at: Optional[datetime.datetime] = None,
         sub_finder_ends_at_timer_id: Optional[int] = None,
+        # Message ID for the sub finder in the sub finding channel
+        sub_finder_message_id: Optional[int] = None,
+        # Message ID for the sub finder in the team's channel for updates.
+        sub_finder_update_message_id: Optional[int] = None,
     ) -> None:
         self.bot: FuryBot = bot
 
@@ -662,6 +670,8 @@ class Gameday:
         self.sub_finder_starts_at: Optional[datetime.datetime] = sub_finder_starts_at
         self.sub_finder_ends_at: Optional[datetime.datetime] = sub_finder_ends_at
         self.sub_finder_ends_at_timer_id: Optional[int] = sub_finder_ends_at_timer_id
+        self.sub_finder_message_id: Optional[int] = sub_finder_message_id
+        self.sub_finder_update_message_id: Optional[int] = sub_finder_update_message_id
 
     @classmethod
     async def create(
@@ -806,7 +816,7 @@ class Gameday:
         return image_to_file(image, filename='gameday_images.png', description='The merged image for all gameday images.')
 
     async def create_member(
-        self, member_id: int, *, reason: Optional[str] = None, connection: ConnectionType
+        self, member_id: int, *, reason: Optional[str] = None, connection: ConnectionType, is_temporary_sub: bool = False
     ) -> GamedayMember:
         return await GamedayMember.create(
             self.bot,
@@ -817,6 +827,7 @@ class Gameday:
             bucket_id=self.bucket_id,
             gameday_id=self.id,
             reason=reason,
+            is_temporary_sub=is_temporary_sub,
         )
 
     async def fetch_members(self, *, connection: ConnectionType) -> List[GamedayMember]:
@@ -926,7 +937,7 @@ class Gameday:
         if self.sub_finder_ends_at_timer_id is None:
             return None
 
-        return await timer_manager.fetch_timer(self.sub_finder_timer_id, connection=connection)
+        return await timer_manager.fetch_timer(self.sub_finder_ends_at_timer_id, connection=connection)
 
     async def edit(
         self,
@@ -944,7 +955,9 @@ class Gameday:
         score_message_id: int = MISSING,
         sub_finder_starts_at: datetime.datetime = MISSING,
         sub_finder_ends_at: datetime.datetime = MISSING,
-        sub_finder_timer_id: int = MISSING,
+        sub_finder_ends_at_timer_id: int = MISSING,
+        sub_finder_message_id: int = MISSING,
+        sub_finder_update_message_id: int = MISSING,
     ) -> None:
         builder = QueryBuilder('teams.gamedays')
         builder.add_condition('id', self.id)
@@ -997,9 +1010,17 @@ class Gameday:
             builder.add_arg('sub_finder_ends_at', sub_finder_ends_at)
             self.sub_finder_ends_at = sub_finder_ends_at
 
-        if sub_finder_timer_id is not MISSING:
-            builder.add_arg('sub_finder_timer_id', sub_finder_timer_id)
-            self.sub_finder_timer_id = sub_finder_timer_id
+        if sub_finder_ends_at_timer_id is not MISSING:
+            builder.add_arg('sub_finder_ends_at_timer_id', sub_finder_ends_at_timer_id)
+            self.sub_finder_ends_at_timer_id = sub_finder_ends_at_timer_id
+
+        if sub_finder_message_id is not MISSING:
+            builder.add_arg('sub_finder_message_id', sub_finder_message_id)
+            self.sub_finder_message_id = sub_finder_message_id
+
+        if sub_finder_update_message_id is not MISSING:
+            builder.add_arg('sub_finder_update_message_id', sub_finder_update_message_id)
+            self.sub_finder_update_message_id = sub_finder_update_message_id
 
         if self.bot.timer_manager:
             updating_timers = [
