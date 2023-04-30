@@ -11,7 +11,7 @@ emoji
 parsedatetime
 python-dateutil
 pytz
-jishaku
+git+https://github.com/Gorialis/jishaku/tree/master
 fuzzywuzzy
 sentry-sdk
 aiofile

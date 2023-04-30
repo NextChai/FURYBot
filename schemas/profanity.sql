@@ -11,8 +11,9 @@ CREATE TABLE IF NOT EXISTS profanity.settings (
 
 CREATE TABLE IF NOT EXISTS profanity.words (
     id SERIAL PRIMARY KEY,
+    guild_id BIGINT,
     settings_id BIGINT REFERENCES profanity.settings(id) ON DELETE CASCADE,
-    automod_rule_id BIGINT REFERENCES profanity.settings(automod_rule_id),
+    automod_rule_id BIGINT,
     word TEXT UNIQUE,
     added_at TIMESTAMP WITH TIME ZONE
 );

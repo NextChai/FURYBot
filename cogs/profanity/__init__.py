@@ -82,8 +82,8 @@ class Profanity(BaseCog):
 
             now = discord.utils.utcnow()
             await connection.executemany(
-                'INSERT INTO profanity.words(settings_id, automod_rule_id, word, added_at) VALUES ($1, $2, $3, $4) ON CONFLICT (word) DO NOTHING',
-                [(settings_data['id'], rule.id, word, now) for word in rule.trigger.keyword_filter],
+                'INSERT INTO profanity.words(settings_id, automod_rule_id, word, added_at, guild_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (word) DO NOTHING',
+                [(settings_data['id'], rule.id, word, now, rule.guild.id) for word in rule.trigger.keyword_filter],
             )
 
             # Fetch all the words across all the profanity.settings tables where guild_id = rule.guild.id and automod_rule_id != rule.id
@@ -125,7 +125,7 @@ class Profanity(BaseCog):
             self.bot.remove_custom_profanity_finder(rule.guild.id)
 
     async def _overwrite_words(
-        self, settings_id: int, rule_keywords: List[str], rule_id: int, connection: ConnectionType
+        self, settings_id: int, guild_id: int, rule_keywords: List[str], rule_id: int, connection: ConnectionType
     ) -> None:
         all_words = await connection.fetch('SELECT word FROM profanity.words WHERE automod_rule_id = $1', rule_id)
 
@@ -141,8 +141,8 @@ class Profanity(BaseCog):
 
         if words_to_add:
             await connection.executemany(
-                'INSERT INTO profanity.words(settings_id, automod_rule_id, word, added_at) VALUES ($1, $2, $3, $4) ON CONFLICT (word) DO NOTHING',
-                [(settings_id, rule_id, word, discord.utils.utcnow()) for word in words_to_add],
+                'INSERT INTO profanity.words(settings_id, automod_rule_id, word, added_at, guild_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (word) DO NOTHING',
+                [(settings_id, rule_id, word, discord.utils.utcnow(), guild_id) for word in words_to_add],
             )
 
     @commands.Cog.listener('on_automod_rule_update')
@@ -160,7 +160,7 @@ class Profanity(BaseCog):
                 # This isn't a tracked item
                 return
 
-            await self._overwrite_words(settings_id, rule_keywords, rule.id, connection)
+            await self._overwrite_words(settings_id, rule.guild.id, rule_keywords, rule.id, connection)
 
             # Now we can fetch all the updated words from the entire guild and re-build the profanity finder.
             all_words_raw = await connection.fetch(

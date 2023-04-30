@@ -940,9 +940,7 @@ class ProfanityPanel(BaseView):
             # Using the guild_id, we need to fetch the settings_id from profanity.settings then we can use it to fetch all the words
             all_words = await connection.fetch(
                 """
-                SELECT * FROM profanity.words WHERE settings_id = (
-                    SELECT id FROM profanity.settings WHERE guild_id = $1
-                )
+                SELECT * FROM profanity.words WHERE guild_id = $1
                 """,
                 interaction.guild_id,
             )
