@@ -177,14 +177,7 @@ class ChannelSelect(
     you can pass additional args and kwargs to be passed to the callback.
     """
 
-    def __init__(
-        self,
-        after: AfterCallback[Union[AppCommandChannel, AppCommandThread]],
-        parent: ViewMixinT,
-        *args: Any,
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(after, parent, *args, **kwargs)
+    ...
 
 
 class RoleSelect(Generic[ViewMixinT], RelaySelect[discord.Role, ViewMixinT], discord.ui.RoleSelect[ViewMixinT]):
@@ -192,8 +185,7 @@ class RoleSelect(Generic[ViewMixinT], RelaySelect[discord.Role, ViewMixinT], dis
     you can pass additional args and kwargs to be passed to the callback.
     """
 
-    def __init__(self, after: AfterCallback[discord.Role], parent: ViewMixinT, *args: Any, **kwargs: Any) -> None:
-        super().__init__(after, parent, *args, **kwargs)
+    ...
 
 
 class UserSelect(
@@ -204,14 +196,7 @@ class UserSelect(
     you can pass additional args and kwargs to be passed to the callback.
     """
 
-    def __init__(
-        self,
-        after: AfterCallback[Union[discord.Member, discord.User]],
-        parent: ViewMixinT,
-        *args: Any,
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(after, parent, *args, **kwargs)
+    ...
 
 
 class MentionableSelect(
@@ -222,14 +207,7 @@ class MentionableSelect(
     you can pass additional args and kwargs to be passed to the callback.
     """
 
-    def __init__(
-        self,
-        after: AfterCallback[Union[discord.Member, discord.User, discord.Role]],
-        parent: ViewMixinT,
-        *args: Any,
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(after, parent, *args, **kwargs)
+    ...
 
 
 class SelectEater(
