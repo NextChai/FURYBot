@@ -848,29 +848,6 @@ class GamedayBucketPanel(BaseView):
             inline=False,
         )
 
-        automatic_sub_channel_fmt: str
-        automatic_sub_finding_channel = self.bucket.automatic_sub_finding_channel
-
-        if automatic_sub_finding_channel is not None:
-            automatic_sub_channel_fmt = f'{automatic_sub_finding_channel.mention} is used to find subs for this bucket.'
-        else:
-            if self.bucket.automatic_sub_finding_channel_id is not None:
-                automatic_sub_channel_fmt = (
-                    'I could not find the channel to use for automatic sub finding. Did it get deleted?'
-                )
-            else:
-                automatic_sub_channel_fmt = 'There is no channel set for automatic sub finding.'
-
-        embed.add_field(
-            name='Automatic Sub Finding',
-            value=f'Automatic sub finding when possible is **{"enabled" if self.bucket.automatic_sub_finding_if_possible else "disabled"}**. '
-            'Note that, at times, it is not possible to use automatic sub finding. This is only because a moderator has changed a gameday\'s '
-            'settings 24 hours before the gameday.',
-            inline=False,
-        )
-
-        embed.add_field(name='Automatic Sub Finding Channel', value=automatic_sub_channel_fmt, inline=False)
-
         return embed
 
     @discord.ui.button(label='Manage Gameday Times')

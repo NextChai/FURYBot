@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from bot import FuryBot
 
     from ...team import Team
-    from ..gameday import Gameday
+    from ..gameday import Gameday, GamedaySubFinding
 
 
 def create_sub_finding_status_embed(gameday: Gameday) -> discord.Embed:
@@ -80,7 +80,21 @@ class ConfirmSubFinding(BaseView):
 
     @property
     def embed(self) -> discord.Embed:
-        ...
+        embed = self.team.embed(
+            title='Please Confirm',
+            description='Confirm your attendance for the upcoming gameday. If you press "Confirm" you agree to show '
+            'up to the gameday at the attended time and communicate with your team accoridngly. If for some reason '
+            'you are unable to attend after confirming, please contact your team captain or a staff member.',
+        )
+
+        embed.add_field(name='Gameday Starts At', value=human_timestamp(self.gameday.starts_at))
+        embed.add_field(
+            name='Current Registered Teammates',
+            value=human_join((m.mention for m in self.gameday.attending_members)),
+            inline=False,
+        )
+
+        return embed
 
     @discord.ui.button(label='Confirm', style=discord.ButtonStyle.green)
     async def confirm(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
@@ -91,14 +105,35 @@ class ConfirmSubFinding(BaseView):
             await self.team.add_team_member(member_id=interaction.user.id, is_sub=True)
             await self.gameday.create_member(member_id=interaction.user.id, connection=connection, is_temporary_sub=True)
 
-        await self.team.text_channel.send(
-            f'I\'ve added a temporary sub to this team for the upcoming gameday. Say hello to {interaction.user.mention}!'
-        )
+            await self.team.text_channel.send(
+                f'I\'ve added a temporary sub to this team for the upcoming gameday. Say hello to {interaction.user.mention}!'
+            )
 
-        await interaction.followup.send(
-            f'I\'ve added you as a sub to {self.team.display_name}, say hello to your temporary teammates in {self.team.text_channel.mention}!',
-            ephemeral=True,
-        )
+            await interaction.followup.send(
+                f'I\'ve added you as a sub to {self.team.display_name}, say hello to your temporary teammates in {self.team.text_channel.mention}!',
+                ephemeral=True,
+            )
+
+            sub_finding = await self.gameday.getch_sub_finding(connection=connection)
+            update_message = await sub_finding.fetch_update_message()
+            if update_message is not None:
+                embed = create_sub_finding_status_embed(self.gameday)
+                await update_message.edit(embed=embed)
+
+            message = await sub_finding.fetch_message()
+            if self.gameday.voting.has_votes_needed:
+                # We can end the sub finding sooner than expected.
+                timer = await sub_finding.fetch_ends_at_timer(connection=connection)
+                if timer is not None:
+                    await timer.edit(expires=interaction.created_at)
+
+                if message is not None:
+                    await message.edit(view=None)
+
+                return
+
+            if message is not None:
+                await message.edit(view=sub_finding.view, embed=sub_finding.view.embed)
 
     @discord.ui.button(label='Cancel', style=discord.ButtonStyle.red)
     async def cancel(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
@@ -139,9 +174,10 @@ class SubFinder(discord.ui.View):
         This team has been deleted but the sub finder was initialized.
     """
 
-    def __init__(self, gameday: Gameday) -> None:
+    def __init__(self, gameday: Gameday, sub_finding: GamedaySubFinding) -> None:
         self.bot: FuryBot = gameday.bot
         self.gameday: Gameday = gameday
+        self.sub_finding: GamedaySubFinding = sub_finding
 
         team = gameday.team
         if team is None:
@@ -151,13 +187,22 @@ class SubFinder(discord.ui.View):
 
     @property
     def embed(self) -> discord.Embed:
+        sub_finder_ends_at = self.sub_finding.ends_at
+        if sub_finder_ends_at is None:
+            raise ValueError('Cannot create a sub finder embed for a gameday that has no sub finder end time.')
+
         embed = self.team.embed(
             title='Sub Needed',
             description=f'{self.gameday.subs_needed} sub(s) are needed for the upcoming gameday. '
-            'This sub finder expires in {}',
+            f'This sub finder expires in {human_timestamp(sub_finder_ends_at)}',
         )
 
         embed.add_field(name='Gameday Starts At', value=human_timestamp(self.gameday.starts_at), inline=False)
+        embed.add_field(
+            name='Current Registered Teammates',
+            value=human_join((m.mention for m in self.gameday.attending_members)),
+            inline=False,
+        )
 
         return embed
 
@@ -176,32 +221,35 @@ class SubFinder(discord.ui.View):
             # TODO: Better error here
             raise ValueError('Cannot create a sub finder for a gameday that is too close to start.')
 
-        self = cls(gameday=gameday)
-        message = await sub_finding_channel.send(view=self, embed=self.embed)
-
-        team_message = await self.team.text_channel.send(embed=create_sub_finding_status_embed(self.gameday))
-
-        # Let's create a timer for when the sub finder should end
         bot = gameday.bot
-        timer_id = discord.utils.MISSING
-        if bot.timer_manager:
-            timer = await bot.timer_manager.create_timer(
-                comfy_sub_fiding_times.end,
-                'sub_finding_end',
-                guild_id=gameday.guild_id,
-                team_id=gameday.team_id,
-                gameday_id=gameday.id,
-            )
-            timer_id = timer.id
 
         async with bot.safe_connection() as connection:
-            await gameday.edit(
+            sub_finding = await gameday.getch_sub_finding(connection=connection)
+
+            self = cls(gameday=gameday, sub_finding=sub_finding)
+
+            message = await sub_finding_channel.send(view=self, embed=self.embed)
+            team_message = await self.team.text_channel.send(embed=create_sub_finding_status_embed(self.gameday))
+
+            # Let's create a timer for when the sub finder should end
+            timer_id = discord.utils.MISSING
+            if bot.timer_manager:
+                timer = await bot.timer_manager.create_timer(
+                    comfy_sub_fiding_times.end,
+                    'sub_finding_end',
+                    guild_id=gameday.guild_id,
+                    team_id=gameday.team_id,
+                    gameday_id=gameday.id,
+                )
+                timer_id = timer.id
+
+            await sub_finding.edit(
                 connection=connection,
-                sub_finder_starts_at=comfy_sub_fiding_times.start,
-                sub_finder_ends_at=comfy_sub_fiding_times.end,
-                sub_finder_ends_at_timer_id=timer_id,
-                sub_finder_message_id=message.id,
-                sub_finder_update_message_id=team_message.id,
+                starts_at=comfy_sub_fiding_times.start,
+                ends_at=comfy_sub_fiding_times.end,
+                ends_at_timer_id=timer_id,
+                message_id=message.id,
+                update_message_id=team_message.id,
             )
 
         return self

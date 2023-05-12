@@ -238,42 +238,66 @@ class GamedayEventListener(BaseCog):
                     embed=embed,
                     content=human_join((obj.mention for obj in [*team.captain_roles, *gameday.attending_members])),
                 )
-                return
+
+            return
+
+        # We cannot do automatic sub finding, let's figure out why first. This cna be for one of two reasons:
+        # 1. The bucket has it disabled
+        # 2. The bot disabled it for this gameday due to time constraints
+        if bucket.automatic_sub_finding_if_possible:
+            reason = 'Due to time constraints, automatic sub finding was disabled for this gameday.'
         else:
-            # We cannot do automatic sub finding, let's figure out why first. This cna be for one of two reasons:
-            # 1. The bucket has it disabled
-            # 2. The bot disabled it for this gameday due to time constraints
-            if bucket.automatic_sub_finding_if_possible:
-                reason = 'Due to time constraints, automatic sub finding was disabled for this gameday.'
-            else:
-                reason = 'Automatic sub finding is disabled for this team\'s gameday bucket.'
+            reason = 'Automatic sub finding is disabled for this team\'s gameday bucket.'
 
-            embed = discord.Embed(
-                title='Gameday Attendance Voting Ended',
-                description='Unfortunately, we do not have enough votes to fill the team for this gameday. The miniumum '
-                f'is **{bucket.per_team} players** and we only have **{len(gameday.attending_members)}** members.',
-            )
+        embed = discord.Embed(
+            title='Gameday Attendance Voting Ended',
+            description='Unfortunately, we do not have enough votes to fill the team for this gameday. The miniumum '
+            f'is **{bucket.per_team} players** and we only have **{len(gameday.attending_members)}** members.',
+        )
 
-            embed.add_field(
-                name='Attending Members', value=human_join((m.mention for m in gameday.attending_members)), inline=False
-            )
-            embed.add_field(
-                name='Not Atending Members',
-                value='\n'.join(f'{m.mention}: {m.reason}' for m in gameday.not_attending_members),
-                inline=False,
-            )
+        embed.add_field(
+            name='Attending Members', value=human_join((m.mention for m in gameday.attending_members)), inline=False
+        )
+        embed.add_field(
+            name='Not Atending Members',
+            value='\n'.join(f'{m.mention}: {m.reason}' for m in gameday.not_attending_members),
+            inline=False,
+        )
 
-            embed.add_field(name='Automatic Sub Finding Disabled', value=reason)
+        embed.add_field(name='Automatic Sub Finding Disabled', value=reason)
 
-            await message.reply(
-                embed=embed,
-                content=captain_mention_content,
-                allowed_mentions=discord.AllowedMentions(roles=True),
-            )
-            
+        await message.reply(
+            embed=embed,
+            content=captain_mention_content,
+            allowed_mentions=discord.AllowedMentions(roles=True),
+        )
+
     @commands.Cog.listener('on_sub_finding_end_timer_complete')
     async def on_sub_finding_end(self, *, guild_id: int, team_id: int, gameday_id: int) -> None:
-        ...
+        guild = self.bot.get_guild(guild_id)
+        if guild is None:
+            _log.debug('Guild %s not found.', guild_id)
+            return
+
+        team = self.bot.get_team(team_id, guild_id=guild_id)
+        if team is None:
+            _log.debug('Team %s not found.', team_id)
+            return
+
+        bucket = team.get_gameday_bucket()
+        if bucket is None:
+            _log.debug('Gameday bucket not found.')
+            return
+
+        gameday = bucket.get_gameday(gameday_id)
+        if gameday is None:
+            _log.debug('Gameday %s not found.', gameday_id)
+            return
+
+        raise NotImplementedError('Sub finding result not implemented yet.')
+
+        if gameday.voting.has_votes_needed:
+            ...
 
 
 class GamedayCommands(BaseCog):

@@ -32,6 +32,9 @@ import discord
 import pytz
 from typing_extensions import Self
 
+from ..errors import TeamDeleted
+from persistent.sub_finding import SubFinder
+
 from utils import QueryBuilder, TimerNotFound, image_from_urls, image_to_file
 
 if TYPE_CHECKING:
@@ -605,6 +608,123 @@ class GamedayAttendanceVoting:
 
 
 @dataclasses.dataclass()
+class GamedaySubFinding:
+    bot: FuryBot
+    id: int
+    guild_id: int
+    team_id: int
+    bucket_id: int
+    gameday_id: int
+
+    enabled: bool
+
+    starts_at: Optional[datetime.datetime]
+    ends_at: Optional[datetime.datetime]
+    ends_at_timer_id: Optional[int]
+    message_id: Optional[int]
+    update_message_id: Optional[int]
+
+    @property
+    def bucket(self) -> Optional[GamedayBucket]:
+        return self.bot.get_gameday_bucket(self.guild_id, self.team_id)
+
+    @property
+    def team(self) -> Optional[Team]:
+        return self.bot.get_team(self.team_id, guild_id=self.guild_id)
+
+    @property
+    def gameday(self) -> Optional[Gameday]:
+        bucket = self.bucket
+        if bucket is None:
+            return None
+
+        return bucket.get_gameday(self.gameday_id)
+
+    @discord.utils.cached_property
+    def view(self) -> SubFinder:
+        gameday = self.gameday
+        if gameday is None:
+            raise ValueError('Gameday not found')
+
+        return SubFinder(gameday, sub_finding=self)
+
+    async def fetch_message(self) -> Optional[discord.Message]:
+        message_id = self.message_id
+        if message_id is None:
+            return
+
+        bucket = self.bucket
+        if bucket is None:
+            return
+
+        channel = bucket.automatic_sub_finding_channel
+        if channel is None:
+            return
+
+        return await channel.fetch_message(message_id)
+
+    async def fetch_update_message(self) -> Optional[discord.Message]:
+        update_message_id = self.update_message_id
+        if update_message_id is None:
+            return
+
+        team = self.team
+        if team is None:
+            raise TeamDeleted(team_id=self.team_id)
+
+        return await team.text_channel.fetch_message(update_message_id)
+
+    async def fetch_ends_at_timer(self, *, connection: Optional[ConnectionType] = None) -> Optional[Timer]:
+        timer_manager = self.bot.timer_manager
+        if timer_manager is None:
+            return None
+
+        if self.ends_at_timer_id is None:
+            return None
+
+        return await timer_manager.fetch_timer(self.ends_at_timer_id, connection=connection)
+
+    async def edit(
+        self,
+        *,
+        connection: ConnectionType,
+        enabled: bool = MISSING,
+        starts_at: datetime.datetime = MISSING,
+        ends_at: datetime.datetime = MISSING,
+        ends_at_timer_id: int = MISSING,
+        message_id: int = MISSING,
+        update_message_id: int = MISSING,
+    ) -> None:
+        builder = QueryBuilder('teams.gameday_automatic_sub_finding')
+        builder.add_condition('id', self.id)
+
+        if enabled is not MISSING:
+            builder.add_arg('enabled', enabled)
+            self.enabled = enabled
+
+        if starts_at is not MISSING:
+            builder.add_arg('starts_at', starts_at)
+            self.starts_at = starts_at
+
+        if ends_at is not MISSING:
+            builder.add_arg('ends_at', ends_at)
+            self.ends_at = ends_at
+
+        if ends_at_timer_id is not MISSING:
+            builder.add_arg('ends_at_timer_id', ends_at_timer_id)
+            self.ends_at_timer_id = ends_at_timer_id
+
+        if message_id is not MISSING:
+            builder.add_arg('message_id', message_id)
+            self.message_id = message_id
+
+        if update_message_id is not MISSING:
+            builder.add_arg('update_message_id', update_message_id)
+            self.update_message_id = update_message_id
+
+        await builder(connection)
+
+
 class Gameday:
     def __init__(
         self,
@@ -619,7 +739,6 @@ class Gameday:
         bucket_id: int,
         starts_at: datetime.datetime,
         ended_at: Optional[datetime.datetime] = None,
-        automatic_sub_finding: bool,
         voting_starts_at: datetime.datetime,
         voting_ends_at: datetime.datetime,
         gameday_time_id: int,
@@ -628,13 +747,6 @@ class Gameday:
         starts_at_timer_id: Optional[int] = None,
         voting_message_id: Optional[int] = None,
         score_message_id: Optional[int] = None,
-        sub_finder_starts_at: Optional[datetime.datetime] = None,
-        sub_finder_ends_at: Optional[datetime.datetime] = None,
-        sub_finder_ends_at_timer_id: Optional[int] = None,
-        # Message ID for the sub finder in the sub finding channel
-        sub_finder_message_id: Optional[int] = None,
-        # Message ID for the sub finder in the team's channel for updates.
-        sub_finder_update_message_id: Optional[int] = None,
     ) -> None:
         self.bot: FuryBot = bot
 
@@ -648,7 +760,6 @@ class Gameday:
         self.bucket_id: int = bucket_id
         self.starts_at: datetime.datetime = starts_at
         self.ended_at: Optional[datetime.datetime] = ended_at
-        self.automatic_sub_finding: bool = automatic_sub_finding
         self.starts_at_timer_id: Optional[int] = starts_at_timer_id
         self.gameday_time_id: int = gameday_time_id
 
@@ -667,11 +778,7 @@ class Gameday:
             message_id=voting_message_id,
         )
 
-        self.sub_finder_starts_at: Optional[datetime.datetime] = sub_finder_starts_at
-        self.sub_finder_ends_at: Optional[datetime.datetime] = sub_finder_ends_at
-        self.sub_finder_ends_at_timer_id: Optional[int] = sub_finder_ends_at_timer_id
-        self.sub_finder_message_id: Optional[int] = sub_finder_message_id
-        self.sub_finder_update_message_id: Optional[int] = sub_finder_update_message_id
+        self._sub_finding: Optional[GamedaySubFinding] = None
 
     @classmethod
     async def create(
@@ -697,7 +804,6 @@ class Gameday:
                 team_id, 
                 bucket_id, 
                 starts_at,
-                automatic_sub_finding, 
                 voting_starts_at,
                 voting_ends_at,
                 gameday_time_id
@@ -712,7 +818,6 @@ class Gameday:
             team_id,
             bucket_id,
             starts_at,
-            voting.can_use_automatic_sub_finding,
             voting.start,
             voting.end,
             gameday_time_id,
@@ -721,6 +826,27 @@ class Gameday:
 
         self = cls(bot=bot, members={}, images={}, score_reports={}, **dict(data))
         bucket.add_gameday(self)
+
+        data = await connection.fetchrow(
+            """
+            INSERT INTO teams.gameday_automatic_sub_finding(
+                guild_id,
+                team_id,
+                bucket_id,
+                enabled
+            )
+            VALUES ($1, $2, $3, $4)
+            RETURNING *
+            """,
+            guild_id,
+            team_id,
+            bucket_id,
+            voting.can_use_automatic_sub_finding,
+        )
+        assert data
+
+        sub_finding = GamedaySubFinding(self.bot, **dict(data))
+        self._sub_finding = sub_finding
 
         # We need to spawn the timers here to dispatch the events
         timer_manager = bot.timer_manager
@@ -806,6 +932,24 @@ class Gameday:
     def get_image(self, image_id: int, /) -> Optional[GamedayImage]:
         return self.images.get(image_id)
 
+    async def getch_sub_finding(self, *, connection: Optional[ConnectionType] = None) -> GamedaySubFinding:
+        if self._sub_finding:
+            return self._sub_finding
+
+        if connection is None:
+            async with self.bot.safe_connection() as connection:
+                data = await connection.fetchrow(
+                    'SELECT * FROM teams.gameday_automatic_sub_finding WHERE gameday_id = $1', self.id
+                )
+        else:
+            data = await connection.fetchrow(
+                'SELECT * FROM teams.gameday_automatic_sub_finding WHERE gameday_id = $1', self.id
+            )
+
+        assert data
+
+        return GamedaySubFinding(self.bot, **dict(data))
+
     async def merge_images(self) -> Optional[discord.File]:
         if not self.images:
             return
@@ -873,6 +1017,12 @@ class Gameday:
         for score in scores:
             self.add_score_report(score)
 
+        # If there's an ongoing sub finder we need to add the view to the bot
+        now = discord.utils.utcnow()
+        sub_finding = await self.getch_sub_finding(connection=connection)
+        if sub_finding.starts_at and sub_finding.ends_at and sub_finding.starts_at < now < sub_finding.ends_at:
+            self.bot.add_view(sub_finding.view)
+
     async def delete(self, *, connection: ConnectionType) -> None:
         query = """
             DELETE FROM teams.gamedays
@@ -890,7 +1040,7 @@ class Gameday:
             self.fetch_starts_at_timer,
             self.voting.fetch_starts_at_timer,
             self.voting.fetch_ends_at_timer,
-            self.fetch_sub_finder_ends_at_timer,
+            # self.fetch_sub_finder_ends_at_timer,
         ]
 
         for coro in timer_coros:
@@ -929,16 +1079,6 @@ class Gameday:
 
         return await timer_manager.fetch_timer(self.starts_at_timer_id, connection=connection)
 
-    async def fetch_sub_finder_ends_at_timer(self, *, connection: Optional[ConnectionType] = None) -> Optional[Timer]:
-        timer_manager = self.bot.timer_manager
-        if timer_manager is None:
-            return None
-
-        if self.sub_finder_ends_at_timer_id is None:
-            return None
-
-        return await timer_manager.fetch_timer(self.sub_finder_ends_at_timer_id, connection=connection)
-
     async def edit(
         self,
         connection: ConnectionType,
@@ -953,11 +1093,6 @@ class Gameday:
         starts_at_timer_id: int = MISSING,
         ended_at: datetime.datetime = MISSING,
         score_message_id: int = MISSING,
-        sub_finder_starts_at: datetime.datetime = MISSING,
-        sub_finder_ends_at: datetime.datetime = MISSING,
-        sub_finder_ends_at_timer_id: int = MISSING,
-        sub_finder_message_id: int = MISSING,
-        sub_finder_update_message_id: int = MISSING,
     ) -> None:
         builder = QueryBuilder('teams.gamedays')
         builder.add_condition('id', self.id)
@@ -1002,32 +1137,11 @@ class Gameday:
             builder.add_arg('score_message_id', score_message_id)
             self.score_message_id = score_message_id
 
-        if sub_finder_starts_at is not MISSING:
-            builder.add_arg('sub_finder_starts_at', sub_finder_starts_at)
-            self.sub_finder_starts_at = sub_finder_starts_at
-
-        if sub_finder_ends_at is not MISSING:
-            builder.add_arg('sub_finder_ends_at', sub_finder_ends_at)
-            self.sub_finder_ends_at = sub_finder_ends_at
-
-        if sub_finder_ends_at_timer_id is not MISSING:
-            builder.add_arg('sub_finder_ends_at_timer_id', sub_finder_ends_at_timer_id)
-            self.sub_finder_ends_at_timer_id = sub_finder_ends_at_timer_id
-
-        if sub_finder_message_id is not MISSING:
-            builder.add_arg('sub_finder_message_id', sub_finder_message_id)
-            self.sub_finder_message_id = sub_finder_message_id
-
-        if sub_finder_update_message_id is not MISSING:
-            builder.add_arg('sub_finder_update_message_id', sub_finder_update_message_id)
-            self.sub_finder_update_message_id = sub_finder_update_message_id
-
         if self.bot.timer_manager:
             updating_timers = [
                 (starts_at, self.fetch_starts_at_timer),
                 (voting_starts_at, self.voting.fetch_starts_at_timer),
                 (voting_ends_at, self.voting.fetch_ends_at_timer),
-                (sub_finder_ends_at, self.fetch_sub_finder_ends_at_timer),
             ]
 
             for new_datetime, coro in updating_timers:
