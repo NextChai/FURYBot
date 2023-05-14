@@ -102,6 +102,7 @@ initial_extensions: Tuple[str, ...] = (
     'cogs.teams.scrims',
     'jishaku',
     'utils.error_handler',
+    'cogs.fury',
 )
 
 
