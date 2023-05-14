@@ -24,6 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 import collections
 
+import string
 import asyncio
 import io
 import textwrap
@@ -48,69 +49,55 @@ CAPTAIN_ROLE_ID: int = 765360488816967722
 BOTS_ROLE_ID: int = 763455351332798485
 
 KICKENING_MESSAGES: List[str] = [
-    "Oops! Looks like you got kicked! Better luck next time, champ.",
-    "Kicked out of the game and the server? Ouch, that's gotta hurt.",
-    "Time to take a break and rethink your strategy. Kicked!",
-    "Don't worry, it's just a kick in the pants. See you soon!",
-    "You've been kicked to the curb. Better dust off your gaming skills.",
-    "A kick in the server is worth two in the game. Time to regroup.",
-    "Kicked and banished! Time to work on those team skills.",
-    "Kicked to the sidelines? Use this time to practice and come back stronger.",
-    "Kicked out? That's okay, there's always room for improvement.",
-    "Kicked, but not defeated! Keep pushing for that victory.",
-    "Sorry, but you're not living up to the game's standards. Kicked!",
-    "Kicked like a ball in Rocket League. Keep your head up!",
-    "No need to rage quit, you've already been kicked. Come back stronger.",
-    "The only way to go is up after getting kicked. Good luck!",
-    "Kicked for being a sore loser? Try being a gracious winner instead.",
-    "Kicked, but still loved. Come back and join the fun again soon!",
-    "A kick in the server is a wake-up call. Time to up your game!",
-    "You can't win them all, but you can learn from getting kicked. Keep going!",
-    "Looks like you've been kicked from the game. Time to Overwatch your strategy.",
-    "Mario Kart outta here! You've been kicked from the server.",
-    "Sorry, but you're not Smash-ing it today. You've been kicked!",
-    "Kicked like a soccer ball in Rocket League? Time to work on your defense.",
-    "We're not Spla-toon with you today. You've been kicked from the game.",
-    "You've been kicked from the server. That's a Valo-rant, don't you think?",
-    "League of Legends? More like League of Losers. You've been kicked!",
-    "Kicked from the server? It's time to Get-Gooder at the game.",
-    "Sorry, you're not living up to our standards. You've been Overwatch-ed and kicked.",
-    "Kicked from the server? Looks like you need to Aimbot-ter next time.",
-    "Super Smash Bros? More like Super Smashed by the ban hammer. You've been kicked!",
-    "Mario Karted out of the server. Time to re-Luigi-n your gaming skills.",
-    "Splatoon? More like Sploosh-gone. You've been kicked!",
-    "Kicked from the server? That's not very VALOR-ant of us.",
-    "Time to take a break and re-focus. You've been kicked from the game.",
-    "Sorry, we had to kick you out. We don't want any toxicity in our community.",
-    "Kicked from the server? It's time to level up your gaming skills.",
-    "Looks like you're not quite ready for the big leagues. You've been kicked.",
-    "We're not seeing eye-to-eye on this one. You've been kicked from the game.",
-    "Kicked from the server? Don't worry, there's always next time.",
-    "Sorry, but you're not on our team today. You've been kicked from the game.",
-    "Kicked from the server? Time to re-strategize and come back stronger.",
-    "Looks like we need to recalibrate. You've been kicked from the game.",
-    "Kicked from the server? Don't take it personally, it's just business.",
-    "Sorry, but you've been voted off the island. You've been kicked from the server.",
-    "Looks like it's game over for you. You've been kicked from the server.",
-    "Kicked from the server? Take this as a sign to practice and improve your skills.",
-    "Sorry, but you're just not cutting it. You've been kicked from the game.",
-    "Kicked from the server? We don't tolerate cheaters in our community.",
-    "Looks like it's time for a time out. You've been kicked from the game.",
-    "Sorry, but we had to give you the boot. Your puns were too cheesy.",
-    "Kicked from the server? Looks like you'll have to find another way to procrastinate.",
-    "Looks like your gameplay needs a reboot. You've been kicked from the game.",
-    "Kicked from the server? Don't worry, we won't hold it against you... much.",
-    "Sorry, but you're just not winning us over. You've been kicked from the game.",
-    "Kicked from the server? It's time to switch up your strategy.",
-    "Looks like you need to take a breather. You've been kicked from the game.",
-    "Kicked from the server? Don't sweat it, we've all been there before... but I haven't!",
-    "Sorry, but you're not quite our cup of tea. You've been kicked from the server.",
-    "Kicked from the server? We had to make room for our pet hamster. Sorry!",
-    "Looks like it's time for a reality check. You've been kicked from the game.",
-    "Kicked from the server? Maybe you should try playing with your eyes open next time.",
-    "Sorry, but you're just not keeping up with the pack. You've been kicked from the game.",
-    "Kicked from the server? We have a strict 'no camping' policy.",
-    "Looks like it's time for a reboot. You've been kicked from the game.",
+    "Oops! Looks like $mention got kicked! Better luck next time, champ.",
+    "Kicked out of the game and the server? Ouch, that's gotta hurt, $mention.",
+    "Time to take a break and rethink your strategy, $mention. You've been kicked!",
+    "Don't worry, $mention, it's just a kick in the pants. See you soon!",
+    "You've been kicked to the curb, $mention. Better dust off your gaming skills.",
+    "A kick in the server is worth two in the game, $mention. Time to regroup.",
+    "Kicked and banished! Time to work on those team skills, $mention.",
+    "Kicked to the sidelines, $mention? Use this time to practice and come back stronger.",
+    "Kicked out? That's okay, $mention, there's always room for improvement.",
+    "Kicked, but not defeated! Keep pushing for that victory, $mention.",
+    "Sorry, but $mention is not living up to the game's standards. Kicked!",
+    "Kicked like a ball in Rocket League, $mention. Keep your head up!",
+    "No need to rage quit, $mention, you've already been kicked. Come back stronger.",
+    "The only way to go is up after getting kicked. Good luck, $mention!",
+    "Kicked for being a sore loser? Try being a gracious winner instead, $mention.",
+    "Kicked, but still loved. Come back and join the fun again soon, $mention!",
+    "A kick in the server is a wake-up call. Time to up your game, $mention!",
+    "You can't win them all, but you can learn from getting kicked. Keep going, $mention!",
+    "Looks like $mention has been kicked from the game. Time to Overwatch your strategy.",
+    "Mario Kart outta here! $mention has been kicked from the server.",
+    "Sorry, but $mention is not Smash-ing it today. You've been kicked!",
+    "Kicked like a soccer ball in Rocket League? Time to work on your defense, $mention.",
+    "We're not Spla-toon with you today. $mention has been kicked from the game.",
+    "$mention has been kicked from the server. That's a Valo-rant, don't you think?",
+    "League of Legends? More like League of Losers. $mention has been kicked!",
+    "Kicked from the server? It's time to Get-Gooder at the game, $mention.",
+    "Sorry, $mention, you're not living up to our standards. You've been Overwatch-ed and kicked.",
+    "Kicked from the server? Looks like $mention needs to Aimbot-ter next time.",
+    "Super Smash Bros? More like Super Smashed by the ban hammer. $mention has been kicked!",
+    "Mario Karted out of the server. Time to re-Luigi-n your gaming skills, $mention.",
+    "Splatoon? More like Sploosh-gone. $mention has been kicked!",
+    "Kicked from the server? That's not very VALOR-ant of us, $mention.",
+    "Time to take a break and re-focus, $mention. You've been kicked from the game.",
+    "Looks like $mention got the boot! Maybe next time you'll kick it up a notch.",
+    "Kicked from the server? Don't worry, $mention, there's always another game to play.",
+    "A kick in the pants might be just what you need, $mention. Come back stronger!",
+    "Sorry, $mention, but you're out of the game. Time to level up your skills!",
+    "Kicked from the game? That's a sign to take a break and come back refreshed, $mention.",
+    "Don't be a sore loser, $mention. Accept the kick and learn from it.",
+    "Kicked out of the server? That's just a temporary setback, $mention. Keep striving for greatness.",
+    "A kick in the server is like a reset button. Use it to your advantage, $mention.",
+    "Looks like $mention got the boot! And not the fashionable kind.",
+    "Don't worry, $mention. Getting kicked is just the universe's way of telling you to take a break from screens and go outside.",
+    "Kicked to the curb like an old can of LaCroix, $mention. Better luck next time.",
+    "Kicked from the server? That's okay, $mention, there's always another game to play.",
+    "Did someone just kick $mention to the moon? Because they're definitely not on this server anymore.",
+    "Looks like $mention just got sent to the penalty box. Better start practicing those power plays.",
+    "Sorry, $mention, but we had to give you the boot. We heard you were hoarding all the gold coins.",
+    "You can't spell \"kicked\" without \"I C K\" and that's exactly what $mention just got. Ouch.",
 ]
 
 
@@ -339,11 +326,13 @@ class FurySpecificCommands(BaseCog):
         await asyncio.sleep(30)
 
         for offline_member in offline_members:
+            kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=offline_member.mention)
+
             await ctx.send(
                 embed=self.bot.Embed(
                     title=f'{offline_member.display_name} is offline!',
                     description=f'{offline_member.mention} is offline on Discord, so they will not be included in the kickening. Someone '
-                    'didn\'t look at <#757666199214751794>! Shame on them, bye bye!',
+                    f'didn\'t look at <#757666199214751794>! {kick_message}',
                     author=offline_member,
                 ),
                 delete_after=3,
@@ -402,6 +391,12 @@ class FurySpecificCommands(BaseCog):
                     'for your service and hope you will continue to support us in the future. See you next season!',
                     inline=False,
                 )
+                embed.add_field(
+                    name='Remaining Members',
+                    value=f'There are **{len(all_kickable_members)} people** remaining in the kickening.',
+                    inline=False,
+                )
+
                 embed.set_footer(
                     text=f'You have {GRACE_PERIOD} seconds until you get kicked and we move onto the next member.'
                 )
@@ -409,14 +404,15 @@ class FurySpecificCommands(BaseCog):
                 file = await view.generate_image()
                 embed.set_image(url=f'attachment://{file.filename}')
 
-            await ctx.send(embed=embed, files=[file])
+            message = await ctx.send(embed=embed, files=[file])
 
             await asyncio.sleep(GRACE_PERIOD)
             # await ctx.guild.kick(member_to_kick, reason='The kickening has spoken!')
 
-            await ctx.send(random.choice(KICKENING_MESSAGES))
+            kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=member_to_kick.mention)
+            await message.reply(kick_message)
 
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)
 
             # Remove the kicked member from the list
             all_kickable_members.remove(member_to_kick)
