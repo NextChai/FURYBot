@@ -216,13 +216,21 @@ class FurySpecificCommands(BaseCog):
 
         random.shuffle(all_kickable_members)
 
-        await ctx.send(
-            embed=self.bot.Embed(
-                title='Fetched All Members',
-                description=f'Fetched {len(all_kickable_members)} members for the kickening, let it begin!',
-            ),
-            delete_after=3,
+        embed = self.bot.Embed(
+            title='Fetched All Members',
+            description=f'Fetched {len(all_kickable_members) + len(offline_members)} members for the kickening, let it begin in 30 seconds!',
         )
+        embed.add_field(
+            name='Offline Members!',
+            value=f'There are {len(offline_members)} offline members! They will be kicked immediately! You had your chance!',
+        )
+
+        await ctx.send(
+            embed=embed,
+            delete_after=30,
+        )
+        
+        await asyncio.sleep(30)
 
         for offline_member in offline_members:
             await ctx.send(
