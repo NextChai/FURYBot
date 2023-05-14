@@ -30,7 +30,7 @@ import textwrap
 import random
 from typing import TYPE_CHECKING, List, Optional, Set, Type
 from typing_extensions import Self
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 import discord
 from discord.ext import commands
@@ -201,14 +201,23 @@ class KickeningView(discord.ui.View):
         image = image.convert("RGBA")
 
         # Create a mask in the shape of a circle
-        mask = Image.new("L", image.size, 0)
+        mask_size = (image.width * 2, image.height * 2)
+        mask = Image.new("L", mask_size, 0)
         draw = ImageDraw.Draw(mask)
-        draw.ellipse((0, 0, image.width - 4, image.height - 4), fill=255)
+        draw.ellipse((0, 0, mask_size[0], mask_size[1]), fill=255)
+
+        # Resize the image to the size of the mask
+        resized_image = image.resize(mask_size)
 
         # Apply the mask to the image
-        image.putalpha(mask)
+        cropped_image = ImageOps.fit(resized_image, mask.size, centering=(0.5, 0.5))
+        cropped_image.putalpha(
+            mask.crop(
+                (image.width // 2, image.height // 2, image.width // 2 + image.width, image.height // 2 + image.height)
+            )
+        )
 
-        return image
+        return cropped_image
 
     def _sync_generate_image(
         self,
