@@ -277,7 +277,9 @@ class KickeningView(discord.ui.View):
         image.paste(first_member_image, (middle_of_image - (main_member_image_width // 2), top_image_padding))
 
         if first_member_voters_image:
-            image.paste(first_member_voters_image, (10, 120))
+            image.paste(
+                first_member_voters_image, (10, top_image_padding + main_member_image_height + sub_image_bottom_padding)
+            )
 
         # Then paste the second members image
         second_member_image = self.crop_to_circle(
@@ -288,7 +290,9 @@ class KickeningView(discord.ui.View):
         )
 
         if second_member_voters_image:
-            image.paste(second_member_voters_image, (260, 120))
+            image.paste(
+                second_member_voters_image, (260, top_image_padding + main_member_image_height + sub_image_bottom_padding)
+            )
 
         return image
 
