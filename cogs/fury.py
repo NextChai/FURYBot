@@ -229,7 +229,12 @@ class KickeningView(discord.ui.View):
 
         # Image height needs to be calculated though as it's dynamic.
         # Top border is 10px, image height is 100, bottom border is 10px.
-        image_height = 120
+        top_image_padding = 10
+        bottom_image_padding = 10
+        sub_image_bottom_padding = 10
+        main_member_image_height = 100
+        main_member_image_width = 100
+        image_height = main_member_image_height + top_image_padding + bottom_image_padding + sub_image_bottom_padding
 
         # Below it is going to be the images showing who voted for who, which
         # is completely dynamic.
@@ -259,22 +264,28 @@ class KickeningView(discord.ui.View):
         second_height = second_member_voters_image and second_member_voters_image.height or 0
         image_height += max(first_height, second_height)
 
-        # And add the padding back
-        image_height += 10
-
         # Now we can create our image
         image = Image.new('RGBA', (image_width, image_height), (49, 51, 56))
 
+        middle_of_image = image_width // 2
+        quarter_of_image = image_width // 4
+
         # First paste the first members image
-        first_member_image = self.crop_to_circle(Image.open(io.BytesIO(first_bytes)).resize((100, 100)))
-        image.paste(first_member_image, (75, 10))
+        first_member_image = self.crop_to_circle(
+            Image.open(io.BytesIO(first_bytes)).resize((main_member_image_height, main_member_image_width))
+        )
+        image.paste(first_member_image, (middle_of_image - (main_member_image_width // 2), top_image_padding))
 
         if first_member_voters_image:
             image.paste(first_member_voters_image, (10, 120))
 
         # Then paste the second members image
-        second_member_image = self.crop_to_circle(Image.open(io.BytesIO(second_bytes)).resize((100, 100)))
-        image.paste(second_member_image, (325, 10))
+        second_member_image = self.crop_to_circle(
+            Image.open(io.BytesIO(second_bytes)).resize((main_member_image_height, main_member_image_width))
+        )
+        image.paste(
+            second_member_image, (middle_of_image + (quarter_of_image - (main_member_image_width // 2)), top_image_padding)
+        )
 
         if second_member_voters_image:
             image.paste(second_member_voters_image, (260, 120))
