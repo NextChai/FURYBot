@@ -203,7 +203,7 @@ class KickeningView(discord.ui.View):
         # Create a mask in the shape of a circle
         mask = Image.new("L", image.size, 0)
         draw = ImageDraw.Draw(mask)
-        draw.ellipse((0, 0, image.width - 1, image.height - 1), fill=255)
+        draw.ellipse((0, 0, image.width - 4, image.height - 4), fill=255)
 
         # Apply the mask to the image
         image.putalpha(mask)
