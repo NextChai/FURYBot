@@ -266,14 +266,14 @@ class KickeningView(discord.ui.View):
         image = Image.new('RGBA', (image_width, image_height), (49, 51, 56))
 
         # First paste the first members image
-        first_member_image = Image.open(io.BytesIO(first_bytes))
+        first_member_image = Image.open(io.BytesIO(first_bytes)).resize((100, 100))
         image.paste(first_member_image, (10, 10))
 
         if first_member_voters_image:
             image.paste(first_member_voters_image, (10, 120))
 
         # Then paste the second members image
-        second_member_image = Image.open(io.BytesIO(second_bytes))
+        second_member_image = Image.open(io.BytesIO(second_bytes)).resize((100, 100))
         image.paste(second_member_image, (image_width - 110, 10))
 
         if second_member_voters_image:
