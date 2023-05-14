@@ -36,7 +36,7 @@ import discord
 from discord.ext import commands
 
 from utils import BaseCog, Context, human_join
-from utils.images import ImageType, image_from_urls, sync_merge_images
+from utils.images import ImageType, sync_merge_images
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -294,6 +294,7 @@ class KickeningView(discord.ui.View):
         second_voters = await asyncio.gather(*[_download_image(m.display_avatar.url) for m in self.second_votes])
 
         return await self.bot.wrap(self._sync_generate_image, first_member, first_voters, second_member, second_voters)
+
 
 class FurySpecificCommands(BaseCog):
     @commands.command(name='start_kickening', hidden=True)
