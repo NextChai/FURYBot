@@ -41,8 +41,8 @@ from utils.images import ImageType, sync_merge_images
 if TYPE_CHECKING:
     from bot import FuryBot
 
-VOTING_TIME: int = 8
-GRACE_PERIOD: int = 7
+VOTING_TIME: int = 20
+GRACE_PERIOD: int = 20
 
 LEAD_CAPTAIN_ROLE_ID: int = 763384816942448640
 CAPTAIN_ROLE_ID: int = 765360488816967722
@@ -168,6 +168,8 @@ class KickeningView(discord.ui.View):
 
         embed.add_field(name=self.first.display_name, value=f'**{self.voting_counter[self.first]} votes**.')
         embed.add_field(name=self.second.display_name, value=f'**{self.voting_counter[self.second]} votes**.')
+
+        embed.set_image(url='attachment://kickening.png')
 
         return embed
 
@@ -332,7 +334,7 @@ class FurySpecificCommands(BaseCog):
                 embed=self.bot.Embed(
                     title=f'{offline_member.display_name} is offline!',
                     description=f'{offline_member.mention} is offline on Discord, so they will not be included in the kickening. Someone '
-                    f'didn\'t look at <#757666199214751794>! {kick_message}',
+                    f'didn\'t look at <#757666199214751794>!\n\n{kick_message}',
                     author=offline_member,
                 ),
                 delete_after=3,
@@ -348,11 +350,14 @@ class FurySpecificCommands(BaseCog):
             kickable_members = random.choices(all_kickable_members, k=2)
 
             view = KickeningView(self.bot, kickable_members[0], kickable_members[1])
+            image = await view.generate_image()
+
             message = await ctx.channel.send(
                 embed=view.embed,
                 view=view,
                 content=human_join((m.mention for m in kickable_members)),
                 allowed_mentions=discord.AllowedMentions(users=True),
+                files=[image],
             )
 
             await view.wait()
@@ -374,7 +379,6 @@ class FurySpecificCommands(BaseCog):
                     )
 
                     member_to_kick = second_member
-
                 elif len(voting_results) == 0:
                     # No one voted, shuffle then kicka random member
                     first_member, first_votes = kickable_members[0], 0
@@ -389,7 +393,7 @@ class FurySpecificCommands(BaseCog):
                         # This is a tie, randomize the winner
                         member_to_kick = random.choice(voting_results)[0]
                     else:
-                        member_to_kick = first_member if first_votes > second_votes else second_member
+                        member_to_kick = first_member if first_votes < second_votes else second_member
 
                 embed = self.bot.Embed(
                     title=textwrap.shorten(f'Results Of {first_member.display_name} vs {second_member.display_name}', 256),
@@ -424,9 +428,10 @@ class FurySpecificCommands(BaseCog):
                 file = await view.generate_image()
                 embed.set_image(url=f'attachment://{file.filename}')
 
-            message = await ctx.send(embed=embed, files=[file])
+            message = await message.reply(embed=embed, files=[file])
 
             await asyncio.sleep(GRACE_PERIOD)
+
             # await ctx.guild.kick(member_to_kick, reason='The kickening has spoken!')
 
             kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=member_to_kick.mention)
