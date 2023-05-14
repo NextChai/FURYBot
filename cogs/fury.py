@@ -28,9 +28,8 @@ import asyncio
 import io
 import textwrap
 import random
-from typing import TYPE_CHECKING, List, Optional, Set, Type
-from typing_extensions import Self
-from PIL import Image, ImageDraw, ImageOps
+from typing import TYPE_CHECKING, List, Optional, Set
+from PIL import Image
 
 import discord
 from discord.ext import commands
@@ -196,30 +195,6 @@ class KickeningView(discord.ui.View):
 
         return True
 
-    @classmethod
-    def crop_to_circle(cls: Type[Self], image: ImageType) -> ImageType:
-        image = image.convert("RGBA")
-
-        # Create a mask in the shape of a circle
-        mask_size = (image.width * 2, image.height * 2)
-        mask = Image.new("L", mask_size, 0)
-        draw = ImageDraw.Draw(mask)
-        draw.ellipse((0, 0, mask_size[0], mask_size[1]), fill=255)
-
-        # Resize the image to the size of the mask
-        resized_image = image.resize(mask_size, resample=Image.BICUBIC)
-
-        # Apply the mask to the image
-        cropped_image = Image.new('RGBA', image.size, (255, 255, 255, 0))
-        cropped_image.paste(resized_image, (-image.width // 2, -image.height // 2))
-        cropped_image.putalpha(
-            mask.crop(
-                (image.width // 2, image.height // 2, image.width // 2 + image.width, image.height // 2 + image.height)
-            )
-        )
-
-        return cropped_image
-
     def _sync_generate_image(
         self,
         first_bytes: bytes,
@@ -254,7 +229,6 @@ class KickeningView(discord.ui.View):
                 images_per_row=10,
                 frame_width=sub_image_width,
                 background_color=(49, 51, 56),
-                image_alteration=self.crop_to_circle,
             )
 
         second_member_voters_image: Optional[ImageType] = None
@@ -264,7 +238,6 @@ class KickeningView(discord.ui.View):
                 images_per_row=10,
                 frame_width=sub_image_width,
                 background_color=(49, 51, 56),
-                image_alteration=self.crop_to_circle,
             )
 
         # Update the image height to include highest voter image height
@@ -279,9 +252,7 @@ class KickeningView(discord.ui.View):
         quarter_of_image = image_width // 4
 
         # First paste the first members image
-        first_member_image = self.crop_to_circle(
-            Image.open(io.BytesIO(first_bytes)).resize((main_member_image_height, main_member_image_width))
-        )
+        first_member_image = Image.open(io.BytesIO(first_bytes)).resize((main_member_image_height, main_member_image_width))
         image.paste(first_member_image, (quarter_of_image - (main_member_image_width // 2), top_image_padding))
 
         if first_member_voters_image:
@@ -290,8 +261,8 @@ class KickeningView(discord.ui.View):
             )
 
         # Then paste the second members image
-        second_member_image = self.crop_to_circle(
-            Image.open(io.BytesIO(second_bytes)).resize((main_member_image_height, main_member_image_width))
+        second_member_image = Image.open(io.BytesIO(second_bytes)).resize(
+            (main_member_image_height, main_member_image_width)
         )
         image.paste(
             second_member_image, (middle_of_image + (quarter_of_image - (main_member_image_width // 2)), top_image_padding)
