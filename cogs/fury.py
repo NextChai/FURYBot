@@ -207,10 +207,11 @@ class KickeningView(discord.ui.View):
         draw.ellipse((0, 0, mask_size[0], mask_size[1]), fill=255)
 
         # Resize the image to the size of the mask
-        resized_image = image.resize(mask_size)
+        resized_image = image.resize(mask_size, resample=Image.BICUBIC)
 
         # Apply the mask to the image
-        cropped_image = ImageOps.fit(resized_image, mask.size, centering=(0.5, 0.5))
+        cropped_image = Image.new('RGBA', image.size, (255, 255, 255, 0))
+        cropped_image.paste(resized_image, (-image.width // 2, -image.height // 2))
         cropped_image.putalpha(
             mask.crop(
                 (image.width // 2, image.height // 2, image.width // 2 + image.width, image.height // 2 + image.height)
