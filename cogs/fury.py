@@ -199,16 +199,14 @@ class KickeningView(discord.ui.View):
     @classmethod
     def crop_to_circle(cls: Type[Self], image: ImageType) -> ImageType:
         image = image.convert("RGBA")
-        size = (image.width + 4, image.height + 4)  # add 2 pixels of padding on each side
 
         # Create a mask in the shape of a circle
-        mask = Image.new("L", size, 0)
+        mask = Image.new("L", image.size, 0)
         draw = ImageDraw.Draw(mask)
-        draw.ellipse((0, 0, size[0], size[1]), fill=255)
+        draw.ellipse((0, 0, image.width - 1, image.height - 1), fill=255)
 
         # Apply the mask to the image
-        image = image.crop((2, 2, size[0] - 2, size[1] - 2))
-        image.putalpha(mask.crop((2, 2, size[0] - 2, size[1] - 2)))
+        image.putalpha(mask)
 
         return image
 
