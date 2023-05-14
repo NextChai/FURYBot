@@ -275,7 +275,7 @@ class KickeningView(discord.ui.View):
 
         return image
 
-    async def generate_image(self) -> ImageType:
+    async def generate_image(self) -> discord.File:
         # Download first member avatar
         async def _download_image(url: str) -> bytes:
             async with self.bot.session.get(url) as response:
@@ -287,7 +287,13 @@ class KickeningView(discord.ui.View):
         first_voters = await asyncio.gather(*[_download_image(m.display_avatar.url) for m in self.first_votes])
         second_voters = await asyncio.gather(*[_download_image(m.display_avatar.url) for m in self.second_votes])
 
-        return await self.bot.wrap(self._sync_generate_image, first_member, first_voters, second_member, second_voters)
+        image = await self.bot.wrap(self._sync_generate_image, first_member, first_voters, second_member, second_voters)
+
+        buffer = io.BytesIO()
+        image.save(buffer, format='PNG')
+        buffer.seek(0)
+
+        return discord.File(buffer, filename='kickening.png')
 
 
 class FurySpecificCommands(BaseCog):
@@ -398,7 +404,10 @@ class FurySpecificCommands(BaseCog):
                     text=f'You have {GRACE_PERIOD} seconds until you get kicked and we move onto the next member.'
                 )
 
-            await ctx.send(embed=embed)
+                file = await view.generate_image()
+                embed.set_image(url=f'attachment://{file.filename}')
+
+            await ctx.send(embed=embed, files=[file])
 
             await asyncio.sleep(GRACE_PERIOD)
             # await ctx.guild.kick(member_to_kick, reason='The kickening has spoken!')
