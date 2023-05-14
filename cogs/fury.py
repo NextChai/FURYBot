@@ -416,6 +416,8 @@ class FurySpecificCommands(BaseCog):
 
             await ctx.send(random.choice(KICKENING_MESSAGES))
 
+            await asyncio.sleep(1)
+
             # Remove the kicked member from the list
             all_kickable_members.remove(member_to_kick)
             random.shuffle(all_kickable_members)
