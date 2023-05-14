@@ -25,14 +25,18 @@ from __future__ import annotations
 import collections
 
 import asyncio
+import io
 import textwrap
 import random
-from typing import TYPE_CHECKING, List, Optional, Set
+from typing import TYPE_CHECKING, List, Optional, Set, Type
+from typing_extensions import Self
+from PIL import ImageOps, Image, ImageDraw
 
 import discord
 from discord.ext import commands
 
 from utils import BaseCog, Context, human_join
+from utils.images import ImageType, image_from_urls, sync_merge_images
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -131,17 +135,18 @@ def should_kick_member(member: discord.Member) -> bool:
 
 
 class KickeningMemberButton(discord.ui.Button['KickeningView']):
-    def __init__(self, parent: KickeningView, member: discord.Member) -> None:
-        super().__init__(label=textwrap.shorten(member.display_name, width=80), style=discord.ButtonStyle.red)
-        self.parent = parent
-        self.member = member
+    def __init__(self, parent: KickeningView, member: discord.Member, voting_list: List[discord.Member]) -> None:
+        super().__init__(label=textwrap.shorten(f'{member.display_name}', width=80), style=discord.ButtonStyle.red)
+        self.parent: KickeningView = parent
+        self.member: discord.Member = member
+        self.voting_list: List[discord.Member] = voting_list
 
     async def callback(self, interaction: discord.Interaction[FuryBot]) -> None:
         await interaction.response.defer()  # The client's latency will skyrocket, this is precautionary
 
         async with self.parent.lock:
             self.parent.voting_counter[self.member] += 1
-            self.parent.voted_members.add(interaction.user.id)
+            self.voting_list.append(self.member)
 
             # Edit with the new count
             await interaction.edit_original_response(view=self.parent, embed=self.parent.embed)
@@ -150,45 +155,145 @@ class KickeningMemberButton(discord.ui.Button['KickeningView']):
 
 
 class KickeningView(discord.ui.View):
-    def __init__(self, bot: FuryBot, voting_members: List[discord.Member]) -> None:
+    def __init__(self, bot: FuryBot, first: discord.Member, second: discord.Member) -> None:
         super().__init__(timeout=VOTING_TIME)
         self.bot = bot
 
-        self.kickening_members: List[discord.Member] = voting_members
-        self.voting_counter: collections.Counter[discord.Member] = collections.Counter(self.kickening_members)
+        self.first: discord.Member = first
+        self.second: discord.Member = second
+
+        self.first_votes: List[discord.Member] = []
+        self.second_votes: List[discord.Member] = []
+
+        self.voting_counter: collections.Counter[discord.Member] = collections.Counter()
         self.lock: asyncio.Lock = asyncio.Lock()
 
         self.voted_members: Set[int] = set()
 
-        for member in self.kickening_members:
-            self.add_item(KickeningMemberButton(self, member))
+        self.add_item(KickeningMemberButton(self, self.first, self.first_votes))
+        self.add_item(KickeningMemberButton(self, self.second, self.second_votes))
 
     @property
     def embed(self) -> discord.Embed:
-        first = self.kickening_members[0]
-        second = self.kickening_members[1]
-
         embed = self.bot.Embed(
-            title=textwrap.shorten(f'{first.display_name} vs {second.display_name}', 256),
-            description='Use the buttons below to vote for who you want to kick! This is an anonymous vote.',
+            title=textwrap.shorten(f'{self.first.display_name} vs {self.second.display_name}', 256),
+            description='Use the two buttons below to choose which member you want to see kicked from the server! Your vot',
         )
 
-        embed.add_field(name=first.display_name, value=f'**{self.voting_counter[first]} votes**.')
-        embed.add_field(name=second.display_name, value=f'**{self.voting_counter[second]} votes**.')
+        embed.add_field(name=self.first.display_name, value=f'**{self.voting_counter[self.first]} votes**.')
+        embed.add_field(name=self.second.display_name, value=f'**{self.voting_counter[self.second]} votes**.')
 
         return embed
 
     async def interaction_check(self, interaction: discord.Interaction[FuryBot], /) -> Optional[bool]:
-        if interaction.user in self.kickening_members:
+        if interaction.user in {self.first, self.second}:
             return await interaction.response.send_message(
                 'You cannot vote when you\'re up for the kickening!', ephemeral=True
             )
 
-        if interaction.user.id in self.voted_members:
+        if interaction.user in [*self.first_votes, *self.second_votes]:
             return await interaction.response.send_message('You have already voted!', ephemeral=True)
 
         return True
 
+    @classmethod
+    def crop_to_circle(cls: Type[Self], image: ImageType) -> ImageType:
+        # Crop the image to a square
+        img = ImageOps.fit(image, (image.size[0], image.size[0]))
+
+        # Create a mask in the shape of a circle
+        mask = Image.new("L", img.size, 0)
+        draw = ImageDraw.Draw(mask)
+        draw.ellipse((0, 0, img.size[0], img.size[1]), fill=255)
+
+        # Apply the mask to the image
+        cropped = ImageOps.fit(img, mask.size, centering=(0.5, 0.5))
+        cropped.putalpha(mask)
+
+        return cropped
+
+    def _sync_generate_image(
+        self,
+        first_bytes: bytes,
+        first_voters_bytes: List[bytes],
+        second_bytes: bytes,
+        second_voters_bytes: List[bytes],
+    ) -> ImageType:
+        # After some respectable amount of testing, we can determine that a good image size
+        # is going to be 500 width.
+        image_width = 500
+
+        # There are two bottom images, one for each member. The total image width is 500,
+        # and there is a 10px padding between the images and a 10px padding on the left and right.
+        sub_image_width = (image_width - 30) // 2
+
+        # Image height needs to be calculated though as it's dynamic.
+        # Top border is 10px, image height is 100, bottom border is 10px.
+        image_height = 120
+
+        # Below it is going to be the images showing who voted for who, which
+        # is completely dynamic.
+
+        first_member_voters_image: Optional[ImageType] = None
+        if first_voters_bytes:
+            first_member_voters_image = sync_merge_images(
+                first_voters_bytes,
+                images_per_row=10,
+                frame_width=sub_image_width,
+                background_color=(49, 51, 56),
+                image_alteration=self.crop_to_circle,
+            )
+
+        second_member_voters_image: Optional[ImageType] = None
+        if second_voters_bytes:
+            second_member_voters_image = sync_merge_images(
+                second_voters_bytes,
+                images_per_row=10,
+                frame_width=sub_image_width,
+                background_color=(49, 51, 56),
+                image_alteration=self.crop_to_circle,
+            )
+
+        # Update the image height to include highest voter image height
+        first_height = first_member_voters_image and first_member_voters_image.height or 0
+        second_height = second_member_voters_image and second_member_voters_image.height or 0
+        image_height += max(first_height, second_height)
+
+        # And add the padding back
+        image_height += 10
+
+        # Now we can create our image
+        image = Image.new('RGBA', (image_width, image_height), (49, 51, 56))
+
+        # First paste the first members image
+        first_member_image = Image.open(io.BytesIO(first_bytes))
+        image.paste(first_member_image, (10, 10))
+
+        if first_member_voters_image:
+            image.paste(first_member_voters_image, (10, 120))
+
+        # Then paste the second members image
+        second_member_image = Image.open(io.BytesIO(second_bytes))
+        image.paste(second_member_image, (image_width - 110, 10))
+
+        if second_member_voters_image:
+            image.paste(second_member_voters_image, (image_width - 110, 120))
+
+        return image
+
+    async def generate_image(self) -> ImageType:
+        # Download first member avatar
+        async def _download_image(url: str) -> bytes:
+            async with self.bot.session.get(url) as response:
+                return await response.read()
+
+        first_member = await _download_image(self.first.display_avatar.url)
+        second_member = await _download_image(self.second.display_avatar.url)
+
+        first_voters = await asyncio.gather(*[_download_image(m.display_avatar.url) for m in self.first_votes])
+        second_voters = await asyncio.gather(*[_download_image(m.display_avatar.url) for m in self.second_votes])
+
+        return await self.bot.wrap(self._sync_generate_image, first_member, first_voters, second_member, second_voters)
 
 class FurySpecificCommands(BaseCog):
     @commands.command(name='start_kickening', hidden=True)
@@ -222,14 +327,14 @@ class FurySpecificCommands(BaseCog):
         )
         embed.add_field(
             name='Offline Members!',
-            value=f'There are {len(offline_members)} offline members! They will be kicked immediately! You had your chance!',
+            value=f'There are {len(offline_members)} offline members, they will be kicked immediately! You had your chance!',
         )
 
         await ctx.send(
             embed=embed,
             delete_after=30,
         )
-        
+
         await asyncio.sleep(30)
 
         for offline_member in offline_members:
@@ -280,8 +385,8 @@ class FurySpecificCommands(BaseCog):
                     description=f'I\'m sorry {member_to_kick.mention}, but your time has come! You will be kicked!',
                 )
 
-                embed.add_field(name=first_member.display_name, value=f'**{first_votes} votes**.')
-                embed.add_field(name=first_member.display_name, value=f'**{second_votes} votes**.')
+                embed.add_field(name=first_member.display_name, value=f'{first_votes} votes.')
+                embed.add_field(name=second_member.display_name, value=f'{second_votes} votes.')
 
                 if first_votes == second_votes:
                     embed.add_field(
@@ -292,6 +397,7 @@ class FurySpecificCommands(BaseCog):
                     name='Thank You!',
                     value='From all of us working hard to make the FLVS Fury eSports team everything it is, we thank you '
                     'for your service and hope you will continue to support us in the future. See you next season!',
+                    inline=False,
                 )
                 embed.set_footer(
                     text=f'You have {GRACE_PERIOD} seconds until you get kicked and we move onto the next member.'

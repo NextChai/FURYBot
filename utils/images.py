@@ -24,10 +24,9 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import asyncio
-import functools
 import io
 import math
-from typing import TYPE_CHECKING, Any, Callable, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Callable, List, Optional, Sequence, Tuple, Union
 
 import discord
 import numpy
@@ -46,39 +45,6 @@ __all__: Tuple[str, ...] = (
 )
 
 ImageType: TypeAlias = Image.Image
-
-
-def _perform_pasting(
-    merged: ImageType,
-    y_coordinate: int,
-    row: Iterable[Any],
-    image_width: int,
-    image_height: int,
-) -> None:
-    """A method to perform pasting based upon the given parameters on an image.
-
-    Parameters
-    ----------
-    merged: ImageType
-        The merged image to perform the pasting on.
-    y_coordinate: int
-        The y coordinate of the row to paste on.
-    row: Iterable[Any]
-        The row of images to paste on the merged image.
-    image_width: int
-        The width of each image to paste.
-    """
-    for x_coordinate, image_bytes in enumerate(row):
-        if image_bytes is None:
-            continue
-
-        image = Image.open(io.BytesIO(image_bytes)).resize((image_width, image_height))
-
-        # Let's get the dimensions
-        y_pixel_coordinate = int(y_coordinate * image_height)
-        x_pixel_coordinate = int(x_coordinate * image_width)
-
-        merged.paste(image, (x_pixel_coordinate, y_pixel_coordinate))
 
 
 def _normalize_images(data: Sequence[bytes]) -> Sequence[bytes]:
@@ -122,14 +88,15 @@ def _normalize_images(data: Sequence[bytes]) -> Sequence[bytes]:
     return image_data
 
 
-def _sync_gen_array_new(
+def sync_merge_images(
     data: Sequence[bytes],
     *,
     images_per_row: int = 20,
     frame_width: int = 1920,
     background_color: Union[int, Tuple[int, int, int], str] = (0, 0, 0),
     normalize_images: bool = False,
-) -> Tuple[ImageType, List[Callable[[], None]]]:
+    image_alteration: Optional[Callable[[ImageType], ImageType]] = None,
+) -> ImageType:
     """Used to generate an image array based upon the given parameters.
 
     Parameters
@@ -186,11 +153,22 @@ def _sync_gen_array_new(
     merged = Image.new('RGBA', (new_frame_width, new_frame_height), background_color)
 
     # Now we cam use this to build our image
-    callables: List[Callable[[], None]] = []
     for y_coordinate, row in enumerate(new_arr):
-        callables.append(functools.partial(_perform_pasting, merged, y_coordinate, row, image_width, image_height))
+        for x_coordinate, image_bytes in enumerate(row):
+            if image_bytes is None:
+                continue
 
-    return merged, callables
+            image = Image.open(io.BytesIO(image_bytes)).resize((image_width, image_height))
+            if image_alteration:
+                image = image_alteration(image)
+
+            # Let's get the dimensions
+            y_pixel_coordinate = int(y_coordinate * image_height)
+            x_pixel_coordinate = int(x_coordinate * image_width)
+
+            merged.paste(image, (x_pixel_coordinate, y_pixel_coordinate))
+
+    return merged
 
 
 async def async_merge_images(
@@ -202,6 +180,7 @@ async def async_merge_images(
     frame_width: int = 1920,
     background_color: Union[int, Tuple[int, int, int], str] = (0, 0, 0),
     normalize_images: bool = False,
+    image_alteration: Optional[Callable[[ImageType], ImageType]] = None,
 ) -> ImageType:
     """|coro|
 
@@ -227,17 +206,15 @@ async def async_merge_images(
     ImageType
         The merged image.
     """
-    merged, callables = await bot.wrap(
-        functools.partial(
-            _sync_gen_array_new,
-            data,
-            images_per_row=images_per_row,
-            frame_width=frame_width,
-            background_color=background_color,
-            normalize_images=normalize_images,
-        )
+    merged = await bot.wrap(
+        sync_merge_images,
+        data,
+        images_per_row=images_per_row,
+        frame_width=frame_width,
+        background_color=background_color,
+        normalize_images=normalize_images,
+        image_alteration=image_alteration,
     )
-    await asyncio.gather(*(bot.wrap(paster) for paster in callables))
 
     if half_size:
         merged = merged.resize((int(merged.width / 2), int(merged.height / 2)))
@@ -281,6 +258,7 @@ async def image_from_urls(
     frame_width: int = 1920,
     background_color: Union[int, Tuple[int, int, int], str] = (0, 0, 0),
     normalize_images: bool = False,
+    image_alteration: Optional[Callable[[ImageType], ImageType]] = None,
 ) -> ImageType:
     """|coro|
 
@@ -305,6 +283,7 @@ async def image_from_urls(
         frame_width=frame_width,
         background_color=background_color,
         normalize_images=normalize_images,
+        image_alteration=image_alteration,
     )
 
 
