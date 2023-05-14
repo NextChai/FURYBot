@@ -560,7 +560,7 @@ class GamedayPanel(BaseView):
 
     @discord.ui.button(label='Manage Images')
     async def manage_images(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        ...
+        raise NotImplementedError('TODO')
 
 
 class ManageGamedayTime(BaseView):
@@ -848,6 +848,12 @@ class GamedayBucketPanel(BaseView):
             inline=False,
         )
 
+        embed.add_field(
+            name='Automatic Sub Finding',
+            value=f'**Automatic Sub Finding If Possible**: {self.bucket.automatic_sub_finding_if_possible}\n'
+            f'**Automatic Sub Finding Channel**: {self.bucket.automatic_sub_finding_channel and self.bucket.automatic_sub_finding_channel.mention}',  # type: ignore
+        )
+
         return embed
 
     @discord.ui.button(label='Manage Gameday Times')
@@ -908,6 +914,44 @@ class GamedayBucketPanel(BaseView):
             timeout=None,
         )
         return await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label='Toggle Automatic Sub Finding If Possible', style=discord.ButtonStyle.green)
+    async def toggle_automatic_sub_finding_if_possible(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        """A button to toggle the automatic sub finding if possible value."""
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            await self.bucket.edit(
+                connection=connection, automatic_sub_finding_if_possible=not self.bucket.automatic_sub_finding_if_possible
+            )
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    async def _set_automatic_sub_finding_channel_after(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        channels: List[Union[app_commands.AppCommandChannel, app_commands.AppCommandThread]],
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        channel = channels[0]
+        async with self.bot.safe_connection() as connection:
+            await self.bucket.edit(connection=connection, automatic_sub_finding_channel_id=channel.id)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
+    @discord.ui.button(label='Set Automatic Sub Finding Channel', style=discord.ButtonStyle.green)
+    async def set_automatic_sub_finding_channel(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        """A button to launch a view that allows the user to set the automatic sub finding channel."""
+        await interaction.response.defer()
+
+        ChannelSelect(self._set_automatic_sub_finding_channel_after, self, channel_types=[discord.ChannelType.text])
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
 
 class CreateGamedayBucketView(BaseView):

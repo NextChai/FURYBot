@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING, Type, NamedTuple
 
 import discord
 from typing_extensions import Self, Unpack
@@ -32,13 +32,28 @@ from typing_extensions import Self, Unpack
 from utils import BaseView, BaseViewKwargs, default_button_doc_string, human_join, human_timestamp
 
 from ...errors import TeamDeleted
-from ..gameday import determine_comfy_sub_finding_times
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
     from ...team import Team
     from ..gameday import Gameday, GamedaySubFinding
+
+SubFindingTimes = NamedTuple(
+    'SubFindingTimes', [('start', datetime.datetime), ('end', datetime.datetime), ('can_use_automatic_sub_finding', bool)]
+)
+
+
+def determine_comfy_sub_finding_times(*, starts_at: datetime.datetime, now: datetime.datetime) -> SubFindingTimes:
+    time_until_gameday_starts = starts_at - now
+
+    if time_until_gameday_starts < datetime.timedelta(hours=1):
+        # We know the moderator did something bad here, so return a sub finding time that shows
+        # the sub finder can not be used.
+        return SubFindingTimes(start=now, end=now, can_use_automatic_sub_finding=False)
+
+    thirty_mins_before_starts_at = starts_at - datetime.timedelta(minutes=30)
+    return SubFindingTimes(start=now, end=thirty_mins_before_starts_at, can_use_automatic_sub_finding=True)
 
 
 def create_sub_finding_status_embed(gameday: Gameday) -> discord.Embed:

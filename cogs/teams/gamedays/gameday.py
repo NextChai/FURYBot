@@ -33,7 +33,7 @@ import pytz
 from typing_extensions import Self
 
 from ..errors import TeamDeleted
-from persistent.sub_finding import SubFinder
+from .persistent.sub_finding import SubFinder
 
 from utils import QueryBuilder, TimerNotFound, image_from_urls, image_to_file
 
@@ -48,9 +48,6 @@ VotingTimes = NamedTuple(
     'VotingTimes', [('start', datetime.datetime), ('end', datetime.datetime), ('can_use_automatic_sub_finding', bool)]
 )
 
-SubFindingTimes = NamedTuple(
-    'SubFindingTimes', [('start', datetime.datetime), ('end', datetime.datetime), ('can_use_automatic_sub_finding', bool)]
-)
 
 EST = pytz.timezone('US/Eastern')
 
@@ -121,18 +118,6 @@ def get_next_gameday_time(*, weekday: Weekday, game_time: datetime.time) -> date
     utc_datetime = now_est.astimezone(pytz.utc)
 
     return utc_datetime
-
-
-def determine_comfy_sub_finding_times(*, starts_at: datetime.datetime, now: datetime.datetime) -> SubFindingTimes:
-    time_until_gameday_starts = starts_at - now
-
-    if time_until_gameday_starts < datetime.timedelta(hours=1):
-        # We know the moderator did something bad here, so return a sub finding time that shows
-        # the sub finder can not be used.
-        return SubFindingTimes(start=now, end=now, can_use_automatic_sub_finding=False)
-
-    thirty_mins_before_starts_at = starts_at - datetime.timedelta(minutes=30)
-    return SubFindingTimes(start=now, end=thirty_mins_before_starts_at, can_use_automatic_sub_finding=True)
 
 
 class Weekday(enum.IntEnum):
@@ -931,6 +916,17 @@ class Gameday:
 
     def get_image(self, image_id: int, /) -> Optional[GamedayImage]:
         return self.images.get(image_id)
+
+    async def fetch_score_message(self) -> Optional[discord.Message]:
+        message_id = self.score_message_id
+        if message_id is None:
+            return
+
+        team = self.team
+        if team is None:
+            return
+
+        return await team.text_channel.fetch_message(message_id)
 
     async def getch_sub_finding(self, *, connection: Optional[ConnectionType] = None) -> GamedaySubFinding:
         if self._sub_finding:

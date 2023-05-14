@@ -22,24 +22,37 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
+import functools
 
 import logging
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Tuple, List
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils import BaseCog, human_join
+from utils import BaseCog, human_join, human_timestamp, SelectOneOfMany, BaseView
 from .persistent.sub_finding import SubFinder
+from .gameday import GamedayImage
 
 if TYPE_CHECKING:
     from bot import FuryBot
+    from .gameday import Gameday
 
 __all__: Tuple[str, ...] = ('GamedayEventListener', 'GamedayCommands')
 
 _log = logging.getLogger(__name__)
 _log.setLevel(logging.DEBUG)
+
+
+class SelectAGameday(BaseView):
+    @property
+    def embed(self) -> discord.Embed:
+        return self.bot.Embed(
+            title='Multiple Gamedays',
+            description='There is more than one gameday going on at the moment, please use '
+            'the select below to choose which you would like to add an image for.',
+        )
 
 
 class GamedayEventListener(BaseCog):
@@ -68,33 +81,6 @@ class GamedayEventListener(BaseCog):
             return
 
         if not gameday.voting.has_votes_needed:
-            bucket = team.get_gameday_bucket()
-            if bucket is None:
-                _log.debug('Gameday bucket not found.')
-                return
-
-            # Oh no, we don't have enough players to start the gameday!
-            # We need to send an information embed to the channel.
-            embed = team.embed(
-                title='Gameday Start Failed',
-                description='This gameday did not start as it does not have the minimum amount of '
-                f'players required to start. This gameday is missing **{bucket.per_team - len(gameday.attending_members)} votes**.',
-            )
-            embed.add_field(
-                name='Attending Members', value=human_join((m.mention for m in gameday.attending_members)), inline=False
-            )
-            embed.add_field(
-                name='Not Attending Members',
-                value=human_join((m.mention for m in gameday.not_attending_members)),
-            )
-
-            mentions = [*(m.mention for m in gameday.attending_members), *(m.mention for m in team.captain_roles)]
-            await team.text_channel.send(
-                embed=embed,
-                content=human_join(mentions, additional='Gameday start failed!'),
-                allowed_mentions=discord.AllowedMentions(users=True),
-            )
-
             return
 
         view = self.bot.score_report_view
@@ -294,15 +280,122 @@ class GamedayEventListener(BaseCog):
             _log.debug('Gameday %s not found.', gameday_id)
             return
 
-        raise NotImplementedError('Sub finding result not implemented yet.')
+        sub_finding = await gameday.getch_sub_finding()
+
+        message = await sub_finding.fetch_message()
+        if message is not None:
+            await message.edit(view=None)
+
+        update_message = await sub_finding.fetch_update_message()
 
         if gameday.voting.has_votes_needed:
-            ...
+            # We can update the status message to let them know that we have enough votes now.
+            embed = self.bot.Embed(
+                title='Substitutes Found',
+                description='Enough substitutes have been found to fill the team for the upcoming gameday. The '
+                f'gameday will start at {human_timestamp(gameday.starts_at)} without issues.',
+            )
+
+            embed.add_field(
+                name='Subs Found', value=human_join((m.mention for m in gameday.attending_members if m.is_temporary_sub))
+            )
+            if update_message is not None:
+                await update_message.reply(embed=embed)
+
+        # We need to yell at them and let them know we could not get enough members.
+        embed = team.embed(
+            title='Unable To Locate Substitutes',
+            description='This gameday will not start as it does not have the minimum amount of '
+            f'players required to start. This gameday is missing **{bucket.per_team - len(gameday.attending_members)} votes**.',
+        )
+        embed.add_field(
+            name='Attending Members', value=human_join((m.mention for m in gameday.attending_members)), inline=False
+        )
+        embed.add_field(
+            name='Not Attending Members', value=human_join((m.mention for m in gameday.not_attending_members)), inline=False
+        )
+        embed.add_field(
+            name='Automatic Sub Finding Ended',
+            value='Automatic sub finding has ended, but there is still hope. If a substitute is found, '
+            'they can be added to the team and the gameday will start as normal.',
+            inline=False,
+        )
+
+        if update_message is not None:
+            await update_message.reply(embed=embed)
 
 
 class GamedayCommands(BaseCog):
-    gameday = app_commands.Group(name='gameday', description='Commands related to gamedays.')
+    gameday = app_commands.Group(name='gameday', description='Commands related to gamedays.', guild_only=True)
+
+    async def _add_image(
+        self, interaction: discord.Interaction, gameday: Gameday, image: discord.Attachment
+    ) -> discord.InteractionMessage:
+        async with self.bot.safe_connection() as connection:
+            gameday_image = await GamedayImage.create(
+                self.bot,
+                connection=connection,
+                guild_id=gameday.guild_id,
+                team_id=gameday.team_id,
+                gameday_id=gameday.id,
+                bucket_id=gameday.bucket_id,
+                url=image.url,
+                uploader_id=interaction.user.id,
+                uploaded_at=interaction.created_at,
+            )
+
+        gameday.add_image(gameday_image)
+
+        message = await gameday.fetch_score_message()
+        if message is not None and self.bot.score_report_view:
+            embed, attachments = await self.bot.score_report_view.create_sender_information(gameday)
+            await message.edit(embed=embed, attachments=attachments)
+
+        return await interaction.edit_original_response(content='Image uploaded successfully.')
+
+    async def _select_gameday_after(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        values: List[str],
+        *,
+        gamedays: List[Gameday],
+        image: discord.Attachment,
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        value = values[0]
+        gameday = discord.utils.get(gamedays, id=int(value))
+        assert gameday
+
+        return await self._add_image(interaction, gameday, image)
 
     @gameday.command(name='upload')
-    async def gameday_upload(self, interaction: discord.Interaction[FuryBot], image: discord.Attachment) -> None:
-        raise NotImplementedError('Gameday upload not implemented yet.')
+    async def gameday_upload(
+        self, interaction: discord.Interaction[FuryBot], image: discord.Attachment
+    ) -> discord.InteractionMessage:
+        assert interaction.guild
+        assert interaction.channel_id
+
+        await interaction.response.defer(ephemeral=True)
+
+        # Let's try and find the gameday that this image is for.. first let's find the team.
+        team = self.bot.get_team_from_channel(interaction.channel_id, interaction.guild.id)
+        if team is None:
+            return await interaction.edit_original_response(content="You must invoke this command in a team channel.")
+
+        gamedays = team.ongoing_gamedays
+        if len(gamedays) > 1:
+            # We need to have the user select one..
+            view = SelectAGameday(target=interaction)
+            SelectOneOfMany(
+                view,
+                options=[
+                    discord.SelectOption(label=gameday.starts_at.strftime("%I:%M %p"), value=str(gameday.id))
+                    for gameday in gamedays
+                ],
+                after=functools.partial(self._select_gameday_after, gamedays=gamedays, image=image),
+                placeholder='Select a gameday...',
+            )
+
+        gameday = gamedays[0]
+        return await self._add_image(interaction, gameday, image)
