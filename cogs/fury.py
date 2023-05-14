@@ -225,7 +225,7 @@ class KickeningView(discord.ui.View):
 
         # There are two bottom images, one for each member. The total image width is 500,
         # and there is a 10px padding between the images and a 10px padding on the left and right.
-        sub_image_width = (image_width - 30) // 2
+        sub_image_width = (500 // 2) - 10 - 5
 
         # Image height needs to be calculated though as it's dynamic.
         # Top border is 10px, image height is 100, bottom border is 10px.
@@ -267,14 +267,26 @@ class KickeningView(discord.ui.View):
 
         # First paste the first members image
         first_member_image = Image.open(io.BytesIO(first_bytes)).resize((100, 100))
-        image.paste(first_member_image, (10, 10))
+
+        first_member_pasting_point = (
+            (image_width // 2) - first_member_image.width - 10,
+            10,
+        )
+
+        image.paste(first_member_image, first_member_pasting_point)
 
         if first_member_voters_image:
             image.paste(first_member_voters_image, (10, 120))
 
         # Then paste the second members image
         second_member_image = Image.open(io.BytesIO(second_bytes)).resize((100, 100))
-        image.paste(second_member_image, (image_width - 110, 10))
+
+        second_member_pasting_point = (
+            image_width // 2 + 10,
+            10,
+        )
+
+        image.paste(second_member_image, second_member_pasting_point)
 
         if second_member_voters_image:
             image.paste(second_member_voters_image, (image_width - 110, 120))
