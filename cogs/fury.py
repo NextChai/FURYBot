@@ -274,7 +274,7 @@ class KickeningView(discord.ui.View):
         first_member_image = self.crop_to_circle(
             Image.open(io.BytesIO(first_bytes)).resize((main_member_image_height, main_member_image_width))
         )
-        image.paste(first_member_image, (middle_of_image - (main_member_image_width // 2), top_image_padding))
+        image.paste(first_member_image, (quarter_of_image - (main_member_image_width // 2), top_image_padding))
 
         if first_member_voters_image:
             image.paste(
