@@ -132,7 +132,7 @@ class KickeningMemberButton(discord.ui.Button['KickeningView']):
 
         async with self.parent.lock:
             self.parent.voting_counter[self.member] += 1
-            self.voting_list.append(self.member)
+            self.voting_list.append(interaction.user)  # type: ignore
 
             # Edit with the new count
             await interaction.edit_original_response(view=self.parent, embed=self.parent.embed)
