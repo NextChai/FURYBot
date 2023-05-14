@@ -201,7 +201,10 @@ class FurySpecificCommands(BaseCog):
         all_kickable_members: List[discord.Member] = []
         offline_members: List[discord.Member] = []
         async with ctx.typing():
-            async for member in ctx.guild.fetch_members(limit=None):
+            members = await self.bot._connection.query_members(
+                guild=ctx.guild, query='', limit=0, user_ids=None, cache=False, presences=True
+            )
+            for member in members:
                 if not should_kick_member(member):
                     continue
 
@@ -234,7 +237,6 @@ class FurySpecificCommands(BaseCog):
             )
 
             # await offline_member.kick(reason='Offline member')
-            await ctx.send(random.choice(KICKENING_MESSAGES))
 
         # We're going to use a while True loop here and abuse some mutable objects
         while True:
