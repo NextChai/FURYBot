@@ -151,7 +151,7 @@ class KickeningView(discord.ui.View):
         self.first_votes: List[discord.Member] = []
         self.second_votes: List[discord.Member] = []
 
-        self.voting_counter: collections.Counter[discord.Member] = collections.Counter((first, second))
+        self.voting_counter: collections.Counter[discord.Member] = collections.Counter()
         self.lock: asyncio.Lock = asyncio.Lock()
 
         self.voted_members: Set[int] = set()
@@ -361,15 +361,35 @@ class FurySpecificCommands(BaseCog):
                 await message.edit(view=None)
 
                 # Now we can get the results of the vote
-                voting_results = view.voting_counter.most_common(2)
-                first_member, first_votes = voting_results[0]
-                second_member, second_votes = voting_results[1]
+                voting_results = view.voting_counter.most_common()
 
-                if first_votes == second_votes:
-                    # This is a tie, randomize the winner
-                    member_to_kick = random.choice(voting_results)[0]
+                # If a member doesn't get a vote then they won't be in the results.
+                # If there is a tie, we'll randomize the winner
+                if len(voting_results) == 1:
+                    # Only one member got votes, kick the one that didn't get any
+                    first_member, first_votes = voting_results[0]
+                    second_member, second_votes = (
+                        kickable_members[1] if first_member == kickable_members[0] else kickable_members[0],
+                        0,
+                    )
+
+                    member_to_kick = second_member
+
+                elif len(voting_results) == 0:
+                    # No one voted, shuffle then kicka random member
+                    first_member, first_votes = kickable_members[0], 0
+                    second_member, second_votes = kickable_members[1], 0
+
+                    member_to_kick = random.choice((first_member, second_member))
                 else:
-                    member_to_kick = first_member if first_votes > second_votes else second_member
+                    first_member, first_votes = voting_results[0]
+                    second_member, second_votes = voting_results[1]
+
+                    if first_votes == second_votes:
+                        # This is a tie, randomize the winner
+                        member_to_kick = random.choice(voting_results)[0]
+                    else:
+                        member_to_kick = first_member if first_votes > second_votes else second_member
 
                 embed = self.bot.Embed(
                     title=textwrap.shorten(f'Results Of {first_member.display_name} vs {second_member.display_name}', 256),
