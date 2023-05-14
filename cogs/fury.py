@@ -164,7 +164,7 @@ class KickeningView(discord.ui.View):
         self.first_votes: List[discord.Member] = []
         self.second_votes: List[discord.Member] = []
 
-        self.voting_counter: collections.Counter[discord.Member] = collections.Counter()
+        self.voting_counter: collections.Counter[discord.Member] = collections.Counter((first, second))
         self.lock: asyncio.Lock = asyncio.Lock()
 
         self.voted_members: Set[int] = set()
@@ -344,6 +344,7 @@ class FurySpecificCommands(BaseCog):
                     title=f'{offline_member.display_name} is offline!',
                     description=f'{offline_member.mention} is offline on Discord, so they will not be included in the kickening. Someone '
                     'didn\'t look at <#757666199214751794>! Shame on them, bye bye!',
+                    author=offline_member,
                 ),
                 delete_after=3,
                 content=offline_member.mention,
@@ -384,6 +385,7 @@ class FurySpecificCommands(BaseCog):
                 embed = self.bot.Embed(
                     title=textwrap.shorten(f'Results Of {first_member.display_name} vs {second_member.display_name}', 256),
                     description=f'I\'m sorry {member_to_kick.mention}, but your time has come! You will be kicked!',
+                    author=member_to_kick,
                 )
 
                 embed.add_field(name=first_member.display_name, value=f'{first_votes} votes.')
