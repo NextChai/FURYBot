@@ -229,9 +229,9 @@ class KickeningView(discord.ui.View):
 
         # Image height needs to be calculated though as it's dynamic.
         # Top border is 10px, image height is 100, bottom border is 10px.
-        top_image_padding = 10
-        bottom_image_padding = 10
-        sub_image_bottom_padding = 10
+        top_image_padding = 20
+        bottom_image_padding = 15
+        sub_image_bottom_padding = 20
         main_member_image_height = 100
         main_member_image_width = 100
         image_height = main_member_image_height + top_image_padding + bottom_image_padding + sub_image_bottom_padding
