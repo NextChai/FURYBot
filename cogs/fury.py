@@ -357,7 +357,7 @@ class FurySpecificCommands(BaseCog):
             # Spawn a new view
             kickable_members = random.choices(all_kickable_members, k=2)
 
-            view = KickeningView(self.bot, kickable_members)
+            view = KickeningView(self.bot, kickable_members[0], kickable_members[1])
             message = await ctx.channel.send(
                 embed=view.embed,
                 view=view,
