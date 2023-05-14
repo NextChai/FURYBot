@@ -30,7 +30,7 @@ import textwrap
 import random
 from typing import TYPE_CHECKING, List, Optional, Set, Type
 from typing_extensions import Self
-from PIL import ImageOps, Image, ImageDraw
+from PIL import Image, ImageDraw
 
 import discord
 from discord.ext import commands
@@ -198,16 +198,17 @@ class KickeningView(discord.ui.View):
 
     @classmethod
     def crop_to_circle(cls: Type[Self], image: ImageType) -> ImageType:
+        image = image.convert("RGBA")
+
         # Create a mask in the shape of a circle
         mask = Image.new("L", image.size, 0)
         draw = ImageDraw.Draw(mask)
-        draw.ellipse((0, 0, image.size[0], image.size[1]), fill=255)
+        draw.ellipse((0, 0, image.width, image.height), fill=255)
 
         # Apply the mask to the image
-        cropped = ImageOps.fit(image, mask.size, centering=(0.5, 0.5))
-        cropped.putalpha(mask)
+        image.putalpha(mask)
 
-        return cropped
+        return image
 
     def _sync_generate_image(
         self,
