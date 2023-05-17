@@ -350,20 +350,15 @@ class FurySpecificCommands(BaseCog):
             )
 
             await ctx.send(
-                embed=self.bot.Embed(
-                    title=f'{offline_member.display_name} is offline!',
-                    description=f'{offline_member.mention} is offline on Discord, so they will not be included in the kickening. Someone '
-                    f'didn\'t look at <#757666199214751794>!\n\n{kick_message}',
-                    author=offline_member,
-                ),
-                delete_after=20,
+                embed=embed,
+                delete_after=25,
                 content=offline_member.mention,
                 allowed_mentions=discord.AllowedMentions(users=True),
             )
 
             # await offline_member.kick(reason='Offline member')
 
-            await asyncio.sleep(10)
+            await asyncio.sleep(20)
 
         # We're going to use a while True loop here and abuse some mutable objects
         while True:
