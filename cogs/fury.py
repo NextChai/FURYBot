@@ -148,7 +148,7 @@ class KickeningMemberButton(discord.ui.Button['KickeningVoting']):
         await interaction.followup.send('Your vote has been counted!', ephemeral=True)
 
 
-@dataclasses.dataclass(init=True, frozen=True)
+@dataclasses.dataclass(init=True)
 class Results:
     cog: FurySpecificCommands
     winner: discord.Member
@@ -405,7 +405,7 @@ class FurySpecificCommands(BaseCog):
             kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=offline_member.mention)
 
             member_information: List[str] = [
-                '**Roles**: {}'.format(human_join([role.mention for role in offline_member.roles]))
+                '**Roles**: {}'.format(human_join([role.mention for role in list(reversed(offline_member.roles))[:-1]]))
             ]
             if offline_member.joined_at is not None:
                 member_information.append(f'**Joined At**: {human_timestamp(offline_member.joined_at)}')
