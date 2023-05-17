@@ -23,6 +23,9 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import logging
+import sys
+import importlib.util
 import asyncio
 import inspect
 import io
@@ -37,6 +40,8 @@ from utils import BaseCog, Context, human_timedelta, human_timestamp, make_table
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
+_log = logging.getLogger(__name__)
 
 FLAG_REGEX = re.compile(
     r'\-{2}(?P<arg_name>\w+)\=(?P<arg_content>(?:\`){3}python\n(?P<arg_code_content>(?:.+\n)+)(?:\`){3}|(?:[a-z0-9\s\.])+)'
@@ -272,6 +277,45 @@ class Owner(BaseCog):
                 return await ctx.send(f'Failed to execute query. Error: `{exc}`')
 
             return await ctx.send(f'`{result}`')
+
+    def _reload_extension(self, extension: str) -> None:
+        spec = importlib.util.find_spec(extension)
+        if spec is None:
+            return
+
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[extension] = module
+
+    @commands.command(name='reload', description='Reload an extension.')
+    async def _reload(self, ctx: Context, *extensions: str) -> discord.Message:
+        fmt: List[str] = []
+        for extension in extensions:
+            if extension not in self.bot.extensions:
+                try:
+                    self._reload_extension(extension)
+                except ModuleNotFoundError:
+                    fmt.append(ctx.tick(None, f'{extension}: Module not found.'))
+                    continue
+
+                fmt.append(ctx.tick(True, extension))
+                continue
+
+            try:
+                try:
+                    self._reload_extension(extension)
+                except ModuleNotFoundError:
+                    # I don't care
+                    pass
+
+                await self.bot.reload_extension(extension)
+            except Exception as exc:
+                _log.exception(f'Failed to reload extension {extension}.', exc_info=exc)
+                fmt.append(ctx.tick(False, f'{extension}: {exc}'))
+                continue
+
+            fmt.append(ctx.tick(True, f'{extension}'))
+
+        return await ctx.reply('Reloaded:\n' + '\n'.join(fmt))
 
 
 async def setup(bot: FuryBot):

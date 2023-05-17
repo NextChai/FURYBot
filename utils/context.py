@@ -23,7 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Tuple, TypeAlias
+from typing import TYPE_CHECKING, Tuple, Optional
 
 from discord.ext import commands
 
@@ -32,4 +32,17 @@ if TYPE_CHECKING:
 
 __all__: Tuple[str, ...] = ('Context',)
 
-Context: TypeAlias = 'commands.Context[FuryBot]'
+
+class Context(commands.Context['FuryBot']):
+    def tick(self, opt: Optional[bool], label: Optional[str] = None) -> str:
+        lookup = {
+            True: '✅',
+            False: '❌',
+            None: '❔',
+        }
+
+        emoji = lookup.get(opt, '❌')
+        if label is not None:
+            return f'{emoji}: {label}'
+
+        return emoji
