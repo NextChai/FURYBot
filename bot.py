@@ -71,6 +71,7 @@ from utils import (
     TimerManager,
     _parse_environ_boolean,
     parse_initial_extensions,
+    Context,
 )
 
 if TYPE_CHECKING:
@@ -654,6 +655,12 @@ class FuryBot(commands.Bot):
             member = team.get_member(payload.user.id)
             if member is not None:
                 await member.remove_from_team()
+
+    async def get_context(
+        self,
+        origin: Union[discord.Message, discord.Interaction[Self]],  # cls: Type[commands.Context[Self]] = Context
+    ) -> Context:
+        return await super().get_context(origin, cls=Context)
 
     # Helper utilities
     def safe_connection(self, *, timeout: Optional[float] = 10.0) -> DbContextManager:
