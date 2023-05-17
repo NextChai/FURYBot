@@ -334,8 +334,20 @@ class FurySpecificCommands(BaseCog):
 
         await asyncio.sleep(30)
 
-        for offline_member in offline_members:
+        for index, offline_member in enumerate(offline_members):
             kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=offline_member.mention)
+
+            embed = self.bot.Embed(
+                title=f'{offline_member.display_name} is offline!',
+                description=f'{offline_member.mention} is offline on Discord, so they will not be included in the kickening. Someone '
+                f'didn\'t look at <#757666199214751794>!\n\n{kick_message}',
+                author=offline_member,
+            )
+            embed.add_field(
+                name='Offline Members Remaining',
+                value=f'There are **{len(offline_members) - index - 1} offline members** remaining!',
+                inline=False,
+            )
 
             await ctx.send(
                 embed=self.bot.Embed(
