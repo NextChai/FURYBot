@@ -35,7 +35,7 @@ from PIL import Image
 import discord
 from discord.ext import commands
 
-from utils import BaseCog, Context, human_join
+from utils import BaseCog, Context, human_join, human_timestamp
 from utils.images import ImageType, sync_merge_images
 
 if TYPE_CHECKING:
@@ -222,7 +222,7 @@ class KickeningView(discord.ui.View):
         if first_voters_bytes:
             first_member_voters_image = sync_merge_images(
                 first_voters_bytes,
-                images_per_row=10,
+                images_per_row=5,
                 frame_width=sub_image_width,
                 background_color=(49, 51, 56),
             )
@@ -231,7 +231,7 @@ class KickeningView(discord.ui.View):
         if second_voters_bytes:
             second_member_voters_image = sync_merge_images(
                 second_voters_bytes,
-                images_per_row=10,
+                images_per_row=5,
                 frame_width=sub_image_width,
                 background_color=(49, 51, 56),
             )
@@ -337,15 +337,31 @@ class FurySpecificCommands(BaseCog):
         for index, offline_member in enumerate(offline_members):
             kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=offline_member.mention)
 
+            member_information: List[str] = [
+                '**Roles**: {}'.format(human_join([role.mention for role in offline_member.roles]))
+            ]
+            if offline_member.joined_at is not None:
+                member_information.append(f'**Joined At**: {human_timestamp(offline_member.joined_at)}')
+            else:
+                # Thanks discord
+                maybe_member = ctx.guild.get_member(offline_member.id)
+                if maybe_member is not None and maybe_member.joined_at is not None:
+                    member_information.append(f'**Joined At**: {human_timestamp(maybe_member.joined_at)}')
+
+            if offline_member.premium_since:
+                member_information.append(f'**Boosting The Server Since**: {human_timestamp(offline_member.premium_since)}')
+
             embed = self.bot.Embed(
                 title=f'{offline_member.display_name} is offline!',
                 description=f'{offline_member.mention} is offline on Discord, so they will not be included in the kickening. Someone '
                 f'didn\'t look at <#757666199214751794>!\n\n{kick_message}',
                 author=offline_member,
             )
+            embed.add_field(name='Member Information', value='\n'.join(member_information), inline=False)
+
             embed.add_field(
                 name='Offline Members Remaining',
-                value=f'There are **{len(offline_members) - index - 1} offline members** remaining!',
+                value=f'There are **{len(offline_members) - index - 1} offline members** remaining to be kicked!',
                 inline=False,
             )
 
@@ -396,7 +412,7 @@ class FurySpecificCommands(BaseCog):
 
                     member_to_kick = second_member
                 elif len(voting_results) == 0:
-                    # No one voted, shuffle then kicka random member
+                    # No one voted, shuffle then kick a random member
                     first_member, first_votes = kickable_members[0], 0
                     second_member, second_votes = kickable_members[1], 0
 
@@ -413,7 +429,7 @@ class FurySpecificCommands(BaseCog):
 
                 embed = self.bot.Embed(
                     title=textwrap.shorten(f'Results Of {first_member.display_name} vs {second_member.display_name}', 256),
-                    description=f'I\'m sorry {member_to_kick.mention}, but your time has come! You will be kicked!',
+                    description=f'**{member_to_kick.mention}, your time has come!** You will be kicked!',
                     author=member_to_kick,
                 )
 
