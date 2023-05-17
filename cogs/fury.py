@@ -29,7 +29,7 @@ import asyncio
 import io
 import textwrap
 import random
-from typing import TYPE_CHECKING, List, Optional, Set
+from typing import TYPE_CHECKING, List, Optional, Set, Tuple
 from PIL import Image
 
 import discord
@@ -118,6 +118,13 @@ def should_kick_member(member: discord.Member) -> bool:
         return False
 
     return True
+
+
+def determine_kickable_members(all_kickable_members: List[discord.Member]) -> Tuple[discord.Member, discord.Member]:
+    while True:
+        kickable_members = random.sample(all_kickable_members, 2)
+        if kickable_members[0] != kickable_members[1]:
+            return kickable_members[0], kickable_members[1]
 
 
 class KickeningMemberButton(discord.ui.Button['KickeningView']):
@@ -344,11 +351,13 @@ class FurySpecificCommands(BaseCog):
 
             # await offline_member.kick(reason='Offline member')
 
+            await asyncio.sleep(10)
+
         # We're going to use a while True loop here and abuse some mutable objects
         while True:
-            # Spawn a new view
-            kickable_members = random.choices(all_kickable_members, k=2)
+            kickable_members = determine_kickable_members(all_kickable_members)
 
+            # Spawn a new view
             view = KickeningView(self.bot, kickable_members[0], kickable_members[1])
             image = await view.generate_image()
 
@@ -437,7 +446,7 @@ class FurySpecificCommands(BaseCog):
             kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=member_to_kick.mention)
             await message.reply(kick_message)
 
-            await asyncio.sleep(5)
+            await asyncio.sleep(10)
 
             # Remove the kicked member from the list
             all_kickable_members.remove(member_to_kick)
