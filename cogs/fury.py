@@ -22,14 +22,16 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
-import collections
 
+import cachetools
+import dataclasses
 import string
 import asyncio
 import io
 import textwrap
 import random
 from typing import TYPE_CHECKING, List, Optional, Set, Tuple
+from typing_extensions import Self, Type
 from PIL import Image
 
 import discord
@@ -127,10 +129,10 @@ def determine_kickable_members(all_kickable_members: List[discord.Member]) -> Tu
             return kickable_members[0], kickable_members[1]
 
 
-class KickeningMemberButton(discord.ui.Button['KickeningView']):
-    def __init__(self, parent: KickeningView, member: discord.Member, voting_list: List[discord.Member]) -> None:
+class KickeningMemberButton(discord.ui.Button['KickeningVoting']):
+    def __init__(self, parent: KickeningVoting, member: discord.Member, voting_list: List[discord.Member]) -> None:
         super().__init__(label=textwrap.shorten(f'{member.display_name}', width=80), style=discord.ButtonStyle.red)
-        self.parent: KickeningView = parent
+        self.parent: KickeningVoting = parent
         self.member: discord.Member = member
         self.voting_list: List[discord.Member] = voting_list
 
@@ -138,7 +140,6 @@ class KickeningMemberButton(discord.ui.Button['KickeningView']):
         await interaction.response.defer()  # The client's latency will skyrocket, this is precautionary
 
         async with self.parent.lock:
-            self.parent.voting_counter[self.member] += 1
             self.voting_list.append(interaction.user)  # type: ignore
 
             # Edit with the new count
@@ -147,56 +148,64 @@ class KickeningMemberButton(discord.ui.Button['KickeningView']):
         await interaction.followup.send('Your vote has been counted!', ephemeral=True)
 
 
-class KickeningView(discord.ui.View):
-    def __init__(self, bot: FuryBot, first: discord.Member, second: discord.Member) -> None:
-        super().__init__(timeout=VOTING_TIME)
-        self.bot = bot
+@dataclasses.dataclass(init=True, frozen=True)
+class Results:
+    cog: FurySpecificCommands
+    winner: discord.Member
+    loser: discord.Member
+    winner_votes: List[discord.Member]
+    loser_votes: List[discord.Member]
 
-        self.first: discord.Member = first
-        self.second: discord.Member = second
+    @classmethod
+    def from_voting_results(
+        cls: Type[Self],
+        cog: FurySpecificCommands,
+        first: discord.Member,
+        second: discord.Member,
+        first_votes: List[discord.Member],
+        second_votes: List[discord.Member],
+    ) -> Self:
+        if first_votes == second_votes:
+            # This is a tie, pick a random member as the winner.
+            (winner, winner_votes), (loser, loser_votes) = random.sample([(first, first_votes), (second, second_votes)], 2)
+            return cls(cog, winner, loser, winner_votes, loser_votes)
 
-        self.first_votes: List[discord.Member] = []
-        self.second_votes: List[discord.Member] = []
+        if first_votes > second_votes:
+            # First member won
+            return cls(cog, first, second, first_votes, second_votes)
 
-        self.voting_counter: collections.Counter[discord.Member] = collections.Counter()
-        self.lock: asyncio.Lock = asyncio.Lock()
+        # Second member won
+        return cls(cog, second, first, second_votes, first_votes)
 
-        self.voted_members: Set[int] = set()
+    @classmethod
+    async def fetch_partial_image(
+        cls: Type[Self], cog: FurySpecificCommands, first: discord.Member, second: discord.Member
+    ) -> discord.File:
+        temp = cls(cog, first, second, [], [])
+        return await temp.generate_image()
 
-        self.add_item(KickeningMemberButton(self, self.first, self.first_votes))
-        self.add_item(KickeningMemberButton(self, self.second, self.second_votes))
+    @discord.utils.cached_property
+    def winner_vote_count(self) -> int:
+        return len(self.winner_votes)
+
+    @discord.utils.cached_property
+    def loser_vote_count(self) -> int:
+        return len(self.loser_votes)
 
     @property
-    def embed(self) -> discord.Embed:
-        embed = self.bot.Embed(
-            title=textwrap.shorten(f'{self.first.display_name} vs {self.second.display_name}', 256),
-            description='Use the two buttons below to choose which member you want to see kicked from the server! Your vot',
-        )
+    def was_tie(self) -> bool:
+        return self.winner_votes == self.loser_votes
 
-        embed.add_field(name=self.first.display_name, value=f'**{self.voting_counter[self.first]} votes**.')
-        embed.add_field(name=self.second.display_name, value=f'**{self.voting_counter[self.second]} votes**.')
-
-        embed.set_image(url='attachment://kickening.png')
-
-        return embed
-
-    async def interaction_check(self, interaction: discord.Interaction[FuryBot], /) -> Optional[bool]:
-        if interaction.user in {self.first, self.second}:
-            return await interaction.response.send_message(
-                'You cannot vote when you\'re up for the kickening!', ephemeral=True
-            )
-
-        if interaction.user in [*self.first_votes, *self.second_votes]:
-            return await interaction.response.send_message('You have already voted!', ephemeral=True)
-
-        return True
+    @property
+    def bot(self) -> FuryBot:
+        return self.cog.bot
 
     def _sync_generate_image(
         self,
-        first_bytes: bytes,
-        first_voters_bytes: List[bytes],
-        second_bytes: bytes,
-        second_voters_bytes: List[bytes],
+        winner_bytes: bytes,
+        winner_voters_bytes: List[bytes],
+        loser_bytes: bytes,
+        loser_voters_bytes: List[bytes],
     ) -> ImageType:
         # After some respectable amount of testing, we can determine that a good image size
         # is going to be 500 width.
@@ -219,18 +228,18 @@ class KickeningView(discord.ui.View):
         # is completely dynamic.
 
         first_member_voters_image: Optional[ImageType] = None
-        if first_voters_bytes:
+        if winner_voters_bytes:
             first_member_voters_image = sync_merge_images(
-                first_voters_bytes,
+                winner_voters_bytes,
                 images_per_row=5,
                 frame_width=sub_image_width,
                 background_color=(49, 51, 56),
             )
 
         second_member_voters_image: Optional[ImageType] = None
-        if second_voters_bytes:
+        if loser_voters_bytes:
             second_member_voters_image = sync_merge_images(
-                second_voters_bytes,
+                loser_voters_bytes,
                 images_per_row=5,
                 frame_width=sub_image_width,
                 background_color=(49, 51, 56),
@@ -248,7 +257,7 @@ class KickeningView(discord.ui.View):
         quarter_of_image = image_width // 4
 
         # First paste the first members image
-        first_member_image = Image.open(io.BytesIO(first_bytes)).resize((main_member_image_height, main_member_image_width))
+        first_member_image = Image.open(io.BytesIO(winner_bytes)).resize((main_member_image_height, main_member_image_width))
         image.paste(first_member_image, (quarter_of_image - (main_member_image_width // 2), top_image_padding))
 
         if first_member_voters_image:
@@ -257,9 +266,7 @@ class KickeningView(discord.ui.View):
             )
 
         # Then paste the second members image
-        second_member_image = Image.open(io.BytesIO(second_bytes)).resize(
-            (main_member_image_height, main_member_image_width)
-        )
+        second_member_image = Image.open(io.BytesIO(loser_bytes)).resize((main_member_image_height, main_member_image_width))
         image.paste(
             second_member_image, (middle_of_image + (quarter_of_image - (main_member_image_width // 2)), top_image_padding)
         )
@@ -273,17 +280,24 @@ class KickeningView(discord.ui.View):
 
     async def generate_image(self) -> discord.File:
         # Download first member avatar
-        async def _download_image(url: str) -> bytes:
+        async def _download_image(member_id: int, url: str) -> bytes:
+            maybe_downloaded = self.cog.avatar_cache.get(member_id)
+            if maybe_downloaded is not None:
+                return maybe_downloaded
+
             async with self.bot.session.get(url) as response:
-                return await response.read()
+                data = await response.read()
 
-        first_member = await _download_image(self.first.display_avatar.url)
-        second_member = await _download_image(self.second.display_avatar.url)
+            self.cog.avatar_cache[member_id] = data
+            return data
 
-        first_voters = await asyncio.gather(*[_download_image(m.display_avatar.url) for m in self.first_votes])
-        second_voters = await asyncio.gather(*[_download_image(m.display_avatar.url) for m in self.second_votes])
+        winner = await _download_image(self.winner.id, self.winner.display_avatar.url)
+        loser = await _download_image(self.loser.id, self.loser.display_avatar.url)
 
-        image = await self.bot.wrap(self._sync_generate_image, first_member, first_voters, second_member, second_voters)
+        winner_votes = await asyncio.gather(*[_download_image(m.id, m.display_avatar.url) for m in self.winner_votes])
+        loser_votes = await asyncio.gather(*[_download_image(m.id, m.display_avatar.url) for m in self.loser_votes])
+
+        image = await self.bot.wrap(self._sync_generate_image, winner, winner_votes, loser, loser_votes)
 
         buffer = io.BytesIO()
         image.save(buffer, format='PNG')
@@ -292,7 +306,60 @@ class KickeningView(discord.ui.View):
         return discord.File(buffer, filename='kickening.png')
 
 
+class KickeningVoting(discord.ui.View):
+    def __init__(self, cog: FurySpecificCommands, first: discord.Member, second: discord.Member) -> None:
+        super().__init__(timeout=VOTING_TIME)
+        self.cog: FurySpecificCommands = cog
+        self.bot = cog.bot
+
+        self.first: discord.Member = first
+        self.second: discord.Member = second
+
+        self.first_votes: List[discord.Member] = []
+        self.second_votes: List[discord.Member] = []
+
+        self.lock: asyncio.Lock = asyncio.Lock()
+
+        self.voted_members: Set[int] = set()
+
+        self.add_item(KickeningMemberButton(self, self.first, self.first_votes))
+        self.add_item(KickeningMemberButton(self, self.second, self.second_votes))
+
+    @property
+    def embed(self) -> discord.Embed:
+        embed = self.bot.Embed(
+            title=textwrap.shorten(f'{self.first.display_name} vs {self.second.display_name}', 256),
+            description='Use the two buttons below to choose which member you want to see kicked from the server! Your vot',
+        )
+
+        embed.add_field(name=self.first.display_name, value=f'**{len(self.first_votes)} votes**.')
+        embed.add_field(name=self.second.display_name, value=f'**{len(self.second_votes)} votes**.')
+
+        embed.set_image(url='attachment://kickening.png')
+
+        return embed
+
+    async def interaction_check(self, interaction: discord.Interaction[FuryBot], /) -> Optional[bool]:
+        if interaction.user in {self.first, self.second}:
+            return await interaction.response.send_message(
+                'You cannot vote when you\'re up for the kickening!', ephemeral=True
+            )
+
+        if interaction.user in [*self.first_votes, *self.second_votes]:
+            return await interaction.response.send_message('You have already voted!', ephemeral=True)
+
+        return True
+
+    def get_results(self) -> Results:
+        return Results.from_voting_results(self.cog, self.first, self.second, self.first_votes, self.second_votes)
+
+
 class FurySpecificCommands(BaseCog):
+    def __init__(self, bot: FuryBot) -> None:
+        super().__init__(bot)
+
+        self.avatar_cache: cachetools.LFUCache[int, bytes] = cachetools.LFUCache(maxsize=100)
+
     @commands.command(name='start_kickening', hidden=True)
     @commands.is_owner()
     @commands.guild_only()
@@ -381,15 +448,16 @@ class FurySpecificCommands(BaseCog):
             kickable_members = determine_kickable_members(all_kickable_members)
 
             # Spawn a new view
-            view = KickeningView(self.bot, kickable_members[0], kickable_members[1])
-            image = await view.generate_image()
+            view = KickeningVoting(self, kickable_members[0], kickable_members[1])
+
+            partial_image = await Results.fetch_partial_image(self, kickable_members[0], kickable_members[1])
 
             message = await ctx.channel.send(
                 embed=view.embed,
                 view=view,
                 content=human_join((m.mention for m in kickable_members)),
                 allowed_mentions=discord.AllowedMentions(users=True),
-                files=[image],
+                files=[partial_image],
             )
 
             await view.wait()
@@ -398,55 +466,22 @@ class FurySpecificCommands(BaseCog):
                 await message.edit(view=None)
 
                 # Now we can get the results of the vote
-                voting_results = view.voting_counter.most_common()
-
-                # If a member doesn't get a vote then they won't be in the results.
-                # If there is a tie, we'll randomize the winner
-                if len(voting_results) == 1:
-                    # Only one member got votes, kick the one that didn't get any
-                    first_member, first_votes = voting_results[0]
-                    second_member, second_votes = (
-                        kickable_members[1] if first_member == kickable_members[0] else kickable_members[0],
-                        0,
-                    )
-
-                    member_to_kick = second_member
-                elif len(voting_results) == 0:
-                    # No one voted, shuffle then kick a random member
-                    first_member, first_votes = kickable_members[0], 0
-                    second_member, second_votes = kickable_members[1], 0
-
-                    member_to_kick = random.choice((first_member, second_member))
-                else:
-                    first_member, first_votes = voting_results[0]
-                    second_member, second_votes = voting_results[1]
-
-                    if first_votes == second_votes:
-                        # This is a tie, randomize the winner
-                        member_to_kick = random.choice(voting_results)[0]
-                    else:
-                        member_to_kick = first_member if first_votes < second_votes else second_member
+                results = view.get_results()
 
                 embed = self.bot.Embed(
-                    title=textwrap.shorten(f'Results Of {first_member.display_name} vs {second_member.display_name}', 256),
-                    description=f'**{member_to_kick.mention}, your time has come!** You will be kicked!',
-                    author=member_to_kick,
+                    title=textwrap.shorten(f'Results Of {results.winner.display_name} vs {results.loser.display_name}', 256),
+                    description=f'**{results.winner.mention}, your time has come!** You will be kicked!',
+                    author=results.winner,
                 )
 
-                embed.add_field(name=first_member.display_name, value=f'{first_votes} votes.')
-                embed.add_field(name=second_member.display_name, value=f'{second_votes} votes.')
+                embed.add_field(name=results.winner.display_name, value=f'{results.winner_vote_count} votes.')
+                embed.add_field(name=results.loser.display_name, value=f'{results.loser_vote_count} votes.')
 
-                if first_votes == second_votes:
+                if results.was_tie:
                     embed.add_field(
-                        name='It Was A Tie!', value='The results were a tie, so we randomized the winner!', inline=False
+                        name='It Was A Tie!', value='The results were a tie, so I randomized the winner!', inline=False
                     )
 
-                embed.add_field(
-                    name='Thank You!',
-                    value='From all of us working hard to make the FLVS Fury eSports team everything it is, we thank you '
-                    'for your service and hope you will continue to support us in the future. See you next season!',
-                    inline=False,
-                )
                 embed.add_field(
                     name='Remaining Members',
                     value=f'There are **{len(all_kickable_members)} people** remaining in the kickening.',
@@ -457,7 +492,7 @@ class FurySpecificCommands(BaseCog):
                     text=f'You have {GRACE_PERIOD} seconds until you get kicked and we move onto the next member.'
                 )
 
-                file = await view.generate_image()
+                file = await results.generate_image()
                 embed.set_image(url=f'attachment://{file.filename}')
 
             message = await message.reply(embed=embed, files=[file])
@@ -466,13 +501,13 @@ class FurySpecificCommands(BaseCog):
 
             # await ctx.guild.kick(member_to_kick, reason='The kickening has spoken!')
 
-            kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=member_to_kick.mention)
+            kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=results.winner.mention)
             await message.reply(kick_message)
 
             await asyncio.sleep(10)
 
             # Remove the kicked member from the list
-            all_kickable_members.remove(member_to_kick)
+            all_kickable_members.remove(results.winner)
             random.shuffle(all_kickable_members)
 
             # If the length of all kickable members is 1, we can stop and announce them the winner
