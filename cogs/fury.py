@@ -344,7 +344,7 @@ class FurySpecificCommands(BaseCog):
                     f'didn\'t look at <#757666199214751794>!\n\n{kick_message}',
                     author=offline_member,
                 ),
-                delete_after=3,
+                delete_after=20,
                 content=offline_member.mention,
                 allowed_mentions=discord.AllowedMentions(users=True),
             )
