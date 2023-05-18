@@ -291,35 +291,27 @@ class Results:
 
         # We need to paste the given scores onto the image.
         winner_voter_count = f'{len(winner_voters_bytes)} Votes'
-        winner_font_size = 74
-        winner_font = ImageFont.truetype('./assets/fonts/burbank.otf', winner_font_size)
-        while winner_font.getsize(winner_voter_count)[0] > sub_image_width:
-            winner_font_size -= 1
+        loser_voter_count = f'{len(loser_voters_bytes)} Votes'
+
+        # We'll use the longer of the two strings to determine the font size.
+        chosen_count = winner_voter_count if len(winner_voter_count) > len(loser_voter_count) else loser_voter_count
+
+        font_size = 74
+        font = ImageFont.truetype('./assets/fonts/burbank.otf', font_size)
+        while font.getsize(chosen_count)[0] > sub_image_width:
+            font_size -= 1
             winner_font.font = PIL_CORE.getfont(  # type: ignore
                 './assets/fonts/burbank.otf',
-                winner_font_size,
-                winner_font.index,
-                winner_font.encoding,
-                layout_engine=winner_font.layout_engine,
+                font_size,
+                font.index,
+                font.encoding,
+                layout_engine=font.layout_engine,
             )
 
-        font_height = winner_font.getsize(str(winner_voter_count))[1]
-        total_font_height = font_height + font_padding_top
+        max_font_height = font.getsize(chosen_count)[1]
+        total_font_height = max_font_height + font_padding_top
 
         image_height += total_font_height
-
-        loser_voter_count = f'{len(loser_voters_bytes)} Votes'
-        loser_font_size = 74
-        loser_font = ImageFont.truetype('./assets/fonts/burbank.otf', loser_font_size)
-        while loser_font.getsize(loser_voter_count)[0] > sub_image_width:
-            loser_font_size -= 1
-            loser_font.font = PIL_CORE.getfont(  # type: ignore
-                './assets/fonts/burbank.otf',
-                loser_font_size,
-                loser_font.index,
-                loser_font.encoding,
-                layout_engine=winner_font.layout_engine,
-            )
 
         # Now we can create our image
         image = Image.new('RGBA', (image_width, image_height), (49, 51, 56))
@@ -342,11 +334,15 @@ class Results:
             )
 
         # Paste the voting number
+        winner_count_width, _winner_count_height = font.getsize(winner_voter_count)
+
+        blank_space_per_side = (sub_image_width - winner_count_width) // 2
+
         draw.text(  # type: ignore
-            (10, top_image_padding + main_member_image_height + font_padding_top),
+            (10, top_image_padding + main_member_image_height + font_padding_top + blank_space_per_side),
             winner_voter_count,
-            font=winner_font,
-            fill=(255, 255, 255),
+            font=font,
+            fill=(92, 136, 235),
         )
 
         # Then paste the second members image
@@ -362,11 +358,15 @@ class Results:
             )
 
         # Paste the second voting number
+        loser_count_width, _loser_count_height = font.getsize(loser_voter_count)
+
+        blank_space_per_side = (sub_image_width - loser_count_width) // 2
+
         draw.text(  # type: ignore
-            (260, top_image_padding + main_member_image_height + font_padding_top),
+            (260, top_image_padding + main_member_image_height + font_padding_top + blank_space_per_side),
             loser_voter_count,
-            font=loser_font,
-            fill=(255, 255, 255),
+            font=font,
+            fill=(237, 69, 66),
         )
 
         return image
