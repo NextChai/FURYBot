@@ -339,7 +339,7 @@ class Results:
         blank_space_per_side = (sub_image_width - winner_count_width) // 2
 
         draw.text(  # type: ignore
-            (10, top_image_padding + main_member_image_height + font_padding_top + blank_space_per_side),
+            (10 + blank_space_per_side, top_image_padding + main_member_image_height + font_padding_top),
             winner_voter_count,
             font=font,
             fill=(92, 136, 235),
@@ -363,7 +363,7 @@ class Results:
         blank_space_per_side = (sub_image_width - loser_count_width) // 2
 
         draw.text(  # type: ignore
-            (260, top_image_padding + main_member_image_height + font_padding_top + blank_space_per_side),
+            (260 + blank_space_per_side, top_image_padding + main_member_image_height + font_padding_top),
             loser_voter_count,
             font=font,
             fill=(237, 69, 66),
