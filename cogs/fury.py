@@ -342,7 +342,7 @@ class Results:
             (10 + blank_space_per_side, top_image_padding + main_member_image_height + font_padding_top),
             winner_voter_count,
             font=font,
-            fill=(92, 136, 235),
+            fill=(92, 235, 136),
         )
 
         # Then paste the second members image
@@ -366,7 +366,7 @@ class Results:
             (260 + blank_space_per_side, top_image_padding + main_member_image_height + font_padding_top),
             loser_voter_count,
             font=font,
-            fill=(237, 69, 66),
+            fill=(237, 66, 69),
         )
 
         return image
