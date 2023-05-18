@@ -32,7 +32,9 @@ import textwrap
 import random
 from typing import TYPE_CHECKING, List, Optional, Set, Tuple
 from typing_extensions import Self, Type
-from PIL import Image
+
+import PIL
+from PIL import Image, ImageFont, ImageDraw
 
 import discord
 from discord.ext import commands
@@ -43,6 +45,8 @@ from utils.images import ImageType, sync_merge_images
 if TYPE_CHECKING:
     from bot import FuryBot
 
+PIL_CORE = PIL._imagingft  # type: ignore
+
 VOTING_TIME: int = 20
 GRACE_PERIOD: int = 20
 
@@ -51,6 +55,8 @@ CAPTAIN_ROLE_ID: int = 765360488816967722
 BOTS_ROLE_ID: int = 763455351332798485
 
 ROO_DEVIL_EMOJI: str = '<:rooDevil:1108541372505538620>'
+
+SCORE_FONT_SIZE: int = 57
 
 KICKENING_MESSAGES: List[str] = [
     "Oops! Looks like $mention got kicked! Better luck next time, champ.",
@@ -250,23 +256,28 @@ class Results:
         sub_image_bottom_padding = 20
         main_member_image_height = 100
         main_member_image_width = 100
-        image_height = main_member_image_height + top_image_padding + bottom_image_padding + sub_image_bottom_padding
+
+        font_padding_top = 20
+
+        image_height = (
+            main_member_image_height + top_image_padding + bottom_image_padding + sub_image_bottom_padding + font_padding_top
+        )
 
         # Below it is going to be the images showing who voted for who, which
         # is completely dynamic.
 
-        first_member_voters_image: Optional[ImageType] = None
+        winner_member_voters_image: Optional[ImageType] = None
         if winner_voters_bytes:
-            first_member_voters_image = sync_merge_images(
+            winner_member_voters_image = sync_merge_images(
                 winner_voters_bytes,
                 images_per_row=5,
                 frame_width=sub_image_width,
                 background_color=(49, 51, 56),
             )
 
-        second_member_voters_image: Optional[ImageType] = None
+        loser_member_voters_image: Optional[ImageType] = None
         if loser_voters_bytes:
-            second_member_voters_image = sync_merge_images(
+            loser_member_voters_image = sync_merge_images(
                 loser_voters_bytes,
                 images_per_row=5,
                 frame_width=sub_image_width,
@@ -274,24 +285,69 @@ class Results:
             )
 
         # Update the image height to include highest voter image height
-        first_height = first_member_voters_image and first_member_voters_image.height or 0
-        second_height = second_member_voters_image and second_member_voters_image.height or 0
-        image_height += max(first_height, second_height)
+        winner_height = winner_member_voters_image and winner_member_voters_image.height or 0
+        loser_height = loser_member_voters_image and loser_member_voters_image.height or 0
+        image_height += max(winner_height, loser_height)
+
+        # We need to paste the given scores onto the image.
+        winner_voter_count = f'{len(winner_voters_bytes)} Votes'
+        winner_font_size = 74
+        winner_font = ImageFont.truetype('./assets/fonts/burbank.otf', winner_font_size)
+        while winner_font.getsize(winner_voter_count)[0] > sub_image_width:
+            winner_font_size -= 1
+            winner_font.font = PIL_CORE.getfont(  # type: ignore
+                './assets/fonts/burbank.otf',
+                winner_font_size,
+                winner_font.index,
+                winner_font.encoding,
+                layout_engine=winner_font.layout_engine,
+            )
+
+        font_height = winner_font.getsize(str(winner_voter_count))[1]
+        total_font_height = font_height + font_padding_top
+
+        image_height += total_font_height
+
+        loser_voter_count = f'{len(loser_voters_bytes)} Votes'
+        loser_font_size = 74
+        loser_font = ImageFont.truetype('./assets/fonts/burbank.otf', loser_font_size)
+        while loser_font.getsize(loser_voter_count)[0] > sub_image_width:
+            loser_font_size -= 1
+            loser_font.font = PIL_CORE.getfont(  # type: ignore
+                './assets/fonts/burbank.otf',
+                loser_font_size,
+                loser_font.index,
+                loser_font.encoding,
+                layout_engine=winner_font.layout_engine,
+            )
 
         # Now we can create our image
         image = Image.new('RGBA', (image_width, image_height), (49, 51, 56))
+        draw = ImageDraw.Draw(image)
 
         middle_of_image = image_width // 2
         quarter_of_image = image_width // 4
 
         # First paste the first members image
-        first_member_image = Image.open(io.BytesIO(winner_bytes)).resize((main_member_image_height, main_member_image_width))
-        image.paste(first_member_image, (quarter_of_image - (main_member_image_width // 2), top_image_padding))
+        winner_member_image = Image.open(io.BytesIO(winner_bytes)).resize(
+            (main_member_image_height, main_member_image_width)
+        )
+        image.paste(winner_member_image, (quarter_of_image - (main_member_image_width // 2), top_image_padding))
 
-        if first_member_voters_image:
+        # Paste the winner voter count, it's x-coordinate is going to be the same as the
+        if winner_member_voters_image:
             image.paste(
-                first_member_voters_image, (10, top_image_padding + main_member_image_height + sub_image_bottom_padding)
+                winner_member_voters_image,
+                (10, top_image_padding + main_member_image_height + sub_image_bottom_padding + total_font_height),
             )
+
+        # Paste the voting number
+        draw.text(  # type: ignore
+            (10, top_image_padding + main_member_image_height + font_padding_top),
+            winner_voter_count,
+            font=winner_font,
+            fill=(255, 255, 255),
+        )
 
         # Then paste the second members image
         second_member_image = Image.open(io.BytesIO(loser_bytes)).resize((main_member_image_height, main_member_image_width))
@@ -299,10 +355,19 @@ class Results:
             second_member_image, (middle_of_image + (quarter_of_image - (main_member_image_width // 2)), top_image_padding)
         )
 
-        if second_member_voters_image:
+        if loser_member_voters_image:
             image.paste(
-                second_member_voters_image, (260, top_image_padding + main_member_image_height + sub_image_bottom_padding)
+                loser_member_voters_image,
+                (260, top_image_padding + main_member_image_height + sub_image_bottom_padding + total_font_height),
             )
+
+        # Paste the second voting number
+        draw.text(  # type: ignore
+            (260, top_image_padding + main_member_image_height + font_padding_top),
+            loser_voter_count,
+            font=loser_font,
+            fill=(255, 255, 255),
+        )
 
         return image
 
@@ -386,6 +451,7 @@ class FurySpecificCommands(BaseCog):
     def __init__(self, bot: FuryBot) -> None:
         super().__init__(bot)
 
+        self._kickening_task: Optional[asyncio.Task[None]] = None
         self.avatar_cache: cachetools.LFUCache[int, bytes] = cachetools.LFUCache(maxsize=100)
 
     async def _listen_for_members(
@@ -412,11 +478,7 @@ class FurySpecificCommands(BaseCog):
                     allowed_mentions=discord.AllowedMentions(users=True),
                 )
 
-    @commands.command(name='start_kickening', hidden=True)
-    @commands.is_owner()
-    @commands.guild_only()
-    async def start_kickening(self, ctx: Context) -> None:
-        """Starts the kickening."""
+    async def _wrap_kickening(self, ctx: Context) -> None:
         assert ctx.guild
 
         all_kickable_members: List[discord.Member] = []
@@ -587,6 +649,41 @@ class FurySpecificCommands(BaseCog):
 
         # End the searching for offline members
         task.cancel()
+
+    @commands.group(name='kickening', hidden=True)
+    @commands.is_owner()
+    @commands.guild_only()
+    async def kickening(self, ctx: Context) -> None:
+        """Commands for the kickening."""
+        await ctx.send('Invalid subcommand passed. Valid subcommands are `start`, `stop`.')
+
+    @kickening.command(name='start', hidden=True)
+    @commands.is_owner()
+    @commands.guild_only()
+    async def start_kickening(self, ctx: Context) -> None:
+        """Starts the kickening."""
+        self._kickening_task = self.bot.create_task(self._wrap_kickening(ctx))
+
+    @kickening.command(name='stop', hidden=True)
+    @commands.is_owner()
+    @commands.guild_only()
+    async def stop_kickening(self, ctx: Context) -> None:
+        """Stops the kickening."""
+        if self._kickening_task is None:
+            await ctx.send('The kickening is not currently running!')
+            return
+
+        self._kickening_task.cancel()
+
+        try:
+            await self._kickening_task
+        except asyncio.CancelledError:
+            # This is good, we want this
+            pass
+
+        self._kickening_task = None
+
+        await ctx.send('The kickening has been stopped.')
 
 
 async def setup(bot: FuryBot) -> None:
