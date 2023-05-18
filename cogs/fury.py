@@ -408,7 +408,8 @@ class FurySpecificCommands(BaseCog):
 
                 await message.reply(
                     f'Welcome online {message.author.mention}! You have been removed from the offline members list and added to the kickening list! In the mean time, '
-                    'view <#757666199214751794> to see the announcements you missed.'
+                    'view <#757666199214751794> to see the announcements you missed.',
+                    allowed_mentions=discord.AllowedMentions(users=True),
                 )
 
     @commands.command(name='start_kickening', hidden=True)
@@ -503,8 +504,6 @@ class FurySpecificCommands(BaseCog):
             if index != len(offline_members) - 1:
                 await asyncio.sleep(20)
 
-        task.cancel()
-
         await ctx.send(embed=KICKENING_EMBED)
         await asyncio.sleep(60 * 2)  # 2 minutes
 
@@ -585,6 +584,9 @@ class FurySpecificCommands(BaseCog):
                     allowed_mentions=discord.AllowedMentions(users=True),
                 )
                 break
+
+        # End the searching for offline members
+        task.cancel()
 
 
 async def setup(bot: FuryBot) -> None:
