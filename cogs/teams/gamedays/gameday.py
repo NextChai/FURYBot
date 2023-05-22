@@ -793,7 +793,7 @@ class Gameday:
                 voting_ends_at,
                 gameday_time_id
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
             """
 
