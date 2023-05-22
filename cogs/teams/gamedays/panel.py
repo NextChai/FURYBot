@@ -452,12 +452,6 @@ class GamedayPanel(BaseView):
             name='Images', value=image_hyperlinks or 'No supporting images have been added to this gameday.', inline=False
         )
 
-        embed.add_field(
-            name='Automatic Sub Finding',
-            value=f'Automatic sub finding is {"enabled" if self.gameday.automatic_sub_finding else "disabled"}.',
-            inline=False,
-        )
-
         attendance_voting_info: List[str] = [
             f'Voting Starts At: {human_timestamp(self.gameday.voting.starts_at)}',
             f'Voting Ends At: {human_timestamp(self.gameday.voting.ends_at)}',

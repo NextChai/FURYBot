@@ -707,6 +707,16 @@ class GamedaySubFinding:
             builder.add_arg('update_message_id', update_message_id)
             self.update_message_id = update_message_id
 
+        timers = [(self.fetch_ends_at_timer, ends_at)]
+        for timer_coro, new_time in timers:
+            try:
+                timer = await timer_coro(connection=connection)
+            except TimerNotFound:
+                continue
+            else:
+                if timer is not None:
+                    await timer.edit(expires=new_time)
+
         await builder(connection)
 
 
@@ -1080,7 +1090,6 @@ class Gameday:
         connection: ConnectionType,
         *,
         starts_at: datetime.datetime = MISSING,
-        automatic_sub_finding: bool = MISSING,
         voting_starts_at: datetime.datetime = MISSING,
         voting_ends_at: datetime.datetime = MISSING,
         voting_starts_at_timer_id: int = MISSING,
@@ -1096,10 +1105,6 @@ class Gameday:
         if starts_at is not MISSING:
             builder.add_arg('starts_at', starts_at)
             self.starts_at = starts_at
-
-        if automatic_sub_finding is not MISSING:
-            builder.add_arg('automatic_sub_finding', automatic_sub_finding)
-            self.automatic_sub_finding = automatic_sub_finding
 
         if voting_starts_at is not MISSING:
             builder.add_arg('voting_starts_at', voting_starts_at)
@@ -1285,7 +1290,15 @@ class GamedayTime:
                     starts_at=new_starts_at,
                     voting_starts_at=voting.start,
                     voting_ends_at=voting.end,
-                    automatic_sub_finding=voting.can_use_automatic_sub_finding,
+                )
+
+                # Fetch the sub finding
+                sub_finding = await gameday.getch_sub_finding(connection=connection)
+                await sub_finding.edit(
+                    connection=connection,
+                    enabled=voting.can_use_automatic_sub_finding,
+                    starts_at=voting.start,
+                    ends_at=voting.end,
                 )
 
                 # Some timers may need to be updated as well, so let's do that.
