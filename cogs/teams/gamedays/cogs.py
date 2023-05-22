@@ -215,7 +215,8 @@ class GamedayEventListener(BaseCog):
             return
 
         # We do not have enough votes, so we need to check for automatic sub finding and act accordingly.
-        if gameday.automatic_sub_finding:
+        sub_finding = await gameday.getch_sub_finding()
+        if sub_finding.enabled:
             try:
                 await SubFinder.create(gameday=gameday, now=discord.utils.utcnow())
             except ValueError as exc:
