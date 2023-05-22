@@ -31,7 +31,6 @@ from typing_extensions import Self, Unpack
 
 from utils import AfterModal, BaseView, BaseViewKwargs, RoleSelect, SelectOneOfMany, UserSelect, default_button_doc_string
 
-from .gamedays import CreateGamedayBucketView, GamedayBucketPanel
 from .practices.panel import PracticeMemberStatistics, TeamPracticesPanel
 from .scrims.panel import TeamScrimsPanel
 from .team import TeamMember
@@ -631,19 +630,6 @@ class TeamView(BaseView):
     async def practices(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Manage the team\'s practices."""
         view = self.create_child(TeamPracticesPanel, self.team)
-        return await interaction.response.edit_message(embed=view.embed, view=view)
-
-    @discord.ui.button(label='Gameday Management')
-    @default_button_doc_string
-    async def gameday(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """Manage the team\'s gameday."""
-        bucket = self.team.get_gameday_bucket()
-
-        if bucket is None:
-            child = self.create_child(CreateGamedayBucketView, self.team)
-            return await interaction.response.edit_message(embed=child.embed, view=child)
-
-        view = self.create_child(GamedayBucketPanel, bucket)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
     @discord.ui.button(label='Delete Team', style=discord.ButtonStyle.danger)

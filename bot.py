@@ -55,9 +55,6 @@ from typing_extensions import Concatenate, Self
 from cogs.images import ApproveOrDenyImage, ImageRequest
 from cogs.links import AllowedLink, LinkAction, LinkSettings
 from cogs.teams import Team
-from cogs.teams.gamedays import GamedayBucket
-from cogs.teams.gamedays.persistent.score import ScoreReportView
-from cogs.teams.gamedays.persistent.voting import AttendanceVotingView
 from cogs.teams.practices import Practice
 from cogs.teams.scrims import Scrim, ScrimStatus
 from utils import (
@@ -98,7 +95,6 @@ initial_extensions: Tuple[str, ...] = (
     'cogs.moderation',
     'cogs.owner',
     'cogs.teams',
-    'cogs.teams.gamedays',
     'cogs.teams.practices',
     'cogs.teams.scrims',
     'jishaku',
@@ -242,12 +238,6 @@ class FuryBot(commands.Bot):
         # Mapping[guild_id, Mapping[team_id, Mapping[practice_id, Practice]]]
         self._team_practice_cache: Dict[int, Dict[int, Dict[int, Practice]]] = {}
 
-        # Mapping[guild_id, Mapping[team_id, GameBucket]]
-        self._team_gameday_buckets: Dict[int, Dict[int, GamedayBucket]] = {}
-
-        self.attendance_voting_view: Optional[AttendanceVotingView] = None
-        self.score_report_view: Optional[ScoreReportView] = None
-
         self.global_profanity_finder: Optional[GuildProfanityFinder] = None
 
         # Mapping[guild_id, GuildProfanityFinder]
@@ -366,42 +356,6 @@ class FuryBot(commands.Bot):
 
     def remove_custom_profanity_finder(self, guild_id: int, /) -> Optional[GuildProfanityFinder]:
         return self.guild_profanity_finders.pop(guild_id, None)
-
-    def get_gameday_bucket(
-        self,
-        guild_id: int,
-        team_id: int,
-    ) -> Optional[GamedayBucket]:
-        """Get a gameday bucket for a team in a guild.
-
-        Parameters
-        ----------
-        guild_id: :class:`int`
-            The guild ID to get buckets from.
-        team_id: :class:`int`
-            The team ID to get buckets from.
-        bucket_id: :class:`int`
-            The bucket ID to get.
-
-        Returns
-        -------
-        Optional[:class:`GamedayBucket`]
-            The bucket, if it exists.
-        """
-        return self._team_gameday_buckets.get(guild_id, {}).get(team_id, None)
-
-    def add_gameday_bucket(self, bucket: GamedayBucket, /):
-        """Add a gameday bucket to the cache.
-
-        Parameters
-        ----------
-        bucket: :class:`GamedayBucket`
-            The bucket to add.
-        """
-        self._team_gameday_buckets.setdefault(bucket.guild_id, {})[bucket.team_id] = bucket
-
-    def remove_gameday_bucket(self, guild_id: int, team_id: int, /) -> Optional[GamedayBucket]:
-        return self._team_gameday_buckets.get(guild_id, {}).pop(team_id, None)
 
     # Team management
     def get_teams(self, guild_id: int, /) -> List[Team]:
@@ -821,24 +775,6 @@ class FuryBot(commands.Bot):
             self._team_practice_cache.setdefault(practice.guild_id, {}).setdefault(practice.team_id, {})[
                 practice.id
             ] = practice
-
-    @cache_loader('GAMEDAY_BUCKETS')
-    async def _cache_setup_gameday_buckets(self, connection: ConnectionType) -> None:
-        gameday_bucket_data = await connection.fetch("SELECT * FROM teams.gameday_buckets")
-
-        for row in gameday_bucket_data:
-            bucket = GamedayBucket(bot=self, **dict(row))
-            self.add_gameday_bucket(bucket)
-
-            await bucket.setup(connection=connection)
-
-    @cache_loader('GAMEDAY_PERSISTENT_VIEWS')
-    async def _cache_setup_gameday_persistent_views(self, connection: ConnectionType) -> None:
-        self.attendance_voting_view = AttendanceVotingView(timeout=None)
-        self.add_view(self.attendance_voting_view)
-
-        self.score_report_view = ScoreReportView(timeout=None)
-        self.add_view(self.score_report_view)
 
     @cache_loader('PROFANITY_FILTER')
     async def _cache_setup_profanity_filter(self, connection: ConnectionType) -> None:

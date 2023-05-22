@@ -36,7 +36,6 @@ from utils import QueryBuilder, human_join
 if TYPE_CHECKING:
     from bot import ConnectionType, FuryBot
 
-    from .gamedays.gameday import Gameday, GamedayBucket
     from .practices import Practice
     from .scrims import Scrim
 
@@ -398,18 +397,6 @@ class Team:
             return 0
 
         return sum(practice_points)
-
-    @property
-    def ongoing_gamedays(self) -> List[Gameday]:
-        bucket = self.get_gameday_bucket()
-        if bucket is None:
-            return []
-
-        return bucket.ongoing_gamedays
-
-    def get_gameday_bucket(self, /) -> Optional[GamedayBucket]:
-        """Optional[:class:`GamedayBucket`]: Gets the gameday bucket for this team."""
-        return self.bot.get_gameday_bucket(self.guild_id, self.id)
 
     def mention_members(self, delimiter: str = ', ') -> str:
         """Mentions all the members in this team.
@@ -855,7 +842,3 @@ class Team:
             await channel.delete()
 
         self.bot.remove_team(self.id, self.guild_id)
-
-        bucket = self.get_gameday_bucket()
-        if bucket is not None:
-            await bucket.delete(connection=connection)  # To cleanup the timers.
