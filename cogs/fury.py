@@ -124,7 +124,7 @@ KICKENING_EMBED.add_field(
 )
 KICKENING_EMBED.add_field(
     name="So How Does The Kickening Work?",
-    value="This year's Kickening is a randomized voting gamer! Two members will be selected at random, "
+    value="This year's Kickening is a randomized voting event! Two members will be selected at random, "
     f"after which all other participants will have the opportunity to vote for the person they want to see kicked {ROO_DEVIL_EMOJI}! "
     "Each voter will be given a 20-second window to cast their vote, following which the results will be shown. "
     "The member who holds the highest number of votes will be given a brief 20-second grace period before their "
@@ -133,7 +133,7 @@ KICKENING_EMBED.add_field(
     inline=False,
 )
 KICKENING_EMBED.set_image(
-    url='https://media.discordapp.net/attachments/887771983792701480/1108522479275753522/image.png?width=448&height=560'
+    url='https://media.discordapp.net/attachments/887771983792701480/1108564025857560618/kickening.png?width=449&height=566'
 )
 
 
