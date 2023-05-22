@@ -62,13 +62,13 @@ from utils import (
     BYPASS_SETUP_HOOK_CACHE_LOADING,
     RUNNING_DEVELOPMENT,
     START_TIMER_MANAGER,
+    Context,
     ErrorHandler,
     GuildProfanityFinder,
     LinkFilter,
     TimerManager,
     _parse_environ_boolean,
     parse_initial_extensions,
-    Context,
 )
 
 if TYPE_CHECKING:

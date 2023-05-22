@@ -23,13 +23,13 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import logging
-import sys
-import importlib.util
 import asyncio
+import importlib.util
 import inspect
 import io
+import logging
 import re
+import sys
 import textwrap
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional, Tuple
 

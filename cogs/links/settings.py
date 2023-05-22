@@ -96,6 +96,15 @@ class LinkAction:
 
         return self
 
+    def __eq__(self, __value: object) -> bool:
+        return isinstance(__value, LinkAction) and __value.id == self.id
+
+    def __ne__(self, __value: object) -> bool:
+        return not self.__eq__(__value)
+
+    def __hash__(self, __value: object) -> int:
+        return hash(self.id)
+
     @property
     def settings(self) -> Optional[LinkSettings]:
         return self.bot.get_link_setting(self.settings_id)
@@ -128,7 +137,12 @@ class LinkAction:
     async def delete(self, *, connection: ConnectionType) -> None:
         await connection.execute('DELETE FROM links.actions WHERE id = $1', self.id)
 
-        raise NotImplementedError
+        # Need to remove this action from the settings
+        settings = self.settings
+        if settings is None:
+            return
+
+        settings.actions.remove(self)
 
 
 class LinkSettings:

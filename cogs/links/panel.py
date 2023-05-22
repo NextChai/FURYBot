@@ -26,7 +26,7 @@ from __future__ import annotations
 import discord
 from typing_extensions import Self, Unpack
 
-from utils import BaseButtonPaginator, BaseView, BaseViewKwargs, SelectOneOfMany, human_timedelta, ShortTime, AfterModal
+from utils import AfterModal, BaseButtonPaginator, BaseView, BaseViewKwargs, SelectOneOfMany, ShortTime, human_timedelta
 
 from .settings import *
 

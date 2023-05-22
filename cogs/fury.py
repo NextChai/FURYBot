@@ -23,21 +23,20 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import cachetools
-import dataclasses
-import string
 import asyncio
+import dataclasses
 import io
-import textwrap
 import random
+import string
+import textwrap
 from typing import TYPE_CHECKING, List, Optional, Set, Tuple
-from typing_extensions import Self, Type
 
-import PIL
-from PIL import Image, ImageFont, ImageDraw
-
+import cachetools
 import discord
+import PIL
 from discord.ext import commands
+from PIL import Image, ImageDraw, ImageFont
+from typing_extensions import Self, Type
 
 from utils import BaseCog, Context, human_join, human_timestamp
 from utils.images import ImageType, sync_merge_images
