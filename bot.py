@@ -54,6 +54,7 @@ from typing_extensions import Concatenate, Self
 
 from cogs.images import ApproveOrDenyImage, ImageRequest
 from cogs.links import AllowedLink, LinkAction, LinkSettings
+from cogs.links.settings import ExemptTarget
 from cogs.teams import Team
 from cogs.teams.practices import Practice
 from cogs.teams.scrims import Scrim, ScrimStatus
@@ -802,6 +803,13 @@ class FuryBot(commands.Bot):
             assert settings
 
             settings.add_allowed_link(AllowedLink(bot=self, data=dict(allowed_link_data)))
+
+        exempt_targets_data = await connection.fetch('SELECT * FROM links.exempt_targets')
+        for exempt_target_data in exempt_targets_data:
+            settings = self.get_link_setting(exempt_target_data['settings_id'])
+            assert settings
+
+            settings.add_exempt_target(ExemptTarget(bot=self, data=dict(exempt_target_data)))
 
         # Now that out cache is full we can create the regex for each guild
         # that will be used to check if a link is allowed or not.

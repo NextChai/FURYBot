@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import datetime
 import enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
 
 import discord
 from typing_extensions import Self
@@ -47,9 +47,54 @@ class AllowedLink:
         self.added_at: datetime.datetime = data['added_at']
         self.added_by_id: int = data['added_by_id']
 
+    @classmethod
+    async def create(
+        cls: Type[Self],
+        *,
+        bot: FuryBot,
+        connection: ConnectionType,
+        settings_id: int,
+        url: str,
+        added_at: datetime.datetime,
+        added_by_id: int,
+    ) -> Self:
+        settings = bot.get_link_setting(settings_id)
+        if settings is None:
+            raise ValueError('No link settings found for guild_id')
+
+        data = await connection.fetchrow(
+            'INSERT INTO links.allowed_links (settings_id, url, added_at, added_by_id) '
+            'VALUES ($1, $2, $3, $4 '
+            'RETURNING *',
+            settings_id,
+            url,
+            added_at,
+            added_by_id,
+        )
+        assert data
+
+        self = cls(bot=bot, data=dict(data))
+        settings.add_allowed_link(self)
+
+        return self
+
     @property
     def added_by(self) -> Optional[discord.User]:
         return self.bot.get_user(self.added_by_id)
+
+    @property
+    def settings(self) -> Optional[LinkSettings]:
+        return self.bot.get_link_setting(self.settings_id)
+
+    async def delete(self, *, connection: ConnectionType) -> None:
+        await connection.execute('DELETE FROM links.allowed_links WHERE id = $1', self.id)
+
+        # Need to remove this allowed link from the settings
+        settings = self.settings
+        if settings is None:
+            return
+
+        settings.remove_allowed_link(self)
 
 
 class LinkActionType(enum.Enum):
@@ -145,6 +190,98 @@ class LinkAction:
         settings.actions.remove(self)
 
 
+class ExemptTargetType(enum.Enum):
+    role = 'role'
+    user = 'user'
+    channel = 'channel'
+
+
+class ExemptTarget:
+    def __init__(self, *, bot: FuryBot, data: Dict[str, Any]) -> None:
+        self.bot: FuryBot = bot
+        self.id: int = data['id']
+        self.settings_id: int = data['settings_id']
+        self.exempt_id: int = data['exempt_id']
+        self.exempt_type: ExemptTargetType = ExemptTargetType(data['exempt_type'])
+
+    @classmethod
+    async def create(
+        cls: Type[Self], *, bot: FuryBot, connection: ConnectionType, settings_id: int, id: int, type: ExemptTargetType
+    ) -> Self:
+        settings = bot.get_link_setting(settings_id)
+        if settings is None:
+            raise ValueError('No link settings found for guild_id')
+
+        data = await connection.fetchrow(
+            'INSERT ITO links.exempt_targets (settings_id, exempt_id, exempt_type) VALUES ($1, $2, $3) RETURNING *',
+        )
+        assert data
+
+        self = cls(bot=bot, data=dict(data))
+
+        settings.add_exempt_target(self)
+
+        return self
+
+    @property
+    def settings(self) -> Optional[LinkSettings]:
+        return self.bot.get_link_setting(self.settings_id)
+
+    @property
+    def mention(self) -> str:
+        if self.exempt_type is ExemptTargetType.channel:
+            return f'<#{self.exempt_id}>'
+        elif self.exempt_type is ExemptTargetType.role:
+            return f'<@&{self.exempt_id}>'
+        elif self.exempt_type is ExemptTargetType.user:
+            return f'<@{self.exempt_id}>'
+        else:
+            raise ValueError(f'Unknown exempt type {self.exempt_type}')
+
+    def resolve(self) -> Optional[Union[discord.Role, discord.abc.User, discord.abc.GuildChannel, discord.Thread]]:
+        settings = self.settings
+        if settings is None:
+            return
+
+        guild = settings.guild
+        if guild is None:
+            return
+
+        if self.exempt_type is ExemptTargetType.role:
+            return guild.get_role(self.exempt_id)
+        elif self.exempt_type is ExemptTargetType.channel:
+            return guild.get_channel_or_thread(self.exempt_id)
+        elif self.exempt_type is ExemptTargetType.user:
+            return guild.get_member(self.exempt_id) or self.bot.get_user(self.exempt_id)
+
+    async def edit(
+        self,
+        *,
+        connection: ConnectionType,
+        exempt_id: int = MISSING,
+        exempt_type: ExemptTargetType = MISSING,
+    ) -> None:
+        builder = QueryBuilder('links.exempt_targets')
+        builder.add_condition('id', self.id)
+
+        if exempt_id is not MISSING:
+            builder.add_arg('exempt_id', exempt_id)
+            self.exempt_id = exempt_id
+
+        if exempt_type is not MISSING:
+            builder.add_arg('exempt_type', exempt_type.value)
+            self.exempt_type = exempt_type
+
+        await builder(connection)
+
+    async def delete(self, *, connection: ConnectionType) -> None:
+        await connection.execute('DELETE FROM links.exempt_targets WHERE id = $1', self.id)
+
+        settings = self.settings
+        if settings is not None:
+            settings.remove_exempt_target(self)
+
+
 class LinkSettings:
     def __init__(self, *, bot: FuryBot, data: Dict[str, Any]) -> None:
         self.bot: FuryBot = bot
@@ -153,6 +290,7 @@ class LinkSettings:
         self.notifier_channel_id: Optional[int] = data['notifier_channel_id']
         self.actions: List[LinkAction] = []
         self.allowed_links: List[AllowedLink] = []
+        self.exempt_targets: List[ExemptTarget] = []
 
     @classmethod
     async def create(
@@ -203,6 +341,12 @@ class LinkSettings:
     def remove_allowed_link(self, link: AllowedLink) -> None:
         self.allowed_links.remove(link)
 
+    def add_exempt_target(self, target: ExemptTarget) -> None:
+        self.exempt_targets.append(target)
+
+    def remove_exempt_target(self, target: ExemptTarget) -> None:
+        self.exempt_targets.remove(target)
+
     async def edit(self, *, connection: ConnectionType, notifier_channel_id: int = MISSING) -> None:
         builder = QueryBuilder('links.settings')
         builder.add_condition('id', self.id)
@@ -229,3 +373,21 @@ class LinkSettings:
             delta=delta,
             warn_message=warn_message,
         )
+
+    async def create_exempt_target(self, *, connection: ConnectionType, id: int, type: ExemptTargetType) -> ExemptTarget:
+        return await ExemptTarget.create(bot=self.bot, connection=connection, settings_id=self.id, id=id, type=type)
+
+    async def create_allowed_link(
+        self, *, connection: ConnectionType, url: str, added_at: datetime.datetime, added_by_id: int
+    ) -> AllowedLink:
+        return await AllowedLink.create(
+            bot=self.bot,
+            connection=connection,
+            settings_id=self.id,
+            url=url,
+            added_at=added_at,
+            added_by_id=added_by_id,
+        )
+
+    async def delete(self, *, connection: ConnectionType) -> None:
+        await connection.execute('DELETE FROM links.settings WHERE id = $1', self.id)

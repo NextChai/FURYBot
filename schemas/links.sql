@@ -21,8 +21,17 @@ CREATE TABLE IF NOT EXISTS links.actions (
 
 CREATE TABLE IF NOT EXISTS links.allowed_links (
     id SERIAL PRIMARY KEY,
-    settings_id INTEGER REFERENCES links.settings(id),
+    settings_id INTEGER REFERENCES links.settings(id) ON DELETE CASCADE,
     url TEXT,
     added_at TIMESTAMP WITH TIME ZONE,
     added_by_id TEXT
+);
+
+CREATE TYPE links.exempt_target_type AS ENUM ('role', 'user', 'channel');
+
+CREATE TABLE IF NOT EXISTS links.exempt_targets (
+    id SERIAL PRIMARY KEY,
+    settings_id INTEGER REFERENCES links.settings(id) ON DELETE CASCADE,
+    exempt_id BIGINT,
+    exempt_type links.exempt_target_type
 );

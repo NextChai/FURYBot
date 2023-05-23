@@ -24,7 +24,20 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Generic, List, ParamSpec, Tuple, TypeAlias, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Concatenate,
+    Coroutine,
+    Generic,
+    List,
+    ParamSpec,
+    Tuple,
+    TypeAlias,
+    TypeVar,
+    Union,
+)
 
 import discord
 from discord.app_commands import AppCommandChannel, AppCommandThread
@@ -210,19 +223,52 @@ class MentionableSelect(
     ...
 
 
-class SelectEater(
-    RelaySelect[T, ViewMixinT],
-):
-    def __init__(
-        self, after: AfterCallback[T], parent: ViewMixinT, *args: RelaySelect[Any, ViewMixinT], **kwargs: Any
-    ) -> None:
-        # We're going to do a bit of "hackery". We're going to call super().__init__
-        # Then clear the children and add the relay select instances to the parent.
-        # This will allow us to add two children. When a callback is selected
-        # it'll readd the original parent children and call the shared callback between the relays.
-        super().__init__(after, parent, **kwargs)
+class SelectEater(Generic[P, ViewMixinT]):
+    """A normal Select instance works by adding itself to the parent view after removing all the children.
+    Under normal circumstances that's okay, but when you want multiple instances it's not going to work. The
+    sub-selects will store the original children as their parent selects.. it becomes a nightmare.
 
+    To combat this we're going to do some top-level trickery. We're going to store the parent's children and then
+    handle everything special.
+
+    .. code-block:: python3
+
+        eater = SelectEater(after=..., parent=self)
+        eater.add_select(RoleSelect(...))
+        eater.add_select(UserSelect(...)
+    """
+
+    def __init__(
+        self,
+        after: Callable[Concatenate[discord.Interaction[FuryBot], P], Coroutine[Any, Any, Any]],
+        parent: ViewMixinT,
+    ) -> None:
+        self._after: Callable[Concatenate[discord.Interaction[FuryBot], P], Coroutine[Any, Any, Any]] = after
+        self._parent: ViewMixinT = parent
+        self._original_children: List[discord.ui.Item[ViewMixinT]] = parent.children
+
+        self._children: List[RelaySelect[Any, ViewMixinT]] = []
+
+        # It's safe to clear the parent's children becuase we have a copy of them.
         parent.clear_items()
 
-        for relay_select in args:
-            parent.add_item(relay_select)
+    def add_select(self, select: RelaySelect[Any, ViewMixinT]) -> None:
+        select.callback = self._wrapped_callback
+
+        # Every time a RelaySelect instance is created, it will clear the parent's children
+        # then add itself. We don't want that, so we're going to clear the parent's children
+        # then add all our children back.
+        self._parent.clear_items()
+
+        self._children.append(select)
+
+        for child in self._children:
+            self._parent.add_item(child)
+
+    def _readd_children(self) -> None:
+        for child in self._original_children:
+            self._parent.add_item(child)
+
+    async def _wrapped_callback(self, interaction: discord.Interaction[FuryBot], *args: P.args, **kwargs: P.kwargs) -> None:
+        self._readd_children()
+        await self._after(interaction, *args, **kwargs)

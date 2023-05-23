@@ -24,9 +24,23 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import discord
+from discord import app_commands
 from typing_extensions import Self, Unpack
 
-from utils import AfterModal, BaseButtonPaginator, BaseView, BaseViewKwargs, SelectOneOfMany, ShortTime, human_timedelta
+from utils import (
+    AfterModal,
+    BaseView,
+    BaseViewKwargs,
+    SelectOneOfMany,
+    ShortTime,
+    human_join,
+    human_timedelta,
+    SelectEater,
+    ChannelSelect,
+    RoleSelect,
+    UserSelect,
+    MultiSelector,
+)
 
 from .settings import *
 
@@ -244,8 +258,22 @@ class ManageLinkActions(BaseView):
         return await interaction.edit_original_response(view=self)
 
 
-class AllowedItemPaginator(BaseButtonPaginator['AllowedLink']):
-    ...
+class AllowedItemPaginator(MultiSelector['ManageAllowedItems', 'AllowedLink']):
+    def hash_item(self, item: AllowedLink) -> int:
+        return item.id
+
+    def create_embed(self, items: List[AllowedLink]) -> discord.Embed:
+        ...
+
+    async def on_item_chosen(self, interaction: discord.Interaction[FuryBot], item: AllowedLink) -> Any:
+        ...
+
+
+class ManageAllowedItem(BaseView):
+    def __init__(self, settings: LinkSettings, allowed_link: AllowedLink, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+        self.settings: LinkSettings = settings
+        self.allowed_link: AllowedLink = allowed_link
 
 
 class ManageAllowedItems(BaseView):
@@ -269,15 +297,41 @@ class ManageAllowedItems(BaseView):
 
         return embed
 
+    async def _add_allowed_item_after(
+        self, interaction: discord.Interaction[FuryBot], item_value: discord.ui.TextInput[AfterModal]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        value = item_value.value
+        for action in self.settings.allowed_links:
+            if action.url == value:
+                await interaction.followup.send(f'This link is already allowed.', ephemeral=True)
+                return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        async with self.bot.safe_connection() as connection:
+            await self.settings.create_allowed_link(
+                connection=connection, url=value, added_at=interaction.created_at, added_by_id=interaction.user.id
+            )
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
+
     @discord.ui.button(label='Add Allowed Item')
     async def add_allowed_item(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        ...
+        modal = AfterModal(
+            self.bot,
+            self._add_allowed_item_after,
+            discord.ui.TextInput(
+                label='Enter Allowed Item',
+                placeholder='Enter the item to allow. Can be a domain or an entire link.',
+                required=True,
+            ),
+            title='Add Allowed Item',
+            tiemout=None,
+        )
 
-    @discord.ui.button(label='Remove Allowed Item')
-    async def remove_allowed_item(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        ...
+        return await interaction.response.send_modal(modal)
 
-    @discord.ui.button(label='View Allowed Items')
+    @discord.ui.button(label='View and Select Allowed Items')
     async def view_allowed_items(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
@@ -291,23 +345,102 @@ class ManageExemptTargets(BaseView):
     def __init__(self, settings: LinkSettings, **kwargs: Unpack[BaseViewKwargs]) -> None:
         super().__init__(**kwargs)
         self.settings: LinkSettings = settings
-        raise NotImplementedError
 
     @property
     def embed(self) -> discord.Embed:
-        ...
+        embed = self.bot.Embed(
+            title='Exempt Targets',
+            description='Use the button(s) below to add or remove exempt targets from the '
+            'link filter. An exempt target is completely ignored by the link filter.',
+        )
+
+        embed.add_field(
+            name='Current Exempt Targets',
+            value=human_join([target.mention for target in self.settings.exempt_targets]) or 'No exempt targets set.',
+        )
+
+        return embed
+
+    async def _add_exempt_targets_after(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        values: Union[
+            List[discord.Role],
+            List[Union[discord.User, discord.Member]],
+            List[Union[app_commands.AppCommandChannel, app_commands.AppCommandThread]],
+        ],
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        value = values[0]
+        if isinstance(value, discord.Role):
+            target_type = ExemptTargetType.role
+        elif isinstance(value, (discord.User, discord.Member)):
+            target_type = ExemptTargetType.user
+        else:
+            target_type = ExemptTargetType.channel
+
+        # Let's see if this is already an exempt target.
+        for target in self.settings.exempt_targets:
+            if target.exempt_id == value.id:
+                await interaction.followup.send(f'{value.mention} is already an exempt target.', ephemeral=True)
+                return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        async with self.bot.safe_connection() as connection:
+            await self.settings.create_exempt_target(connection=connection, id=value.id, type=target_type)
+
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Add Exempt Targets')
     async def add_exempt_targets(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
-        ...
+        await interaction.response.defer()
+
+        eater = SelectEater(after=self._add_exempt_targets_after, parent=self)
+        eater.add_select(UserSelect(after=self._add_exempt_targets_after, parent=self, placeholder='Select a user...'))
+        eater.add_select(ChannelSelect(after=self._add_exempt_targets_after, parent=self, placeholder='Select a channel...'))
+        eater.add_select(RoleSelect(after=self._add_exempt_targets_after, parent=self, placeholder='Select a role...'))
+        return await interaction.edit_original_response(view=self)
+
+    async def _remove_exempt_targets_after(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        values: Union[
+            List[discord.Role],
+            List[Union[discord.User, discord.Member]],
+            List[Union[app_commands.AppCommandChannel, app_commands.AppCommandThread]],
+        ],
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        # We need to see if we can find an existing target that has this id.
+        value = values[0]
+        for target in self.settings.exempt_targets:
+            if target.exempt_id == value.id:
+                async with self.bot.safe_connection() as connection:
+                    await target.delete(connection=connection)
+
+                return await interaction.edit_original_response(view=self, embed=self.embed)
+
+        await interaction.followup.send(
+            f'I couldn\'t find an exempt target with the id {value.id} in the exempt targets list.', ephemeral=True
+        )
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
     @discord.ui.button(label='Remove Exempt Targets')
     async def remove_exempt_targets(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:
-        ...
+        await interaction.response.defer()
+
+        eater = SelectEater(after=self._remove_exempt_targets_after, parent=self)
+        eater.add_select(UserSelect(after=self._remove_exempt_targets_after, parent=self, placeholder='Select a user...'))
+        eater.add_select(
+            ChannelSelect(after=self._remove_exempt_targets_after, parent=self, placeholder='Select a channel...')
+        )
+        eater.add_select(RoleSelect(after=self._remove_exempt_targets_after, parent=self, placeholder='Select a role...'))
+        return await interaction.edit_original_response(view=self)
 
 
 class ManageLinkSettings(BaseView):
@@ -371,6 +504,31 @@ class ManageLinkSettings(BaseView):
         view = self.create_child(ManageLinkActions, settings=self.settings)
         return await interaction.edit_original_response(embed=view.embed, view=view)
 
+    async def _delete_filter_after(
+        self, interaction: discord.Interaction[FuryBot], delete_input: discord.ui.TextInput[AfterModal]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        value = delete_input.value
+        if value.lower() != 'DELETE':
+            await interaction.followup.send('Invalid confirmation. Cancelling deletion.', ephemeral=True)
+            return await interaction.edit_original_response(embed=self.embed, view=self)
+
+        # Delete the filter.
+        async with self.bot.safe_connection() as connection:
+            await self.settings.delete(connection=connection)
+
+        return await interaction.edit_original_response(view=None, embed=None, content='I\'ve deleted the filter.')
+
     @discord.ui.button(label='Delete Filter')
     async def delete_filter(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        ...
+        modal = AfterModal(
+            self.bot,
+            self._delete_filter_after,
+            discord.ui.TextInput(
+                label='Confirm', placeholder='Type "DELETE" to confirm.', required=True, max_length=6, min_length=6
+            ),
+            title='Delete Filter',
+            timeout=None,
+        )
+        return await interaction.response.send_modal(modal)
