@@ -444,7 +444,7 @@ class FurySpecificCommands(BaseCog):
 
             # If it's not the last member, sleep for 20 seconds
             if index != len(offline_members) - 1:
-                await asyncio.sleep(20)
+                await asyncio.sleep(10)
 
         # End the searching for offline members
         task.cancel()
