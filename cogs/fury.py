@@ -25,26 +25,19 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-import io
 import random
 import string
 import textwrap
 from typing import TYPE_CHECKING, List, Optional, Set, Tuple
 
-import cachetools
 import discord
-import PIL
 from discord.ext import commands
-from PIL import Image, ImageDraw, ImageFont
 from typing_extensions import Self, Type
 
 from utils import BaseCog, Context, human_join, human_timestamp
-from utils.images import ImageType, sync_merge_images
 
 if TYPE_CHECKING:
     from bot import FuryBot
-
-PIL_CORE = PIL._imagingft  # type: ignore
 
 VOTING_TIME: int = 20
 GRACE_PERIOD: int = 20
@@ -53,9 +46,10 @@ LEAD_CAPTAIN_ROLE_ID: int = 763384816942448640
 CAPTAIN_ROLE_ID: int = 765360488816967722
 BOTS_ROLE_ID: int = 763455351332798485
 
+KICKENING_OPT_OUT_IDS: List[int] = []
+
 ROO_DEVIL_EMOJI: str = '<:rooDevil:1108541372505538620>'
 
-SCORE_FONT_SIZE: int = 57
 
 KICKENING_MESSAGES: List[str] = [
     "Oops! Looks like $mention got kicked! Better luck next time, champ.",
@@ -183,7 +177,7 @@ class KickeningMemberButton(discord.ui.Button['KickeningVoting']):
 
 @dataclasses.dataclass(init=True)
 class Results:
-    cog: FurySpecificCommands
+    bot: FuryBot
     winner: discord.Member
     loser: discord.Member
     winner_votes: List[discord.Member]
@@ -192,7 +186,7 @@ class Results:
     @classmethod
     def from_voting_results(
         cls: Type[Self],
-        cog: FurySpecificCommands,
+        bot: FuryBot,
         first: discord.Member,
         second: discord.Member,
         first_votes: List[discord.Member],
@@ -201,21 +195,14 @@ class Results:
         if first_votes == second_votes:
             # This is a tie, pick a random member as the winner.
             (winner, winner_votes), (loser, loser_votes) = random.sample([(first, first_votes), (second, second_votes)], 2)
-            return cls(cog, winner, loser, winner_votes, loser_votes)
+            return cls(bot, winner, loser, winner_votes, loser_votes)
 
         if first_votes > second_votes:
             # First member won
-            return cls(cog, first, second, first_votes, second_votes)
+            return cls(bot, first, second, first_votes, second_votes)
 
         # Second member won
-        return cls(cog, second, first, second_votes, first_votes)
-
-    @classmethod
-    async def fetch_partial_image(
-        cls: Type[Self], cog: FurySpecificCommands, first: discord.Member, second: discord.Member
-    ) -> discord.File:
-        temp = cls(cog, first, second, [], [])
-        return await temp.generate_image()
+        return cls(bot, second, first, second_votes, first_votes)
 
     @discord.utils.cached_property
     def winner_vote_count(self) -> int:
@@ -229,180 +216,11 @@ class Results:
     def was_tie(self) -> bool:
         return self.winner_votes == self.loser_votes
 
-    @property
-    def bot(self) -> FuryBot:
-        return self.cog.bot
-
-    def _sync_generate_image(
-        self,
-        winner_bytes: bytes,
-        winner_voters_bytes: List[bytes],
-        loser_bytes: bytes,
-        loser_voters_bytes: List[bytes],
-    ) -> ImageType:
-        # After some respectable amount of testing, we can determine that a good image size
-        # is going to be 500 width.
-        image_width = 500
-
-        # There are two bottom images, one for each member. The total image width is 500,
-        # and there is a 10px padding between the images and a 10px padding on the left and right.
-        sub_image_width = 235
-
-        # Image height needs to be calculated though as it's dynamic.
-        # Top border is 10px, image height is 100, bottom border is 10px.
-        top_image_padding = 20
-        bottom_image_padding = 15
-        sub_image_bottom_padding = 20
-        main_member_image_height = 100
-        main_member_image_width = 100
-
-        font_padding_top = 20
-
-        image_height = (
-            main_member_image_height + top_image_padding + bottom_image_padding + sub_image_bottom_padding + font_padding_top
-        )
-
-        # Below it is going to be the images showing who voted for who, which
-        # is completely dynamic.
-
-        winner_member_voters_image: Optional[ImageType] = None
-        if winner_voters_bytes:
-            winner_member_voters_image = sync_merge_images(
-                winner_voters_bytes,
-                images_per_row=5,
-                frame_width=sub_image_width,
-                background_color=(49, 51, 56),
-            )
-
-        loser_member_voters_image: Optional[ImageType] = None
-        if loser_voters_bytes:
-            loser_member_voters_image = sync_merge_images(
-                loser_voters_bytes,
-                images_per_row=5,
-                frame_width=sub_image_width,
-                background_color=(49, 51, 56),
-            )
-
-        # Update the image height to include highest voter image height
-        winner_height = winner_member_voters_image and winner_member_voters_image.height or 0
-        loser_height = loser_member_voters_image and loser_member_voters_image.height or 0
-        image_height += max(winner_height, loser_height)
-
-        # We need to paste the given scores onto the image.
-        winner_voter_count = f'{len(winner_voters_bytes)} Votes'
-        loser_voter_count = f'{len(loser_voters_bytes)} Votes'
-
-        # We'll use the longer of the two strings to determine the font size.
-        chosen_count = winner_voter_count if len(winner_voter_count) > len(loser_voter_count) else loser_voter_count
-
-        font_size = 74
-        font = ImageFont.truetype('./assets/fonts/burbank.otf', font_size)
-        while font.getsize(chosen_count)[0] > sub_image_width:
-            font_size -= 1
-            winner_font.font = PIL_CORE.getfont(  # type: ignore
-                './assets/fonts/burbank.otf',
-                font_size,
-                font.index,
-                font.encoding,
-                layout_engine=font.layout_engine,
-            )
-
-        max_font_height = font.getsize(chosen_count)[1]
-        total_font_height = max_font_height + font_padding_top
-
-        image_height += total_font_height
-
-        # Now we can create our image
-        image = Image.new('RGBA', (image_width, image_height), (49, 51, 56))
-        draw = ImageDraw.Draw(image)
-
-        middle_of_image = image_width // 2
-        quarter_of_image = image_width // 4
-
-        # First paste the first members image
-        winner_member_image = Image.open(io.BytesIO(winner_bytes)).resize(
-            (main_member_image_height, main_member_image_width)
-        )
-        image.paste(winner_member_image, (quarter_of_image - (main_member_image_width // 2), top_image_padding))
-
-        # Paste the winner voter count, it's x-coordinate is going to be the same as the
-        if winner_member_voters_image:
-            image.paste(
-                winner_member_voters_image,
-                (10, top_image_padding + main_member_image_height + sub_image_bottom_padding + total_font_height),
-            )
-
-        # Paste the voting number
-        winner_count_width, _winner_count_height = font.getsize(winner_voter_count)
-
-        blank_space_per_side = (sub_image_width - winner_count_width) // 2
-
-        draw.text(  # type: ignore
-            (10 + blank_space_per_side, top_image_padding + main_member_image_height + font_padding_top),
-            winner_voter_count,
-            font=font,
-            fill=(92, 235, 136),
-        )
-
-        # Then paste the second members image
-        second_member_image = Image.open(io.BytesIO(loser_bytes)).resize((main_member_image_height, main_member_image_width))
-        image.paste(
-            second_member_image, (middle_of_image + (quarter_of_image - (main_member_image_width // 2)), top_image_padding)
-        )
-
-        if loser_member_voters_image:
-            image.paste(
-                loser_member_voters_image,
-                (260, top_image_padding + main_member_image_height + sub_image_bottom_padding + total_font_height),
-            )
-
-        # Paste the second voting number
-        loser_count_width, _loser_count_height = font.getsize(loser_voter_count)
-
-        blank_space_per_side = (sub_image_width - loser_count_width) // 2
-
-        draw.text(  # type: ignore
-            (260 + blank_space_per_side, top_image_padding + main_member_image_height + font_padding_top),
-            loser_voter_count,
-            font=font,
-            fill=(237, 66, 69),
-        )
-
-        return image
-
-    async def generate_image(self) -> discord.File:
-        # Download first member avatar
-        async def _download_image(member_id: int, url: str) -> bytes:
-            maybe_downloaded = self.cog.avatar_cache.get(member_id)
-            if maybe_downloaded is not None:
-                return maybe_downloaded
-
-            async with self.bot.session.get(url) as response:
-                data = await response.read()
-
-            self.cog.avatar_cache[member_id] = data
-            return data
-
-        winner = await _download_image(self.winner.id, self.winner.display_avatar.url)
-        loser = await _download_image(self.loser.id, self.loser.display_avatar.url)
-
-        winner_votes = await asyncio.gather(*[_download_image(m.id, m.display_avatar.url) for m in self.winner_votes])
-        loser_votes = await asyncio.gather(*[_download_image(m.id, m.display_avatar.url) for m in self.loser_votes])
-
-        image = await self.bot.wrap(self._sync_generate_image, winner, winner_votes, loser, loser_votes)
-
-        buffer = io.BytesIO()
-        image.save(buffer, format='PNG')
-        buffer.seek(0)
-
-        return discord.File(buffer, filename='kickening.png')
-
 
 class KickeningVoting(discord.ui.View):
-    def __init__(self, cog: FurySpecificCommands, first: discord.Member, second: discord.Member) -> None:
+    def __init__(self, bot: FuryBot, first: discord.Member, second: discord.Member) -> None:
         super().__init__(timeout=VOTING_TIME)
-        self.cog: FurySpecificCommands = cog
-        self.bot = cog.bot
+        self.bot = bot
 
         self.first: discord.Member = first
         self.second: discord.Member = second
@@ -443,7 +261,7 @@ class KickeningVoting(discord.ui.View):
         return True
 
     def get_results(self) -> Results:
-        return Results.from_voting_results(self.cog, self.first, self.second, self.first_votes, self.second_votes)
+        return Results.from_voting_results(self.bot, self.first, self.second, self.first_votes, self.second_votes)
 
 
 class FurySpecificCommands(BaseCog):
@@ -451,7 +269,7 @@ class FurySpecificCommands(BaseCog):
         super().__init__(bot)
 
         self._kickening_task: Optional[asyncio.Task[None]] = None
-        self.avatar_cache: cachetools.LFUCache[int, bytes] = cachetools.LFUCache(maxsize=100)
+        self._kickening_members: List[discord.Member] = []
 
     async def _listen_for_members(
         self, ctx: Context, offline_members: List[discord.Member], members_to_kick: List[discord.Member]
@@ -460,7 +278,7 @@ class FurySpecificCommands(BaseCog):
             if ctx.channel != message.channel:
                 return False
 
-            if message.author in offline_members:
+            if message.author in offline_members and message.author.id not in KICKENING_OPT_OUT_IDS:
                 return True
 
             return False
@@ -490,6 +308,10 @@ class FurySpecificCommands(BaseCog):
                 if not should_kick_member(member):
                     continue
 
+                if member.id in KICKENING_OPT_OUT_IDS:
+                    offline_members.append(member)
+                    continue
+
                 if member.status is discord.Status.offline:
                     offline_members.append(member)
                     continue
@@ -501,7 +323,7 @@ class FurySpecificCommands(BaseCog):
         embed = self.bot.Embed(
             title='Kicking Offline Members First!',
             description=f'A total of **{len(all_kickable_members) + len(offline_members)} members** have been fetched for the kickening! '
-            f'**{len(offline_members)}** of these members are offline, and as a result, they will be kicked first!',
+            f'**{len(offline_members)}** of these members are offline or have chosen to opt-out, and as a result, they will be kicked first!',
         )
         embed.add_field(
             name='Offline Member Kicking',
@@ -539,16 +361,15 @@ class FurySpecificCommands(BaseCog):
                 member_information.append(f'**Boosting The Server Since**: {human_timestamp(offline_member.premium_since)}')
 
             embed = self.bot.Embed(
-                title=f'{offline_member.display_name} is offline!',
-                description=f'{offline_member.mention} is offline on Discord, so they will not be included in the kickening. Someone '
-                f'didn\'t look at <#757666199214751794>!\n\n{kick_message}',
+                title=f'{offline_member.display_name}\'s Time is Up!',
+                description=f'{offline_member.mention} is offline on Discord or has chosen to opt-out of the kickening.\n\n{kick_message}',
                 author=offline_member,
             )
             embed.add_field(name='Member Information', value='\n'.join(member_information), inline=False)
 
             embed.add_field(
-                name='Offline Members Remaining',
-                value=f'There are **{len(offline_members) - index - 1} offline members** remaining to be kicked!',
+                name='Offline/Opt-Out Members Remaining',
+                value=f'There are **{len(offline_members) - index - 1} members** remaining to be kicked!',
                 inline=False,
             )
 
@@ -573,16 +394,13 @@ class FurySpecificCommands(BaseCog):
             kickable_members = determine_kickable_members(all_kickable_members)
 
             # Spawn a new view
-            view = KickeningVoting(self, kickable_members[0], kickable_members[1])
-
-            partial_image = await Results.fetch_partial_image(self, kickable_members[0], kickable_members[1])
+            view = KickeningVoting(self.bot, kickable_members[0], kickable_members[1])
 
             message = await ctx.channel.send(
                 embed=view.embed,
                 view=view,
                 content=human_join((m.mention for m in kickable_members)),
                 allowed_mentions=discord.AllowedMentions(users=True),
-                files=[partial_image],
             )
 
             await view.wait()
@@ -617,10 +435,7 @@ class FurySpecificCommands(BaseCog):
                     text=f'You have {GRACE_PERIOD} seconds until you get kicked and we move onto the next member.'
                 )
 
-                file = await results.generate_image()
-                embed.set_image(url=f'attachment://{file.filename}')
-
-            message = await message.reply(embed=embed, files=[file])
+            message = await message.reply(embed=embed)
 
             await asyncio.sleep(GRACE_PERIOD)
 
