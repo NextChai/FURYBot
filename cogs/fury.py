@@ -166,8 +166,6 @@ class KickeningMemberButton(discord.ui.Button['KickeningVoting']):
         self.voting_list: List[discord.Member] = voting_list
 
     async def callback(self, interaction: discord.Interaction[FuryBot]) -> None:
-        await interaction.response.defer()  # The client's latency will skyrocket, this is precautionary
-
         async with self.parent.lock:
             if interaction.user.id == COACH_LAMBART_ID:
                 self.voting_list.extend([interaction.user] * 50)  # type: ignore # Weight of 50 votes.
@@ -276,13 +274,14 @@ class KickeningVoting(discord.ui.View):
         return embed
 
     async def interaction_check(self, interaction: discord.Interaction[FuryBot], /) -> Optional[bool]:
-        if interaction.user in {self.first, self.second}:
-            return await interaction.response.send_message(
-                'You cannot vote when you\'re up for the kickening!', ephemeral=True
-            )
+        await interaction.response.defer()
 
-        if interaction.user in [*self.first_votes, *self.second_votes]:
-            return
+        async with self.lock:
+            if interaction.user in {self.first, self.second}:
+                return await interaction.followup.send('You cannot vote when you\'re up for the kickening!', ephemeral=True)
+
+            if interaction.user in [*self.first_votes, *self.second_votes]:
+                return await interaction.followup.send('You cannot vote twice!', ephemeral=True)
 
         return True
 
