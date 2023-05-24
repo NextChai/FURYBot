@@ -202,7 +202,7 @@ class Results:
             (winner, winner_votes), (loser, loser_votes) = random.sample([(first, first_votes), (second, second_votes)], 2)
             return cls(bot, winner, loser, winner_votes, loser_votes)
 
-        if first_votes > second_votes:
+        if len(first_votes) > len(second_votes):
             # First member won
             return cls(bot, first, second, first_votes, second_votes)
 
@@ -378,7 +378,7 @@ class FurySpecificCommands(BaseCog):
         )
         embed.add_field(
             name='Offline And Opt-Out Member Kicking',
-            value=f'All offline members will randomly be kicked first without voting, then afterward all the online members will be submitted '
+            value=f'All offline and opt-out members will randomly be kicked first without voting, then afterward all the online members will be submitted '
             'for voting! If you come online during this time and type in this channel, you will be removed from the offline member list '
             'and be submitted for voting!',
         )
@@ -395,8 +395,6 @@ class FurySpecificCommands(BaseCog):
         await asyncio.sleep(30)
 
         for index, offline_member in enumerate(offline_members):
-            kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=offline_member.mention)
-
             member_information: List[str] = [
                 '**Roles**: {}'.format(human_join([role.mention for role in list(reversed(offline_member.roles))[:-1]]))
             ]
@@ -413,8 +411,8 @@ class FurySpecificCommands(BaseCog):
 
             embed = self.bot.Embed(
                 title=f'{offline_member.display_name}\'s Time is Up!',
-                description=f'{offline_member.mention} is offline on Discord or has chosen to opt-out of the kickening. You have 20 seconds '
-                'before you are kicked.',
+                description=f'{offline_member.mention} is offline on Discord or has chosen to opt-out of the kickening. They have 20 seconds '
+                'before they are kicked if they are an opted-out member, otherwise it\'s an instant boot!',
                 author=offline_member,
             )
             embed.add_field(name='Member Information', value='\n'.join(member_information), inline=False)
@@ -435,7 +433,12 @@ class FurySpecificCommands(BaseCog):
                 # This member removed themselves
                 await message.reply('Did not kick member as they removed themselves from the offline member list!')
             else:
+                if offline_member.id in KICKENING_OPT_OUT_IDS:
+                    await asyncio.sleep(20)  # 20 seconds for opted-out members
+
                 # await offline_member.kick(reason='Offline member')
+
+                kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=offline_member.mention)
                 await message.reply(kick_message)
 
             # If it's not the last member, sleep for 20 seconds
