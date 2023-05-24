@@ -237,6 +237,8 @@ class Results:
                 name='It Was A Tie!', value='The results were a tie, so the winner has been randomized.', inline=False
             )
 
+        embed.set_image(url='attachment://kickening.png')
+
         embed.set_footer(text=f'You have {GRACE_PERIOD} seconds until you get kicked and we move onto the next member.')
 
         return embed
@@ -491,7 +493,7 @@ class FurySpecificCommands(BaseCog):
                     f'{members_beat} members**!',
                     inline=False,
                 )
-                embed.set_image(url=message.attachments[0].url)
+                file = await view.get_first_v_second_file()
 
             message = await message.reply(embed=embed, file=file)
 
