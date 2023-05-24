@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import time
 import io
 import asyncio
 import dataclasses
@@ -37,6 +38,7 @@ from typing_extensions import Self, Type
 
 from utils import BaseCog, Context, human_join, human_timestamp
 from utils.images import ImageType, async_merge_images
+from utils.time import human_timedelta
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -451,6 +453,8 @@ class FurySpecificCommands(BaseCog):
         await asyncio.sleep(60 * 2)  # 2 minutes
 
         # We're going to use a while True loop here and abuse some mutable objects
+        members_beat = 0
+        start = time.time()
         while len(all_kickable_members) > 1:
             kickable_members = determine_kickable_members(all_kickable_members)
 
@@ -481,6 +485,12 @@ class FurySpecificCommands(BaseCog):
                     f'20 seconds before kicking {results.winner.mention} and moving on to the next round!',
                     inline=False,
                 )
+                embed.add_field(
+                    name='Total Lasting Time',
+                    value=f'{results.winner.mention} lasted a total of **{human_timedelta(time.time() - start)}**! They **outlasted '
+                    f'{members_beat} members**!',
+                    inline=False,
+                )
                 embed.set_image(url=message.attachments[0].url)
 
             message = await message.reply(embed=embed, file=file)
@@ -497,6 +507,7 @@ class FurySpecificCommands(BaseCog):
             # Remove the kicked member from the list
             all_kickable_members.remove(results.winner)
             random.shuffle(all_kickable_members)
+            members_beat += 1
 
         # The length of all kickable members is 1, we can stop and announce them the winner
         await ctx.send(
