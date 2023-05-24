@@ -20,5 +20,5 @@ class TracebackOptional(TypedDict, total=False):
 
 class Traceback(TracebackOptional):
     time: datetime.datetime
-    exception: Exception
+    exception: BaseException
     event_name: NotRequired[str]

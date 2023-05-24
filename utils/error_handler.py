@@ -174,7 +174,7 @@ class ExceptionManager:
     async def add_error(
         self,
         *,
-        error: Exception,
+        error: BaseException,
         target: Optional[Union[Context, discord.Interaction[FuryBot]]],
         event_name: Optional[str] = None,
     ) -> None:
@@ -185,7 +185,7 @@ class ExceptionManager:
 
         Parameters
         ----------
-        error: :class:`Exception`
+        error: :class:`BaseException`
             The error to add.
         ctx: Optional[:class:`DuckContext`]
             The invocation context of the error, if any.
@@ -216,7 +216,7 @@ class ExceptionManager:
                 'guild': target.guild and target.guild.id,
                 'channel': target.channel and target.channel.id,
             }
-            packet.update(addons)  # type: ignore
+            packet.update(addons)
 
         traceback_string = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
         current = self.errors.get(traceback_string)
@@ -285,9 +285,9 @@ class ErrorHandler:
 
     async def log_error(
         self,
-        exception: Exception,
+        exception: BaseException,
         *,
-        origin: Union[Context, discord.Interaction[FuryBot]],
+        origin: Optional[Union[Context, discord.Interaction[FuryBot]]],
         sender: Optional[Callable[..., Awaitable[Optional[discord.WebhookMessage]]]] = None,
         event_name: Optional[Any] = None,
     ) -> None:
@@ -298,7 +298,7 @@ class ErrorHandler:
 
         Parameters
         ----------
-        exception: :class:`Exception`
+        exception: :class:`BaseException`
             The exception to log.
         origin: Union[:class:`Context`, :class:`discord.Interaction`]
             The origin of the error.
@@ -386,7 +386,7 @@ class ErrorHandler:
         if not error:
             raise
 
-        await self.exception_manager.add_error(error=error, target=None, event_name=event_method)  # type: ignore
+        await self.exception_manager.add_error(error=error, target=None, event_name=event_method)
 
 
 async def setup(bot: FuryBot) -> None:

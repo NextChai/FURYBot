@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import io
 import asyncio
 import dataclasses
 import random
@@ -35,6 +36,7 @@ from discord.ext import commands
 from typing_extensions import Self, Type
 
 from utils import BaseCog, Context, human_join, human_timestamp
+from utils.images import ImageType, async_merge_images
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -45,6 +47,8 @@ GRACE_PERIOD: int = 20
 LEAD_CAPTAIN_ROLE_ID: int = 763384816942448640
 CAPTAIN_ROLE_ID: int = 765360488816967722
 BOTS_ROLE_ID: int = 763455351332798485
+
+COACH_LAMBART_ID: int = 757663899532132418
 
 KICKENING_OPT_OUT_IDS: List[int] = []
 
@@ -105,7 +109,8 @@ KICKENING_MESSAGES: List[str] = [
 
 KICKENING_EMBED = discord.Embed(
     title="The Kickening Is Near!",
-    description="Below describes the details of The Kickening! Be sure to read everything so you know how it works!",
+    description="All offline and opted out members have been removed from the server. All remaining members "
+    'will be casted for the voting process. **The Kickening will start in 2 minutes.**',
 )
 KICKENING_EMBED.add_field(
     name="What Is The Kickening?",
@@ -119,14 +124,11 @@ KICKENING_EMBED.add_field(
     name="So How Does The Kickening Work?",
     value="This year's Kickening is a randomized voting event! Two members will be selected at random, "
     f"after which all other participants will have the opportunity to vote for the person they want to see kicked {ROO_DEVIL_EMOJI}! "
-    "Each voter will be given a 20-second window to cast their vote, following which the results will be shown. "
+    "Voters will be given a 20-second window to cast their vote, following which the results will be shown. "
     "The member who holds the highest number of votes will be given a brief 20-second grace period before their "
-    "eventual removal from the server. An example image of voting results has been attached below.\n\n"
-    f"**TLDR (Too Long Didn't Read)**: Vote to kick people, see who betrays you {ROO_DEVIL_EMOJI}",
+    "eventual removal from the server.\n\n"
+    f"**TLDR (Too Long Didn't Read)**: Vote to kick people, vote to get kicked {ROO_DEVIL_EMOJI}",
     inline=False,
-)
-KICKENING_EMBED.set_image(
-    url='https://media.discordapp.net/attachments/887771983792701480/1108564025857560618/kickening.png?width=449&height=566'
 )
 
 
@@ -167,7 +169,10 @@ class KickeningMemberButton(discord.ui.Button['KickeningVoting']):
         await interaction.response.defer()  # The client's latency will skyrocket, this is precautionary
 
         async with self.parent.lock:
-            self.voting_list.append(interaction.user)  # type: ignore
+            if interaction.user.id == COACH_LAMBART_ID:
+                self.voting_list.extend([interaction.user] * 50)  # type: ignore # Weight of 50 votes.
+            else:
+                self.voting_list.append(interaction.user)  # type: ignore
 
             # Edit with the new count
             await interaction.edit_original_response(view=self.parent, embed=self.parent.embed)
@@ -216,6 +221,24 @@ class Results:
     def was_tie(self) -> bool:
         return self.winner_votes == self.loser_votes
 
+    @property
+    def embed(self) -> discord.Embed:
+        embed = self.bot.Embed(
+            title=textwrap.shorten(f'Results Of {self.winner.display_name} vs {self.loser.display_name}', 256),
+            description=f'**{self.winner.mention}, your time has come!** You will be kicked!',
+            author=self.winner,
+        )
+
+        embed.add_field(name=self.winner.display_name, value=f'{self.winner_vote_count} votes.')
+        embed.add_field(name=self.loser.display_name, value=f'{self.loser_vote_count} votes.')
+
+        if self.was_tie:
+            embed.add_field(name='It Was A Tie!', value='The results were a tie, so I randomized the winner!', inline=False)
+
+        embed.set_footer(text=f'You have {GRACE_PERIOD} seconds until you get kicked and we move onto the next member.')
+
+        return embed
+
 
 class KickeningVoting(discord.ui.View):
     def __init__(self, bot: FuryBot, first: discord.Member, second: discord.Member) -> None:
@@ -235,11 +258,14 @@ class KickeningVoting(discord.ui.View):
         self.add_item(KickeningMemberButton(self, self.first, self.first_votes))
         self.add_item(KickeningMemberButton(self, self.second, self.second_votes))
 
+        self.first_v_second_image: Optional[ImageType] = None
+
     @property
     def embed(self) -> discord.Embed:
         embed = self.bot.Embed(
             title=textwrap.shorten(f'{self.first.display_name} vs {self.second.display_name}', 256),
-            description='Use the two buttons below to choose which member you want to see kicked from the server! Your vot',
+            description='Use one of the two buttons below to vote for who you want to see kicked. '
+            'You can only vote once per set, so make it count! The person with the most amount of votes will be kicked from the server.',
         )
 
         embed.add_field(name=self.first.display_name, value=f'**{len(self.first_votes)} votes**.')
@@ -263,13 +289,36 @@ class KickeningVoting(discord.ui.View):
     def get_results(self) -> Results:
         return Results.from_voting_results(self.bot, self.first, self.second, self.first_votes, self.second_votes)
 
+    async def _get_first_v_second_image(self) -> ImageType:
+        if self.first_v_second_image is not None:
+            return self.first_v_second_image
+
+        async with self.bot.session.get(self.first.display_avatar.url) as response:
+            first_bytes = await response.read()
+
+        async with self.bot.session.get(self.second.display_avatar.url) as response:
+            second_bytes = await response.read()
+
+        self.first_v_second_image = image = await async_merge_images(
+            self.bot, [first_bytes, second_bytes], images_per_row=2, half_size=False, frame_width=1000
+        )
+        return image
+
+    async def get_first_v_second_file(self) -> discord.File:
+        image = await self._get_first_v_second_image()
+        buf = io.BytesIO()
+
+        image.save(buf, format='PNG')
+        buf.seek(0)
+
+        return discord.File(buf, filename='kickening.png')
+
 
 class FurySpecificCommands(BaseCog):
     def __init__(self, bot: FuryBot) -> None:
         super().__init__(bot)
 
         self._kickening_task: Optional[asyncio.Task[None]] = None
-        self._kickening_members: List[discord.Member] = []
 
     async def _listen_for_members(
         self, ctx: Context, offline_members: List[discord.Member], members_to_kick: List[discord.Member]
@@ -321,12 +370,12 @@ class FurySpecificCommands(BaseCog):
         random.shuffle(all_kickable_members)
 
         embed = self.bot.Embed(
-            title='Kicking Offline Members First!',
+            title='Kicking Offline and Opt-Out Members First!',
             description=f'A total of **{len(all_kickable_members) + len(offline_members)} members** have been fetched for the kickening! '
             f'**{len(offline_members)}** of these members are offline or have chosen to opt-out, and as a result, they will be kicked first!',
         )
         embed.add_field(
-            name='Offline Member Kicking',
+            name='Offline And Opt-Out Member Kicking',
             value=f'All offline members will randomly be kicked first without voting, then afterward all the online members will be submitted '
             'for voting! If you come online during this time and type in this channel, you will be removed from the offline member list '
             'and be submitted for voting!',
@@ -362,7 +411,8 @@ class FurySpecificCommands(BaseCog):
 
             embed = self.bot.Embed(
                 title=f'{offline_member.display_name}\'s Time is Up!',
-                description=f'{offline_member.mention} is offline on Discord or has chosen to opt-out of the kickening.\n\n{kick_message}',
+                description=f'{offline_member.mention} is offline on Discord or has chosen to opt-out of the kickening. You have 20 seconds '
+                'before you are kicked.',
                 author=offline_member,
             )
             embed.add_field(name='Member Information', value='\n'.join(member_information), inline=False)
@@ -373,14 +423,18 @@ class FurySpecificCommands(BaseCog):
                 inline=False,
             )
 
-            await ctx.send(
+            message = await ctx.send(
                 embed=embed,
-                delete_after=25,
                 content=offline_member.mention,
                 allowed_mentions=discord.AllowedMentions(users=True),
             )
 
-            # await offline_member.kick(reason='Offline member')
+            if offline_member not in offline_members:
+                # This member removed themselves
+                await message.reply('Did not kick member as they removed themselves from the offline member list!')
+            else:
+                # await offline_member.kick(reason='Offline member')
+                await message.reply(kick_message)
 
             # If it's not the last member, sleep for 20 seconds
             if index != len(offline_members) - 1:
@@ -395,44 +449,29 @@ class FurySpecificCommands(BaseCog):
 
             # Spawn a new view
             view = KickeningVoting(self.bot, kickable_members[0], kickable_members[1])
+            file = await view.get_first_v_second_file()
 
             message = await ctx.channel.send(
                 embed=view.embed,
                 view=view,
                 content=human_join((m.mention for m in kickable_members)),
                 allowed_mentions=discord.AllowedMentions(users=True),
+                file=file,
             )
 
             await view.wait()
 
             async with ctx.typing():
-                await message.edit(view=None)
-
                 # Now we can get the results of the vote
                 results = view.get_results()
 
-                embed = self.bot.Embed(
-                    title=textwrap.shorten(f'Results Of {results.winner.display_name} vs {results.loser.display_name}', 256),
-                    description=f'**{results.winner.mention}, your time has come!** You will be kicked!',
-                    author=results.winner,
-                )
+                await message.edit(view=None)
 
-                embed.add_field(name=results.winner.display_name, value=f'{results.winner_vote_count} votes.')
-                embed.add_field(name=results.loser.display_name, value=f'{results.loser_vote_count} votes.')
-
-                if results.was_tie:
-                    embed.add_field(
-                        name='It Was A Tie!', value='The results were a tie, so I randomized the winner!', inline=False
-                    )
-
+                embed = results.embed
                 embed.add_field(
                     name='Remaining Members',
                     value=f'There are **{len(all_kickable_members)} people** remaining in the kickening.',
                     inline=False,
-                )
-
-                embed.set_footer(
-                    text=f'You have {GRACE_PERIOD} seconds until you get kicked and we move onto the next member.'
                 )
 
             message = await message.reply(embed=embed)
@@ -469,14 +508,34 @@ class FurySpecificCommands(BaseCog):
     @commands.guild_only()
     async def kickening(self, ctx: Context) -> None:
         """Commands for the kickening."""
+        if ctx.invoked_subcommand is not None:
+            return
+
         await ctx.send('Invalid subcommand passed. Valid subcommands are `start`, `stop`.')
+
+    def _kickening_task_done(self, task: asyncio.Task[None]) -> None:
+        exception = task.exception()
+        if exception is None:
+            return
+
+        if isinstance(exception, asyncio.InvalidStateError):
+            # This task is not Done?
+            return
+
+        if self.bot.error_handler:
+            asyncio.create_task(
+                self.bot.error_handler.log_error(exception, origin=None, sender=None, event_name=task.get_name())
+            )
+        else:
+            raise exception
 
     @kickening.command(name='start', hidden=True)
     @commands.is_owner()
     @commands.guild_only()
     async def start_kickening(self, ctx: Context) -> None:
         """Starts the kickening."""
-        self._kickening_task = self.bot.create_task(self._wrap_kickening(ctx))
+        self._kickening_task = task = self.bot.create_task(self._wrap_kickening(ctx))
+        task.add_done_callback(self._kickening_task_done)
 
     @kickening.command(name='stop', hidden=True)
     @commands.is_owner()
