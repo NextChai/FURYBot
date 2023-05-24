@@ -231,7 +231,9 @@ class Results:
         embed.add_field(name=self.loser.display_name, value=f'{self.loser_vote_count} votes.')
 
         if self.was_tie:
-            embed.add_field(name='It Was A Tie!', value='The results were a tie, so I randomized the winner!', inline=False)
+            embed.add_field(
+                name='It Was A Tie!', value='The results were a tie, so the winner has been randomized.', inline=False
+            )
 
         embed.set_footer(text=f'You have {GRACE_PERIOD} seconds until you get kicked and we move onto the next member.')
 
