@@ -237,6 +237,8 @@ class Results:
 
         embed.set_footer(text=f'You have {GRACE_PERIOD} seconds until you get kicked and we move onto the next member.')
 
+        embed.set_image(url='attachment://kickening.png')
+
         return embed
 
 
@@ -440,11 +442,14 @@ class FurySpecificCommands(BaseCog):
             if index != len(offline_members) - 1:
                 await asyncio.sleep(20)
 
+        # End the searching for offline members
+        task.cancel()
+
         await ctx.send(embed=KICKENING_EMBED)
         await asyncio.sleep(60 * 2)  # 2 minutes
 
         # We're going to use a while True loop here and abuse some mutable objects
-        while True:
+        while len(all_kickable_members) > 1:
             kickable_members = determine_kickable_members(all_kickable_members)
 
             # Spawn a new view
@@ -470,11 +475,12 @@ class FurySpecificCommands(BaseCog):
                 embed = results.embed
                 embed.add_field(
                     name='Remaining Members',
-                    value=f'There are **{len(all_kickable_members)} people** remaining in the kickening.',
+                    value=f'There are **{len(all_kickable_members)} people** remaining in the kickening. Waiting '
+                    f'20 seconds before kicking {results.winner.mention} and moving on to the next round!',
                     inline=False,
                 )
 
-            message = await message.reply(embed=embed)
+            message = await message.reply(embed=embed, file=file)
 
             await asyncio.sleep(GRACE_PERIOD)
 
@@ -489,19 +495,14 @@ class FurySpecificCommands(BaseCog):
             all_kickable_members.remove(results.winner)
             random.shuffle(all_kickable_members)
 
-            # If the length of all kickable members is 1, we can stop and announce them the winner
-            if len(all_kickable_members) == 1:
-                await ctx.send(
-                    embed=self.bot.Embed(
-                        title='The Winner!',
-                        description=f'Congratulations {all_kickable_members[0].mention}, you have won the kickening!',
-                    ),
-                    allowed_mentions=discord.AllowedMentions(users=True),
-                )
-                break
-
-        # End the searching for offline members
-        task.cancel()
+        # The length of all kickable members is 1, we can stop and announce them the winner
+        await ctx.send(
+            embed=self.bot.Embed(
+                title='The Winner!',
+                description=f'Congratulations {all_kickable_members[0].mention}, you have won the kickening!',
+            ),
+            allowed_mentions=discord.AllowedMentions(users=True),
+        )
 
     @commands.group(name='kickening', hidden=True)
     @commands.is_owner()
