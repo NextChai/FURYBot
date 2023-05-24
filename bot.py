@@ -248,7 +248,7 @@ class FuryBot(commands.Bot):
         self.link_settings: Dict[int, LinkSettings] = {}
 
         super().__init__(
-            command_prefix=commands.when_mentioned_or('fury.'),
+            command_prefix=commands.when_mentioned_or('trev.', 'trev'),
             help_command=None,
             description='A helpful moderation tool',
             intents=discord.Intents.all(),
