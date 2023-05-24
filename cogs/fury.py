@@ -392,64 +392,64 @@ class FurySpecificCommands(BaseCog):
             self._listen_for_members(ctx, offline_members, all_kickable_members), name='kickening-offline-member-searching'
         )
 
-        await asyncio.sleep(30)
-
-        for index, offline_member in enumerate(offline_members):
-            member_information: List[str] = [
-                '**Roles**: {}'.format(human_join([role.mention for role in list(reversed(offline_member.roles))[:-1]]))
-            ]
-            if offline_member.joined_at is not None:
-                member_information.append(f'**Joined At**: {human_timestamp(offline_member.joined_at)}')
-            else:
-                # Thanks discord
-                maybe_member = ctx.guild.get_member(offline_member.id)
-                if maybe_member is not None and maybe_member.joined_at is not None:
-                    member_information.append(f'**Joined At**: {human_timestamp(maybe_member.joined_at)}')
-
-            if offline_member.premium_since:
-                member_information.append(f'**Boosting The Server Since**: {human_timestamp(offline_member.premium_since)}')
-
-            embed = self.bot.Embed(
-                title=f'{offline_member.display_name}\'s Time is Up!',
-                description=f'{offline_member.mention} is offline on Discord or has chosen to opt-out of the kickening. They have 20 seconds '
-                'before they are kicked if they are an opted-out member, otherwise it\'s an instant boot!',
-                author=offline_member,
-            )
-            embed.add_field(name='Member Information', value='\n'.join(member_information), inline=False)
-
-            embed.add_field(
-                name='Offline/Opt-Out Members Remaining',
-                value=f'There are **{len(offline_members) - index - 1} members** remaining to be kicked!',
-                inline=False,
-            )
-
-            message = await ctx.send(
-                embed=embed,
-                content=offline_member.mention,
-                allowed_mentions=discord.AllowedMentions(users=True),
-            )
-
-            if offline_member not in offline_members:
-                # This member removed themselves
-                await message.reply('Did not kick member as they removed themselves from the offline member list!')
-            else:
-                if offline_member.id in KICKENING_OPT_OUT_IDS:
-                    await asyncio.sleep(20)  # 20 seconds for opted-out members
-
-                # await offline_member.kick(reason='Offline member')
-
-                kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=offline_member.mention)
-                await message.reply(kick_message)
-
-            # If it's not the last member, sleep for 20 seconds
-            if index != len(offline_members) - 1:
-                await asyncio.sleep(20)
-
-        # End the searching for offline members
-        task.cancel()
-
-        await ctx.send(embed=KICKENING_EMBED)
-        await asyncio.sleep(60 * 2)  # 2 minutes
+        # await asyncio.sleep(30)
+        #
+        # for index, offline_member in enumerate(offline_members):
+        #     member_information: List[str] = [
+        #         '**Roles**: {}'.format(human_join([role.mention for role in list(reversed(offline_member.roles))[:-1]]))
+        #     ]
+        #     if offline_member.joined_at is not None:
+        #         member_information.append(f'**Joined At**: {human_timestamp(offline_member.joined_at)}')
+        #     else:
+        #         # Thanks discord
+        #         maybe_member = ctx.guild.get_member(offline_member.id)
+        #         if maybe_member is not None and maybe_member.joined_at is not None:
+        #             member_information.append(f'**Joined At**: {human_timestamp(maybe_member.joined_at)}')
+        #
+        #     if offline_member.premium_since:
+        #         member_information.append(f'**Boosting The Server Since**: {human_timestamp(offline_member.premium_since)}')
+        #
+        #     embed = self.bot.Embed(
+        #         title=f'{offline_member.display_name}\'s Time is Up!',
+        #         description=f'{offline_member.mention} is offline on Discord or has chosen to opt-out of the kickening. They have 20 seconds '
+        #         'before they are kicked if they are an opted-out member, otherwise it\'s an instant boot!',
+        #         author=offline_member,
+        #     )
+        #     embed.add_field(name='Member Information', value='\n'.join(member_information), inline=False)
+        #
+        #     embed.add_field(
+        #         name='Offline/Opt-Out Members Remaining',
+        #         value=f'There are **{len(offline_members) - index - 1} members** remaining to be kicked!',
+        #         inline=False,
+        #     )
+        #
+        #     message = await ctx.send(
+        #         embed=embed,
+        #         content=offline_member.mention,
+        #         allowed_mentions=discord.AllowedMentions(users=True),
+        #     )
+        #
+        #     if offline_member not in offline_members:
+        #         # This member removed themselves
+        #         await message.reply('Did not kick member as they removed themselves from the offline member list!')
+        #     else:
+        #         if offline_member.id in KICKENING_OPT_OUT_IDS:
+        #             await asyncio.sleep(20)  # 20 seconds for opted-out members
+        #
+        #         # await offline_member.kick(reason='Offline member')
+        #
+        #         kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=offline_member.mention)
+        #         await message.reply(kick_message)
+        #
+        #     # If it's not the last member, sleep for 20 seconds
+        #     if index != len(offline_members) - 1:
+        #         await asyncio.sleep(20)
+        #
+        # # End the searching for offline members
+        # task.cancel()
+        #
+        # await ctx.send(embed=KICKENING_EMBED)
+        # await asyncio.sleep(60 * 2)  # 2 minutes
 
         # We're going to use a while True loop here and abuse some mutable objects
         while len(all_kickable_members) > 1:
