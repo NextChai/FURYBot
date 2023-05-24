@@ -219,7 +219,7 @@ class Results:
 
     @property
     def was_tie(self) -> bool:
-        return self.winner_votes == self.loser_votes
+        return len(self.winner_votes) == len(self.loser_votes)
 
     @property
     def embed(self) -> discord.Embed:
@@ -236,8 +236,6 @@ class Results:
             embed.add_field(name='It Was A Tie!', value='The results were a tie, so I randomized the winner!', inline=False)
 
         embed.set_footer(text=f'You have {GRACE_PERIOD} seconds until you get kicked and we move onto the next member.')
-
-        embed.set_image(url='attachment://kickening.png')
 
         return embed
 
@@ -284,7 +282,7 @@ class KickeningVoting(discord.ui.View):
             )
 
         if interaction.user in [*self.first_votes, *self.second_votes]:
-            return await interaction.response.send_message('You have already voted!', ephemeral=True)
+            return
 
         return True
 
@@ -478,10 +476,11 @@ class FurySpecificCommands(BaseCog):
                 embed = results.embed
                 embed.add_field(
                     name='Remaining Members',
-                    value=f'There are **{len(all_kickable_members)} people** remaining in the kickening. Waiting '
+                    value=f'There are **{len(all_kickable_members)} people** remaining in the kickening. There is '
                     f'20 seconds before kicking {results.winner.mention} and moving on to the next round!',
                     inline=False,
                 )
+                embed.set_image(url=message.attachments[0].url)
 
             message = await message.reply(embed=embed, file=file)
 
