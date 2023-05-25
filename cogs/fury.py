@@ -335,10 +335,12 @@ class KickeningVoting(discord.ui.View):
 
         async with self.lock:
             if interaction.user in {self.first, self.second}:
-                return await interaction.followup.send('You cannot vote when you\'re up for the kickening!', ephemeral=True)
+                await interaction.followup.send('You cannot vote when you\'re up for the kickening!', ephemeral=True)
+                return False
 
             if interaction.user in [*self.first_votes, *self.second_votes]:
-                return await interaction.followup.send('You cannot vote twice!', ephemeral=True)
+                await interaction.followup.send('You cannot vote twice!', ephemeral=True)
+                return False
 
         return True
 
