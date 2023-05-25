@@ -610,6 +610,8 @@ class FurySpecificCommands(BaseCog):
     @commands.guild_only()
     async def start_kickening(self, ctx: Context) -> None:
         """Starts the kickening."""
+        await ctx.message.delete()
+
         self._kickening_task = task = self.bot.create_task(self._wrap_kickening(ctx))
         task.add_done_callback(self._kickening_task_done)
 
