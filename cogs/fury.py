@@ -494,7 +494,7 @@ class FurySpecificCommands(BaseCog):
                 if offline_member.id in KICKENING_OPT_OUT_IDS:
                     await asyncio.sleep(20)  # 20 seconds for opted-out members
 
-                # await offline_member.kick(reason='Offline member')
+                await offline_member.kick(reason='Offline member')
 
                 kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=offline_member.mention)
                 await message.reply(kick_message)
@@ -558,7 +558,7 @@ class FurySpecificCommands(BaseCog):
 
             await asyncio.sleep(GRACE_PERIOD)
 
-            # await ctx.guild.kick(member_to_kick, reason='The kickening has spoken!')
+            await ctx.guild.kick(results.winner, reason='The kickening has spoken!')
 
             kick_message = string.Template(random.choice(KICKENING_MESSAGES)).substitute(mention=results.winner.mention)
             await message.reply(kick_message)
