@@ -592,6 +592,7 @@ class FurySpecificCommands(BaseCog):
     def _kickening_task_done(self, task: asyncio.Task[None]) -> None:
         exception = task.exception()
         if exception is None:
+            self._kickening_task = None
             return
 
         if isinstance(exception, asyncio.InvalidStateError):
@@ -611,6 +612,10 @@ class FurySpecificCommands(BaseCog):
     async def start_kickening(self, ctx: Context) -> None:
         """Starts the kickening."""
         await ctx.message.delete()
+
+        if self._kickening_task is not None:
+            await ctx.send('The kickening is already running!')
+            return
 
         self._kickening_task = task = self.bot.create_task(self._wrap_kickening(ctx))
         task.add_done_callback(self._kickening_task_done)
