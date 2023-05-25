@@ -125,7 +125,39 @@ KICKENING_MESSAGES: List[str] = [
     "$mention has fallen out of the world!",
     "No Gulag comeback this time... $mention has been kicked!",
     "$mention just spammed missiles for the last time this semester, get out of here reflux main!",
-    "Booyah Bomb spam isnt gonna save you this time $mention, you've been kicked! Ill aero-see you later! ",
+    "Booyah Bomb spam isnt gonna save you this time $mention, you've been kicked! Ill aero-see you later!",
+    """Ring ding ding daa baa
+    Baa aramba baa bom baa barooumba
+    Wh-wha-what's going on-on?
+    Ding, ding
+    This is the Crazy Frog
+    Ding, ding
+    Bem, bem!
+    Ring ding ding ding ding ding
+    Ring ding ding ding bem bem bem
+    Ring ding ding ding ding ding
+    Ring ding ding ding baa baa
+    Ring ding ding ding ding ding
+    Ring ding ding ding bem bem bem
+    Ring ding ding ding ding ding
+    This is the Crazy Frog
+    Breakdown!
+    Ding, ding
+    Br-br-break it, br-break it
+    Dum dum dumda dum dum dum
+    Dum dum dumda dum dum dum
+    Dum dum dumda dum dum dum
+    Bem, bem!
+    Dum dum dumda dum dum dum
+    Dum dum dumda dum dum dum
+    Dum dum dumda dum dum dum
+    This is the Crazy Frog
+    A ram me ma bra ba bra bra rim bran
+    Dran drra ma mababa baabeeeaaaaaaa!
+    Ding, ding
+    This is the Crazy Frog
+    Ding, ding""",
+    "https://media.discordapp.net/attachments/881938845929730098/1055965863280381982/makesweet-eqwpsj.gif",
 ]
 
 KICKENING_EMBED = discord.Embed(
@@ -370,6 +402,7 @@ class FurySpecificCommands(BaseCog):
 
     async def _wrap_kickening(self, ctx: Context) -> None:
         assert ctx.guild
+        assert isinstance(ctx.channel, discord.TextChannel)
 
         all_kickable_members: List[discord.Member] = []
         offline_members: List[discord.Member] = []
@@ -396,7 +429,8 @@ class FurySpecificCommands(BaseCog):
         embed = self.bot.Embed(
             title='Kicking Offline and Opt-Out Members First!',
             description=f'A total of **{len(all_kickable_members) + len(offline_members)} members** have been fetched for the kickening! '
-            f'**{len(offline_members)}** of these members are offline or have chosen to opt-out, and as a result, they will be kicked first!',
+            f'**{len(offline_members)}** of these members are offline or have chosen to opt-out, and as a result, they will be kicked first! Starting '
+            'in 30 seconds...',
         )
         embed.add_field(
             name='Offline And Opt-Out Member Kicking',
@@ -441,7 +475,7 @@ class FurySpecificCommands(BaseCog):
 
             embed.add_field(
                 name='Offline/Opt-Out Members Remaining',
-                value=f'There are **{len(offline_members) - index - 1} members** remaining to be kicked!',
+                value=f'There are **{len(offline_members) - index - 1} offline/opted out members** remaining to be kicked!',
                 inline=False,
             )
 
@@ -483,6 +517,8 @@ class FurySpecificCommands(BaseCog):
             view = KickeningVoting(self.bot, kickable_members[0], kickable_members[1])
             file = await view.get_first_v_second_file()
 
+            await ctx.channel.edit(slowmode_delay=10)
+
             message = await ctx.channel.send(
                 embed=view.embed,
                 view=view,
@@ -492,6 +528,8 @@ class FurySpecificCommands(BaseCog):
             )
 
             await view.wait()
+
+            await ctx.channel.edit(slowmode_delay=0)
 
             async with ctx.typing():
                 # Now we can get the results of the vote
