@@ -40,6 +40,7 @@ from utils import (
     RoleSelect,
     UserSelect,
     MultiSelector,
+    human_timestamp,
 )
 
 from .settings import *
@@ -258,22 +259,71 @@ class ManageLinkActions(BaseView):
         return await interaction.edit_original_response(view=self)
 
 
-class AllowedItemPaginator(MultiSelector['ManageAllowedItems', 'AllowedLink']):
-    def hash_item(self, item: AllowedLink) -> int:
+class AllowedItemPaginator(MultiSelector['ManageAllowedItems', 'AllowedItem']):
+    def hash_item(self, item: AllowedItem) -> int:
         return item.id
 
-    def create_embed(self, items: List[AllowedLink]) -> discord.Embed:
-        ...
+    def create_embed(self, items: List[AllowedItem]) -> discord.Embed:
+        embed = self.parent.bot.Embed(
+            title='All ALlowed Items',
+        )
 
-    async def on_item_chosen(self, interaction: discord.Interaction[FuryBot], item: AllowedLink) -> Any:
-        ...
+        for item in items:
+            embed.add_field(
+                name=f'ID: {item.id}',
+                value=f'**Url**: [{item.url}]({item.url})\n**Added At**: {human_timestamp(item.added_at)}\n**Added By**: <@{item.added_by_id}>',
+                inline=False,
+            )
+
+        return embed
+
+    async def on_item_chosen(
+        self, interaction: discord.Interaction[FuryBot], item: AllowedItem
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+        view = self.parent.create_child(ManageAllowedItem, self.parent.settings, item)
+        return await interaction.edit_original_response(view=view, embed=view.embed)
 
 
 class ManageAllowedItem(BaseView):
-    def __init__(self, settings: LinkSettings, allowed_link: AllowedLink, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, settings: LinkSettings, allowed_item: AllowedItem, **kwargs: Unpack[BaseViewKwargs]) -> None:
         super().__init__(**kwargs)
         self.settings: LinkSettings = settings
-        self.allowed_link: AllowedLink = allowed_link
+        self.allowed_item: AllowedItem = allowed_item
+
+    @property
+    def embed(self) -> discord.Embed:
+        embed = self.bot.Embed(
+            title=f'Manage Allowed Item {self.allowed_item.id}',
+        )
+        embed.add_field(
+            name='Allowed Item Url',
+            value=f'[{self.allowed_item.url}]({self.allowed_item.url})',
+            inline=False,
+        )
+        embed.add_field(
+            name='Added By',
+            value=f'<@{self.allowed_item.added_by_id}>',
+            inline=False,
+        )
+        embed.add_field(
+            name='Added At',
+            value=human_timestamp(self.allowed_item.added_at),
+            inline=False,
+        )
+        return embed
+
+    @discord.ui.button(label='Delete Allowed Item')
+    async def delete_allowed_item(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        async with self.bot.safe_connection() as connection:
+            await self.allowed_item.delete(connection=connection)
+
+        view = ManageAllowedItems(self.settings, target=interaction)
+        return await interaction.edit_original_response(embed=view.embed, view=view)
 
 
 class ManageAllowedItems(BaseView):
@@ -291,7 +341,7 @@ class ManageAllowedItems(BaseView):
 
         embed.add_field(
             name='Allowed Items',
-            value=f'Use the buttons below to manage your {len(self.settings.allowed_links)} allowed items. '
+            value=f'Use the buttons below to manage your {len(self.settings.allowed_items)} allowed items. '
             'Use the "View Allowed Items" button to see all your allowed domains and links for this link filter.',
         )
 
@@ -303,13 +353,13 @@ class ManageAllowedItems(BaseView):
         await interaction.response.defer()
 
         value = item_value.value
-        for action in self.settings.allowed_links:
+        for action in self.settings.allowed_items:
             if action.url == value:
                 await interaction.followup.send(f'This link is already allowed.', ephemeral=True)
                 return await interaction.edit_original_response(view=self, embed=self.embed)
 
         async with self.bot.safe_connection() as connection:
-            await self.settings.create_allowed_link(
+            await self.settings.create_allowed_item(
                 connection=connection, url=value, added_at=interaction.created_at, added_by_id=interaction.user.id
             )
 
@@ -332,13 +382,19 @@ class ManageAllowedItems(BaseView):
         return await interaction.response.send_modal(modal)
 
     @discord.ui.button(label='View and Select Allowed Items')
-    async def view_allowed_items(
-        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
-    ) -> discord.InteractionMessage:
+    async def view_allowed_items(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         await interaction.response.defer()
 
-        paginator = self.create_child(AllowedItemPaginator, entries=self.settings.allowed_links, per_page=20)
-        return await interaction.edit_original_response(embed=paginator.embed, view=paginator)
+        view = AllowedItemPaginator(
+            parent=self,
+            items=self.settings.allowed_items,
+            per_page=10,
+            modal_title='Choose Allowed Item',
+            modal_item=discord.ui.TextInput(
+                label='Allowed Item ID', placeholder='Enter the ID of the Allowed Item you want...'
+            ),
+        )
+        await view.launch(interaction)
 
 
 class ManageExemptTargets(BaseView):
@@ -457,7 +513,7 @@ class ManageLinkSettings(BaseView):
         # Let's get the current ctions and words from these settings.
         embed.add_field(
             name='Allowed Items',
-            value=f'There is **{len(self.settings.allowed_links)}** allowed '
+            value=f'There is **{len(self.settings.allowed_items)}** allowed '
             'items for link filtering. Click the button below to manage them.',
             inline=False,
         )

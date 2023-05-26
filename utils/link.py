@@ -37,18 +37,18 @@ class LinkFilter(URLExtract):
     def __init__(self, bot: FuryBot, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.bot: FuryBot = bot
-        self._allowed_links: Dict[int, re.Pattern[str]] = {}
+        self._allowed_items: Dict[int, re.Pattern[str]] = {}
 
     def build_regex_for_settings(self, settings: LinkSettings) -> None:
-        if not settings.allowed_links:
+        if not settings.allowed_items:
             return
 
-        links = [allowed_link.url for allowed_link in settings.allowed_links]
+        links = [allowed_item.url for allowed_item in settings.allowed_items]
 
         tre = trieregex.TrieRegEx(*links)
-        self._allowed_links[settings.guild_id] = re.compile(f'\\b{tre.regex()}\\b', re.IGNORECASE)
+        self._allowed_items[settings.guild_id] = re.compile(f'\\b{tre.regex()}\\b', re.IGNORECASE)
 
-    def create_allowed_links_regex(self) -> None:
+    def create_allowed_items_regex(self) -> None:
         for setting in self.bot.get_link_settings():
             self.build_regex_for_settings(setting)
 
@@ -59,12 +59,12 @@ class LinkFilter(URLExtract):
         if guild_id is None:
             return links
 
-        allowed_links = self._allowed_links.get(guild_id)
-        if not allowed_links:
+        allowed_items = self._allowed_items.get(guild_id)
+        if not allowed_items:
             return links
 
         for link, (_start, _end) in links:
-            matches = await self.bot.wrap(allowed_links.findall, link)
+            matches = await self.bot.wrap(allowed_items.findall, link)
             if matches:
                 # We have a match, we need to remove it from the list
                 links.remove((link, (_start, _end)))

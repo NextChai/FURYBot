@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS links.actions (
     warn_message TEXT -- Message to send when warning
 );
 
-CREATE TABLE IF NOT EXISTS links.allowed_links (
+CREATE TABLE IF NOT EXISTS links.allowed_items (
     id SERIAL PRIMARY KEY,
     settings_id INTEGER REFERENCES links.settings(id) ON DELETE CASCADE,
     url TEXT,

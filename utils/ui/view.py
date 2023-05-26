@@ -450,4 +450,8 @@ class MultiSelector(Generic[BaseViewT, T], abc.ABC):
         # Get information from the first page
         items = self.current_items
         embed = self.create_embed(items)
-        await interaction.response.edit_message(embed=embed, view=self.parent)
+
+        if interaction.response.is_done():
+            await interaction.edit_original_response(embed=embed, view=self.parent)
+        else:
+            await interaction.response.edit_message(embed=embed, view=self.parent)

@@ -53,7 +53,7 @@ from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
 from cogs.images import ApproveOrDenyImage, ImageRequest
-from cogs.links import AllowedLink, LinkAction, LinkSettings
+from cogs.links import AllowedItem, LinkAction, LinkSettings
 from cogs.links.settings import ExemptTarget
 from cogs.teams import Team
 from cogs.teams.practices import Practice
@@ -796,12 +796,12 @@ class FuryBot(commands.Bot):
 
             settings.add_action(LinkAction(bot=self, data=dict(action)))
 
-        allowed_links_data = await connection.fetch('SELECT * FROM links.allowed_links')
-        for allowed_link_data in allowed_links_data:
-            settings = self.get_link_setting(allowed_link_data['settings_id'])
+        allowed_items_data = await connection.fetch('SELECT * FROM links.allowed_items')
+        for allowed_item_data in allowed_items_data:
+            settings = self.get_link_setting(allowed_item_data['settings_id'])
             assert settings
 
-            settings.add_allowed_link(AllowedLink(bot=self, data=dict(allowed_link_data)))
+            settings.add_allowed_item(AllowedItem(bot=self, data=dict(allowed_item_data)))
 
         exempt_targets_data = await connection.fetch('SELECT * FROM links.exempt_targets')
         for exempt_target_data in exempt_targets_data:
@@ -812,7 +812,7 @@ class FuryBot(commands.Bot):
 
         # Now that out cache is full we can create the regex for each guild
         # that will be used to check if a link is allowed or not.
-        self.link_filter.create_allowed_links_regex()
+        self.link_filter.create_allowed_items_regex()
 
     # Hooks
     async def setup_hook(self) -> None:

@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 MISSING = discord.utils.MISSING
 
 
-class AllowedLink:
+class AllowedItem:
     def __init__(self, *, bot: FuryBot, data: Dict[str, Any]) -> None:
         self.bot: FuryBot = bot
         self.id: int = data['id']
@@ -63,7 +63,7 @@ class AllowedLink:
             raise ValueError('No link settings found for guild_id')
 
         data = await connection.fetchrow(
-            'INSERT INTO links.allowed_links (settings_id, url, added_at, added_by_id) '
+            'INSERT INTO links.allowed_items (settings_id, url, added_at, added_by_id) '
             'VALUES ($1, $2, $3, $4 '
             'RETURNING *',
             settings_id,
@@ -74,7 +74,7 @@ class AllowedLink:
         assert data
 
         self = cls(bot=bot, data=dict(data))
-        settings.add_allowed_link(self)
+        settings.add_allowed_item(self)
 
         return self
 
@@ -87,14 +87,14 @@ class AllowedLink:
         return self.bot.get_link_setting(self.settings_id)
 
     async def delete(self, *, connection: ConnectionType) -> None:
-        await connection.execute('DELETE FROM links.allowed_links WHERE id = $1', self.id)
+        await connection.execute('DELETE FROM links.allowed_items WHERE id = $1', self.id)
 
         # Need to remove this allowed link from the settings
         settings = self.settings
         if settings is None:
             return
 
-        settings.remove_allowed_link(self)
+        settings.remove_allowed_item(self)
 
 
 class LinkActionType(enum.Enum):
@@ -289,7 +289,7 @@ class LinkSettings:
         self.guild_id: int = data['guild_id']
         self.notifier_channel_id: Optional[int] = data['notifier_channel_id']
         self.actions: List[LinkAction] = []
-        self.allowed_links: List[AllowedLink] = []
+        self.allowed_items: List[AllowedItem] = []
         self.exempt_targets: List[ExemptTarget] = []
 
     @classmethod
@@ -335,11 +335,11 @@ class LinkSettings:
     def remove_action(self, action: LinkAction) -> None:
         self.actions.remove(action)
 
-    def add_allowed_link(self, link: AllowedLink) -> None:
-        self.allowed_links.append(link)
+    def add_allowed_item(self, link: AllowedItem) -> None:
+        self.allowed_items.append(link)
 
-    def remove_allowed_link(self, link: AllowedLink) -> None:
-        self.allowed_links.remove(link)
+    def remove_allowed_item(self, link: AllowedItem) -> None:
+        self.allowed_items.remove(link)
 
     def add_exempt_target(self, target: ExemptTarget) -> None:
         self.exempt_targets.append(target)
@@ -377,10 +377,10 @@ class LinkSettings:
     async def create_exempt_target(self, *, connection: ConnectionType, id: int, type: ExemptTargetType) -> ExemptTarget:
         return await ExemptTarget.create(bot=self.bot, connection=connection, settings_id=self.id, id=id, type=type)
 
-    async def create_allowed_link(
+    async def create_allowed_item(
         self, *, connection: ConnectionType, url: str, added_at: datetime.datetime, added_by_id: int
-    ) -> AllowedLink:
-        return await AllowedLink.create(
+    ) -> AllowedItem:
+        item = await AllowedItem.create(
             bot=self.bot,
             connection=connection,
             settings_id=self.id,
@@ -388,6 +388,10 @@ class LinkSettings:
             added_at=added_at,
             added_by_id=added_by_id,
         )
+
+        self.bot.link_filter.build_regex_for_settings(self)
+
+        return item
 
     async def delete(self, *, connection: ConnectionType) -> None:
         await connection.execute('DELETE FROM links.settings WHERE id = $1', self.id)
