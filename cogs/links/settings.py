@@ -188,6 +188,7 @@ class LinkAction:
             return
 
         settings.actions.remove(self)
+        self.bot.link_filter.build_regex_for_settings(settings)
 
 
 class ExemptTargetType(enum.Enum):
