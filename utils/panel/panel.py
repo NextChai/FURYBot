@@ -23,20 +23,27 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, Type
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, Generic, Optional, Type
 from typing_extensions import Self
 
 from .types import T
+from .underlying import UnderlyingPanelView
 
 if TYPE_CHECKING:
     from .field import Field
-    from discord import Embed
+    from discord import Embed, Interaction
+    from bot import FuryBot
 
 
 class Panel(Generic[T]):
+    _edit_coroutine: Optional[Callable[..., Coroutine[Any, Any, None]]] = None
+
     def __init__(self, cls: Type[T], table_name: str, fields: Dict[str, Field[T]], **kwargs: Any) -> None:
         self.cls: Type[T] = cls
         self.table_name: str = table_name
         self.fields: Dict[str, Field[T]] = fields
 
         self._create_embed_func: Optional[Callable[[Self], Embed]] = kwargs.get('create_embed', None)
+
+    def create_underlying_view(self, target: Interaction[FuryBot], *, timeout: float = 120.0) -> UnderlyingPanelView:
+        return UnderlyingPanelView(self, timeout=timeout, parent=None, target=target)

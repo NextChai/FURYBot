@@ -23,21 +23,130 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 from typing_extensions import Unpack
 
 import discord
-from ..ui import BaseView, BaseViewKwargs
+from ..ui import BaseView, BaseViewKwargs, BaseModal
+from .types import FieldType
+from . import ALL_PANELS
 
 if TYPE_CHECKING:
     from .field import Field
     from .panel import Panel
 
+    from bot import FuryBot
+
+
+class _ModalConverter(BaseModal):
+    def __init__(self, parent: UnderlyingPanelView, field: Field[Any], **kwargs: Any) -> None:
+        super().__init__(**kwargs, bot=parent.bot)
+        self.parent: UnderlyingPanelView = parent
+        self.field: Field[Any] = field
+
+    async def callback(self, interaction: discord.Interaction[FuryBot]) -> None:
+        await interaction.response.defer()
+
+        child = self.children[0]
+        assert isinstance(child, discord.ui.TextInput)
+
+        transformed = await self.transform(interaction, child.value)
+        if transformed is None:
+            return
+
+        edit_coro = self.field.panel._edit_coroutine
+        if edit_coro is None:
+            raise ValueError(f'Panel {self.field.panel} does not have an edit coroutine.')
+
+        async with interaction.client.safe_connection() as connection:
+            await edit_coro(connection=connection, **{self.field.name: transformed})
+
+    async def transform(self, interaction: discord.Interaction[FuryBot], value: str) -> Optional[Any]:
+        raise NotImplementedError
+
+
+class BooleanModal(_ModalConverter):
+    async def transform(self, interaction: discord.Interaction[FuryBot], value: str) -> Optional[bool]:
+        if value.lower() in ('y', 'yes', 'true', 't', '1'):
+            return True
+        elif value.lower() in ('n', 'no', 'false', 'f', '0'):
+            return False
+
+        await interaction.followup.send(
+            'You did not provide a valid boolean value. Example: `yes`, `no`, `true`, `false`', ephemeral=True
+        )
+
+
+class IntegerModal(_ModalConverter):
+    async def transform(self, interaction: discord.Interaction[FuryBot], value: str) -> Optional[int]:
+        if value.isdigit():
+            return int(value)
+
+        await interaction.followup.send('You did not provide a valid integer value. Example: `10`', ephemeral=True)
+
+
+class FloatModal(_ModalConverter):
+    async def transform(self, interaction: discord.Interaction[FuryBot], value: str) -> Optional[float]:
+        try:
+            return float(value)
+        except ValueError:
+            await interaction.followup.send('You did not provide a valid float value. Example: `10.1`', ephemeral=True)
+
+
+class TextModal(_ModalConverter):
+    async def transform(self, interaction: discord.Interaction[FuryBot], value: str) -> Optional[str]:
+        return value
+
+
+class DatetimeModal(_ModalConverter):
+    async def transform(self, interaction: discord.Interaction[FuryBot], value: str) -> Optional[Any]:
+        raise NotImplementedError
+
+
+class TimeDeltaModal(_ModalConverter):
+    async def transform(self, interaction: discord.Interaction[FuryBot], value: str) -> Optional[Any]:
+        raise NotImplementedError
+
 
 class UnderlyingPanelButton(discord.ui.Button['UnderlyingPanelView']):
-    def __init__(self, field: Field[Any]) -> None:
-        super().__init__(**field._button_kwargs)
+    def __init__(self, parent: UnderlyingPanelView, field: Field[Any]) -> None:
+        label = field._button_kwargs.pop('label', f'Edit {field.name}')
+        super().__init__(**field._button_kwargs, label=label)
         self.field: Field[Any] = field
+        self.parent: UnderlyingPanelView = parent
+
+    async def callback(self, interaction: discord.Interaction[FuryBot]) -> Any:
+        field_modal_mapping = {
+            FieldType.BOOLEAN_MODAL: BooleanModal,
+            FieldType.DATETIME_MODAL: DatetimeModal,
+            FieldType.TIMEDELTA_MODAL: TimeDeltaModal,
+            FieldType.INTEGER_MODAL: IntegerModal,
+            FieldType.FLOAT_MODAL: FloatModal,
+            FieldType.TEXT_MODAL: TextModal,
+        }
+
+        if any(self.field.type == field_type for field_type in field_modal_mapping):
+            # We have a modal
+            modal = field_modal_mapping[self.field.type](self.parent, self.field)
+            return await interaction.response.send_modal(modal)
+
+        await interaction.response.defer()
+
+        if self.field.type == FieldType.SUBITEM:
+            # We have a sub field, we need to try and find it in the registry.
+            subpanel = ALL_PANELS.get(self.field.type.sub_item.__qualname__)
+            if subpanel is None:
+                raise ValueError(f'Panel {self.field.type.sub_item.__qualname__} is not registered as a panel.')
+
+            # Awesome, we need to launch it's underlying view.
+            view = self.parent.create_child(UnderlyingPanelView, subpanel)
+            return await interaction.edit_original_response(view=view, embed=view.embed)
+        elif self.field.type == FieldType.CHANNEL_SELECT:
+            ...
+        elif self.field.type == FieldType.ROLE_SELECT:
+            ...
+        elif self.field.type == FieldType.USER_SELECT:
+            ...
 
 
 class UnderlyingPanelView(BaseView):
@@ -46,4 +155,8 @@ class UnderlyingPanelView(BaseView):
         self.panel: Panel[Any] = panel
 
         for field in self.panel.fields.values():
-            self.add_item(UnderlyingPanelButton(field))
+            self.add_item(UnderlyingPanelButton(self, field))
+
+    @property
+    def embed(self) -> discord.Embed:
+        return discord.Embed(description='[test value]')

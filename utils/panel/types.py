@@ -113,6 +113,10 @@ class FieldType:
         return 1 << 2
 
     @panel_field
+    def TIMEDELTA_MODAL(self) -> int:
+        return 1 << 9
+
+    @panel_field
     def INTEGER_MODAL(self) -> int:
         return 1 << 3
 

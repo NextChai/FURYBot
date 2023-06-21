@@ -23,11 +23,13 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Type, Callable, Dict
+from typing import TYPE_CHECKING, Any, Optional, Type, Callable, Dict
 from typing_extensions import dataclass_transform
 
+from utils.query import QueryBuilder
+
 from . import ALL_PANELS
-from .types import FieldType, T
+from .types import MISSING, FieldType, T
 from .dataclass import create_dataclass
 from .field import Field
 from .panel import Panel
@@ -35,6 +37,7 @@ from .panel import Panel
 
 if TYPE_CHECKING:
     from discord import Embed
+    from bot import ConnectionType
 
 
 def register_panel(
@@ -43,6 +46,7 @@ def register_panel(
     init: bool = True,
     repr: bool = True,
     slots: bool = True,
+    create_edit_func: bool = True,
     create_embed: Optional[Callable[[Panel[T]], Embed]] = None,
     **fields: FieldType,
 ) -> Type[T]:
@@ -76,10 +80,30 @@ def register_panel(
 
     panel = Panel(cls, table_name, transformed_fields, create_embed=create_embed)
 
+    if create_edit_func:
+        id = cls_fields.get('id', MISSING)
+        if id is MISSING:
+            raise ValueError('You must have an `id` field in your panel to use the `create_edit_func` option.')
+
+        async def _edit_coro(self: Panel[T], connection: ConnectionType, **kwargs: Any) -> None:
+            item_id = getattr(self, 'id')
+
+            builder = QueryBuilder(table=self.table_name)
+            builder.add_condition('id', item_id)
+
+            for name, value in kwargs.items():
+                builder.add_arg(name, value)
+                setattr(self, name, value)
+
+            await builder(connection)
+
+        panel._edit_coroutine = _edit_coro
+
     for field in transformed_fields.values():
         field.panel = panel
 
     ALL_PANELS[cls.__qualname__] = panel
+    setattr(cls, '__panel__', panel)
 
     return cls
 
@@ -91,11 +115,21 @@ def register(
     init: bool = True,
     repr: bool = True,
     slots: bool = True,
+    create_edit_func: bool = True,
     create_embed: Optional[Callable[[Panel[T]], Embed]] = None,
     **fields: FieldType,
 ) -> Callable[[Type[T]], Type[T]]:
     def wrapped(cls: Type[T]) -> Type[T]:
-        return register_panel(cls, table_name, init=init, repr=repr, slots=slots, create_embed=create_embed, **fields)
+        return register_panel(
+            cls,
+            table_name,
+            init=init,
+            repr=repr,
+            slots=slots,
+            create_embed=create_embed,
+            create_edit_func=create_edit_func,
+            **fields,
+        )
 
     return wrapped
 
