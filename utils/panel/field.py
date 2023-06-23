@@ -23,9 +23,10 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Generic
+from typing import TYPE_CHECKING, Any, Dict, Generic, Optional, Callable, Union
+from types import NoneType
 
-from .types import T
+from .types import T, MISSING
 
 if TYPE_CHECKING:
     from .types import FieldType
@@ -33,22 +34,91 @@ if TYPE_CHECKING:
 
 
 class Field(Generic[T]):
-    """Represents a Field on a given panel. Depending on the type of the field,
-    one of a couple things can happen.
-
-    - If the field is a SUBITEM, then the field will be a button that points to a new panel.
-    - If the field is a MODAL, then the field will be a button that opens a modal.
-    - If the field is a select, then the field will be a dropdown menu.
-    """
-
     if TYPE_CHECKING:
         panel: Panel[T]
 
-    def __init__(self, name: str, type: FieldType, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        type: FieldType = MISSING,
+        name: str = MISSING,
+        annotation: Any = MISSING,
+        default: Any = MISSING,
+        converter: Optional[Callable[[Any], Any]] = None,
+        ignored: bool = MISSING,
+        **kwargs: Any,
+    ) -> None:
         self.name: str = name
         self.type: FieldType = type
+
+        self.annotation: Any = annotation
+        self.default: Any = default
+        self.converter: Optional[Callable[[Any], Any]] = converter
+        self._ignored: bool = ignored
 
         self._button_kwargs: Dict[str, Any] = {}
         for name in kwargs.keys():
             if name.startswith('button_'):
                 self._button_kwargs[name[7:]] = kwargs.pop(name)
+
+    def __repr__(self) -> str:
+        return f'<Field name={self.name!r} annotation={self.annotation!r} default={self.default!r} converter={bool(self.converter)} ignored={self.ignored} type={self.type!r}>'
+
+    @property
+    def ignored(self) -> bool:
+        if self._ignored is MISSING:
+            return self.name.startswith('_')
+
+        return self._ignored
+
+    @ignored.setter
+    def ignored(self, value: bool) -> None:
+        self._ignored = value
+
+    def transform(self, value: Optional[Any]) -> Any:
+        if value is None:
+            # We can't do anything if the default *is* missing, so value
+            # will have to stay as None
+            if self.default is not MISSING:
+                value = self.default
+
+        if self.converter is not None:
+            value = self.converter(value)
+
+        return value
+
+
+def field(
+    *,
+    type: FieldType = MISSING,
+    name: Optional[str] = None,
+    annotation: Any = MISSING,
+    default: Any = MISSING,
+    converter: Optional[Callable[[Any], Any]] = None,
+    ignored: bool = MISSING,
+    **kwargs: Any,
+) -> Any:
+    # The field class doesn't take the same types of arguments as the decorator,
+    # so we need to do some work to make sure we can handle both.
+    data: Dict[str, Any] = {
+        'default': default,
+        'converter': converter,
+        'ignored': ignored,
+        'type': type,
+    }
+
+    if name is not None:
+        data['name'] = name
+
+    if annotation is not MISSING:
+        data['annotation'] = annotation
+
+        if default is MISSING:
+            # We can check if the annotation is Optional. If it is the default
+            # here can be None.
+            origin = getattr(annotation, '__origin__', None)
+            if origin is not None and origin is Union:
+                args = origin.__args__
+                if args.index(NoneType) == len(args) - 1:
+                    data['default'] = None
+
+    return Field(**data, **kwargs)

@@ -23,21 +23,208 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional, Type, Callable, Dict
+import datetime
+import sys
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Type, List, Callable, Dict, Union
 from typing_extensions import dataclass_transform
 
 from utils.query import QueryBuilder
 
 from . import ALL_PANELS
 from .types import MISSING, FieldType, T
-from .dataclass import create_dataclass
-from .field import Field
+from .field import Field, field
 from .panel import Panel
 
+import discord
+from discord.utils import evaluate_annotation
 
 if TYPE_CHECKING:
     from discord import Embed
     from bot import ConnectionType
+
+
+# @dataclass_transform(field_specifiers=(field,))
+# def create_dataclass(cls: Type[T], *, init: bool = True, repr: bool = True, slots: bool = True) -> Type[T]:
+#
+#     # Need to create our repr now
+#     if repr:
+#
+#         def _cls_repr(self: T) -> str:
+#             field_strings: List[str] = []
+#             for name in fields.keys():
+#                 if name.startswith('_'):
+#                     continue
+#
+#                 value = getattr(self, name)
+#                 field_strings.append(f'{name}={value!r}')
+#
+#             return f'<{cls.__name__} {" ".join(field_strings)}>'
+#
+#         setattr(cls, '__repr__', _cls_repr)
+#
+#     return cls
+
+CHANNEL_TYPE_MAPPING: Mapping[Type[Union[discord.abc.GuildChannel, discord.Thread]], Iterable[discord.ChannelType]] = {
+    discord.TextChannel: (discord.ChannelType.text, discord.ChannelType.news),
+    discord.VoiceChannel: (discord.ChannelType.voice,),
+    discord.CategoryChannel: (discord.ChannelType.category,),
+    discord.ForumChannel: (discord.ChannelType.forum,),
+    discord.Thread: (discord.ChannelType.public_thread, discord.ChannelType.private_thread, discord.ChannelType.news_thread),
+}
+
+ANNOTWATION_FIELD_TYPE_MAPPING: Mapping[Type[Any], FieldType] = {
+    discord.Role: FieldType.ROLE_SELECT,
+    discord.User: FieldType.USER_SELECT,
+    discord.Member: FieldType.USER_SELECT,
+    datetime.datetime: FieldType.DATETIME_MODAL,
+    datetime.timedelta: FieldType.TIMEDELTA_MODAL,
+    str: FieldType.TEXT_MODAL,
+    int: FieldType.INTEGER_MODAL,
+    float: FieldType.FLOAT_MODAL,
+    bool: FieldType.BOOLEAN_MODAL,
+}
+
+
+def infer_field_type(cls: Type[Any], annotation: str) -> FieldType:
+    module = sys.modules[cls.__module__]
+
+    module_globals = module.__dict__['__builtins__']['globals']()
+    module_locals = module.__dict__['__builtins__']['locals']()
+
+    try:
+        evaluated = evaluate_annotation(annotation, module_globals, module_locals, {})
+    except NameError as exc:
+        # Maybe this annotation is already a panel?
+        raise TypeError(f'Could not infer field type for {annotation!r}') from exc
+
+    if issubclass(evaluated, (discord.abc.GuildChannel, discord.Thread)):
+        channel_types = CHANNEL_TYPE_MAPPING.get(evaluated, MISSING)
+        return FieldType.CHANNEL_SELECT(channel_types=channel_types)
+    elif evaluated is discord.Role:
+        return FieldType.ROLE_SELECT
+    elif issubclass(evaluated, discord.User):
+        return FieldType.USER_SELECT
+    elif evaluated is datetime.datetime:
+        return FieldType.DATETIME_MODAL
+
+    potential_type_mapping = ANNOTWATION_FIELD_TYPE_MAPPING.get(evaluated)
+    if potential_type_mapping is not None:
+        return potential_type_mapping
+
+    # This may be a module-defined type, so let's see if we can shortcut it to a subitem.
+    if hasattr(evaluated, '__panel__'):
+        return FieldType.SUBITEM(evaluated)
+
+    raise TypeError(f'Could not infer field type for {annotation!r}')
+
+
+def create_fields(cls: Type[T], field_types: Mapping[str, FieldType]) -> Mapping[str, Field[T]]:
+    annotations = cls.__annotations__
+    fields: Dict[str, Field[T]] = {}
+    for name, annotation in annotations.items():
+        existing_field = cls.__dict__.get(name)
+        default = MISSING  # Maybe a default we find in the existing field
+        if existing_field is not None:
+            # This could or could *not* be a field.
+            if isinstance(existing_field, Field):
+                if existing_field.annotation is not MISSING:
+                    # This is a field that has an annotation
+                    fields[name] = existing_field
+                    continue
+                else:
+                    # This is a field that does not have an annotation, so we can use the annotation we have here.
+                    default = existing_field.default
+            else:
+                # This field does not have an annotation, so we can use the annotation we have here.
+                default = existing_field
+
+        # We can try and evaluate the annotation of the field type is not directly given
+        field_type = field_types.get(name, MISSING)
+        if field_type is MISSING:
+            if existing_field is not None:
+                if existing_field.type is not MISSING:
+                    field_type = existing_field.type
+                else:
+                    if existing_field.ignored is False:
+                        try:
+                            field_type = infer_field_type(cls, annotation)
+                        except TypeError as exc:
+                            raise ValueError(f'Could not infer field type for {name!r} and type was not given.') from exc
+            else:
+                try:
+                    field_type = infer_field_type(cls, annotation)
+                except TypeError as exc:
+                    raise ValueError(f'Could not infer field type for {name!r} and type was not given.') from exc
+
+        fields[name] = Field(field_type, name=name, annotation=annotation, default=default)
+
+    for field in field_types.keys():
+        if field not in fields:
+            raise ValueError(f'Field {field!r} was not found in the dataclass.')
+
+    return fields
+
+
+def create_init(cls: Type[T], fields: Mapping[str, Field[T]]) -> None:
+    def _cls_init(self: T, **kwargs: Any) -> None:
+        completed_fields: Dict[str, Any] = {}
+        for name, value in kwargs.items():
+            field = fields.get(name)
+            if field is None:
+                raise TypeError(f'__init__() got an unexpected keyword argument {name!r}')
+
+            transformed = field.transform(value)
+            completed_fields[name] = transformed
+
+        # Transform all missing fields
+        for name, field in fields.items():
+            if name not in completed_fields:
+                if field.default is MISSING:
+                    # We're missing this field and there's no default, so we need to raise an error.
+                    raise TypeError(f'__init__() missing required argument {name!r}')
+
+                completed_fields[name] = field.transform(None)
+
+        # Set all the fields
+        for name, value in completed_fields.items():
+            setattr(self, name, value)
+
+    setattr(cls, '__init__', _cls_init)
+
+
+def create_repr(cls: Type[T], fields: Mapping[str, Field[T]]) -> None:
+    def _cls_repr(self: T) -> str:
+        field_strings: List[str] = []
+        for name in fields.keys():
+            if name.startswith('_'):
+                continue
+
+            value = getattr(self, name)
+            field_strings.append(f'{name}={value!r}')
+
+        return f'<{cls.__name__} {" ".join(field_strings)}>'
+
+    setattr(cls, '__repr__', _cls_repr)
+
+
+def create_edit_function(panel: Panel[T], fields: Mapping[str, Field[T]]) -> None:
+    id = fields.get('id', MISSING)
+    if id is MISSING:
+        raise ValueError('You must have an `id` field in your panel to use the `create_edit_func` option.')
+
+    async def _edit_coro(self: Panel[T], connection: ConnectionType, **kwargs: Any) -> None:
+        item_id = getattr(self, 'id')
+
+        builder = QueryBuilder(table=self.table_name)
+        builder.add_condition('id', item_id)
+
+        for name, value in kwargs.items():
+            builder.add_arg(name, value)
+            setattr(self, name, value)
+
+        await builder(connection)
+
+    panel._edit_coroutine = _edit_coro
 
 
 def register_panel(
@@ -48,58 +235,27 @@ def register_panel(
     slots: bool = True,
     create_edit_func: bool = True,
     create_embed: Optional[Callable[[Panel[T]], Embed]] = None,
-    **fields: FieldType,
+    **field_types: FieldType,
 ) -> Type[T]:
-    """A helper function to register a given panel at runtime. This will insert the given
-    panel into the global registry, and allow it to be used in the panel system.
-
-    A majority of the time, though, you should be using `@register` instead of this.
-    """
     if ALL_PANELS.get(cls.__qualname__) is not None:
         raise ValueError(f'Panel {cls.__qualname__} is already registered as a panel.')
 
-    # We need to register this as a dataclass.
-    cls = create_dataclass(cls, init=init, repr=repr, slots=slots)
-    cls_fields = getattr(cls, '__dataclass_fields__')
+    fields = create_fields(cls, field_types)
+    panel = Panel(cls, table_name, fields, create_embed=create_embed)
 
-    # We need to go through and ensure all the children and ensure that if a panel
-    # child is a panel, it has the correct regristration.
-    transformed_fields: Dict[str, Field[T]] = {}
-    for field_name, field_type in fields.items():
-        if field_name not in cls_fields:
-            raise ValueError(f'Child {field_name} is not a valid field.')
+    if init:
+        create_init(cls, fields)
 
-        if field_type == FieldType.SUBITEM:
-            sub_item = field_type.sub_item
-            if ALL_PANELS.get(sub_item.__qualname__) is None:
-                raise ValueError(
-                    f'Child {field_name} is not a valid panel. You must register the panel first before you can add it as a child.'
-                )
+    if slots:
+        setattr(cls, '__slots__', tuple(fields.keys()))
 
-        transformed_fields[field_name] = Field(field_name, field_type)
-
-    panel = Panel(cls, table_name, transformed_fields, create_embed=create_embed)
+    if repr:
+        create_repr(cls, fields)
 
     if create_edit_func:
-        id = cls_fields.get('id', MISSING)
-        if id is MISSING:
-            raise ValueError('You must have an `id` field in your panel to use the `create_edit_func` option.')
+        create_edit_function(panel, fields)
 
-        async def _edit_coro(self: Panel[T], connection: ConnectionType, **kwargs: Any) -> None:
-            item_id = getattr(self, 'id')
-
-            builder = QueryBuilder(table=self.table_name)
-            builder.add_condition('id', item_id)
-
-            for name, value in kwargs.items():
-                builder.add_arg(name, value)
-                setattr(self, name, value)
-
-            await builder(connection)
-
-        panel._edit_coroutine = _edit_coro
-
-    for field in transformed_fields.values():
+    for field in fields.values():
         field.panel = panel
 
     ALL_PANELS[cls.__qualname__] = panel
@@ -108,7 +264,7 @@ def register_panel(
     return cls
 
 
-@dataclass_transform()
+@dataclass_transform(field_specifiers=(field,))
 def register(
     table_name: str,
     *,

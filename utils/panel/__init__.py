@@ -35,7 +35,6 @@ if TYPE_CHECKING:
 ALL_PANELS: Dict[str, PanelType[Any]] = {}
 
 from .panel import *
-from .dataclass import *
 from .decorators import *
 from .field import *
 from .types import *

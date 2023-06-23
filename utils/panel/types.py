@@ -33,7 +33,12 @@ if TYPE_CHECKING:
 P = ParamSpec('P')
 T = TypeVar('T')
 
-MISSING: Any = type('MISSING', (object,), {})()
+
+def _repr_missing(_self: Any) -> str:
+    return '<MISSING>'
+
+
+MISSING: Any = type('MISSING', (object,), {'__repr__': _repr_missing})()
 
 
 # A decorator that allows us to create a new panel field type one of a couple ways.
@@ -90,7 +95,7 @@ class FieldType:
         return hash(self._value)
 
     def __repr__(self) -> str:
-        return f'<PanelFieldType value={self._value}>'
+        return f'<PanelFieldType value={self._value} sub_item={self.sub_item!r} channel_types={self.channel_types!r}>'
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         call_func = self.__dict__.get('__overriden_call__')

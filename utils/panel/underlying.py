@@ -23,11 +23,11 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, Mapping, Type, Union
 from typing_extensions import Unpack
 
 import discord
-from ..ui import BaseView, BaseViewKwargs, BaseModal
+from ..ui import BaseView, BaseViewKwargs, BaseModal, UserSelect, ChannelSelect, RoleSelect
 from .types import FieldType
 from . import ALL_PANELS
 
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from .panel import Panel
 
     from bot import FuryBot
+    from discord.ui.select import BaseSelect
 
 
 class _ModalConverter(BaseModal):
@@ -108,6 +109,62 @@ class TimeDeltaModal(_ModalConverter):
         raise NotImplementedError
 
 
+FIELD_MODAL_MAPPING: Mapping[FieldType, Type[_ModalConverter]] = {
+    FieldType.BOOLEAN_MODAL: BooleanModal,
+    FieldType.DATETIME_MODAL: DatetimeModal,
+    FieldType.TIMEDELTA_MODAL: TimeDeltaModal,
+    FieldType.INTEGER_MODAL: IntegerModal,
+    FieldType.FLOAT_MODAL: FloatModal,
+    FieldType.TEXT_MODAL: TextModal,
+}
+
+
+class ChannelSelectConverter(ChannelSelect['UnderlyingPanelView']):
+    def __init__(self, parent: UnderlyingPanelView, field: Field[Any]) -> None:
+        super().__init__(after=self._callback, parent=parent)
+        self.field: Field[Any] = field
+
+    async def _callback(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        channels: List[Union[discord.app_commands.AppCommandChannel, discord.app_commands.AppCommandThread]],
+    ) -> None:
+        ...
+
+
+class UserSelectConverter(UserSelect['UnderlyingPanelView']):
+    def __init__(self, parent: UnderlyingPanelView, field: Field[Any]) -> None:
+        super().__init__(after=self._callback, parent=parent)
+        self.field: Field[Any] = field
+
+    async def _callback(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        users: List[Union[discord.Member, discord.User]],
+    ) -> None:
+        ...
+
+
+class RoleSelectConverter(RoleSelect['UnderlyingPanelView']):
+    def __init__(self, parent: UnderlyingPanelView, field: Field[Any]) -> None:
+        super().__init__(after=self._callback, parent=parent)
+        self.field: Field[Any] = field
+
+    async def _callback(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        roles: List[discord.Role],
+    ) -> None:
+        ...
+
+
+FIELD_SELECT_MAPPING: Mapping[FieldType, Type[BaseSelect[Any]]] = {
+    FieldType.CHANNEL_SELECT: ChannelSelectConverter,
+    FieldType.ROLE_SELECT: RoleSelectConverter,
+    FieldType.USER_SELECT: UserSelectConverter,
+}
+
+
 class UnderlyingPanelButton(discord.ui.Button['UnderlyingPanelView']):
     def __init__(self, parent: UnderlyingPanelView, field: Field[Any]) -> None:
         label = field._button_kwargs.pop('label', f'Edit {field.name}')
@@ -116,18 +173,9 @@ class UnderlyingPanelButton(discord.ui.Button['UnderlyingPanelView']):
         self.parent: UnderlyingPanelView = parent
 
     async def callback(self, interaction: discord.Interaction[FuryBot]) -> Any:
-        field_modal_mapping = {
-            FieldType.BOOLEAN_MODAL: BooleanModal,
-            FieldType.DATETIME_MODAL: DatetimeModal,
-            FieldType.TIMEDELTA_MODAL: TimeDeltaModal,
-            FieldType.INTEGER_MODAL: IntegerModal,
-            FieldType.FLOAT_MODAL: FloatModal,
-            FieldType.TEXT_MODAL: TextModal,
-        }
-
-        if any(self.field.type == field_type for field_type in field_modal_mapping):
+        if any(self.field.type == field_type for field_type in FIELD_MODAL_MAPPING):
             # We have a modal
-            modal = field_modal_mapping[self.field.type](self.parent, self.field)
+            modal = FIELD_MODAL_MAPPING[self.field.type](self.parent, self.field)
             return await interaction.response.send_modal(modal)
 
         await interaction.response.defer()
@@ -155,6 +203,9 @@ class UnderlyingPanelView(BaseView):
         self.panel: Panel[Any] = panel
 
         for field in self.panel.fields.values():
+            if field.ignored:
+                continue
+
             self.add_item(UnderlyingPanelButton(self, field))
 
     @property
