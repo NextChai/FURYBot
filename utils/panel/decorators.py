@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import datetime
 import sys
+from types import ModuleType
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Mapping, Optional, Type, Union
 
 import discord
@@ -43,27 +44,6 @@ if TYPE_CHECKING:
 
     from bot import ConnectionType
 
-
-# @dataclass_transform(field_specifiers=(field,))
-# def create_dataclass(cls: Type[T], *, init: bool = True, repr: bool = True, slots: bool = True) -> Type[T]:
-#
-#     # Need to create our repr now
-#     if repr:
-#
-#         def _cls_repr(self: T) -> str:
-#             field_strings: List[str] = []
-#             for name in fields.keys():
-#                 if name.startswith('_'):
-#                     continue
-#
-#                 value = getattr(self, name)
-#                 field_strings.append(f'{name}={value!r}')
-#
-#             return f'<{cls.__name__} {" ".join(field_strings)}>'
-#
-#         setattr(cls, '__repr__', _cls_repr)
-#
-#     return cls
 
 CHANNEL_TYPE_MAPPING: Mapping[Type[Union[discord.abc.GuildChannel, discord.Thread]], Iterable[discord.ChannelType]] = {
     discord.TextChannel: (discord.ChannelType.text, discord.ChannelType.news),
@@ -88,12 +68,19 @@ ANNOTWATION_FIELD_TYPE_MAPPING: Mapping[Type[Any], FieldType] = {
 
 def infer_field_type(cls: Type[Any], annotation: str) -> FieldType:
     module = sys.modules[cls.__module__]
+    builtins = module.__dict__['__builtins__']
 
-    module_globals = module.__dict__['__builtins__']['globals']()
-    module_locals = module.__dict__['__builtins__']['locals']()
+    if isinstance(builtins, dict):
+        module_globals: Dict[str, Any] = builtins['globals']()  # type: ignore
+        module_locals: Dict[str, Any] = builtins['locals']()  # type: ignore
+    elif isinstance(builtins, ModuleType):
+        module_globals = builtins.globals()
+        module_locals = builtins.locals()
+    else:
+        raise TypeError(f'Could not infer field type for {annotation!r}')
 
     try:
-        evaluated = evaluate_annotation(annotation, module_globals, module_locals, {})
+        evaluated = evaluate_annotation(annotation, module_globals, module_locals, {})  # type: ignore
     except NameError as exc:
         # Maybe this annotation is already a panel?
         raise TypeError(f'Could not infer field type for {annotation!r}') from exc
@@ -130,7 +117,7 @@ def create_fields(cls: Type[T], field_types: Mapping[str, FieldType]) -> Mapping
             if isinstance(existing_field, Field):
                 if existing_field.annotation is not MISSING:
                     # This is a field that has an annotation
-                    fields[name] = existing_field
+                    fields[existing_field.display_name] = existing_field
                     continue
                 else:
                     # This is a field that does not have an annotation, so we can use the annotation we have here.
@@ -228,21 +215,40 @@ def create_edit_function(panel: Panel[T], fields: Mapping[str, Field[T]]) -> Non
     panel._edit_coroutine = _edit_coro
 
 
+def split_camel_case(name: str) -> str:
+    words: List[str] = []
+
+    current = ''
+    for element in name:
+        if element.isupper():
+            words.append(current)
+            current = element
+            continue
+
+        current += element
+
+    return ' '.join(words)
+
+
 def register_panel(
     cls: Type[T],
     table_name: str,
+    panel_name: Optional[str] = None,
     init: bool = True,
     repr: bool = True,
     slots: bool = True,
     create_edit_func: bool = True,
-    create_embed: Optional[Callable[[Panel[T]], Embed]] = None,
+    create_embed: Optional[Callable[[Panel[T], T], Embed]] = None,
     **field_types: FieldType,
-) -> Type[T]:
+) -> Panel[T]:
     if ALL_PANELS.get(cls.__qualname__) is not None:
         raise ValueError(f'Panel {cls.__qualname__} is already registered as a panel.')
 
+    # The panel name will be the given panel name or the class name (parsed to be split by camel case and titled)
+    panel_name = panel_name or split_camel_case(cls.__name__)
+
     fields = create_fields(cls, field_types)
-    panel = Panel(cls, table_name, fields, create_embed=create_embed)
+    panel = Panel(cls, table_name, panel_name, fields, create_embed=create_embed)
 
     if init:
         create_init(cls, fields)
@@ -260,9 +266,8 @@ def register_panel(
         field.panel = panel
 
     ALL_PANELS[cls.__qualname__] = panel
-    setattr(cls, '__panel__', panel)
 
-    return cls
+    return panel
 
 
 @dataclass_transform(field_specifiers=(field,))
@@ -273,10 +278,10 @@ def register(
     repr: bool = True,
     slots: bool = True,
     create_edit_func: bool = True,
-    create_embed: Optional[Callable[[Panel[T]], Embed]] = None,
+    create_embed: Optional[Callable[[Panel[T], T], Embed]] = None,
     **fields: FieldType,
-) -> Callable[[Type[T]], Type[T]]:
-    def wrapped(cls: Type[T]) -> Type[T]:
+) -> Callable[[Type[T]], Panel[T]]:
+    def wrapped(cls: Type[T]) -> Panel[T]:
         return register_panel(
             cls,
             table_name,

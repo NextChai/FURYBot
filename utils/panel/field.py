@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from types import NoneType
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, Union
+from typing_extensions import Self
 
 from .types import MISSING, T
 
@@ -45,6 +46,8 @@ class Field(Generic[T]):
         default: Any = MISSING,
         converter: Optional[Callable[[Any], Any]] = None,
         ignored: bool = MISSING,
+        display_name: Optional[str] = None,
+        embed_field_func: Optional[Callable[[Self, Any], Dict[str, Any]]] = None,
         **kwargs: Any,
     ) -> None:
         self.name: str = name
@@ -53,15 +56,16 @@ class Field(Generic[T]):
         self.annotation: Any = annotation
         self.default: Any = default
         self.converter: Optional[Callable[[Any], Any]] = converter
+        self.display_name = display_name or self.name
+        self.embed_field_func: Optional[Callable[[Self, Any], Dict[str, Any]]] = embed_field_func
+
         self._ignored: bool = ignored
 
-        self._button_kwargs: Dict[str, Any] = {}
-        for name in kwargs.keys():
-            if name.startswith('button_'):
-                self._button_kwargs[name[7:]] = kwargs.pop(name)
-
     def __repr__(self) -> str:
-        return f'<Field name={self.name!r} annotation={self.annotation!r} default={self.default!r} converter={bool(self.converter)} ignored={self.ignored} type={self.type!r}>'
+        return (
+            f'<Field name={self.name!r} annotation={self.annotation!r} default={self.default!r} '
+            f'converter={bool(self.converter)} ignored={self.ignored} type={self.type!r}>'
+        )
 
     @property
     def ignored(self) -> bool:
@@ -86,15 +90,23 @@ class Field(Generic[T]):
 
         return value
 
+    def create_embed_field(self, value: Any) -> Dict[str, Any]:
+        if self.embed_field_func is not None:
+            return self.embed_field_func(self, value)
+
+        raise NotImplementedError('No embed field function was provided for this field')
+
 
 def field(
     *,
     type: FieldType = MISSING,
     name: Optional[str] = None,
+    display_name: Optional[str] = None,
     annotation: Any = MISSING,
     default: Any = MISSING,
     converter: Optional[Callable[[Any], Any]] = None,
     ignored: bool = MISSING,
+    embed_field_func: Optional[Callable[[Field[Any], Any], Dict[str, Any]]] = None,
     **kwargs: Any,
 ) -> Any:
     # The field class doesn't take the same types of arguments as the decorator,
@@ -104,6 +116,8 @@ def field(
         'converter': converter,
         'ignored': ignored,
         'type': type,
+        'display_name': display_name,
+        'embed_field_func': embed_field_func,
     }
 
     if name is not None:

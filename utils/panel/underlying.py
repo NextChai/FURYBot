@@ -23,28 +23,28 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Type, Union
+import datetime
+from typing import TYPE_CHECKING, Any, Generic, List, Mapping, Optional, Type, Union
 
 import discord
 from typing_extensions import Unpack
 
 from ..ui import BaseModal, BaseView, BaseViewKwargs, ChannelSelect, RoleSelect, UserSelect
+from ..time import TimeTransformer, ShortTime
 from . import ALL_PANELS
-from .types import FieldType
+from .types import T, FieldType
 
 if TYPE_CHECKING:
-    from discord.ui.select import BaseSelect
-
     from bot import FuryBot
 
     from .field import Field
     from .panel import Panel
 
 
-class _ModalConverter(BaseModal):
-    def __init__(self, parent: UnderlyingPanelView, field: Field[Any], **kwargs: Any) -> None:
+class _ModalConverter(BaseModal, Generic[T]):
+    def __init__(self, parent: UnderlyingPanelView[T], field: Field[Any], **kwargs: Any) -> None:
         super().__init__(**kwargs, bot=parent.bot)
-        self.parent: UnderlyingPanelView = parent
+        self.parent: UnderlyingPanelView[T] = parent
         self.field: Field[Any] = field
 
     async def callback(self, interaction: discord.Interaction[FuryBot]) -> None:
@@ -68,7 +68,7 @@ class _ModalConverter(BaseModal):
         raise NotImplementedError
 
 
-class BooleanModal(_ModalConverter):
+class BooleanModal(_ModalConverter[T]):
     async def transform(self, interaction: discord.Interaction[FuryBot], value: str) -> Optional[bool]:
         if value.lower() in ('y', 'yes', 'true', 't', '1'):
             return True
@@ -80,7 +80,7 @@ class BooleanModal(_ModalConverter):
         )
 
 
-class IntegerModal(_ModalConverter):
+class IntegerModal(_ModalConverter[T]):
     async def transform(self, interaction: discord.Interaction[FuryBot], value: str) -> Optional[int]:
         if value.isdigit():
             return int(value)
@@ -88,7 +88,7 @@ class IntegerModal(_ModalConverter):
         await interaction.followup.send('You did not provide a valid integer value. Example: `10`', ephemeral=True)
 
 
-class FloatModal(_ModalConverter):
+class FloatModal(_ModalConverter[T]):
     async def transform(self, interaction: discord.Interaction[FuryBot], value: str) -> Optional[float]:
         try:
             return float(value)
@@ -96,33 +96,48 @@ class FloatModal(_ModalConverter):
             await interaction.followup.send('You did not provide a valid float value. Example: `10.1`', ephemeral=True)
 
 
-class TextModal(_ModalConverter):
+class TextModal(_ModalConverter[T]):
     async def transform(self, interaction: discord.Interaction[FuryBot], value: str) -> Optional[str]:
         return value
 
 
-class DatetimeModal(_ModalConverter):
+class DatetimeModal(_ModalConverter[T]):
     async def transform(self, interaction: discord.Interaction[FuryBot], value: str) -> Optional[Any]:
-        raise NotImplementedError
+        transformer = TimeTransformer(default='')
+        return await transformer.transform(interaction, value)
 
 
-class TimeDeltaModal(_ModalConverter):
+class TimeDeltaModal(_ModalConverter[T]):
     async def transform(self, interaction: discord.Interaction[FuryBot], value: str) -> Optional[Any]:
-        raise NotImplementedError
+        short_time_re = ShortTime.compiled
+        match = short_time_re.match(value)
+
+        if not match:
+            await interaction.followup.send(
+                f'Invalid time format. Please try again.',
+                ephemeral=True,
+            )
+            return None
+
+        data = {k: int(v) for k, v in match.groupdict(default=0).items()}
+        data.pop('years', None)
+        data.pop('months', None)
+
+        return datetime.timedelta(**data)
 
 
-FIELD_MODAL_MAPPING: Mapping[FieldType, Type[_ModalConverter]] = {
-    FieldType.BOOLEAN_MODAL: BooleanModal,
-    FieldType.DATETIME_MODAL: DatetimeModal,
-    FieldType.TIMEDELTA_MODAL: TimeDeltaModal,
-    FieldType.INTEGER_MODAL: IntegerModal,
-    FieldType.FLOAT_MODAL: FloatModal,
-    FieldType.TEXT_MODAL: TextModal,
+FIELD_MODAL_MAPPING: Mapping[FieldType, Type[_ModalConverter[Any]]] = {
+    FieldType.BOOLEAN_MODAL: BooleanModal[Any],
+    FieldType.DATETIME_MODAL: DatetimeModal[Any],
+    FieldType.TIMEDELTA_MODAL: TimeDeltaModal[Any],
+    FieldType.INTEGER_MODAL: IntegerModal[Any],
+    FieldType.FLOAT_MODAL: FloatModal[Any],
+    FieldType.TEXT_MODAL: TextModal[Any],
 }
 
 
-class ChannelSelectConverter(ChannelSelect['UnderlyingPanelView']):
-    def __init__(self, parent: UnderlyingPanelView, field: Field[Any]) -> None:
+class ChannelSelectConverter(ChannelSelect['UnderlyingPanelView[T]'], Generic[T]):
+    def __init__(self, parent: UnderlyingPanelView[T], field: Field[Any]) -> None:
         super().__init__(after=self._callback, parent=parent)
         self.field: Field[Any] = field
 
@@ -134,8 +149,8 @@ class ChannelSelectConverter(ChannelSelect['UnderlyingPanelView']):
         ...
 
 
-class UserSelectConverter(UserSelect['UnderlyingPanelView']):
-    def __init__(self, parent: UnderlyingPanelView, field: Field[Any]) -> None:
+class UserSelectConverter(UserSelect['UnderlyingPanelView[T]'], Generic[T]):
+    def __init__(self, parent: UnderlyingPanelView[T], field: Field[Any]) -> None:
         super().__init__(after=self._callback, parent=parent)
         self.field: Field[Any] = field
 
@@ -147,8 +162,8 @@ class UserSelectConverter(UserSelect['UnderlyingPanelView']):
         ...
 
 
-class RoleSelectConverter(RoleSelect['UnderlyingPanelView']):
-    def __init__(self, parent: UnderlyingPanelView, field: Field[Any]) -> None:
+class RoleSelectConverter(RoleSelect['UnderlyingPanelView[T]'], Generic[T]):
+    def __init__(self, parent: UnderlyingPanelView[T], field: Field[Any]) -> None:
         super().__init__(after=self._callback, parent=parent)
         self.field: Field[Any] = field
 
@@ -160,19 +175,19 @@ class RoleSelectConverter(RoleSelect['UnderlyingPanelView']):
         ...
 
 
-FIELD_SELECT_MAPPING: Mapping[FieldType, Type[BaseSelect[Any]]] = {
-    FieldType.CHANNEL_SELECT: ChannelSelectConverter,
-    FieldType.ROLE_SELECT: RoleSelectConverter,
-    FieldType.USER_SELECT: UserSelectConverter,
+ConverterType = Type[Union[ChannelSelectConverter[T], RoleSelectConverter[T], UserSelectConverter[T]]]
+FIELD_SELECT_MAPPING: Mapping[FieldType, ConverterType[Any]] = {
+    FieldType.CHANNEL_SELECT: ChannelSelectConverter[Any],
+    FieldType.ROLE_SELECT: RoleSelectConverter[Any],
+    FieldType.USER_SELECT: UserSelectConverter[Any],
 }
 
 
-class UnderlyingPanelButton(discord.ui.Button['UnderlyingPanelView']):
-    def __init__(self, parent: UnderlyingPanelView, field: Field[Any]) -> None:
-        label = field._button_kwargs.pop('label', f'Edit {field.name}')
-        super().__init__(**field._button_kwargs, label=label)
-        self.field: Field[Any] = field
-        self.parent: UnderlyingPanelView = parent
+class UnderlyingPanelButton(discord.ui.Button['UnderlyingPanelView[T]'], Generic[T]):
+    def __init__(self, parent: UnderlyingPanelView[T], field: Field[T]) -> None:
+        super().__init__(label=field.display_name)
+        self.field: Field[T] = field
+        self.parent: UnderlyingPanelView[T] = parent
 
     async def callback(self, interaction: discord.Interaction[FuryBot]) -> Any:
         if any(self.field.type == field_type for field_type in FIELD_MODAL_MAPPING):
@@ -182,6 +197,11 @@ class UnderlyingPanelButton(discord.ui.Button['UnderlyingPanelView']):
 
         await interaction.response.defer()
 
+        if any(self.field.type == field_type for field_type in FIELD_SELECT_MAPPING):
+            select_cls = FIELD_SELECT_MAPPING[self.field.type]
+            select_cls(parent=self.parent, field=self.field)
+            return await interaction.edit_original_response(embed=self.parent.embed, view=self.parent)
+
         if self.field.type == FieldType.SUBITEM:
             # We have a sub field, we need to try and find it in the registry.
             subpanel = ALL_PANELS.get(self.field.type.sub_item.__qualname__)
@@ -189,20 +209,17 @@ class UnderlyingPanelButton(discord.ui.Button['UnderlyingPanelView']):
                 raise ValueError(f'Panel {self.field.type.sub_item.__qualname__} is not registered as a panel.')
 
             # Awesome, we need to launch it's underlying view.
-            view = self.parent.create_child(UnderlyingPanelView, subpanel)
+            view = self.parent.create_child(UnderlyingPanelView[T], subpanel, self.parent.instance)
             return await interaction.edit_original_response(view=view, embed=view.embed)
-        elif self.field.type == FieldType.CHANNEL_SELECT:
-            ...
-        elif self.field.type == FieldType.ROLE_SELECT:
-            ...
-        elif self.field.type == FieldType.USER_SELECT:
-            ...
+
+        raise ValueError(f'Field type {self.field.type} is not supported.')
 
 
-class UnderlyingPanelView(BaseView):
-    def __init__(self, panel: Panel[Any], **kwargs: Unpack[BaseViewKwargs]) -> None:
+class UnderlyingPanelView(BaseView, Generic[T]):
+    def __init__(self, panel: Panel[T], instance: T, **kwargs: Unpack[BaseViewKwargs]) -> None:
         super().__init__(**kwargs)
-        self.panel: Panel[Any] = panel
+        self.panel: Panel[T] = panel
+        self.instance: T = instance
 
         for field in self.panel.fields.values():
             if field.ignored:
@@ -212,4 +229,13 @@ class UnderlyingPanelView(BaseView):
 
     @property
     def embed(self) -> discord.Embed:
-        return discord.Embed(description='[test value]')
+        if self.panel._create_embed_func is not None:
+            return self.panel._create_embed_func(self.panel, self.instance)
+
+        embed = discord.Embed(title=f'Manage {self.panel.name}', description='Use the buttons below to manage this panel.')
+
+        for field in self.panel.fields.values():
+            if field.ignored:
+                continue
+
+        return embed
