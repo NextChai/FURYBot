@@ -25,21 +25,22 @@ from __future__ import annotations
 
 import datetime
 import sys
-from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Type, List, Callable, Dict, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Mapping, Optional, Type, Union
+
+import discord
+from discord.utils import evaluate_annotation
 from typing_extensions import dataclass_transform
 
 from utils.query import QueryBuilder
 
 from . import ALL_PANELS
-from .types import MISSING, FieldType, T
 from .field import Field, field
 from .panel import Panel
-
-import discord
-from discord.utils import evaluate_annotation
+from .types import MISSING, FieldType, T
 
 if TYPE_CHECKING:
     from discord import Embed
+
     from bot import ConnectionType
 
 

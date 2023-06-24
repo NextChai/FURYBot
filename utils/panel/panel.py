@@ -24,15 +24,18 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Generic, Mapping, Optional, Type
+
 from typing_extensions import Self
 
 from .types import T
 from .underlying import UnderlyingPanelView
 
 if TYPE_CHECKING:
-    from .field import Field
     from discord import Embed, Interaction
+
     from bot import FuryBot
+
+    from .field import Field
 
 
 class Panel(Generic[T]):

@@ -23,20 +23,22 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Optional, Mapping, Type, Union
-from typing_extensions import Unpack
+from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Type, Union
 
 import discord
-from ..ui import BaseView, BaseViewKwargs, BaseModal, UserSelect, ChannelSelect, RoleSelect
-from .types import FieldType
+from typing_extensions import Unpack
+
+from ..ui import BaseModal, BaseView, BaseViewKwargs, ChannelSelect, RoleSelect, UserSelect
 from . import ALL_PANELS
+from .types import FieldType
 
 if TYPE_CHECKING:
-    from .field import Field
-    from .panel import Panel
+    from discord.ui.select import BaseSelect
 
     from bot import FuryBot
-    from discord.ui.select import BaseSelect
+
+    from .field import Field
+    from .panel import Panel
 
 
 class _ModalConverter(BaseModal):

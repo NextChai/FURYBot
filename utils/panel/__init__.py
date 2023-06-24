@@ -23,7 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Any
+from typing import TYPE_CHECKING, Any, Dict
 
 if TYPE_CHECKING:
     from .panel import Panel as PanelType
@@ -34,9 +34,9 @@ if TYPE_CHECKING:
 # be heavy on memory.
 ALL_PANELS: Dict[str, PanelType[Any]] = {}
 
-from .panel import *
 from .decorators import *
 from .field import *
+from .panel import *
 from .types import *
 
 """

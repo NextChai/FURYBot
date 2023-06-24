@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import inspect
 from typing import TYPE_CHECKING, Any, Callable, Concatenate, Generic, Iterable, Optional, Type, TypeVar
+
 from typing_extensions import ParamSpec
 
 if TYPE_CHECKING:

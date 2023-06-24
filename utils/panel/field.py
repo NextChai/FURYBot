@@ -23,14 +23,14 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Generic, Optional, Callable, Union
 from types import NoneType
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, Union
 
-from .types import T, MISSING
+from .types import MISSING, T
 
 if TYPE_CHECKING:
-    from .types import FieldType
     from .panel import Panel
+    from .types import FieldType
 
 
 class Field(Generic[T]):
