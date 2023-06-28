@@ -109,6 +109,37 @@ def field(
     embed_field_func: Optional[Callable[[Field[Any], Any], Dict[str, Any]]] = None,
     **kwargs: Any,
 ) -> Any:
+    """Allows you to edit a given panel field inline.
+
+    Parameters
+    ----------
+    type: FieldType
+        The type of the field. This is used to determine how the field is
+        displayed in the panel and parsed when the panel is updated.
+    name: Optional[:class:`str`]
+        The name of the given field. This will be used as the key when
+        updating the panel. This, if not given, defaults to the name
+        of the attribute the field is assigned to.
+    display_name: Optional[:class:`str`]
+        The name of the field as it will be displayed in the panel.
+        This defaults to the name of the field.
+    annotation: Any
+        The annotation of the field. You can override the annotation on the
+        panel by providing this argument.
+    default: Any
+        The default value of the field if one is not provided when making
+        a new instance.
+    converter: Optional[Callable[[Any], Any]]
+        An optional converter to use upon init. This will be called with
+        the value provided to the panel when it's created to be converted
+        to another type.
+    ignored: bool
+        Denotes of the field should be ignored. An ignored field's annotation
+        will not be evaluated, and it will be ignored out of the panel for customization.
+    embed_field_func: Optional[Callable[[Field[Any], Any], Dict[str, Any]]]
+        An optional function to create an inline embed field for this field. If not provided,
+        a default one will be generated.
+    """
     # The field class doesn't take the same types of arguments as the decorator,
     # so we need to do some work to make sure we can handle both.
     data: Dict[str, Any] = {
