@@ -136,43 +136,61 @@ FIELD_MODAL_MAPPING: Mapping[FieldType, Type[_ModalConverter[Any]]] = {
 }
 
 
+async def do_select_conversion(field: Field[T], parent: UnderlyingPanelView[T], value: Any) -> None:
+    edit_coro = parent.panel._edit_coroutine
+    if edit_coro is None:
+        raise ValueError(f'Panel {parent.panel} does not have an edit coroutine.')
+
+    async with parent.bot.safe_connection() as connection:
+        await edit_coro(connection=connection, **{field.name: value})
+
+
 class ChannelSelectConverter(ChannelSelect['UnderlyingPanelView[T]'], Generic[T]):
-    def __init__(self, parent: UnderlyingPanelView[T], field: Field[Any]) -> None:
+    def __init__(self, parent: UnderlyingPanelView[T], field: Field[T]) -> None:
         super().__init__(after=self._callback, parent=parent)
         self.field: Field[Any] = field
+        self.parent: UnderlyingPanelView[T] = parent
 
     async def _callback(
         self,
         interaction: discord.Interaction[FuryBot],
         channels: List[Union[discord.app_commands.AppCommandChannel, discord.app_commands.AppCommandThread]],
     ) -> None:
-        ...
+        await interaction.response.defer()
+        await do_select_conversion(self.field, self.parent, channels[0].id)
+        return await interaction.followup.send(embed=self.parent.embed, view=self.parent)
 
 
 class UserSelectConverter(UserSelect['UnderlyingPanelView[T]'], Generic[T]):
-    def __init__(self, parent: UnderlyingPanelView[T], field: Field[Any]) -> None:
+    def __init__(self, parent: UnderlyingPanelView[T], field: Field[T]) -> None:
         super().__init__(after=self._callback, parent=parent)
         self.field: Field[Any] = field
+        self.parent: UnderlyingPanelView[T] = parent
 
     async def _callback(
         self,
         interaction: discord.Interaction[FuryBot],
         users: List[Union[discord.Member, discord.User]],
     ) -> None:
-        ...
+        await interaction.response.defer()
+        await do_select_conversion(self.field, self.parent, users[0].id)
+        return await interaction.followup.send(embed=self.parent.embed, view=self.parent)
 
 
 class RoleSelectConverter(RoleSelect['UnderlyingPanelView[T]'], Generic[T]):
-    def __init__(self, parent: UnderlyingPanelView[T], field: Field[Any]) -> None:
+    def __init__(self, parent: UnderlyingPanelView[T], field: Field[T]) -> None:
         super().__init__(after=self._callback, parent=parent)
         self.field: Field[Any] = field
+        self.parent: UnderlyingPanelView[T] = parent
 
     async def _callback(
         self,
         interaction: discord.Interaction[FuryBot],
         roles: List[discord.Role],
     ) -> None:
-        ...
+        await interaction.response.defer()
+        await do_select_conversion(self.field, self.parent, roles[0].id)
+        return await interaction.followup.send(embed=self.parent.embed, view=self.parent)
 
 
 ConverterType = Type[Union[ChannelSelectConverter[T], RoleSelectConverter[T], UserSelectConverter[T]]]
@@ -229,13 +247,4 @@ class UnderlyingPanelView(BaseView, Generic[T]):
 
     @property
     def embed(self) -> discord.Embed:
-        if self.panel._create_embed_func is not None:
-            return self.panel._create_embed_func(self.panel, self.instance)
-
-        embed = discord.Embed(title=f'Manage {self.panel.name}', description='Use the buttons below to manage this panel.')
-
-        for field in self.panel.fields.values():
-            if field.ignored:
-                continue
-
-        return embed
+        return self.panel.create_embed(self.bot.Embed, self.instance)

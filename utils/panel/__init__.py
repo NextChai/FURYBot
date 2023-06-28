@@ -34,6 +34,15 @@ if TYPE_CHECKING:
 # be heavy on memory.
 ALL_PANELS: Dict[str, PanelType[Any]] = {}
 
+
+def remove_panel(cls_qualname: str) -> Optional[Panel[Any]]:
+    return ALL_PANELS.pop(cls_qualname, None)
+
+
+def get_panel(cls_qualname: str) -> Optional[PanelType[Any]]:
+    return ALL_PANELS.get(cls_qualname, None)
+
+
 from .decorators import *
 from .field import *
 from .panel import *

@@ -23,11 +23,12 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Generic, Mapping, Optional, Type
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, Generic, Mapping, Optional, Type, Union
 
 from typing_extensions import Self
 
-from .types import T
+from . import get_panel
+from .types import T, FieldType
 from .underlying import UnderlyingPanelView
 
 if TYPE_CHECKING:
@@ -58,13 +59,30 @@ class Panel(Generic[T]):
     ) -> UnderlyingPanelView[T]:
         return UnderlyingPanelView(self, instance, timeout=timeout, parent=None, target=target)
 
-    def create_embed(self, embed_cls: Callable[..., Embed]) -> Embed:
+    def create_embed(self, embed_cls: Callable[..., Embed], instance: T) -> Embed:
+        if self._create_embed_func is not None:
+            return self._create_embed_func(self, instance)
+
         # An embed for a given panel can be shown in one of two ways. For each field in the panel,
         # it will have a corresponding embed field. If the field is a sub item, it will show a miniature
         # embed of the sub item.
         embed = embed_cls(title=f'Manage {self.name}', description='Use the buttons below to manage this panel.')
 
-        # for field in fields:
-        #   ...
+        for field_name, field in self.fields.items():
+            if field.ignored:
+                continue
+
+            if field.type == FieldType.SUBITEM:
+                # We can try and get the panel for this.
+                panel = get_panel(field.type.sub_item.__qualname__)
+                if panel is None:
+                    raise ValueError(f'No panel found for {field.type.sub_item.__qualname__}')
+
+                instance_field = getattr(instance, field_name)
+                embed_field_data = panel.create_inline_embed(instance_field)
+                embed.add_field(**embed_field_data)
 
         return embed
+
+    def create_inline_embed(self, instance: T) -> Dict[str, Union[Any, bool]]:
+        ...

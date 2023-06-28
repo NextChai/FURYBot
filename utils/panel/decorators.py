@@ -236,7 +236,6 @@ def register_panel(
     panel_name: Optional[str] = None,
     init: bool = True,
     repr: bool = True,
-    slots: bool = True,
     create_edit_func: bool = True,
     create_embed: Optional[Callable[[Panel[T], T], Embed]] = None,
     **field_types: FieldType,
@@ -253,8 +252,7 @@ def register_panel(
     if init:
         create_init(cls, fields)
 
-    if slots:
-        setattr(cls, '__slots__', tuple(fields.keys()))
+    setattr(cls, '__slots__', tuple(fields.keys()))
 
     if repr:
         create_repr(cls, fields)
@@ -273,10 +271,9 @@ def register_panel(
 @dataclass_transform(field_specifiers=(field,))
 def register(
     table_name: str,
-    *,
+    panel_name: Optional[str] = None,
     init: bool = True,
     repr: bool = True,
-    slots: bool = True,
     create_edit_func: bool = True,
     create_embed: Optional[Callable[[Panel[T], T], Embed]] = None,
     **fields: FieldType,
@@ -285,16 +282,12 @@ def register(
         return register_panel(
             cls,
             table_name,
+            panel_name,
             init=init,
             repr=repr,
-            slots=slots,
             create_embed=create_embed,
             create_edit_func=create_edit_func,
             **fields,
         )
 
     return wrapped
-
-
-def remove_panel(cls: Type[T]) -> Optional[Panel[T]]:
-    return ALL_PANELS.pop(cls.__qualname__, None)
