@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from .panel import Panel
 
 
-class _ModalConverter(BaseModal, Generic[T]):
+class _ModalConverter(Generic[T], BaseModal):
     def __init__(self, parent: UnderlyingPanelView[T], field: Field[Any], **kwargs: Any) -> None:
         super().__init__(**kwargs, bot=parent.bot)
         self.parent: UnderlyingPanelView[T] = parent
@@ -210,7 +210,9 @@ class UnderlyingPanelButton(discord.ui.Button['UnderlyingPanelView[T]'], Generic
     async def callback(self, interaction: discord.Interaction[FuryBot]) -> Any:
         if any(self.field.type == field_type for field_type in FIELD_MODAL_MAPPING):
             # We have a modal
-            modal = FIELD_MODAL_MAPPING[self.field.type](self.parent, self.field)
+            modal = FIELD_MODAL_MAPPING[self.field.type](
+                self.parent, self.field, title=f'Edit {self.field.display_name}', timeout=None
+            )
             return await interaction.response.send_modal(modal)
 
         await interaction.response.defer()
@@ -247,4 +249,4 @@ class UnderlyingPanelView(BaseView, Generic[T]):
 
     @property
     def embed(self) -> discord.Embed:
-        return self.panel.create_embed(self.bot.Embed, self.instance)
+        return self.panel.create_embed(self.bot.Embed, self.instance, self.guild)

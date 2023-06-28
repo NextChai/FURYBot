@@ -26,7 +26,7 @@ from __future__ import annotations
 import datetime
 import sys
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Mapping, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple, Type, Union
 
 import discord
 from discord.utils import evaluate_annotation
@@ -66,18 +66,23 @@ ANNOTWATION_FIELD_TYPE_MAPPING: Mapping[Type[Any], FieldType] = {
 }
 
 
-def infer_field_type(cls: Type[Any], annotation: str) -> FieldType:
+def infer_field_type(cls: Type[Any], annotation: str) -> Tuple[Any, FieldType]:
     module = sys.modules[cls.__module__]
-    builtins = module.__dict__['__builtins__']
 
-    if isinstance(builtins, dict):
-        module_globals: Dict[str, Any] = builtins['globals']()  # type: ignore
-        module_locals: Dict[str, Any] = builtins['locals']()  # type: ignore
-    elif isinstance(builtins, ModuleType):
-        module_globals = builtins.globals()
-        module_locals = builtins.locals()
-    else:
-        raise TypeError(f'Could not infer field type for {annotation!r}')
+    try:
+        module_globals = module.__dict__['globals']()
+        module_locals = module.__dict__['locals']()
+    except KeyError:
+        builtins = module.__dict__['__builtins__']
+
+        if isinstance(builtins, dict):
+            module_globals: Dict[str, Any] = builtins['globals']()  # type: ignore
+            module_locals: Dict[str, Any] = builtins['locals']()  # type: ignore
+        elif isinstance(builtins, ModuleType):
+            module_globals = builtins.globals()
+            module_locals = builtins.locals()
+        else:
+            raise TypeError(f'Could not infer field type for {annotation!r}')
 
     try:
         evaluated = evaluate_annotation(annotation, module_globals, module_locals, {})  # type: ignore
@@ -87,21 +92,21 @@ def infer_field_type(cls: Type[Any], annotation: str) -> FieldType:
 
     if issubclass(evaluated, (discord.abc.GuildChannel, discord.Thread)):
         channel_types = CHANNEL_TYPE_MAPPING.get(evaluated, MISSING)
-        return FieldType.CHANNEL_SELECT(channel_types=channel_types)
+        return evaluated, FieldType.CHANNEL_SELECT(channel_types=channel_types)
     elif evaluated is discord.Role:
-        return FieldType.ROLE_SELECT
+        return evaluated, FieldType.ROLE_SELECT
     elif issubclass(evaluated, discord.User):
-        return FieldType.USER_SELECT
+        return evaluated, FieldType.USER_SELECT
     elif evaluated is datetime.datetime:
-        return FieldType.DATETIME_MODAL
+        return evaluated, FieldType.DATETIME_MODAL
 
     potential_type_mapping = ANNOTWATION_FIELD_TYPE_MAPPING.get(evaluated)
     if potential_type_mapping is not None:
-        return potential_type_mapping
+        return evaluated, potential_type_mapping
 
     # This may be a module-defined type, so let's see if we can shortcut it to a subitem.
     if hasattr(evaluated, '__panel__'):
-        return FieldType.SUBITEM(evaluated)
+        return evaluated, FieldType.SUBITEM(evaluated)
 
     raise TypeError(f'Could not infer field type for {annotation!r}')
 
@@ -115,34 +120,34 @@ def create_fields(cls: Type[T], field_types: Mapping[str, FieldType]) -> Mapping
         if existing_field is not None:
             # This could or could *not* be a field.
             if isinstance(existing_field, Field):
-                if existing_field.annotation is not MISSING:
-                    # This is a field that has an annotation
-                    fields[existing_field.display_name] = existing_field
+                if existing_field.ignored:
+                    fields[name] = existing_field
                     continue
-                else:
-                    # This is a field that does not have an annotation, so we can use the annotation we have here.
-                    default = existing_field.default
-            else:
-                # This field does not have an annotation, so we can use the annotation we have here.
-                default = existing_field
+
+                try:
+                    existing_annotation, existing_field_type = infer_field_type(cls, annotation)
+                except TypeError as exc:
+                    raise ValueError(f'Could not infer field type for {name!r} and type was not given.') from exc
+
+                if existing_field.annotation is MISSING:
+                    existing_field.annotation = existing_annotation
+                if existing_field.type is MISSING:
+                    field_type = field_types.get(name, existing_field_type)
+                    existing_field.type = field_type
+
+                fields[name] = existing_field
+                continue
+
+            # This field does not have an annotation, so we can use the annotation we have here.
+            default = existing_field
 
         # We can try and evaluate the annotation of the field type is not directly given
         field_type = field_types.get(name, MISSING)
         if field_type is MISSING:
-            if existing_field is not None:
-                if existing_field.type is not MISSING:
-                    field_type = existing_field.type
-                else:
-                    if existing_field.ignored is False:
-                        try:
-                            field_type = infer_field_type(cls, annotation)
-                        except TypeError as exc:
-                            raise ValueError(f'Could not infer field type for {name!r} and type was not given.') from exc
-            else:
-                try:
-                    field_type = infer_field_type(cls, annotation)
-                except TypeError as exc:
-                    raise ValueError(f'Could not infer field type for {name!r} and type was not given.') from exc
+            try:
+                annotation, field_type = infer_field_type(cls, annotation)
+            except TypeError as exc:
+                raise ValueError(f'Could not infer field type for {name!r} and type was not given.') from exc
 
         fields[name] = Field(field_type, name=name, annotation=annotation, default=default)
 

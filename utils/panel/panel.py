@@ -30,9 +30,10 @@ from typing_extensions import Self
 from . import get_panel
 from .types import T, FieldType
 from .underlying import UnderlyingPanelView
+from .. import human_timestamp, human_timedelta
 
 if TYPE_CHECKING:
-    from discord import Embed, Interaction
+    from discord import Embed, Interaction, Guild
 
     from bot import FuryBot
 
@@ -59,7 +60,7 @@ class Panel(Generic[T]):
     ) -> UnderlyingPanelView[T]:
         return UnderlyingPanelView(self, instance, timeout=timeout, parent=None, target=target)
 
-    def create_embed(self, embed_cls: Callable[..., Embed], instance: T) -> Embed:
+    def create_embed(self, embed_cls: Callable[..., Embed], instance: T, guild: Guild) -> Embed:
         if self._create_embed_func is not None:
             return self._create_embed_func(self, instance)
 
@@ -72,17 +73,47 @@ class Panel(Generic[T]):
             if field.ignored:
                 continue
 
+            instance_field = getattr(instance, field_name)
+
             if field.type == FieldType.SUBITEM:
                 # We can try and get the panel for this.
                 panel = get_panel(field.type.sub_item.__qualname__)
                 if panel is None:
                     raise ValueError(f'No panel found for {field.type.sub_item.__qualname__}')
 
-                instance_field = getattr(instance, field_name)
-                embed_field_data = panel.create_inline_embed(instance_field)
+                embed_field_data = panel.create_inline_embed(instance_field, guild)
                 embed.add_field(**embed_field_data)
+            elif field.type == FieldType.BOOLEAN_MODAL:
+                embed.add_field(name=field.display_name, value=f'**Enabled**: {instance_field}')
+            elif field.type == FieldType.DATETIME_MODAL:
+                embed.add_field(name=field.display_name, value=human_timestamp(instance_field))
+            elif field.type == FieldType.TIMEDELTA_MODAL:
+                embed.add_field(name=field.display_name, value=human_timedelta(instance_field))
+            elif field.type == FieldType.INTEGER_MODAL or field.type == FieldType.FLOAT_MODAL:
+                embed.add_field(name=field.display_name, value=f'**Current Value**: {instance_field}')
+            elif field.type == FieldType.CHANNEL_SELECT:
+                channel = guild.get_channel_or_thread(instance_field)
+                if channel is None:
+                    embed.add_field(name=field.display_name, value='No Channel Found')
+                else:
+                    embed.add_field(name=field.display_name, value=channel.mention)
+            elif field.type == FieldType.ROLE_SELECT:
+                role = guild.get_role(instance_field)
+                if role is None:
+                    embed.add_field(name=field.display_name, value='No Role Found')
+                else:
+                    embed.add_field(name=field.display_name, value=role.mention)
+            elif field.type == FieldType.USER_SELECT:
+                client = guild._state._get_client()
+                member_or_user = guild.get_member(instance_field) or client.get_user(instance_field)
+                if member_or_user is None:
+                    embed.add_field(name=field.display_name, value='No User Found')
+                else:
+                    embed.add_field(name=field.display_name, value=member_or_user.mention)
+            elif field.type == FieldType.TEXT_MODAL:
+                embed.add_field(name=field.display_name, value=f'**Current Value**: {instance_field}')
 
         return embed
 
-    def create_inline_embed(self, instance: T) -> Dict[str, Union[Any, bool]]:
-        ...
+    def create_inline_embed(self, instance: T, guild: Guild) -> Dict[str, Union[Any, bool]]:
+        raise NotImplementedError
