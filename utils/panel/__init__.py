@@ -43,7 +43,6 @@ def get_panel(cls_qualname: str) -> Optional[PanelType[Any]]:
     return ALL_PANELS.get(cls_qualname, None)
 
 
-from .decorators import *
 from .field import *
 from .panel import *
 from .types import *
