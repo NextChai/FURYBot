@@ -835,9 +835,11 @@ class FuryBot(commands.Bot):
 
         _log.info(f'Loading {len(cache_loading_functions)} cache entries.')
 
-        async with self.safe_connection() as connection:
-            for _, cache_loading_function in cache_loading_functions:
+        async def _wrapped_cache_loader(cache_loading_function: Callable[..., Coroutine[Any, Any, Any]]) -> None:
+            async with self.safe_connection() as connection:
                 try:
                     await cache_loading_function(connection=connection)
                 except Exception as exc:
                     _log.warning(f'Failed to load cache entry {cache_loading_function.__name__}.', exc_info=exc)
+
+        await asyncio.gather(*[_wrapped_cache_loader(func) for _, func in cache_loading_functions])
