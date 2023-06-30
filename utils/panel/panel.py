@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import re
 import datetime
 import sys
 from types import ModuleType
@@ -39,16 +40,17 @@ from typing import (
     Mapping,
     Optional,
     Type,
+    TypeVar,
     Union,
 )
 
-from typing_extensions import Self, dataclass_transform
+from typing_extensions import Self
 
 from . import get_panel, ALL_PANELS
 from .types import T, FieldType, MISSING
 from .underlying import UnderlyingPanelView
 from .. import human_timestamp, human_timedelta, QueryBuilder
-from .field import field
+from .field import Field
 
 import discord
 from discord.utils import evaluate_annotation
@@ -58,9 +60,9 @@ if TYPE_CHECKING:
 
     from bot import FuryBot, ConnectionType
 
-    from .field import Field
-
 __all__: Tuple[str, ...] = ('register', 'Panel')
+
+PanelT = TypeVar('PanelT')
 
 CHANNEL_TYPE_MAPPING: Mapping[Type[Union[discord.abc.GuildChannel, discord.Thread]], Iterable[discord.ChannelType]] = {
     discord.TextChannel: (discord.ChannelType.text, discord.ChannelType.news),
@@ -216,6 +218,9 @@ def _create_fields(cls: Type[T], field_types: Mapping[str, FieldType]) -> Mappin
         if existing_field is not None:
             # This could or could *not* be a field.
             if isinstance(existing_field, Field):
+                if existing_field.name is MISSING:
+                    existing_field.name = name
+
                 if existing_field.ignored:
                     fields[name] = existing_field
                     continue
@@ -317,18 +322,8 @@ def _create_edit_function(panel: Panel[T], fields: Mapping[str, Field[T]]) -> No
 
 
 def _split_camel_case(name: str) -> str:
-    words: List[str] = []
-
-    current = ''
-    for element in name:
-        if element.isupper():
-            words.append(current)
-            current = element
-            continue
-
-        current += element
-
-    return ' '.join(words)
+    matches = re.finditer(r'.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', name)
+    return ' '.join([m.group(0) for m in matches])
 
 
 def register_panel(
@@ -369,16 +364,15 @@ def register_panel(
     return panel
 
 
-@dataclass_transform(field_specifiers=(field,))
 def register(
     table_name: str,
     panel_name: Optional[str] = None,
     init: bool = True,
     repr: bool = True,
     create_edit_func: bool = True,
-    create_embed: Optional[Callable[[Panel[T], T], Embed]] = None,
+    create_embed: Optional[Callable[[Panel[PanelT], PanelT], Embed]] = None,
     **fields: FieldType,
-) -> Callable[[Type[T]], Panel[T]]:
+) -> Callable[[Type[PanelT]], Panel[PanelT]]:
     """Register a given class as a panel.
 
     Parameters
@@ -407,7 +401,7 @@ def register(
             panel_name,
             init=init,
             repr=repr,
-            create_embed=create_embed,
+            create_embed=create_embed,  # type: ignore
             create_edit_func=create_edit_func,
             **fields,
         )
