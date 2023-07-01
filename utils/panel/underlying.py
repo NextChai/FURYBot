@@ -27,7 +27,7 @@ import datetime
 from typing import TYPE_CHECKING, Any, Generic, List, Mapping, Optional, Type, Union
 
 import discord
-from typing_extensions import Unpack
+from typing_extensions import Self, Unpack
 
 from ..ui import BaseModal, BaseView, BaseViewKwargs, ChannelSelect, RoleSelect, UserSelect
 from ..time import TimeTransformer, ShortTime
@@ -47,6 +47,11 @@ class _ModalConverter(Generic[T], BaseModal):
         self.parent: UnderlyingPanelView[T] = parent
         self.field: Field[Any] = field
 
+        self.child: discord.ui.TextInput[Self] = discord.ui.TextInput(
+            label=f'Edit {self.field.display_name}',
+            style=discord.TextStyle.long if self.field.type == FieldType.TEXT_MODAL else discord.TextStyle.short,
+        )
+
     async def callback(self, interaction: discord.Interaction[FuryBot]) -> None:
         await interaction.response.defer()
 
@@ -62,7 +67,7 @@ class _ModalConverter(Generic[T], BaseModal):
             raise ValueError(f'Panel {self.field.panel} does not have an edit coroutine.')
 
         async with interaction.client.safe_connection() as connection:
-            await edit_coro(connection=connection, **{self.field.name: transformed})
+            await edit_coro(self.parent.instance, connection=connection, **{self.field.name: transformed})
 
     async def transform(self, interaction: discord.Interaction[FuryBot], value: str) -> Optional[Any]:
         raise NotImplementedError
@@ -142,7 +147,7 @@ async def do_select_conversion(field: Field[T], parent: UnderlyingPanelView[T], 
         raise ValueError(f'Panel {parent.panel} does not have an edit coroutine.')
 
     async with parent.bot.safe_connection() as connection:
-        await edit_coro(connection=connection, **{field.name: value})
+        await edit_coro(parent.instance, connection=connection, **{field.name: value})
 
 
 class ChannelSelectConverter(ChannelSelect['UnderlyingPanelView[T]'], Generic[T]):

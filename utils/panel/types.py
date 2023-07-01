@@ -30,6 +30,7 @@ from typing_extensions import ParamSpec
 
 if TYPE_CHECKING:
     from discord import ChannelType
+    from .options import ModalOptions
 
 P = ParamSpec('P')
 T = TypeVar('T')
@@ -85,6 +86,7 @@ class FieldType:
 
         self.sub_item: Type[Any] = MISSING
         self.channel_types: Iterable[ChannelType] = MISSING
+        self.modal_options: ModalOptions = MISSING
 
     def __eq__(self, __value: object) -> bool:
         return isinstance(__value, self.__class__) and self._value == __value._value
@@ -111,23 +113,28 @@ class FieldType:
         return 1 << 0
 
     @panel_field
-    def BOOLEAN_MODAL(self) -> int:
+    def BOOLEAN_MODAL(self, options: ModalOptions = MISSING) -> int:
+        self.modal_options = options
         return 1 << 1
 
     @panel_field
-    def DATETIME_MODAL(self) -> int:
+    def DATETIME_MODAL(self, options: ModalOptions = MISSING) -> int:
+        self.modal_options = options
         return 1 << 2
 
     @panel_field
-    def TIMEDELTA_MODAL(self) -> int:
+    def TIMEDELTA_MODAL(self, options: ModalOptions = MISSING) -> int:
+        self.modal_options = options
         return 1 << 9
 
     @panel_field
-    def INTEGER_MODAL(self) -> int:
+    def INTEGER_MODAL(self, options: ModalOptions = MISSING) -> int:
+        self.modal_options = options
         return 1 << 3
 
     @panel_field
-    def FLOAT_MODAL(self) -> int:
+    def FLOAT_MODAL(self, options: ModalOptions = MISSING) -> int:
+        self.modal_options = options
         return 1 << 4
 
     @panel_field

@@ -22,6 +22,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
+import functools
 
 import re
 import datetime
@@ -306,19 +307,19 @@ def _create_edit_function(panel: Panel[T], fields: Mapping[str, Field[T]]) -> No
     if id is MISSING:
         raise ValueError('You must have an `id` field in your panel to use the `create_edit_func` option.')
 
-    async def _edit_coro(self: Panel[T], connection: ConnectionType, **kwargs: Any) -> None:
-        item_id = getattr(self, 'id')
+    async def _edit_coro(self: Panel[T], instance: T, connection: ConnectionType, **kwargs: Any) -> None:
+        item_id = getattr(instance, 'id')
 
         builder = QueryBuilder(table=self.table_name)
         builder.add_condition('id', item_id)
 
         for name, value in kwargs.items():
             builder.add_arg(name, value)
-            setattr(self, name, value)
+            setattr(instance, name, value)
 
         await builder(connection)
 
-    panel._edit_coroutine = _edit_coro
+    panel._edit_coroutine = functools.partial(_edit_coro, panel)
 
 
 def _split_camel_case(name: str) -> str:
@@ -336,9 +337,6 @@ def register_panel(
     create_embed: Optional[Callable[[Panel[T], T], Embed]] = None,
     **field_types: FieldType,
 ) -> Panel[T]:
-    if ALL_PANELS.get(cls.__qualname__) is not None:
-        raise ValueError(f'Panel {cls.__qualname__} is already registered as a panel.')
-
     # The panel name will be the given panel name or the class name (parsed to be split by camel case and titled)
     panel_name = panel_name or _split_camel_case(cls.__name__)
 
@@ -372,7 +370,7 @@ def register(
     create_edit_func: bool = True,
     create_embed: Optional[Callable[[Panel[PanelT], PanelT], Embed]] = None,
     **fields: FieldType,
-) -> Callable[[Type[PanelT]], Panel[PanelT]]:
+) -> Callable[[Type[T]], Panel[T]]:
     """Register a given class as a panel.
 
     Parameters
