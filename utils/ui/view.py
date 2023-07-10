@@ -313,10 +313,9 @@ class BaseView(discord.ui.View, abc.ABC):
     async def on_error(
         self, interaction: discord.Interaction[FuryBot], error: Exception, item: discord.ui.Item[Self]
     ) -> None:
-        if self.bot.error_handler:
-            return await self.bot.error_handler.exception_manager.add_error(
-                error=error, target=interaction, event_name=repr(item)
-            )
+        await self.bot.error_handler.exception_manager.add_error(
+            error=error, target=interaction, event_name=repr(item)
+        )
 
         return await super().on_error(interaction, error, item)
 
