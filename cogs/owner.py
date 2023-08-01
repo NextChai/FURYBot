@@ -23,299 +23,93 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import asyncio
+import dataclasses
 import importlib.util
-import inspect
-import io
+import importlib.machinery
 import logging
-import re
 import sys
-import textwrap
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional, Tuple
+from types import ModuleType
+from typing import TYPE_CHECKING, Any, Dict, List
 
 import discord
 from discord.ext import commands
 
-from utils import BaseCog, Context, human_timedelta, human_timestamp, make_table
+from utils import Context, BaseCog
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
 _log = logging.getLogger(__name__)
 
-FLAG_REGEX = re.compile(
-    r'\-{2}(?P<arg_name>\w+)\=(?P<arg_content>(?:\`){3}python\n(?P<arg_code_content>(?:.+\n)+)(?:\`){3}|(?:[a-z0-9\s\.])+)'
-)
-BRACKET_REGEX = re.compile(r'(?:(?:\{(?P<bracket_content>(?:.|\n)+?)\}))')
-ARG_REGEX = re.compile(
-    r'\$(?P<arg_number>\d+)(?:\s)?=(?:\s)?(?P<arg_content>(?:`{3}python\n(?P<arg_code_content>.*?)`{3}|\S+(?:(?:\r?\n(?!\$)\s*)+(?P<arg_text_content>.*?)\s*)?))(?=\s*\$|\Z)',
-    re.MULTILINE | re.DOTALL,
-)
-CODEBLOCK_REGEX = re.compile(r'`{3}(?P<lang>[a-zA-z]*)\n?(?P<code>[^`]*)\n?`{3}')
 
-
-class SQLFlagConverter(commands.Converter[Tuple[str, List[Any]]]):
-    async def convert_flag(self, ctx: Context, flag_content: str, is_code_blocked: bool) -> Any:
-        env: Dict[str, Any] = {
-            'bot': ctx.bot,
-            'ctx': ctx,
-            'channel': ctx.channel,
-            'author': ctx.author,
-            'guild': ctx.guild,
-            'message': ctx.message,
-            'MISSING': discord.utils.MISSING,
-            'human_timestamp': human_timestamp,
-            'human_timedelta': human_timedelta,
-            'View': discord.ui.View,
-            'Button': discord.ui.Button,
-        }
-        env.update(globals())
-
-        return_keyword = 'return ' if not is_code_blocked else ''
-        wrapped_codeblock = textwrap.dedent(
-            f"""
-            async def __wrapped_codeblock():
-                {return_keyword}{flag_content}
-            """
-        )
-
-        exec(wrapped_codeblock, env)
-
-        wrapped_function: Callable[[], Coroutine[Any, Any, Any]] = env['__wrapped_codeblock']
-
-        result = await wrapped_function()
-
-        if inspect.iscoroutine(result):
-            result = await result
-        elif inspect.iscoroutinefunction(result):
-            result = await result()
-        elif inspect.isfunction(result):
-            result = await asyncio.to_thread(result)
-
-        return result
-
-    async def convert(self, ctx: Context, argument: str) -> Tuple[str, List[Any]]:
-        # Let's search for any flags passed to this argument and remove them.
-        # After, we could only be left with our SQL statement.
-        flags = FLAG_REGEX.findall(argument)
-        converted_flags: Dict[str, Any] = {}
-
-        for flag_name, flag_content, code_block_content in flags:
-            flag_full_name = f'--{flag_name}={flag_content}'
-
-            # Remove the flag from the argument
-            argument = argument.replace(flag_full_name, '')
-
-            # Convert the flag content
-            try:
-                converted = await self.convert_flag(ctx, code_block_content or flag_content, bool(code_block_content))
-            except Exception as exc:
-                raise commands.BadArgument(f'Failed to convert flag "{flag_name}".') from exc
-
-            converted_flags[flag_name] = converted
-
-        converted_args: Dict[int, Any] = {}
-        args = ARG_REGEX.findall(argument)
-        for arg_number, arg_content, code_block_content, *_ in args:
-            full_arg_name = f'${arg_number}={arg_content}'
-
-            # Remove the arg from the argument
-            argument = argument.replace(full_arg_name, '')
-
-            # Convert the arg content
-            try:
-                converted = await self.convert_flag(ctx, code_block_content or arg_content, bool(code_block_content))
-            except Exception as exc:
-                raise commands.BadArgument(f'Failed to convert arg "{arg_number}".') from exc
-
-            converted_args[int(arg_number)] = converted
-
-        # We should only be left with the SQL statement now
-        query = argument.strip()
-
-        # If this is a codeblock we need to remove the codeblock formatting.
-        match = CODEBLOCK_REGEX.match(query)
-        if match is not None:
-            query = match.group('code')
-
-        # Let's look for any brackets that point to a flag or an inlined bracket code block.
-        brackets = BRACKET_REGEX.findall(query)
-        for bracket_content in brackets:
-            existing_flag = converted_flags.get(bracket_content, discord.utils.MISSING)
-            if existing_flag is not discord.utils.MISSING:
-                query = query.replace(f'{{{bracket_content}}}', str(existing_flag))
-                continue
-
-            # This is a code block, we can convert it and replace it with the result.
-            try:
-                converted = await self.convert_flag(ctx, bracket_content, False)
-            except Exception as exc:
-                raise commands.BadArgument(f'Failed to convert bracket code block "{bracket_content}".') from exc
-
-            query = query.replace(f'{{{bracket_content}}}', str(converted))
-
-        return query, [arg for i in range(1, len(converted_args) + 1) if (arg := converted_args.get(i, None))]
+@dataclasses.dataclass()
+class ReloadStatus:
+    module: str
+    statuses: List[Any] = dataclasses.field(default_factory=list)
+    exceptions: List[BaseException] = dataclasses.field(default_factory=list)
 
 
 class Owner(BaseCog):
     async def cog_check(self, ctx: Context) -> bool:
         return await self.bot.is_owner(ctx.author)
 
-    async def _common_sql(self, method: str, query: str, *args: Any) -> Any:
-        async with self.bot.safe_connection() as connection:
-            coro = getattr(connection, method)
-
-            return await coro(query, *args)
-
-    async def _send_table(self, ctx: Context, table: str) -> discord.Message:
-        # If the first line of the table is more than 125 chars, we need to send it in a file.
-        comfy_discord_length = 100
-        first_line_length = len(table.split('\n')[0])
-
-        if first_line_length > comfy_discord_length:
-            # Send it in a .txt file
-            file = discord.File(
-                fp=io.BytesIO(table.encode('utf-8')), filename='result.txt', description='Result of the SQL query.'
-            )
-            return await ctx.send(file=file)
-
-        return await ctx.send(f'```{table}```')
-
-    @commands.group(name='sql', description='Does a SQL query and returns the results.', invoke_without_command=True)
-    async def sql(
-        self,
-        ctx: Context,
-        *,
-        query_args: Tuple[str, List[Any]] = commands.parameter(
-            converter=SQLFlagConverter, description='The query you want to pass along.'
-        ),
-    ) -> Optional[discord.Message]:
-        await ctx.invoke(self.sql_execute, query_args=query_args)
-
-    @sql.command(name='execute', description='Execute a given SQL query and returns the results.')
-    async def sql_execute(
-        self,
-        ctx: Context,
-        *,
-        query_args: Tuple[str, List[Any]] = commands.parameter(
-            converter=SQLFlagConverter, description='The query you want to pass along.'
-        ),
-    ) -> Optional[discord.Message]:
-        async with ctx.typing():
-            query, args = query_args
-
-            try:
-                result = await self._common_sql('execute', query, *args)
-            except Exception as exc:
-                return await ctx.send(f'Failed to execute query. Error: `{exc}`')
-
-            return await ctx.send(f'Executed query. Result: `{result}`')
-
-    @sql.command(name='fetch', description='Fetches a given SQL query and returns the results.')
-    async def sql_fetch(
-        self,
-        ctx: Context,
-        *,
-        query_args: Tuple[str, List[Any]] = commands.parameter(
-            converter=SQLFlagConverter, description='The query you want to pass along.'
-        ),
-    ) -> discord.Message:
-        async with ctx.typing():
-            query, args = query_args
-
-            try:
-                result = await self._common_sql('fetch', query, *args)
-            except Exception as exc:
-                return await ctx.send(f'Failed to execute query. Error: `{exc}`')
-
-            if not result:
-                return await ctx.send(f'`{result}`')
-
-            # Make a table from this result
-            table = make_table(rows=[list(dict(entry).values()) for entry in result], labels=list(dict(result[0]).keys()))
-
-            return await self._send_table(ctx, table)
-
-    @sql.command(name='fetchrow', description='Fetches a given SQL query and returns the first row.')
-    async def sql_fetchrow(
-        self,
-        ctx: Context,
-        *,
-        query_args: Tuple[str, List[Any]] = commands.parameter(
-            converter=SQLFlagConverter, description='The query you want to pass along.'
-        ),
-    ) -> discord.Message:
-        async with ctx.typing():
-            query, args = query_args
-
-            try:
-                result = await self._common_sql('fetchrow', query, *args)
-            except Exception as exc:
-                return await ctx.send(f'Failed to execute query. Error: `{exc}`')
-
-            if not result:
-                return await ctx.send(f'`{result}`')
-
-            table = make_table(rows=[list(dict(result).values())], labels=list(dict(result).keys()))
-            return await self._send_table(ctx, table)
-
-    @sql.command(name='fetchval', description='Fetches a given SQL query and returns the first value.')
-    async def sql_fetchval(
-        self,
-        ctx: Context,
-        *,
-        query_args: Tuple[str, List[Any]] = commands.parameter(
-            converter=SQLFlagConverter, description='The query you want to pass along.'
-        ),
-    ) -> discord.Message:
-        async with ctx.typing():
-            query, args = query_args
-
-            try:
-                result = await self._common_sql('fetchval', query, *args)
-            except Exception as exc:
-                return await ctx.send(f'Failed to execute query. Error: `{exc}`')
-
-            return await ctx.send(f'`{result}`')
-
-    def _reload_extension(self, extension: str) -> None:
-        spec = importlib.util.find_spec(extension)
-        if spec is None:
-            return
-
-        module = importlib.util.module_from_spec(spec)
+    def _reload_extension(self, extension: str, module: ModuleType) -> None:
         sys.modules[extension] = module
 
-    @commands.command(name='reload', description='Reload an extension.')
-    async def _reload(self, ctx: Context, *extensions: str) -> discord.Message:
-        fmt: List[str] = []
-        for extension in extensions:
-            if extension not in self.bot.extensions:
-                try:
-                    self._reload_extension(extension)
-                except ModuleNotFoundError:
-                    fmt.append(ctx.tick(None, f'{extension}: Module not found.'))
+    def _is_discordpy_extension(self, spec: importlib.machinery.ModuleSpec, module: ModuleType) -> bool:
+        spec.loader.exec_module(module)  # type: ignore
+        return bool(getattr(module, 'setup', None))
+
+    @commands.command(name='reload', description='Reload a module or extension.', aliases=['rl', 'load'])
+    async def reload_modules(self, ctx: Context, *modules: str) -> discord.Message:
+        async with ctx.typing():
+            statuses: Dict[str, ReloadStatus] = {}
+            for module_name in modules:
+                spec = importlib.util.find_spec(module_name)
+                if spec is None:
+                    statuses[module_name] = ReloadStatus(
+                        module=module_name,
+                        exceptions=[commands.errors.ExtensionNotFound(module_name)],
+                        statuses=[ctx.tick(False, f'Could not find module_name from name `{module_name}`.')],
+                    )
                     continue
 
-                fmt.append(ctx.tick(True, extension))
-                continue
+                module = importlib.util.module_from_spec(spec)
+                status = ReloadStatus(module=module_name)
 
-            try:
+                self._reload_extension(module_name, module)
+                status.statuses.append(f'Reloaded module `{module_name}` successfully.')
+
+                is_dpy_extension = self._is_discordpy_extension(spec, module)
+                if is_dpy_extension is False:
+                    status.statuses.append('Discord.py setup method not found.')
+                    continue
+
+                status.statuses.append('Discord.py setup method detected.')
                 try:
-                    self._reload_extension(extension)
-                except ModuleNotFoundError:
-                    # I don't care
-                    pass
+                    if module_name in self.bot.extensions:
+                        await self.bot.reload_extension(module_name)
+                    else:
+                        await self.bot.load_extension(module_name)
+                except Exception as exc:
+                    status.exceptions.append(exc)
+                    status.statuses.append('Failed to reload module, unknown exception occured.')
 
-                await self.bot.reload_extension(extension)
-            except Exception as exc:
-                _log.exception(f'Failed to reload extension {extension}.', exc_info=exc)
-                fmt.append(ctx.tick(False, f'{extension}: {exc}'))
-                continue
+                status.statuses.append(ctx.tick(True, label='Reloaded entire module without problems.'))
+                statuses[module_name] = status
 
-            fmt.append(ctx.tick(True, f'{extension}'))
+            embed = self.bot.Embed(description='# Reload Statuses')
+            for module_name, status in statuses.items():
+                for exception in status.exceptions:
+                    await self.bot.error_handler.log_error(
+                        exception, origin=ctx, event_name=f'reload-command-fail:{module_name}'
+                    )
 
-        return await ctx.reply('Reloaded:\n' + '\n'.join(fmt))
+                embed.add_field(
+                    name=module_name, value='\n'.join(map(lambda status: f'- {status}', status.statuses)), inline=False
+                )
+
+        return await ctx.send(embed=embed)
 
 
 async def setup(bot: FuryBot):
