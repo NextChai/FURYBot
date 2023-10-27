@@ -7,7 +7,7 @@ import logging
 import os
 import sys
 import traceback
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, DefaultDict, Dict, Generator, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, DefaultDict, Dict, Generator, List, Optional, Tuple, Union
 
 import discord
 from discord import app_commands
@@ -28,15 +28,8 @@ __all__: Tuple[str, ...] = ('ErrorHandler',)
 _log = logging.getLogger(__name__)
 
 
-def _resolve_role_mention(interaction: discord.Interaction[FuryBot], role: Union[int, str]) -> str:
-    assert interaction.guild is not None
-
-    if isinstance(role, int):
-        potential = interaction.guild.get_role(role)
-    else:
-        potential = discord.utils.get(interaction.guild.roles, name=role)
-
-    return potential.mention if potential else role if isinstance(role, str) else f'<@&{role}>'
+def _resolve_role_mention(role: Union[int, str]) -> str:
+    return f'<@&{role}>'
 
 
 class ExceptionManager:
@@ -217,7 +210,7 @@ class ExceptionManager:
                 'guild': target.guild and target.guild.id,
                 'channel': target.channel and target.channel.id,
             }
-            packet.update(addons)
+            packet.update(addons)  # type: ignore
 
         traceback_string = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
         self.errors[traceback_string].append(packet)
@@ -274,18 +267,19 @@ class ErrorHandler:
         """A helper method to inject the error handler into the bot."""
         self.bot.tree.on_error = self.on_tree_error
         self.bot.on_error = self.on_error
+        self.bot.on_command_error = self.on_command_error  # type: ignore
 
     def eject(self) -> None:
         """A helper method to eject the error handler from the bot."""
         self.bot.tree.on_error = super(app_commands.CommandTree, self.bot.tree).on_error  # type: ignore -> not our fault
         self.bot.on_error = super(commands.Bot, self.bot).on_error
+        self.bot.on_command_error = super(commands.Bot, self.bot).on_command_error
 
     async def log_error(
         self,
         exception: BaseException,
         *,
-        origin: Optional[Union[Context, discord.Interaction[FuryBot]]],
-        sender: Optional[Callable[..., Awaitable[Optional[discord.WebhookMessage]]]] = None,
+        ctx: Context,
         event_name: Optional[Any] = None,
     ) -> None:
         """|coro|
@@ -302,10 +296,85 @@ class ErrorHandler:
         sender: Optional[Callable[..., Awaitable[Optional[:class:`discord.WebhookMessage`]]]]
             A sender callable to alert the user of the error.
         """
-        if sender is not None:
-            await sender('Oh no! Something went wrong! I\'ve notified the developer to get this issue fixed, my apologies!')
+        await ctx.send(
+            'Oh no! Something went wrong! I\'ve notified the developer to get this issue fixed, my apologies!',
+            ephemeral=True,
+        )
 
-        await self.exception_manager.add_error(error=exception, target=origin, event_name=event_name)
+        await self.exception_manager.add_error(error=exception, target=ctx, event_name=event_name)
+
+    async def _handle_error(self, ctx: Context, error: Exception) -> Optional[discord.Message]:
+        # We need to try and defer the given context if it has not been done yet.
+        if ctx.interaction and not ctx.interaction.response.is_done():
+            await ctx.defer(ephemeral=True)
+
+        error = getattr(error, 'original', error)
+
+        if isinstance(error, (AutocompleteValidationException, BadArgument)):
+            return await ctx.send(str(error), ephemeral=True)
+
+        elif isinstance(error, app_commands.CommandInvokeError):
+            # Something bad happened here, oh no!
+            return await self.log_error(error.original, ctx=ctx)
+        elif isinstance(error, app_commands.TransformerError):
+            await ctx.send(content=f'Failed to convert `{error.value}` to a {error.type.name.title()}!', ephemeral=True)
+
+            # This is a development error as well, but we don't need to pass a sender
+            return await self.log_error(error, ctx=ctx)
+        elif isinstance(error, app_commands.CheckFailure):
+            if isinstance(error, app_commands.NoPrivateMessage):
+                return await ctx.send(str(error), ephemeral=True)
+            elif isinstance(error, app_commands.MissingRole):
+                role: str = _resolve_role_mention(error.missing_role)
+                return await ctx.send(f'You are missing the {role} role to run this command!', ephemeral=True)
+            elif isinstance(error, app_commands.MissingAnyRole):
+                roles = (_resolve_role_mention(role) for role in error.missing_roles)
+                return await ctx.send(
+                    f'You\'re missing one of the following roles to run this command: {", ".join(roles)}',
+                    ephemeral=True,
+                )
+            elif isinstance(error, (app_commands.MissingPermissions, app_commands.BotMissingPermissions)):
+                fmt = 'I\'m' if isinstance(error, app_commands.BotMissingPermissions) else 'You are'
+                return await ctx.send(
+                    f'{fmt} missing the following permissions to run this command: {", ".join([p.replace("_", " ").title() for p in error.missing_permissions])}',
+                    ephemeral=True,
+                )
+        elif isinstance(error, (app_commands.CommandOnCooldown, commands.CommandOnCooldown)):
+            retry_after = discord.utils.utcnow() + datetime.timedelta(seconds=error.retry_after)
+            return await ctx.send(
+                f'Ope! You\'ve hit this command\'s cooldown, try again in {discord.utils.format_dt(retry_after, "R")}',
+                ephemeral=True,
+            )
+        elif isinstance(error, app_commands.CommandSignatureMismatch):
+            await self.bot.tree.sync()
+            return await ctx.send(
+                'Oh shoot! There\'s a mismatch in my commands, I\'ve synced them, try again!', ephemeral=True
+            )
+        elif isinstance(error, commands.MissingRequiredArgument):
+            return await ctx.send(f'Oop! You forgot to provide a value for `{error.param.name}`.', ephemeral=True)
+        elif isinstance(error, commands.MissingRequiredArgument):
+            return await ctx.send(f'Oop! You forgot to provide a value for `{error.param.name}`.', ephemeral=True)
+        elif isinstance(error, commands.TooManyArguments):
+            return await ctx.send(f'Oop! You provided too many arguments for this command.', ephemeral=True)
+        elif isinstance(error, commands.BadArgument):
+            fmt = (
+                str(error)
+                if not (argument := getattr(error, 'argument', None))
+                else f'Value for `{argument}` is not valid - {str(error)}'
+            )
+            return await ctx.send(f'Oop! You provided an invalid value. {fmt}', ephemeral=True)
+        elif isinstance(error, commands.CommandNotFound):
+            return
+        elif isinstance(error, commands.CheckFailure):
+            return await ctx.send(f'Ope! {error}', ephemeral=True)
+        elif isinstance(error, commands.DisabledCommand):
+            return await ctx.send(f'Oop! This command is disabled.', ephemeral=True)
+        elif isinstance(error, commands.MaxConcurrencyReached):
+            return await ctx.send(
+                f'Oop! This command is currently running too many instances. Try again in a few minutes.', ephemeral=True
+            )
+
+        await self.log_error(error, ctx=ctx)
 
     async def on_tree_error(self, interaction: discord.Interaction[FuryBot], error: app_commands.AppCommandError) -> None:
         """|coro|
@@ -319,49 +388,11 @@ class ErrorHandler:
         error: :class:`app_commands.AppCommandError`
             The error that was raised.
         """
-        sender: Callable[..., Awaitable[Optional[discord.WebhookMessage]]] = (
-            interaction.response.send_message if not interaction.response.is_done() else interaction.followup.send
-        )
+        context = await self.bot.get_context(origin=interaction)
+        await self._handle_error(context, error=error)
 
-        if isinstance(error, (AutocompleteValidationException, BadArgument)):
-            return await sender(str(error))
-
-        elif isinstance(error, app_commands.CommandInvokeError):
-            # Something bad happened here, oh no!
-            return await self.log_error(error.original, origin=interaction, sender=sender)
-
-        elif isinstance(error, app_commands.TransformerError):
-            await sender(content=f'Failed to convert `{error.value}` to a {error.type.name.title()}!')
-
-            # This is a development error as well, but we don't need to pass a sender
-            return await self.log_error(error, origin=interaction)
-        elif isinstance(error, app_commands.CheckFailure):
-            if isinstance(error, app_commands.NoPrivateMessage):
-                return await sender(content=str(error))
-            elif isinstance(error, app_commands.MissingRole):
-                role: str = _resolve_role_mention(interaction, error.missing_role)
-                return await sender(content=f'You are missing the {role} role to run this command!')
-            elif isinstance(error, app_commands.MissingAnyRole):
-                roles = (_resolve_role_mention(interaction, role) for role in error.missing_roles)
-                return await sender(
-                    content=f'You\'re missing one of the following roles to run this command: {", ".join(roles)}'
-                )
-            elif isinstance(error, (app_commands.MissingPermissions, app_commands.BotMissingPermissions)):
-                fmt = 'I\'m' if isinstance(error, app_commands.BotMissingPermissions) else 'You are'
-                return await sender(
-                    content=f'{fmt} missing the following permissions to run this command: {", ".join([p.replace("_", " ").title() for p in error.missing_permissions])}'
-                )
-            elif isinstance(error, app_commands.CommandOnCooldown):
-                retry_after = discord.utils.utcnow() + datetime.timedelta(seconds=error.retry_after)
-                return await sender(
-                    content=f'Ope! You\'ve hit this command\'s cooldown, try again in {discord.utils.format_dt(retry_after, "R")}'
-                )
-
-        elif isinstance(error, app_commands.CommandSignatureMismatch):
-            await self.bot.tree.sync()
-            return await sender(content='Oh shoot! There\'s a mismatch in my commands, I\'ve synced them, try again!')
-
-        await self.log_error(error, origin=interaction, sender=sender)
+    async def on_command_error(self, ctx: Context, error: Exception):
+        await self._handle_error(ctx, error=error)
 
     async def on_error(self, event_method: str, *args: Any, **kwargs: Any) -> None:
         """|coro|
