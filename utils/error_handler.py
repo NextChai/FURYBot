@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 import datetime
 import logging
 import os
 import sys
 import traceback
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Generator, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, DefaultDict, Dict, Generator, List, Optional, Tuple, Union
 
 import discord
 from discord import app_commands
@@ -73,7 +74,7 @@ class ExceptionManager:
         self._lock: asyncio.Lock = asyncio.Lock()
         self._most_recent: Optional[datetime.datetime] = None
 
-        self.errors: Dict[str, List[Traceback]] = {}
+        self.errors: DefaultDict[str, List[Traceback]] = defaultdict(list)
         self.code_blocker: str = '```py\n{}```'
         self.error_webhook: discord.Webhook = discord.Webhook.from_url(
             os.environ['EXCEPTION_WEBHOOK_URL'], session=bot.session, bot_token=bot.http.token
@@ -219,11 +220,7 @@ class ExceptionManager:
             packet.update(addons)
 
         traceback_string = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
-        current = self.errors.get(traceback_string)
-        if current:
-            self.errors[traceback_string].append(packet)
-        else:
-            self.errors[traceback_string] = [packet]
+        self.errors[traceback_string].append(packet)
 
         async with self._lock:
             # I want all other errors to be released after this one, which is why
