@@ -19,3 +19,4 @@ trieregex
 numpy
 Pillow
 python-Levenshtein
+psutil

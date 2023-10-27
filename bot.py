@@ -97,6 +97,7 @@ initial_extensions: Tuple[str, ...] = (
     'cogs.owner',
     'cogs.teams',
     'cogs.teams.practices',
+    'cogs.meta',
     'cogs.teams.scrims',
     'jishaku',
     'utils.error_handler',
@@ -222,6 +223,7 @@ class FuryBot(commands.Bot):
         self.session: aiohttp.ClientSession = session
         self.pool: PoolType = pool
         self.thread_pool: futures.ThreadPoolExecutor = futures.ThreadPoolExecutor(max_workers=20)
+        self.load_time = discord.utils.utcnow()
 
         self.timer_manager: Optional[TimerManager] = None
         if START_TIMER_MANAGER:
