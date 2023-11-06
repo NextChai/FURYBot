@@ -422,5 +422,5 @@ async def setup(bot: FuryBot) -> None:
 
 
 async def teardown(bot: FuryBot) -> None:
-    if bot.error_handler:  # simply to make type checker happy
+    if bot.error_handler:
         bot.error_handler.eject()
