@@ -74,7 +74,7 @@ class ExceptionManager:
         )
 
     def _yield_code_chunks(self, iterable: str, *, chunksize: int = 2000) -> Generator[str, None, None]:
-        cbs = len(self.code_blocker) - 2  # code blocker size
+        cbs: int = len(self.code_blocker) - 2  # code blocker size
 
         for i in range(0, len(iterable), chunksize - cbs):
             yield self.code_blocker.format(iterable[i : i + chunksize - cbs])
