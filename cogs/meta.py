@@ -23,13 +23,11 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-import asyncio
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING
 
 import discord
 import psutil
 from discord.ext import commands
-from typing_extensions import Self
 
 from utils import BaseCog, Context
 
@@ -42,23 +40,6 @@ class Meta(BaseCog):
         self.bot: FuryBot = bot
         self.process = psutil.Process()
 
-    @classmethod
-    async def count_guild(
-        cls: Type[Self], guild: discord.Guild, total_members: int, text: int, voice: int, stage: int, forum: int
-    ) -> None:
-        if guild.member_count:
-            total_members += guild.member_count
-
-        for channel in guild.channels:
-            if isinstance(channel, discord.TextChannel):
-                text += 1
-            elif isinstance(channel, discord.VoiceChannel):
-                voice += 1
-            elif isinstance(channel, discord.StageChannel):
-                stage += 1
-            elif isinstance(channel, discord.ForumChannel):
-                forum += 1
-
     @commands.hybrid_command(name='about', description='Get some information about the bot.')
     async def about(self, ctx: Context) -> None:
         async with ctx.typing():
@@ -67,12 +48,20 @@ class Meta(BaseCog):
             voice = 0
             stage = 0
             forum = 0
-            await asyncio.gather(
-                *(
-                    self.bot.create_task(self.count_guild(guild, total_members, text, voice, stage, forum))
-                    for guild in self.bot.guilds
-                )
-            )
+
+            for guild in self.bot.guilds:
+                if guild.member_count:
+                    total_members += guild.member_count
+
+                for channel in guild.channels:
+                    if isinstance(channel, discord.TextChannel):
+                        text += 1
+                    elif isinstance(channel, discord.VoiceChannel):
+                        voice += 1
+                    elif isinstance(channel, discord.StageChannel):
+                        stage += 1
+                    elif isinstance(channel, discord.ForumChannel):
+                        forum += 1
 
             total_members = "{:,}".format(total_members)
 
