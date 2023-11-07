@@ -7,7 +7,7 @@ import logging
 import os
 import sys
 import traceback
-from typing import TYPE_CHECKING, Any, DefaultDict, Dict, Generator, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, DefaultDict, Dict, Generator, List, Optional, Tuple, Union, TypeAlias
 
 import discord
 from discord import app_commands
@@ -15,7 +15,6 @@ from discord.ext import commands
 
 from .context import Context
 from .errors import *
-from .types.exceptions import Traceback, TracebackOptional
 
 if TYPE_CHECKING:
     import datetime
@@ -26,6 +25,8 @@ __all__: Tuple[str, ...] = ('ErrorHandler',)
 
 
 _log = logging.getLogger(__name__)
+
+Traceback: TypeAlias = Dict[str, Any]
 
 
 def _resolve_role_mention(role: Union[int, str]) -> str:
@@ -159,17 +160,17 @@ class ExceptionManager:
             created = target.message.created_at
             author = target.author
 
-        packet: Traceback = {'exception': error, 'time': created}
+        packet: Traceback = {'exception': error, 'time': created, 'command': 'no command'}
 
         if event_name:
             packet['event_name'] = event_name
 
         if target:
-            addons: TracebackOptional = {
-                'command': (target.command and target.command.qualified_name) or "no command",
+            addons: Dict[str, Optional[str]] = {
+                'command': target.command and target.command.qualified_name,
                 'author': author and f'<@{author.id}> ({author.id})',
-                'guild': target.guild and f'{guild.name} ({guild.id})',
-                'channel': target.channel and target.channel.mention,
+                'guild': target.guild and f'{target.guild.name} ({target.guild.id})',
+                'channel': target.channel and f'<#{target.channel.id}>',
             }
             packet.update(addons)
 
@@ -185,7 +186,7 @@ class ExceptionManager:
                 self._most_recent = discord.utils.utcnow()
                 await self.release_error(traceback_string, packet)
             else:
-                time_between = packet['time'] - self._most_recent
+                time_between = created - self._most_recent
 
                 if time_between > self.cooldown:
                     self._most_recent = discord.utils.utcnow()
@@ -226,9 +227,9 @@ class ErrorHandler:
 
     def inject(self) -> None:
         """A helper method to inject the error handler into the bot."""
-        self.bot.tree.on_error = self.on_tree_error
+        self.bot.tree.on_error = self.handle_interaction_error
         self.bot.on_error = self.on_error
-        self.bot.on_command_error = self.on_command_error  # type: ignore
+        self.bot.on_command_error = self.handle_context_error  # type: ignore
 
     def eject(self) -> None:
         """A helper method to eject the error handler from the bot."""
@@ -337,10 +338,8 @@ class ErrorHandler:
 
         await self.log_error(error, ctx=ctx)
 
-    async def on_tree_error(self, interaction: discord.Interaction[FuryBot], error: app_commands.AppCommandError) -> None:
+    async def handle_interaction_error(self, interaction: discord.Interaction[FuryBot], error: Exception) -> None:
         """|coro|
-
-        Called when there's an exception raised when the CommandTree has reached an error state.
 
         Parameters
         ----------
@@ -352,7 +351,7 @@ class ErrorHandler:
         context = await self.bot.get_context(origin=interaction)
         await self._handle_error(context, error=error)
 
-    async def on_command_error(self, ctx: Context, error: Exception):
+    async def handle_context_error(self, ctx: Context, error: Exception):
         await self._handle_error(ctx, error=error)
 
     async def on_error(self, event_method: str, *args: Any, **kwargs: Any) -> None:

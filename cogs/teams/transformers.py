@@ -68,6 +68,9 @@ class TeamTransformer(app_commands.Transformer):
             return []
 
         guild = channel.guild
+        if guild is None:
+            return []
+
         guild_teams = interaction.client.get_teams(guild.id)
         team = discord.utils.find(lambda team: team.has_channel(channel.id), guild_teams)
         if not team:

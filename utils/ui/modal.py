@@ -60,9 +60,7 @@ class BaseModal(discord.ui.Modal):
 
     async def on_error(self, interaction: discord.Interaction[FuryBot], error: Exception) -> None:
         if self.bot.error_handler:
-            return await self.bot.error_handler.exception_manager.add_error(
-                error=error, target=interaction, event_name=repr(self)
-            )
+            return await self.bot.error_handler.handle_interaction_error(error=error, interaction=interaction)
 
         return await super().on_error(interaction, error)
 
