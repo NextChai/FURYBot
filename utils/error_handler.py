@@ -94,44 +94,10 @@ class ExceptionManager:
         """
         _log.error('Releasing error to log', exc_info=packet['exception'])
 
-        fmt = {
-            'time': discord.utils.format_dt(packet['time']),
-        }
-        if author := packet.get('author'):
-            fmt['author'] = f'<@{author}>'
-
-        # This is a bit of a hack,  but I do it here so guild_id
-        # can be optional, and I wont get type errors.
-        guild_id = packet.get('guild')
-        guild = self.bot._connection._get_guild(guild_id)
-        if guild:
-            fmt['guild'] = f'{guild.name} ({guild.id})'
-
-        if guild:
-            channel_id = packet.get('channel')
-            if channel_id and (channel := guild.get_channel(channel_id)):
-                fmt['channel'] = f'{channel.name} - {channel.mention} - ({channel.id})'
-
-            # Let's try and upgrade the author
-            author_id = packet.get('author')
-            if author_id:
-                author = guild.get_member(author_id) or self.bot.get_user(author_id)
-                if author:
-                    fmt['author'] = f'{str(author)} - {author.mention} ({author.id})'
-
-        if not fmt.get('author') and (author_id := packet.get('author')):
-            fmt['author'] = f'<Unknown User> - <@{author_id}> ({author_id})'
-
-        if command := packet.get('command'):
-            fmt['command'] = command.qualified_name
-            display = f'in command "{command.qualified_name}"'
-        else:
-            display = f'in no command (in FuryBot)'
-
-        embed = discord.Embed(title=f'An error has occured in {display}', timestamp=packet['time'])
+        embed = discord.Embed(title=f'An error has occured in {packet["command"]}', timestamp=packet['time'])
         embed.add_field(
             name='Metadata',
-            value='\n'.join([f'**{k.title()}**: {v}' for k, v in fmt.items()]),
+            value='\n'.join([f'**{k.title()}**: {v}' for k, v in packet.items()]),
         )
 
         kwargs: Dict[str, Any] = {}
@@ -169,7 +135,7 @@ class ExceptionManager:
         self,
         *,
         error: BaseException,
-        target: Optional[Union[Context, discord.Interaction[FuryBot]]],
+        target: Optional[Context] = None,
         event_name: Optional[str] = None,
     ) -> None:
         """|coro|
@@ -186,17 +152,12 @@ class ExceptionManager:
         """
         _log.info('Adding error "%s" to log.', str(error))
 
-        created: datetime.datetime
-        author: Optional[Union[discord.Member, discord.User]]
-        if isinstance(target, discord.Interaction):
-            created = target.created_at
-            author = target.user
-        elif isinstance(target, commands.Context):
+        created: datetime.datetime = discord.utils.utcnow()
+        author: Optional[Union[discord.Member, discord.User]] = None
+
+        if target is not None:
             created = target.message.created_at
             author = target.author
-        else:
-            created = discord.utils.utcnow()
-            author = None
 
         packet: Traceback = {'exception': error, 'time': created}
 
@@ -205,12 +166,12 @@ class ExceptionManager:
 
         if target:
             addons: TracebackOptional = {
-                'command': target.command,
-                'author': author and author.id,
-                'guild': target.guild and target.guild.id,
-                'channel': target.channel and target.channel.id,
+                'command': (target.command and target.command.qualified_name) or "no command",
+                'author': author and f'<@{author.id}> ({author.id})',
+                'guild': target.guild and f'{guild.name} ({guild.id})',
+                'channel': target.channel and target.channel.mention,
             }
-            packet.update(addons)  # type: ignore
+            packet.update(addons)
 
         traceback_string = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
         self.errors[traceback_string].append(packet)
@@ -218,7 +179,7 @@ class ExceptionManager:
         async with self._lock:
             # I want all other errors to be released after this one, which is why
             # lock is here. If you have code that calls MANY errors VERY fast,
-            # this will ratelimit the webhook. We dont want that lmfao.
+            # this will ratelimit the webhook. We dont want that.
 
             if not self._most_recent:
                 self._most_recent = discord.utils.utcnow()
