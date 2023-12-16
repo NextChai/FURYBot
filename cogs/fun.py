@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import io
 from typing import TYPE_CHECKING, Optional
 
 import discord
@@ -37,7 +38,9 @@ if TYPE_CHECKING:
 class Fun(BaseCog):
     @app_commands.command(name='avatar', description='Get the avatar of a user.')
     @app_commands.describe(member='The member to get the avatar of.')
-    async def avatar(self, interaction: discord.Interaction[FuryBot], member: Optional[discord.Member] = None) -> None:
+    async def avatar(
+        self, interaction: discord.Interaction[FuryBot], member: Optional[discord.Member] = None
+    ) -> discord.InteractionMessage:
         """|coro|
 
         Gets the avatar of a user.
@@ -47,10 +50,21 @@ class Fun(BaseCog):
         member: Optional[:class:`discord.Member`]
             The member to get the avatar of. Defaults to the author.
         """
+        await interaction.response.defer()
         target = member or interaction.user
+
+        avatar = await target.display_avatar.read()
+
+        filename = f'{target.display_name}_avatar.png'
+        file = discord.File(
+            fp=io.BytesIO(avatar),
+            filename=f'{target.display_name}_avatar.png',
+            description=f'Avatar of {target.display_name}',
+        )
+
         embed = self.bot.Embed(title=f'{target.display_name} Avatar')
-        embed.set_image(url=target.display_avatar.url)
-        return await interaction.response.send_message(embed=embed)
+        embed.set_image(url=f'attachment://{filename}')
+        return await interaction.edit_original_response(embed=embed, attachments=[file])
 
 
 async def setup(bot: FuryBot) -> None:
