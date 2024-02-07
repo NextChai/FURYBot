@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, cast
@@ -368,8 +369,7 @@ class ImageRequests(BaseCog):
 
         # And alert the user of the request
         return await interaction.edit_original_response(
-            content=f'I\'ve submitted the request for this attachment to be uploaded. You will be notified if it gets approved '
-            'or denied.'
+            content=f'I\'ve submitted the request for this attachment to be uploaded. You will be notified if your request is approved.'
         )
 
 
