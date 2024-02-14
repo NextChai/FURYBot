@@ -448,7 +448,7 @@ Three!  Pick number three, my lord!
 Okay, okay, uh, number three!
 
 Lord Farquaad, you've chosen Princess Fiona!
-Music Plays: �If you like Pina Coladas...� The guards clap and cheer.
+Music Plays: �If you like Pina Coladas...- The guards clap and cheer.
 
 Princess Fiona. She's perfect.
 All I have to do is just find someone who can go... MIRROR
@@ -1351,11 +1351,11 @@ Hey, what's that?
  That's...is that blood?
 
 Donkey faints. Shrek picks him up as they continue on their way.  A montage of scenes including:
-� Shrek crawling up to the top of a tree to make a bridge over a creek.
-� Shrek swatting at a bunch of flies and mosquitoes.
-� Fiona using a spiderweb to catch bugs.
-� Shrek catching a toad which he blows up like a balloon for Fiona.
-� Fiona catching a snake, blowing it up as a balloon animal for Shrek. 
+- Shrek crawling up to the top of a tree to make a bridge over a creek.
+- Shrek swatting at a bunch of flies and mosquitoes.
+- Fiona using a spiderweb to catch bugs.
+- Shrek catching a toad which he blows up like a balloon for Fiona.
+- Fiona catching a snake, blowing it up as a balloon animal for Shrek. 
 The group finally reach a windmill. In the distance is DuLoc.
 
 There it is, Princess. Your future awaits you.
@@ -1681,12 +1681,12 @@ But I thought - -
 
 Yeah. You know what? You thought wrong! 
 
-� Shrek arriving back home.
-� Fiona being fitted for the wedding dress.
-� Donkey at a stream running into the dragon.
-� Shrek cleaning up his house.
-� Fiona eating dinner alone.
-� Shrek eating dinner alone.
+- Shrek arriving back home.
+- Fiona being fitted for the wedding dress.
+- Donkey at a stream running into the dragon.
+- Shrek cleaning up his house.
+- Fiona eating dinner alone.
+- Shrek eating dinner alone.
 
 Shrek is eating dinner when he hears a sound outside. He goes outside to investigate.
 
