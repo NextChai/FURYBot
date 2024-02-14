@@ -110,6 +110,9 @@ class SentenceGrabber:
         # Remove all puntuations and strip the sentence
         sentence = PUNCTUATION_REGEX.sub('', sentence).strip()
 
+        # Ensure that if there's any new lines, we replace them with a space
+        sentence = sentence.replace('\n', ' ')
+
         # Capitalize the first char and ensure it has a period at the end
         if not sentence[0].isupper():
             sentence = sentence.capitalize()
