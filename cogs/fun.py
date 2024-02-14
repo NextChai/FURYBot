@@ -25,7 +25,10 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import io
-from typing import TYPE_CHECKING, Optional
+import aiofile
+import random
+from typing import TYPE_CHECKING, Optional, List
+from typing_extensions import Self
 
 import discord
 from discord import app_commands
@@ -36,7 +39,67 @@ if TYPE_CHECKING:
     from bot import FuryBot
 
 
+class SentenceGrabber:
+    def __init__(
+        self,
+        content: Optional[List[str]] = None,
+        filename: Optional[str] = None,
+        min_sentence_length: int = 5,
+        max_sentence_length: int = 50,
+    ) -> None:
+        assert content or filename, 'You must provide either content or a filename.'
+
+        self.content: Optional[List[str]] = content
+        self.filename: Optional[str] = filename
+        self.min_sentence_length: int = min_sentence_length
+        self.max_sentence_length: int = max_sentence_length
+
+    async def __aenter__(self) -> Self:
+        if self.filename:
+            # Open this file and grab its contents (aiofile)
+            async with aiofile.async_open(self.filename, mode='r') as f:
+                content = await f.read()
+
+            # Split the content by period, strip it, and remove empty strings
+            cleaned_content: List[str] = []
+            for sentence in content.split('.'):
+                sentence = sentence.strip()
+                if sentence:
+                    # Ensure it is within the bounds of the min and max sentence length
+                    if len(sentence) > self.min_sentence_length and len(sentence) < self.max_sentence_length:
+                        cleaned_content.append(sentence)
+
+            if not cleaned_content:
+                raise ValueError('The file provided did not contain any valid sentences.')
+
+            self.content = cleaned_content
+
+        return self
+
+    async def __aexit__(self) -> None:
+        return
+
+    def grab(self) -> str:
+        assert self.content, 'You must provide content or use the class as a context manager with a file.'
+
+        sentence = random.choice(self.content)
+        while len(sentence) > self.max_sentence_length or len(sentence) < self.min_sentence_length:
+            sentence = random.choice(self.content)
+
+        # Capitalize the first char and ensure it has a period at the end
+        if not sentence[0].isupper():
+            sentence = sentence.capitalize()
+
+        if sentence[-1] != '.':
+            sentence += '.'
+
+        return sentence
+
+
 class Fun(BaseCog):
+    def __init__(self, bot: FuryBot) -> None:
+        super().__init__(bot=bot)
+
     @app_commands.command(name='avatar', description='Get the avatar of a user.')
     @app_commands.describe(member='The member to get the avatar of.')
     async def avatar(
