@@ -61,7 +61,7 @@ class SentenceGrabber:
     async def __aenter__(self) -> Self:
         if self.filename:
             # Open this file and grab its contents (aiofile)
-            async with aiofile.async_open(self.filename, mode='r') as f:
+            async with aiofile.async_open(self.filename, mode='r', encoding="utf-8") as f:
                 content = await f.read()
 
             # Split the content by period, strip it, and remove empty strings
