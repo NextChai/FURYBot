@@ -26,10 +26,9 @@ from __future__ import annotations
 
 import re
 import io
-from types import TracebackType
 import aiofile
 import random
-from typing import TYPE_CHECKING, Optional, List, Tuple, Type
+from typing import TYPE_CHECKING, Optional, List, Any
 from typing_extensions import Self
 
 import discord
@@ -91,8 +90,7 @@ class SentenceGrabber:
 
         return self
 
-    async def __aexit__(self, *args: Tuple[Optional[Type[Exception]], Optional[Exception], Optional[TracebackType]]) -> None:
-        return
+    async def __aexit__(self, *args: Any) -> None: ...
 
     def __iter__(self):
         return self
