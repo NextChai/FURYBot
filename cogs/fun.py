@@ -70,7 +70,8 @@ class SentenceGrabber:
                 sentence = sentence.strip()
                 if sentence:
                     # Ensure it is within the bounds of the min and max sentence length
-                    if len(sentence) > self.min_sentence_length and len(sentence) < self.max_sentence_length:
+                    total_words = len(sentence.split())
+                    if total_words > self.min_sentence_length and total_words < self.max_sentence_length:
                         cleaned_content.append(sentence)
 
             if not cleaned_content:
