@@ -24,6 +24,7 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
+import re
 import io
 import aiofile
 import random
@@ -37,6 +38,8 @@ from utils import BaseCog
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
+PUNCTUATION_REGEX = re.compile(r'[!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~]')
 
 
 class SentenceGrabber:
@@ -85,6 +88,9 @@ class SentenceGrabber:
         sentence = random.choice(self.content)
         while len(sentence) > self.max_sentence_length or len(sentence) < self.min_sentence_length:
             sentence = random.choice(self.content)
+
+        # Remove all puntuations and strip the sentence
+        sentence = PUNCTUATION_REGEX.sub('', sentence).strip()
 
         # Capitalize the first char and ensure it has a period at the end
         if not sentence[0].isupper():
