@@ -26,9 +26,10 @@ from __future__ import annotations
 
 import re
 import io
+from types import TracebackType
 import aiofile
 import random
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, Optional, List, Tuple, Type
 from typing_extensions import Self
 
 import discord
@@ -56,6 +57,7 @@ class SentenceGrabber:
         self.filename: Optional[str] = filename
         self.min_sentence_length: int = min_sentence_length
         self.max_sentence_length: int = max_sentence_length
+        self.__index: int = -1
 
     async def __aenter__(self) -> Self:
         if self.filename:
@@ -75,19 +77,37 @@ class SentenceGrabber:
             if not cleaned_content:
                 raise ValueError('The file provided did not contain any valid sentences.')
 
+            random.shuffle(cleaned_content)
             self.content = cleaned_content
+        elif self.content:
+            random.shuffle(self.content)
+
+            # Ensure each sentence in the content does not exceed the max sentence length (or min)
+            self.content = [
+                sentence
+                for sentence in self.content
+                if len(sentence) > self.min_sentence_length and len(sentence) < self.max_sentence_length
+            ]
 
         return self
 
-    async def __aexit__(self) -> None:
+    async def __aexit__(self, *args: Tuple[Optional[Type[Exception]], Optional[Exception], Optional[TracebackType]]) -> None:
         return
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return self.grab()
 
     def grab(self) -> str:
         assert self.content, 'You must provide content or use the class as a context manager with a file.'
 
-        sentence = random.choice(self.content)
-        while len(sentence) > self.max_sentence_length or len(sentence) < self.min_sentence_length:
-            sentence = random.choice(self.content)
+        self.__index += 1
+        if self.__index >= len(self.content):
+            raise StopIteration
+
+        sentence = self.content[self.__index]
 
         # Remove all puntuations and strip the sentence
         sentence = PUNCTUATION_REGEX.sub('', sentence).strip()
