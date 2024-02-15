@@ -80,6 +80,17 @@ class TypingTestView(BaseView):
         self.packets: Dict[int, TTPacket] = {}
         self.grabber: SentenceGrabber = SentenceGrabber(filename="assets/text/shrek_script.txt", min_sentence_length=10)
 
+    @property
+    def embed(self) -> discord.Embed:
+        embed = self.bot.Embed(
+            title='Test Your Typing Speed',
+            description='Press "Start!" to begin a typing test! Once you click it, I\'ll '
+            'send you a sentence to type out. Anyone can participate, but you can only try to '
+            'type one sentence at a time!',
+        )
+        # TODO, more info here maybe
+        return embed
+
     async def interaction_check(self, interaction: discord.Interaction[FuryBot]) -> bool:
         if self.packets.get(interaction.user.id, None):
             await interaction.response.send_message(
