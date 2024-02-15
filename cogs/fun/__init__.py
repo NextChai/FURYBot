@@ -48,7 +48,9 @@ class Fun(BaseCog):
     async def typing_test(self, ctx: Context) -> None:
         async with ctx.typing():
             view = TypingTestView(ctx=ctx)
-            await ctx.send(view=view, embed=view.embed)
+            view.remove_stop_button()
+            message = await ctx.send(view=view, embed=view.embed)
+            view.message = message
 
     @app_commands.command(name='avatar', description='Get the avatar of a user.')
     @app_commands.describe(member='The member to get the avatar of.')

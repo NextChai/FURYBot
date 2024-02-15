@@ -75,7 +75,7 @@ class TypingTestView(BaseView):
         super().__init__(target=ctx, timeout=5 * 60)
 
         self.channel = ctx.channel
-        self.message: Optional[discord.Message] = MISSING
+        self.message: discord.Message = MISSING
 
         self.packets: Dict[int, TTPacket] = {}
         self.grabber: SentenceGrabber = SentenceGrabber(filename="assets/text/shrek_script.txt", min_sentence_length=10)
@@ -88,7 +88,13 @@ class TypingTestView(BaseView):
             'send you a sentence to type out. Anyone can participate, but you can only try to '
             'type one sentence at a time!',
         )
-        # TODO, more info here maybe
+
+        embed.add_field(
+            name='Timeout Warning',
+            value='This typing test will time out after 5 minutes of inactivity. '
+            'When it does, the Start button will become unusable.',
+        )
+
         return embed
 
     async def interaction_check(self, interaction: discord.Interaction[FuryBot]) -> bool:
@@ -101,7 +107,10 @@ class TypingTestView(BaseView):
         return True
 
     async def on_timeout(self) -> None:
-        raise NotImplementedError
+        self.start.disabled = True
+
+        if self.message is not MISSING:
+            await self.message.edit(view=self)
 
     async def _watch_for_message(self, author: Union[discord.User, discord.Member]) -> Optional[discord.Message]:
         def check(message: discord.Message) -> bool:
@@ -156,8 +165,11 @@ class TypingTestView(BaseView):
                     packet.sentence,
                 )
 
+                # Remove their packet from the cache
+                self.packets.pop(message.author.id, None)
+
         total_time = (message.created_at - packet.started_typing_at).total_seconds()
-        return await message.reply(
+        await message.reply(
             f"You typed the sentence in `{total_time:.2f} seconds` with an accuracy of `{(accuracy * 100):.2f}%`!"
         )
 

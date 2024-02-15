@@ -278,6 +278,12 @@ class BaseView(discord.ui.View, abc.ABC):
     def embed(self) -> discord.Embed:
         ...
 
+    def remove_stop_button(self) -> None:
+        """Removes the stop button from the view."""
+        for item in self.children:
+            if isinstance(item, Stop):
+                self.remove_item(item)
+
     def dump_kwargs(self) -> BaseViewKwargs:
         """ViewMixinKwargs: A helper to dump the view's create kwargs when creating a child view."""
         return {'target': self.target, 'timeout': self.timeout, 'parent': self}
