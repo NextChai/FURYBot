@@ -24,8 +24,8 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import dataclasses
-import importlib.util
 import importlib.machinery
+import importlib.util
 import logging
 import sys
 from types import ModuleType
@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 import discord
 from discord.ext import commands
 
-from utils import Context, BaseCog
+from utils import BaseCog, Context
 
 if TYPE_CHECKING:
     from bot import FuryBot

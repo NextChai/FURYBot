@@ -24,20 +24,12 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-import re
-import io
 import aiofile
+import re
 import random
-from typing import TYPE_CHECKING, Optional, List, Any
+from typing import Optional, Any, List
 from typing_extensions import Self
 
-import discord
-from discord import app_commands
-
-from utils import BaseCog
-
-if TYPE_CHECKING:
-    from bot import FuryBot
 
 PUNCTUATION_REGEX = re.compile(r'[!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~]')
 
@@ -122,51 +114,3 @@ class SentenceGrabber:
             sentence += '.'
 
         return sentence
-
-
-class Fun(BaseCog):
-    def __init__(self, bot: FuryBot) -> None:
-        super().__init__(bot=bot)
-
-    @app_commands.command(name='avatar', description='Get the avatar of a user.')
-    @app_commands.describe(member='The member to get the avatar of.')
-    async def avatar(
-        self, interaction: discord.Interaction[FuryBot], member: Optional[discord.Member] = None
-    ) -> discord.InteractionMessage:
-        """|coro|
-
-        Gets the avatar of a user.
-
-        Parameters
-        ----------
-        member: Optional[:class:`discord.Member`]
-            The member to get the avatar of. Defaults to the author.
-        """
-        await interaction.response.defer()
-        target = member or interaction.user
-
-        avatar = await target.display_avatar.read()
-
-        filename = f'{target.display_name}_avatar.png'
-        file = discord.File(
-            fp=io.BytesIO(avatar),
-            filename=f'{target.display_name}_avatar.png',
-            description=f'Avatar of {target.display_name}',
-        )
-
-        embed = self.bot.Embed(title=f'{target.display_name} Avatar')
-        embed.set_image(url=f'attachment://{filename}')
-        return await interaction.edit_original_response(embed=embed, attachments=[file])
-
-
-async def setup(bot: FuryBot) -> None:
-    """|coro|
-
-    The setup function for the cog.
-
-    Parameters
-    ----------
-    bot: :class:`FuryBot`
-        The bot instance.
-    """
-    await bot.add_cog(Fun(bot))
