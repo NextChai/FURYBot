@@ -21,13 +21,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 import dataclasses
 import importlib.util
 import importlib.machinery
 import logging
-import sys
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, Dict, List
 
@@ -53,8 +53,13 @@ class Owner(BaseCog):
     async def cog_check(self, ctx: Context) -> bool:
         return await self.bot.is_owner(ctx.author)
 
-    def _reload_extension(self, extension: str, module: ModuleType) -> None:
-        sys.modules[extension] = module
+    def _reload_extension(self, extension: str) -> None:
+        module = importlib.import_module(extension)
+
+        try:
+            importlib.reload(module)
+        except Exception as exc:
+            _log.warning(f'Failed to reload module {extension}.', exc_info=exc)
 
     def _is_discordpy_extension(self, spec: importlib.machinery.ModuleSpec, module: ModuleType) -> bool:
         spec.loader.exec_module(module)  # type: ignore
@@ -77,8 +82,12 @@ class Owner(BaseCog):
                 module = importlib.util.module_from_spec(spec)
                 status = ReloadStatus(module=module_name)
 
-                self._reload_extension(module_name, module)
-                status.statuses.append(f'Reloaded module `{module_name}` successfully.')
+                try:
+                    self._reload_extension(module_name)
+                    status.statuses.append(f'Reloaded module `{module_name}` successfully.')
+                except Exception as exc:
+                    status.exceptions.append(exc)
+                    status.statuses.append(f'Failed to reload module `{module_name}`.')
 
                 is_dpy_extension = self._is_discordpy_extension(spec, module)
                 if is_dpy_extension is False:
@@ -91,6 +100,8 @@ class Owner(BaseCog):
                         await self.bot.reload_extension(module_name)
                     else:
                         await self.bot.load_extension(module_name)
+
+                    status.statuses.append(ctx.tick(True, label='Reloaded extension without problems.'))
                 except Exception as exc:
                     status.exceptions.append(exc)
                     status.statuses.append('Failed to reload module, unknown exception occured.')
