@@ -270,7 +270,8 @@ class ErrorHandler:
         if ctx.interaction and not ctx.interaction.response.is_done():
             await ctx.defer(ephemeral=True)
 
-        error = getattr(error, 'original', error)
+        while hasattr(error, 'original'):
+            error = getattr(error, 'original')
 
         if isinstance(error, (AutocompleteValidationException, BadArgument)):
             return await ctx.send(str(error), ephemeral=True)
