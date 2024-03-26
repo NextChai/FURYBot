@@ -79,8 +79,16 @@ class Owner(BaseCog):
                     )
                     continue
 
-                module = importlib.util.module_from_spec(spec)
                 status = ReloadStatus(module=module_name)
+
+                # Try and load the module - if it doesn't exist we need to complain and move on.
+                try:
+                    module = importlib.import_module(module_name)
+                except Exception as exc:
+                    status.exceptions.append(exc)
+                    status.statuses.append('Failed to load module, unknown exception occured.')
+                    statuses[module_name] = status
+                    continue
 
                 try:
                     self._reload_extension(module_name)
@@ -90,21 +98,19 @@ class Owner(BaseCog):
                     status.statuses.append(f'Failed to reload module `{module_name}`.')
 
                 is_dpy_extension = self._is_discordpy_extension(spec, module)
-                if is_dpy_extension is False:
-                    status.statuses.append('Discord.py setup method not found.')
-                    continue
+                if is_dpy_extension:
+                    status.statuses.append('Discord.py setup method detected.')
 
-                status.statuses.append('Discord.py setup method detected.')
-                try:
-                    if module_name in self.bot.extensions:
-                        await self.bot.reload_extension(module_name)
-                    else:
-                        await self.bot.load_extension(module_name)
+                    try:
+                        if module_name in self.bot.extensions:
+                            await self.bot.reload_extension(module_name)
+                        else:
+                            await self.bot.load_extension(module_name)
 
-                    status.statuses.append(ctx.tick(True, label='Reloaded extension without problems.'))
-                except Exception as exc:
-                    status.exceptions.append(exc)
-                    status.statuses.append('Failed to reload module, unknown exception occured.')
+                        status.statuses.append(ctx.tick(True, label='Reloaded extension without problems.'))
+                    except Exception as exc:
+                        status.exceptions.append(exc)
+                        status.statuses.append('Failed to reload module, unknown exception occured.')
 
                 status.statuses.append(ctx.tick(True, label='Reloaded entire module without problems.'))
                 statuses[module_name] = status
