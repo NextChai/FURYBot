@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-from collections import defaultdict
 import datetime
 import logging
 import os
 import sys
 import traceback
-from typing import TYPE_CHECKING, Any, DefaultDict, Dict, Generator, List, Optional, Tuple, Union, TypeAlias
+from collections import defaultdict
+from typing import TYPE_CHECKING, Any, DefaultDict, Dict, Generator, List, Optional, Tuple, TypeAlias, Union
 
 import discord
 from discord import app_commands
