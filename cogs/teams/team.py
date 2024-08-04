@@ -279,7 +279,10 @@ class Team:
             The fetched team.
         """
         members = {
-            entry["member_id"]: TeamMember(bot, guild_id=data["guild_id"], **dict(entry)) for entry in member_data or []
+            entry["member_id"]: TeamMember(
+                bot, guild_id=data["guild_id"], **dict(entry)
+            )
+            for entry in member_data or []
         }
         team = cls(bot, **dict(data), team_members=members)
         bot.add_team(team)
@@ -287,7 +290,9 @@ class Team:
         return team
 
     @classmethod
-    async def create(cls: Type[Self], name: str, /, *, guild: discord.Guild, bot: FuryBot) -> Self:
+    async def create(
+        cls: Type[Self], name: str, /, *, guild: discord.Guild, bot: FuryBot
+    ) -> Self:
         """|coro|
 
         Used to create a new team.
@@ -303,10 +308,16 @@ class Team:
         """
         category = await guild.create_category(
             name=name,
-            overwrites={guild.default_role: discord.PermissionOverwrite(read_messages=False)},
+            overwrites={
+                guild.default_role: discord.PermissionOverwrite(read_messages=False)
+            },
         )
-        text_channel = await guild.create_text_channel(name="team-chat", category=category)
-        voice_channel = await guild.create_voice_channel(name="Team Voice", category=category)
+        text_channel = await guild.create_text_channel(
+            name="team-chat", category=category
+        )
+        voice_channel = await guild.create_voice_channel(
+            name="Team Voice", category=category
+        )
 
         async with bot.safe_connection() as connection:
             data = await connection.fetchrow(
@@ -361,13 +372,18 @@ class Team:
     def category_channel(self) -> discord.CategoryChannel:
         """:class:`discord.CategoryChannel`: The category channel this team is bound to."""
         guild = self.guild
-        return cast(discord.CategoryChannel, guild.get_channel(self.category_channel_id))
+        return cast(
+            discord.CategoryChannel, guild.get_channel(self.category_channel_id)
+        )
 
     @property
     def extra_channels(self) -> List[discord.abc.GuildChannel]:
         """List[:class:`discord.abc.GuildChannel`]: A list of all extra channels this team has."""
         guild = self.guild
-        return [cast(discord.abc.GuildChannel, guild.get_channel(channel_id)) for channel_id in self.extra_channel_ids]
+        return [
+            cast(discord.abc.GuildChannel, guild.get_channel(channel_id))
+            for channel_id in self.extra_channel_ids
+        ]
 
     @property
     def scrims(self) -> List[Scrim]:
@@ -388,7 +404,11 @@ class Team:
     def captain_roles(self) -> List[discord.Role]:
         """List[:class:`discord.Role`]: A list of all captain roles for this team."""
         guild = self.guild
-        return [role for role_id in self.captain_role_ids if (role := guild.get_role(role_id))]
+        return [
+            role
+            for role_id in self.captain_role_ids
+            if (role := guild.get_role(role_id))
+        ]
 
     @property
     def display_name(self) -> str:
@@ -398,7 +418,9 @@ class Team:
     @property
     def total_points(self) -> float:
         """:class:`float`: The total points for this team based on their practices."""
-        practice_points = list(points for practice in self.practices if (points := practice.total_points))
+        practice_points = list(
+            points for practice in self.practices if (points := practice.total_points)
+        )
         if not practice_points:
             return 0
 
@@ -417,7 +439,9 @@ class Team:
         :class:`str`
             The mentions.
         """
-        return human_join((member.mention for member in self.members), delimiter=delimiter)
+        return human_join(
+            (member.mention for member in self.members), delimiter=delimiter
+        )
 
     def embed(
         self,
@@ -440,7 +464,9 @@ class Team:
         author: Union[:class:`discord.User`, :class:`discord.Member`]
             The author of the embed.
         """
-        embed = self.bot.Embed(title=title, description=description, url=url, author=author)
+        embed = self.bot.Embed(
+            title=title, description=description, url=url, author=author
+        )
 
         if author is None:
             embed.set_thumbnail(url=self.logo)
@@ -462,7 +488,11 @@ class Team:
         -------
         :class:`bool`
         """
-        return channel_id in [self.category_channel_id, self.text_channel_id, self.voice_channel_id] + self.extra_channel_ids
+        return (
+            channel_id
+            in [self.category_channel_id, self.text_channel_id, self.voice_channel_id]
+            + self.extra_channel_ids
+        )
 
     def get_member(self, member_id: int, /) -> Optional[TeamMember]:
         """Gets a member from this team based upon the given ID.
@@ -499,7 +529,9 @@ class Team:
                 continue
 
             previous_ended_at = self.practices[i - 1].ended_at
-            if previous_ended_at is None:  # This should't happen but if it does, we'll just skip it.
+            if (
+                previous_ended_at is None
+            ):  # This should't happen but if it does, we'll just skip it.
                 continue
 
             if (ended_at - previous_ended_at).days < 8:
@@ -586,16 +618,21 @@ class Team:
         # Count up all the teams scores, rank them, then get the rank of the team we're looking for
         teams = self.bot.get_teams(self.guild_id)
         team_scores = [(team, team.total_points) for team in teams]
-        return sorted(team_scores, key=lambda item: item[1], reverse=True).index((self, self.total_points)) + 1
+        return (
+            sorted(team_scores, key=lambda item: item[1], reverse=True).index(
+                (self, self.total_points)
+            )
+            + 1
+        )
 
     async def sync(self) -> None:
         """|coro|
 
         Syncs the team's channels with the data in the team.
         """
-        overwrites: Dict[Union[discord.Role, discord.Member], discord.PermissionOverwrite] = {
-            self.guild.default_role: discord.PermissionOverwrite(read_messages=False)
-        }
+        overwrites: Dict[
+            Union[discord.Role, discord.Member], discord.PermissionOverwrite
+        ] = {self.guild.default_role: discord.PermissionOverwrite(read_messages=False)}
 
         for member in self.team_members.values():
             discord_member = member.member or await member.fetch_member()
@@ -610,7 +647,9 @@ class Team:
         await self.voice_channel.edit(sync_permissions=True)
 
         for channel in self.extra_channels:
-            await channel._edit({"sync_permissions": True}, reason="Syncing team channels.")
+            await channel._edit(
+                {"sync_permissions": True}, reason="Syncing team channels."
+            )
 
     async def add_team_member(self, member_id: int, is_sub: bool = False) -> TeamMember:
         """|coro|
@@ -639,7 +678,9 @@ class Team:
             )
 
         assert member_record
-        team_member = TeamMember(self.bot, guild_id=self.guild_id, **dict(member_record))
+        team_member = TeamMember(
+            self.bot, guild_id=self.guild_id, **dict(member_record)
+        )
 
         self.team_members[team_member.member_id] = team_member
 
@@ -653,7 +694,9 @@ class Team:
 
         return team_member
 
-    async def remove_team_member(self, team_member: TeamMember, /, force_voice_disconnect: bool = False) -> None:
+    async def remove_team_member(
+        self, team_member: TeamMember, /, force_voice_disconnect: bool = False
+    ) -> None:
         """|coro|
 
         A method used to remove this member from its team.
@@ -842,12 +885,26 @@ class Team:
         """
         await connection.execute("DELETE FROM teams.settings WHERE id = $1", self.id)
 
-        await self.voice_channel.delete()
-        await self.text_channel.delete()
-        await self.category_channel.delete()
+        try:
+            await self.voice_channel.delete()
+        except discord.HTTPException:
+            pass
+
+        try:
+            await self.text_channel.delete()
+        except discord.HTTPException:
+            pass
+
+        try:
+            await self.category_channel.delete()
+        except discord.HTTPException:
+            pass
 
         for channel in self.extra_channels:
-            await channel.delete()
+            try:
+                await channel.delete()
+            except discord.HTTPException:
+                pass
 
         self.bot.remove_team(self.id, self.guild_id)
 
@@ -857,7 +914,9 @@ class Team:
         Deletes all practice history for this team.
         """
         # (1) Delete all practice history
-        await connection.execute("DELETE FROM team.practice WHERE team_id = $1", self.id)
+        await connection.execute(
+            "DELETE FROM team.practice WHERE team_id = $1", self.id
+        )
 
         # (2) Clear the bot's cache for this
         self.bot.clear_practices_for(self.id, self.guild_id)
