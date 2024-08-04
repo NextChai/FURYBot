@@ -31,9 +31,14 @@ import discord
 import pytz
 from typing_extensions import Self, Unpack
 
-from utils import BaseView, BaseViewKwargs, SelectOneOfMany, UserSelect, default_button_doc_string, human_timedelta
-
-from ..views import TeamView
+from utils import (
+    BaseView,
+    BaseViewKwargs,
+    SelectOneOfMany,
+    UserSelect,
+    default_button_doc_string,
+    human_timedelta,
+)
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -103,7 +108,9 @@ class PracticeMemberStatistics(BaseView):
 
         # Get the current streak of attended practices
         current_streak = 0
-        for practice in sorted(team.practices, key=lambda p: p.started_at, reverse=True):
+        for practice in sorted(
+            team.practices, key=lambda p: p.started_at, reverse=True
+        ):
             member = practice.get_member(self.discord_member.id)
             if member is None:
                 current_streak = 0
@@ -158,7 +165,9 @@ class PracticeMemberStatistics(BaseView):
             and f"**Started At**: {last_attended.format_start_time()}\n**Ended At**: {last_attended.format_end_time()}"
             or "Has never attended a practice."
         )
-        embed.add_field(name="Last Attended Practice", value=last_attended_fmt, inline=False)
+        embed.add_field(
+            name="Last Attended Practice", value=last_attended_fmt, inline=False
+        )
 
         return embed
 
@@ -204,7 +213,11 @@ class PracticeMemberPanel(BaseView):
                 value=f"This member has marked themselves as not attending this practice.\n**Reason**: {self.member.reason}",
             )
 
-        total_time = sum(total_time.total_seconds() for history in self.member.history if (total_time := history.total_time))
+        total_time = sum(
+            total_time.total_seconds()
+            for history in self.member.history
+            if (total_time := history.total_time)
+        )
         embed.add_field(
             name="Total Time Practicing This Session",
             value=f"In this session, this member has spent **{human_timedelta(total_time)}** practicing.",
@@ -270,9 +283,15 @@ class PracticePanel(BaseView):
             f'- **Ended At**: {self.practice.format_end_time() or "This practice is in progres..."}\n',
         )
 
-        attending_member_mentions: List[str] = [member.mention for member in self.practice.attending_members]
-        excused_member_mentions: List[str] = [member.mention for member in self.practice.excused_members]
-        members_unattended_mentions: List[str] = [member.mention for member in self.practice.missing_members]
+        attending_member_mentions: List[str] = [
+            member.mention for member in self.practice.attending_members
+        ]
+        excused_member_mentions: List[str] = [
+            member.mention for member in self.practice.excused_members
+        ]
+        members_unattended_mentions: List[str] = [
+            member.mention for member in self.practice.missing_members
+        ]
 
         embed.add_field(
             name="Members Attended",
@@ -298,7 +317,9 @@ class PracticePanel(BaseView):
 
     @discord.ui.button(label="End Practice")
     @default_button_doc_string
-    async def end_practice(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+    async def end_practice(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> None:
         """Ends the practice."""
         if not self.practice.ongoing:
             return await interaction.response.send_message(
@@ -361,15 +382,21 @@ class PracticePanel(BaseView):
 
     @discord.ui.button(label="Delete Practice")
     @default_button_doc_string
-    async def delete_button(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+    async def delete_button(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> None:
         """Delete this practice from the database."""
         if self.practice.ongoing:
-            return await interaction.response.send_message("You can't delete a practice that is ongoing.", ephemeral=True)
+            return await interaction.response.send_message(
+                "You can't delete a practice that is ongoing.", ephemeral=True
+            )
 
         await self.practice.delete()
 
         # Go back a parent view
-        view = TeamPracticesPanel(team=self.practice.team, target=interaction, parent=None)
+        view = TeamPracticesPanel(
+            team=self.practice.team, target=interaction, parent=None
+        )
         await interaction.response.edit_message(view=view, embed=view.embed)
 
 
@@ -399,8 +426,12 @@ class TeamPracticesPanel(BaseView):
         # Get the average number of members per practice
         # Get the average total time in a practice.
         if len(self.team.practices) > 0:
-            average_number_of_members = sum(len(p.members) for p in self.team.practices) / len(self.team.practices)
-            average_time = self.team.get_total_practice_time() / len(self.team.practices)
+            average_number_of_members = sum(
+                len(p.members) for p in self.team.practices
+            ) / len(self.team.practices)
+            average_time = self.team.get_total_practice_time() / len(
+                self.team.practices
+            )
         else:
             average_number_of_members = 0
             average_time = datetime.timedelta()
@@ -431,7 +462,8 @@ class TeamPracticesPanel(BaseView):
             embed.add_field(
                 name="Top 5 Practice Times",
                 value="\n".join(
-                    f"{member.mention}: {human_timedelta(time.total_seconds())}" for (member, time) in ranked_members[:5]
+                    f"{member.mention}: {human_timedelta(time.total_seconds())}"
+                    for (member, time) in ranked_members[:5]
                 ),
                 inline=False,
             )
@@ -440,25 +472,34 @@ class TeamPracticesPanel(BaseView):
         if absent_members:
             embed.add_field(
                 name="Top 5 Absences",
-                value="\n".join(f"{member.mention}: {absences}" for (member, absences) in absent_members[:5]),
+                value="\n".join(
+                    f"{member.mention}: {absences}"
+                    for (member, absences) in absent_members[:5]
+                ),
                 inline=False,
             )
 
         return embed
 
-    async def _manage_practice_after(self, interaction: discord.Interaction[FuryBot], values: List[str]) -> None:
+    async def _manage_practice_after(
+        self, interaction: discord.Interaction[FuryBot], values: List[str]
+    ) -> None:
         practice_id = int(values[0])
         practice = discord.utils.get(self.team.practices, id=practice_id)
         if not practice:
             await interaction.response.edit_message(view=self, embed=self.embed)
-            return await interaction.followup.send("That practice doesn't exist anymore.", ephemeral=True)
+            return await interaction.followup.send(
+                "That practice doesn't exist anymore.", ephemeral=True
+            )
 
         view = self.create_child(PracticePanel, practice)
         return await interaction.response.edit_message(view=view, embed=view.embed)
 
     @discord.ui.button(label="Manage Practice")
     @default_button_doc_string
-    async def manage_practice(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+    async def manage_practice(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> None:
         """Manage a specific practice."""
         # A strftime string to turn a datetime into "Month Day, Hour:Minute AM/PM"
         date_format = "%B %d, %I:%M %p"
@@ -467,7 +508,11 @@ class TeamPracticesPanel(BaseView):
         for practice in self.team.practices[:20]:
             # Practice.ended_at is in UTC, we need to convert it to EST to display it properly.
             # We also need to convert it to a datetime object to use strftime.
-            ended_at = practice.ended_at and practice.ended_at.astimezone(tz=EST).strftime(date_format) or "In Progress..."
+            ended_at = (
+                practice.ended_at
+                and practice.ended_at.astimezone(tz=EST).strftime(date_format)
+                or "In Progress..."
+            )
             options.append(discord.SelectOption(label=ended_at, value=str(practice.id)))
 
         SelectOneOfMany(
@@ -488,9 +533,10 @@ class TeamPracticesPanel(BaseView):
         async with self.bot.safe_connection() as connection:
             await self.team.delete_all_practice_history(connection=connection)
 
-        view = TeamView(team=self.team, target=interaction)
-        await interaction.followup.send("Successfully deleted all practice history.", ephemeral=True)
-        return await interaction.edit_original_response(embed=view.embed, view=view)
+        await interaction.followup.send(
+            "Successfully deleted all practice history.", ephemeral=True
+        )
+        return await interaction.edit_original_response(embed=self.embed, view=self)
 
     # TODO: Add a button to view complete practice history (see ID)
     # TODO: Add a button to get a practice by it's ID
