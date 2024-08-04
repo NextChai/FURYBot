@@ -523,7 +523,9 @@ class TeamPracticesPanel(BaseView):
 
         return await interaction.response.edit_message(view=self)
 
-    @discord.ui.button(label="Delete All Practice History")
+    @discord.ui.button(
+        label="Delete All Practice History", style=discord.ButtonStyle.red
+    )
     @default_button_doc_string
     async def delete_all_practice_history(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
