@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, Protocol, Tuple
@@ -35,13 +36,11 @@ __all__: Tuple[str, ...] = ('Guildable', 'Teamable', 'Botable', 'TeamMemberable'
 
 
 class Botable(Protocol):
-    def _get_bot(self) -> FuryBot:
-        ...
+    def _get_bot(self) -> FuryBot: ...
 
 
 class Guildable(Botable, Protocol):
-    def _get_guild_id(self) -> int:
-        ...
+    def _get_guild_id(self) -> int: ...
 
     @property
     def guild(self) -> Optional[discord.Guild]:
@@ -49,8 +48,7 @@ class Guildable(Botable, Protocol):
 
 
 class Teamable(Guildable, Protocol):
-    def _get_team_id(self) -> int:
-        ...
+    def _get_team_id(self) -> int: ...
 
     @property
     def team(self) -> Team:
@@ -60,8 +58,7 @@ class Teamable(Guildable, Protocol):
 
 
 class TeamMemberable(Teamable, Protocol):
-    def _get_member_id(self) -> int:
-        ...
+    def _get_member_id(self) -> int: ...
 
     @property
     def team_member(self) -> Optional[TeamMember]:

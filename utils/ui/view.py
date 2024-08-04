@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 import abc
@@ -275,8 +276,7 @@ class BaseView(discord.ui.View, abc.ABC):
             self.add_item(Stop(self))
 
     @abc.abstractproperty
-    def embed(self) -> discord.Embed:
-        ...
+    def embed(self) -> discord.Embed: ...
 
     def remove_stop_button(self) -> None:
         """Removes the stop button from the view."""
@@ -437,16 +437,13 @@ class MultiSelector(Generic[BaseViewT, T], abc.ABC):
         return self.pages[self.current_page]
 
     @abc.abstractmethod
-    def create_embed(self, items: Iterable[T]) -> discord.Embed:
-        ...
+    def create_embed(self, items: Iterable[T]) -> discord.Embed: ...
 
     @abc.abstractmethod
-    def hash_item(self, item: T) -> Hashable:
-        ...
+    def hash_item(self, item: T) -> Hashable: ...
 
     @abc.abstractmethod
-    async def on_item_chosen(self, interaction: discord.Interaction[FuryBot], item: T) -> Any:
-        ...
+    async def on_item_chosen(self, interaction: discord.Interaction[FuryBot], item: T) -> Any: ...
 
     async def launch(self, interaction: discord.Interaction[FuryBot]) -> None:
         # Get information from the first page

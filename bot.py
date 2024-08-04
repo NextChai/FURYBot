@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -77,42 +78,44 @@ if TYPE_CHECKING:
 
     import aiohttp
 
-T = TypeVar('T')
-P = ParamSpec('P')
-PoolType: TypeAlias = 'asyncpg.Pool[asyncpg.Record]'
-ConnectionType: TypeAlias = 'asyncpg.Connection[asyncpg.Record]'
-DecoFunc: TypeAlias = Callable[Concatenate['FuryBot', P], Coroutine[T, Any, Any]]
-CacheFunc: TypeAlias = Callable[Concatenate['FuryBot', ConnectionType, P], Coroutine[Any, Any, T]]
+T = TypeVar("T")
+P = ParamSpec("P")
+PoolType: TypeAlias = "asyncpg.Pool[asyncpg.Record]"
+ConnectionType: TypeAlias = "asyncpg.Connection[asyncpg.Record]"
+DecoFunc: TypeAlias = Callable[Concatenate["FuryBot", P], Coroutine[T, Any, Any]]
+CacheFunc: TypeAlias = Callable[Concatenate["FuryBot", ConnectionType, P], Coroutine[Any, Any, T]]
 
 _log = logging.getLogger(__name__)
 if RUNNING_DEVELOPMENT:
     _log.setLevel(logging.DEBUG)
 
 initial_extensions: Tuple[str, ...] = (
-    'cogs.events.notifier',
-    'cogs.fun',
-    'cogs.images',
-    'cogs.message_tracking',
-    'cogs.moderation',
-    'cogs.owner',
-    'cogs.teams',
-    'cogs.teams.practices',
-    'cogs.meta',
-    'cogs.teams.scrims',
-    'jishaku',
-    'utils.error_handler',
+    "cogs.events.notifier",
+    "cogs.fun",
+    "cogs.images",
+    "cogs.message_tracking",
+    "cogs.moderation",
+    "cogs.owner",
+    "cogs.teams",
+    "cogs.teams.practices",
+    "cogs.meta",
+    "cogs.teams.scrims",
+    "jishaku",
+    "utils.error_handler",
 )
 
 
-def cache_loader(flag_name: str) -> Callable[[CacheFunc[P, T]], CacheFunc[P, Optional[T]]]:
+def cache_loader(
+    flag_name: str,
+) -> Callable[[CacheFunc[P, T]], CacheFunc[P, Optional[T]]]:
     def wrapped(func: CacheFunc[P, T]) -> CacheFunc[P, Optional[T]]:
         @functools.wraps(func)
         async def call_func(self: FuryBot, connection: ConnectionType, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
-            flag = _parse_environ_boolean(f'{flag_name}_CACHE')
+            flag = _parse_environ_boolean(f"{flag_name}_CACHE")
             if not flag:
                 return None
 
-            _log.info('Loading %s cache from func %s', flag_name, func.__name__)
+            _log.info("Loading %s cache from func %s", flag_name, func.__name__)
 
             return await func(self, connection, *args, **kwargs)
 
@@ -166,7 +169,14 @@ class DbContextManager:
         The timeout for acquiring a Connectionection.
     """
 
-    __slots__: Tuple[str, ...] = ('bot', 'timeout', '_pool', '_Connection', '_tr', '_connection')
+    __slots__: Tuple[str, ...] = (
+        "bot",
+        "timeout",
+        "_pool",
+        "_Connection",
+        "_tr",
+        "_connection",
+    )
 
     def __init__(self, bot: FuryBot, *, timeout: Optional[float] = 10.0) -> None:
         self.bot: FuryBot = bot
@@ -188,7 +198,10 @@ class DbContextManager:
         return connection  # type: ignore
 
     async def __aexit__(
-        self, exc_type: Optional[Type[Exception]], exc: Optional[Exception], tb: Optional[Type[Exception]]
+        self,
+        exc_type: Optional[Type[Exception]],
+        exc: Optional[Exception],
+        tb: Optional[Type[Exception]],
     ) -> None:
         if exc and self._tr:
             await self._tr.rollback()
@@ -218,7 +231,13 @@ class FuryBot(commands.Bot):
         user: discord.ClientUser  # This isn't accessed before the client has been logged in so it's OK to overwrite it.
         error_handler: ErrorHandler
 
-    def __init__(self, *, loop: asyncio.AbstractEventLoop, session: aiohttp.ClientSession, pool: PoolType) -> None:
+    def __init__(
+        self,
+        *,
+        loop: asyncio.AbstractEventLoop,
+        session: aiohttp.ClientSession,
+        pool: PoolType,
+    ) -> None:
         self.loop: asyncio.AbstractEventLoop = loop
         self.session: aiohttp.ClientSession = session
         self.pool: PoolType = pool
@@ -249,9 +268,9 @@ class FuryBot(commands.Bot):
         self.link_settings: Dict[int, LinkSettings] = {}
 
         super().__init__(
-            command_prefix=commands.when_mentioned_or('trev.', 'trev'),
+            command_prefix=commands.when_mentioned_or("trev.", "trev"),
             help_command=None,
-            description='A helpful moderation tool',
+            description="A helpful moderation tool",
             intents=discord.Intents.all(),
             strip_after_prefix=True,
             allowed_mentions=discord.AllowedMentions.none(),
@@ -276,11 +295,15 @@ class FuryBot(commands.Bot):
         def _decode_jsonb(value: str) -> Dict[Any, Any]:
             return discord.utils._from_json(value)
 
-        old_init = kwargs.pop('init', None)
+        old_init = kwargs.pop("init", None)
 
         async def init(con: asyncpg.Connection[asyncpg.Record]) -> None:
             await con.set_type_codec(
-                'jsonb', schema='pg_catalog', encoder=_encode_jsonb, decoder=_decode_jsonb, format='text'
+                "jsonb",
+                schema="pg_catalog",
+                encoder=_encode_jsonb,
+                decoder=_decode_jsonb,
+                format="text",
             )
             if old_init is not None:
                 await old_init(con)
@@ -296,7 +319,7 @@ class FuryBot(commands.Bot):
         colour: Optional[Union[int, discord.Colour]] = None,
         color: Optional[Union[int, discord.Colour]] = None,
         title: Optional[Any] = None,
-        type: Literal['rich', 'image', 'video', 'gifv', 'article', 'link'] = 'rich',
+        type: Literal["rich", "image", "video", "gifv", "article", "link"] = "rich",
         url: Optional[Any] = None,
         description: Optional[Any] = None,
         timestamp: Optional[datetime.datetime] = None,
@@ -318,11 +341,17 @@ class FuryBot(commands.Bot):
         :class:`discord.Embed`
         """
         embed = discord.Embed(
-            title=title, description=description, url=url, color=color, colour=colour, type=type, timestamp=timestamp
+            title=title,
+            description=description,
+            url=url,
+            color=color,
+            colour=colour,
+            type=type,
+            timestamp=timestamp,
         )
 
         if not colour and not color:
-            embed.colour = discord.Colour.from_str('0x4EDBFC')
+            embed.colour = discord.Colour.from_str("0x4EDBFC")
 
         if author:
             embed.set_author(name=author.name, icon_url=author.display_avatar.url)
@@ -558,6 +587,18 @@ class FuryBot(commands.Bot):
         """
         return self._team_practice_cache.get(guild_id, {}).get(team_id, {}).pop(practice_id, None)
 
+    def clear_practices_for(self, team_id: int, guild_id: int, /) -> None:
+        """Clear all practices for a team in a guild.
+
+        Parameters
+        ----------
+        team_id: :class:`int`
+            The team ID to clear practices for.
+        guild_id: :class:`int`
+            The guild ID to clear practices from.
+        """
+        self._team_practice_cache.get(guild_id, {}).pop(team_id, None)
+
     def get_practices_for(self, team_id: int, guild_id: int, /) -> List[Practice]:
         """Get all practices for the given team in the given guild.
 
@@ -588,9 +629,9 @@ class FuryBot(commands.Bot):
         """
         _log.info(f"Logged in as {self.user.name}")
         _log.info(
-            f'Connected to {len(self.guilds)} servers total watching over {sum(list(m_count for g in self.guilds if (m_count := g.member_count))):,} members.'
+            f"Connected to {len(self.guilds)} servers total watching over {sum(list(m_count for g in self.guilds if (m_count := g.member_count))):,} members."
         )
-        _log.info(f'Invite link: {discord.utils.oauth_url(self.user.id, permissions=discord.Permissions(0))}')
+        _log.info(f"Invite link: {discord.utils.oauth_url(self.user.id, permissions=discord.Permissions(0))}")
 
     async def on_raw_member_remove(self, payload: discord.RawMemberRemoveEvent) -> None:
         """|coro|
@@ -683,27 +724,27 @@ class FuryBot(commands.Bot):
     async def unload_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
         return await super().unload_extension(name, package=package)
 
-    @cache_loader('TEAMS')
+    @cache_loader("TEAMS")
     async def _cache_setup_teams(self, connection: ConnectionType) -> None:
-        team_data = await connection.fetch('SELECT * FROM teams.settings')
-        team_members_data = await connection.fetch('SELECT * FROM teams.members')
+        team_data = await connection.fetch("SELECT * FROM teams.settings")
+        team_members_data = await connection.fetch("SELECT * FROM teams.members")
 
         team_member_mapping: Dict[int, List[Dict[Any, Any]]] = {}
         for entry in team_members_data:
-            team_member_mapping.setdefault(entry['team_id'], []).append(dict(entry))
+            team_member_mapping.setdefault(entry["team_id"], []).append(dict(entry))
 
         for row in team_data:
-            members = team_member_mapping.get(row['id'], [])
+            members = team_member_mapping.get(row["id"], [])
             team = await Team.from_record(dict(row), members, bot=self)
             self._team_cache.setdefault(team.guild_id, {})[team.id] = team
 
-    @cache_loader('SCRIMS')
+    @cache_loader("SCRIMS")
     async def _cache_setup_scrims(self, connection: ConnectionType) -> None:
-        scrim_records = await connection.fetch('SELECT * FROM teams.scrims')
+        scrim_records = await connection.fetch("SELECT * FROM teams.scrims")
 
         for entry in scrim_records:
             data = dict(entry)
-            data['status'] = ScrimStatus(data['status'])
+            data["status"] = ScrimStatus(data["status"])
 
             scrim = Scrim(self, **data)
             scrim.load_persistent_views()
@@ -712,38 +753,39 @@ class FuryBot(commands.Bot):
     async def _load_image_request(self, data: asyncpg.Record) -> None:
         await self.wait_until_ready()
 
-        guild = self.get_guild(data['guild_id'])
+        guild = self.get_guild(data["guild_id"])
         if not guild:
             return
 
         channel = cast(
-            Optional[Union[discord.TextChannel, discord.VoiceChannel, discord.Thread]], guild.get_channel(data['channel_id'])
+            Optional[Union[discord.TextChannel, discord.VoiceChannel, discord.Thread]],
+            guild.get_channel(data["channel_id"]),
         )
         if not channel:
             return
 
-        attachment_data = data.get('attachment')
+        attachment_data = data.get("attachment")
         if attachment_data is None:
             return
 
         request = ImageRequest(
-            requester=await guild.fetch_member(data['requester_id']),
-            attachment=discord.Attachment(data=data['attachment'], state=self._connection),
+            requester=await guild.fetch_member(data["requester_id"]),
+            attachment=discord.Attachment(data=data["attachment"], state=self._connection),
             channel=channel,
-            message=data['message'],
-            id=data['id'],
+            message=data["message"],
+            id=data["id"],
         )
 
         view = ApproveOrDenyImage(self, request)
-        self.add_view(view, message_id=data['message_id'])
+        self.add_view(view, message_id=data["message_id"])
 
-    @cache_loader('IMAGE_REQUESTS')
+    @cache_loader("IMAGE_REQUESTS")
     async def _cache_setup_image_requests(self, connection: ConnectionType) -> None:
-        image_requests = await connection.fetch('SELECT * FROM image_requests')
+        image_requests = await connection.fetch("SELECT * FROM image_requests")
         for request in image_requests:
             self.create_task(self._load_image_request(request))
 
-    @cache_loader('PRACTICES')
+    @cache_loader("PRACTICES")
     async def _cache_setup_practices(self, connection: ConnectionType) -> None:
         practice_data = await connection.fetch("SELECT * FROM teams.practice")
         practice_member_data = await connection.fetch("SELECT * FROM teams.practice_member")
@@ -752,13 +794,13 @@ class FuryBot(commands.Bot):
         # Sort the member data to be {practice_id: {member_id: data}} because we can have more than one member per practice
         practice_member_mapping: Dict[int, Dict[int, Dict[Any, Any]]] = {}
         for entry in practice_member_data:
-            practice_member_mapping.setdefault(entry['practice_id'], {})[entry['member_id']] = dict(entry)
+            practice_member_mapping.setdefault(entry["practice_id"], {})[entry["member_id"]] = dict(entry)
 
         # Sort the member history data to be {practice_id: {member_id: List[data]}} because we an have more than one
         # history entry per member per practice
         practice_member_history_mapping: Dict[int, Dict[int, List[Dict[Any, Any]]]] = {}
         for entry in practice_member_history_data:
-            practice_member_history_mapping.setdefault(entry['practice_id'], {}).setdefault(entry['member_id'], []).append(
+            practice_member_history_mapping.setdefault(entry["practice_id"], {}).setdefault(entry["member_id"], []).append(
                 dict(entry)
             )
 
@@ -778,36 +820,36 @@ class FuryBot(commands.Bot):
                 practice.id
             ] = practice
 
-    @cache_loader('PROFANITY_FILTER')
+    @cache_loader("PROFANITY_FILTER")
     async def _cache_setup_profanity_filter(self, connection: ConnectionType) -> None:
         pattern = await GuildProfanityFinder.get_default_pattern()
         self.global_profanity_finder = GuildProfanityFinder(pattern, guild_id=None)
 
-    @cache_loader('LINKS')
+    @cache_loader("LINKS")
     async def _cache_setup_links(self, connection: ConnectionType) -> None:
-        settings = await connection.fetch('SELECT * FROM links.settings')
-        actions = await connection.fetch('SELECT * FROM links.actions')
+        settings = await connection.fetch("SELECT * FROM links.settings")
+        actions = await connection.fetch("SELECT * FROM links.actions")
 
         for entry in settings:
             settings = LinkSettings(bot=self, data=dict(entry))
             self.add_link_settings(settings)
 
         for action in actions:
-            settings = self.get_link_setting(action['settings_id'])
+            settings = self.get_link_setting(action["settings_id"])
             assert settings
 
             settings.add_action(LinkAction(bot=self, data=dict(action)))
 
-        allowed_items_data = await connection.fetch('SELECT * FROM links.allowed_items')
+        allowed_items_data = await connection.fetch("SELECT * FROM links.allowed_items")
         for allowed_item_data in allowed_items_data:
-            settings = self.get_link_setting(allowed_item_data['settings_id'])
+            settings = self.get_link_setting(allowed_item_data["settings_id"])
             assert settings
 
             settings.add_allowed_item(AllowedItem(bot=self, data=dict(allowed_item_data)))
 
-        exempt_targets_data = await connection.fetch('SELECT * FROM links.exempt_targets')
+        exempt_targets_data = await connection.fetch("SELECT * FROM links.exempt_targets")
         for exempt_target_data in exempt_targets_data:
-            settings = self.get_link_setting(exempt_target_data['settings_id'])
+            settings = self.get_link_setting(exempt_target_data["settings_id"])
             assert settings
 
             settings.add_exempt_target(ExemptTarget(bot=self, data=dict(exempt_target_data)))
@@ -826,22 +868,27 @@ class FuryBot(commands.Bot):
         await asyncio.gather(*(self.load_extension(ext) for ext in extensions_to_load))
 
         if BYPASS_SETUP_HOOK_CACHE_LOADING:
-            _log.info('Bypassing cache loading.')
+            _log.info("Bypassing cache loading.")
             return
 
         cache_loading_functions: List[Tuple[str, Callable[..., Coroutine[Any, Any, Any]]]] = [
             item
             for item in inspect.getmembers(self, predicate=inspect.iscoroutinefunction)
-            if getattr(item[1], '__cache_loader__', None)
+            if getattr(item[1], "__cache_loader__", None)
         ]
 
-        _log.info(f'Loading {len(cache_loading_functions)} cache entries.')
+        _log.info(f"Loading {len(cache_loading_functions)} cache entries.")
 
-        async def _wrapped_cache_loader(cache_loading_function: Callable[..., Coroutine[Any, Any, Any]]) -> None:
+        async def _wrapped_cache_loader(
+            cache_loading_function: Callable[..., Coroutine[Any, Any, Any]],
+        ) -> None:
             async with self.safe_connection() as connection:
                 try:
                     await cache_loading_function(connection=connection)
                 except Exception as exc:
-                    _log.warning(f'Failed to load cache entry {cache_loading_function.__name__}.', exc_info=exc)
+                    _log.warning(
+                        f"Failed to load cache entry {cache_loading_function.__name__}.",
+                        exc_info=exc,
+                    )
 
         await asyncio.gather(*[_wrapped_cache_loader(func) for _, func in cache_loading_functions])

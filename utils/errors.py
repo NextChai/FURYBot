@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 from typing import Any, Tuple
@@ -36,7 +37,6 @@ __all__: Tuple[str, ...] = (
 
 
 class ApplicationCommandException(app_commands.AppCommandError):
-
     """A custom exception raised when an operation fails in an application command's
     callback.
 

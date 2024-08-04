@@ -23,11 +23,13 @@ DEALINGS IN THE SOFTWARE.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Dict, NamedTuple, Optional, TypeAlias, Union
-from typing_extensions import Self
 
 import datetime
+from typing import TYPE_CHECKING, Dict, NamedTuple, Optional, TypeAlias, Union
+
 import discord
+from typing_extensions import Self
+
 from utils import BaseView, Context
 
 from .grabber import SentenceGrabber

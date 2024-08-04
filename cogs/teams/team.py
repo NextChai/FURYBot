@@ -1,4 +1,4 @@
-""" 
+"""
 The MIT License (MIT)
 
 Copyright (c) 2020-present NextChai
@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -92,7 +93,7 @@ class TeamMember:
     @property
     def mention(self) -> str:
         """:class:`str`: A mention of the member."""
-        return f'<@{self.member_id}>'
+        return f"<@{self.member_id}>"
 
     async def remove_from_team(self) -> None:
         """|coro|
@@ -112,13 +113,15 @@ class TeamMember:
             The member is already a sub.
         """
         if self.is_sub:
-            raise Exception('Can not demote a sub.')
+            raise Exception("Can not demote a sub.")
 
         self.is_sub = True
 
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                'UPDATE teams.members SET is_sub = True WHERE team_id = $1 AND member_id = $2', self.team.id, self.member_id
+                "UPDATE teams.members SET is_sub = True WHERE team_id = $1 AND member_id = $2",
+                self.team.id,
+                self.member_id,
             )
 
     async def promote(self) -> None:
@@ -132,13 +135,15 @@ class TeamMember:
             The member is already on the main roster.
         """
         if not self.is_sub:
-            raise Exception('Can not promote a player on the main roster.')
+            raise Exception("Can not promote a player on the main roster.")
 
         self.is_sub = False
 
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                'UPDATE teams.members SET is_sub = False WHERE team_id = $1 AND member_id = $2', self.team.id, self.member_id
+                "UPDATE teams.members SET is_sub = False WHERE team_id = $1 AND member_id = $2",
+                self.team.id,
+                self.member_id,
             )
 
     async def fetch_member(self) -> discord.Member:
@@ -235,13 +240,13 @@ class Team:
         """
         teams = bot.get_teams(guild_id)
         if teams is []:
-            raise Exception('No team with that channel exists.')
+            raise Exception("No team with that channel exists.")
 
         for team in teams:
             if team.has_channel(channel_id):
                 return team
 
-        raise Exception('No team with that channel exists.')
+        raise Exception("No team with that channel exists.")
 
     @classmethod
     async def from_record(
@@ -274,7 +279,7 @@ class Team:
             The fetched team.
         """
         members = {
-            entry['member_id']: TeamMember(bot, guild_id=data['guild_id'], **dict(entry)) for entry in member_data or []
+            entry["member_id"]: TeamMember(bot, guild_id=data["guild_id"], **dict(entry)) for entry in member_data or []
         }
         team = cls(bot, **dict(data), team_members=members)
         bot.add_team(team)
@@ -297,15 +302,16 @@ class Team:
             The bot instance.
         """
         category = await guild.create_category(
-            name=name, overwrites={guild.default_role: discord.PermissionOverwrite(read_messages=False)}
+            name=name,
+            overwrites={guild.default_role: discord.PermissionOverwrite(read_messages=False)},
         )
-        text_channel = await guild.create_text_channel(name='team-chat', category=category)
-        voice_channel = await guild.create_voice_channel(name='Team Voice', category=category)
+        text_channel = await guild.create_text_channel(name="team-chat", category=category)
+        voice_channel = await guild.create_voice_channel(name="Team Voice", category=category)
 
         async with bot.safe_connection() as connection:
             data = await connection.fetchrow(
-                'INSERT INTO teams.settings (guild_id, category_channel_id, text_channel_id, voice_channel_id, name) '
-                'VALUES($1, $2, $3, $4, $5) RETURNING *',
+                "INSERT INTO teams.settings (guild_id, category_channel_id, text_channel_id, voice_channel_id, name) "
+                "VALUES($1, $2, $3, $4, $5) RETURNING *",
                 guild.id,
                 category.id,
                 text_channel.id,
@@ -398,7 +404,7 @@ class Team:
 
         return sum(practice_points)
 
-    def mention_members(self, delimiter: str = ', ') -> str:
+    def mention_members(self, delimiter: str = ", ") -> str:
         """Mentions all the members in this team.
 
         Parameters
@@ -440,7 +446,7 @@ class Team:
             embed.set_thumbnail(url=self.logo)
             embed.set_author(name=self.display_name, icon_url=self.logo, url=self.logo)
 
-        embed.set_footer(text=f'Team ID: {self.id}')
+        embed.set_footer(text=f"Team ID: {self.id}")
 
         return embed
 
@@ -604,7 +610,7 @@ class Team:
         await self.voice_channel.edit(sync_permissions=True)
 
         for channel in self.extra_channels:
-            await channel._edit({'sync_permissions': True}, reason='Syncing team channels.')
+            await channel._edit({"sync_permissions": True}, reason="Syncing team channels.")
 
     async def add_team_member(self, member_id: int, is_sub: bool = False) -> TeamMember:
         """|coro|
@@ -626,7 +632,7 @@ class Team:
         """
         async with self.bot.safe_connection() as connection:
             member_record = await connection.fetchrow(
-                'INSERT INTO teams.members(team_id, member_id, is_sub) VALUES($1, $2, $3) RETURNING *',
+                "INSERT INTO teams.members(team_id, member_id, is_sub) VALUES($1, $2, $3) RETURNING *",
                 self.id,
                 member_id,
                 is_sub,
@@ -659,7 +665,9 @@ class Team:
         """
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                'DELETE FROM teams.members WHERE team_id = $1 AND member_id = $2', self.id, team_member.member_id
+                "DELETE FROM teams.members WHERE team_id = $1 AND member_id = $2",
+                self.id,
+                team_member.member_id,
             )
 
         try:
@@ -671,7 +679,7 @@ class Team:
             if member.voice and force_voice_disconnect:
                 channel = member.voice.channel
                 if channel and channel in (self.voice_channel, *self.extra_channels):
-                    await member.move_to(None, reason='Member removed from the team.')
+                    await member.move_to(None, reason="Member removed from the team.")
 
             category = self.category_channel
             overwrites = category.overwrites
@@ -701,11 +709,11 @@ class Team:
         """
 
         if role_id in self.captain_role_ids:
-            raise Exception('This role is already a captain.')
+            raise Exception("This role is already a captain.")
 
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                'UPDATE teams.settings SET captain_role_ids = array_append(captain_role_ids, $1) WHERE id = $2',
+                "UPDATE teams.settings SET captain_role_ids = array_append(captain_role_ids, $1) WHERE id = $2",
                 role_id,
                 self.id,
             )
@@ -734,11 +742,11 @@ class Team:
         """
 
         if role_id not in self.captain_role_ids:
-            raise Exception('This role is not a captain.')
+            raise Exception("This role is not a captain.")
 
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                'UPDATE teams.settings SET captain_role_ids = array_remove(captain_role_ids, $1) WHERE id = $2',
+                "UPDATE teams.settings SET captain_role_ids = array_remove(captain_role_ids, $1) WHERE id = $2",
                 role_id,
                 self.id,
             )
@@ -793,35 +801,35 @@ class Team:
         None
             When updated, the current instance is edited.
         """
-        builder = QueryBuilder('teams.settings')
-        builder.add_condition('id', self.id)
+        builder = QueryBuilder("teams.settings")
+        builder.add_condition("id", self.id)
 
         if name is not MISSING:
-            builder.add_arg('name', name)
+            builder.add_arg("name", name)
             self.name = name
         if nickname is not MISSING:
-            builder.add_arg('nickname', nickname)
+            builder.add_arg("nickname", nickname)
             self.nickname = nickname
         if description is not MISSING:
-            builder.add_arg('description', description)
+            builder.add_arg("description", description)
             self.description = description
         if logo is not MISSING:
-            builder.add_arg('logo', logo)
+            builder.add_arg("logo", logo)
             self.logo = logo
         if category_channel_id is not MISSING:
-            builder.add_arg('category_channel_id', category_channel_id)
+            builder.add_arg("category_channel_id", category_channel_id)
             self.category_channel_id = category_channel_id
         if text_channel_id is not MISSING:
-            builder.add_arg('text_channel_id', text_channel_id)
+            builder.add_arg("text_channel_id", text_channel_id)
             self.text_channel_id = text_channel_id
         if voice_channel_id is not MISSING:
-            builder.add_arg('voice_channel_id', voice_channel_id)
+            builder.add_arg("voice_channel_id", voice_channel_id)
             self.voice_channel_id = voice_channel_id
         if extra_channel_ids is not MISSING:
-            builder.add_arg('extra_channel_ids', extra_channel_ids)
+            builder.add_arg("extra_channel_ids", extra_channel_ids)
             self.extra_channel_ids = extra_channel_ids
         if sub_role_ids is not MISSING:
-            builder.add_arg('sub_role_ids', sub_role_ids)
+            builder.add_arg("sub_role_ids", sub_role_ids)
             self.sub_role_ids = sub_role_ids
 
         async with self.bot.safe_connection() as connection:
@@ -832,7 +840,7 @@ class Team:
 
         Deletes the team and all of its channels.
         """
-        await connection.execute('DELETE FROM teams.settings WHERE id = $1', self.id)
+        await connection.execute("DELETE FROM teams.settings WHERE id = $1", self.id)
 
         await self.voice_channel.delete()
         await self.text_channel.delete()
@@ -842,3 +850,14 @@ class Team:
             await channel.delete()
 
         self.bot.remove_team(self.id, self.guild_id)
+
+    async def delete_all_practice_history(self, *, connection: ConnectionType) -> None:
+        """|coro|
+
+        Deletes all practice history for this team.
+        """
+        # (1) Delete all practice history
+        await connection.execute("DELETE FROM team.practice WHERE team_id = $1", self.id)
+
+        # (2) Clear the bot's cache for this
+        self.bot.clear_practices_for(self.id, self.guild_id)

@@ -24,12 +24,12 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-import aiofile
-import re
 import random
-from typing import Optional, Any, List
-from typing_extensions import Self
+import re
+from typing import Any, List, Optional
 
+import aiofile
+from typing_extensions import Self
 
 PUNCTUATION_REGEX = re.compile(r'[!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~]')
 
