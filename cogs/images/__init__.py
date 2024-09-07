@@ -24,8 +24,10 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, Dict
 
+from bot import FuryBot
+import nudenet
 import discord
 from discord import app_commands
 
@@ -41,6 +43,10 @@ if TYPE_CHECKING:
 
 class ImageRequests(BaseCog):
 
+    def __init__(self, bot: FuryBot) -> None:
+        super().__init__(bot)
+        self._detector = nudenet.NudeDetector()
+
     async def _fetch_image_request_settings(self, guild_id: int) -> Optional[ImageRequestSettings]:
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow('SELECT * FROM images.request_settings WHERE guild_id = $1', guild_id)
@@ -49,6 +55,25 @@ class ImageRequests(BaseCog):
             return None
 
         return ImageRequestSettings(data=dict(data), bot=self.bot)
+
+    async def _append_nsfw_classification(self, embed: discord.Embed, file: discord.File) -> discord.Embed:
+        data = file.fp.read()
+        file.reset()
+
+        detections: List[Dict[str, Any]] = await self.bot.wrap(self._detector.detect, data)
+        nsfw_classifications: List[str] = []
+
+        for detection in detections:
+            score = detection['score']
+            score_percent = round(score * 100, 2)
+            class_name = detection["class"].replace('_', ' ').title()
+
+            nsfw_classifications.append(f'{class_name}: **{score_percent}%**')
+
+        if nsfw_classifications:
+            embed.add_field(name='NSFW Classifications', value='\n'.join(nsfw_classifications))
+
+        return embed
 
     @app_commands.command(name='attachment-request', description='Request to have an attachment uploaded for you.')
     @app_commands.default_permissions(attach_files=True)
@@ -123,6 +148,7 @@ class ImageRequests(BaseCog):
                 requester=interaction.user, attachment=pending_attachment, channel=sender_channel, message=message
             )
             view = ApproveOrDenyImage(self.bot, request)
+            embed = await self._append_nsfw_classification(view.embed, file)
 
             # Send the request to the channel
             channel = settings.channel
@@ -142,7 +168,7 @@ class ImageRequests(BaseCog):
                 )
 
             moderator_message = await channel.send(
-                view=view, embed=view.embed, content=content, file=file, allowed_mentions=allowed_mentions
+                view=view, embed=embed, content=content, file=file, allowed_mentions=allowed_mentions
             )
 
             # Insert into the DB now
