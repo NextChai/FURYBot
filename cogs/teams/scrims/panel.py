@@ -25,7 +25,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union, Any
 
 import discord
 from typing_extensions import Self, Unpack
@@ -114,7 +114,7 @@ class ScrimPanel(BaseView):
             return await interaction.followup.send(content=str(exc), ephemeral=True)
 
         assert transformed.dt
-        await self.scrim.reschedle(transformed.dt, editor=interaction.user)
+        await self.scrim.reschedule(transformed.dt, editor=interaction.user)
         await interaction.edit_original_response(
             content=f'I\'ve rescheduled this scrim for {self.scrim.scheduled_for_formatted()}.'
         )
@@ -169,6 +169,12 @@ class ScrimPanel(BaseView):
 
             # Send the message to the other channel now
             view = AwayConfirm(self.scrim)
+            away_text_channel = self.scrim.away_team.text_channel
+            if not away_text_channel:
+                # Ths channel, for some reason, has been deleted. We should cancel the scrim.
+                # TODO: Add this
+                raise NotImplementedError('The away team text channel has been deleted.')
+
             away_message = await self.scrim.away_team.text_channel.send(embed=view.embed, view=view)
             await self.scrim.edit(away_message_id=away_message.id)
 
@@ -256,7 +262,7 @@ class TeamScrimsPanel(BaseView):
         The team to manage the scrims for.
     """
 
-    def __init__(self, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, team: Team, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.team: Team = team
 
@@ -316,6 +322,6 @@ class TeamScrimsPanel(BaseView):
         )
 
         # The AutoRemoveSelect automatically removes all children
-        # and adds itslef. Once the select has been completed it will
+        # and adds itself. Once the select has been completed it will
         # add the children back and call the "_manage_a_scrim_callback" callback for us.
         return await interaction.response.edit_message(view=self)

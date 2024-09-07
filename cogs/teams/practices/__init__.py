@@ -1,4 +1,4 @@
-""" 
+"""
 The MIT License (MIT)
 
 Copyright (c) 2020-present NextChai
@@ -33,17 +33,22 @@ from discord.ext import commands
 
 from utils import BaseCog
 
+from .errors import MemberNotAttendingPractice, MemberNotInPractice
+from .practice import PracticeStatus, Practice, PracticeMember
+from .leaderboard import PracticeLeaderboardCog
 from ..errors import MemberNotOnTeam
 from ..team import Team
-from .errors import *
-from .leaderboard import *
-from .persistent import *
-from .practice import *
+
+# for imports and ease of use for other modules
+from .errors import *  # noqa
+from .leaderboard import *  # noqa
+from .persistent import *  # noqa
+from .practice import *  # noqa
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
-__all__: Tuple[str, ...] = ('PracticeCog',)
+__all__: Tuple[str, ...] = ("PracticeCog",)
 
 _log = logging.getLogger(__name__)
 _log.setLevel(logging.DEBUG)
@@ -58,13 +63,13 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
     """
 
     practice = app_commands.Group(
-        name='practice',
-        description='Manage and start practices.',
+        name="practice",
+        description="Manage and start practices.",
         guild_only=True,
         default_permissions=discord.Permissions(moderate_members=True),
     )
 
-    @practice.command(name='start', description='Start a practice for your team.')
+    @practice.command(name="start", description="Start a practice for your team.")
     async def practice_start(self, interaction: discord.Interaction[FuryBot]) -> None:
         """|coro|
 
@@ -80,27 +85,44 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
         member = interaction.user
         assert isinstance(member, discord.Member)
 
-        category = getattr(channel, 'category', None)
+        category = getattr(channel, "category", None)
         if category is None:
-            return await interaction.response.send_message('You must use this command in a team channel.', ephemeral=True)
+            return await interaction.response.send_message("You must use this command in a team channel.", ephemeral=True)
 
         # Let's try and get a team now
         try:
             team = Team.from_channel(category.id, interaction.guild.id, bot=self.bot)
         except Exception:
-            return await interaction.response.send_message('You must use this command in a team channel.', ephemeral=True)
+            return await interaction.response.send_message("You must use this command in a team channel.", ephemeral=True)
 
         # Let's check and see if there's an active practice
         if team.ongoing_practice is not None:
             return await interaction.response.send_message(
-                'There is already an active practice for this team.', ephemeral=True
+                "There is already an active practice for this team.", ephemeral=True
+            )
+
+        # If this team does not have a voice channel, they are physically unable to do
+        # a practice.
+        if team.voice_channel is None:
+            return await interaction.response.send_message(
+                "This team does not have a voice channel. Please contact an administrator to get one.",
+                ephemeral=True,
+            )
+
+        # If this team doesn't have a text channel either they cannot do a practice
+        team_text_channel = team.text_channel
+        if team_text_channel is None:
+            return await interaction.response.send_message(
+                "This team does not have a main text channel. Was it deleted? Why? Please contact an administrator to get one.",
+                ephemeral=True,
             )
 
         # Now we can verify they're in the team's voice channel
         connected_channel = member.voice and member.voice.channel
         if not connected_channel or connected_channel != team.voice_channel:
             return await interaction.response.send_message(
-                'You must be in the team\'s voice channel to start a practice.', ephemeral=True
+                "You must be in the team's voice channel to start a practice.",
+                ephemeral=True,
             )
 
         await interaction.response.defer(ephemeral=True)
@@ -109,7 +131,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
             title="Creating Practice...",
             description="Please wait while we create your practice.",
         )
-        message = await team.text_channel.send(embed=embed)
+        message = await team_text_channel.send(embed=embed)
 
         # We can create a new practice now.
         async with self.bot.safe_connection() as connection:
@@ -149,9 +171,12 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
 
         await interaction.edit_original_response(content="A new practice has been created.")
 
-    @commands.Cog.listener('on_voice_state_update')
+    @commands.Cog.listener("on_voice_state_update")
     async def on_voice_state_update(
-        self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
+        self,
+        member: discord.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState,
     ) -> Optional[PracticeMember]:
         """|coro|
 
@@ -171,27 +196,39 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
             return
 
         if not before.channel and after.channel:
-            _log.debug('Member %s joined a voice channel.', member.id)
+            _log.debug("Member %s joined a voice channel.", member.id)
 
             category = after.channel.category
             if not category:
-                _log.debug('Member %s joined a voice channel that is not in a category.', member.id)
+                _log.debug(
+                    "Member %s joined a voice channel that is not in a category.",
+                    member.id,
+                )
                 return
 
             try:
                 team = Team.from_channel(category.id, member.guild.id, bot=self.bot)
             except Exception:
-                _log.debug('Member %s joined a voice channel that is not in a team channel.', member.id)
+                _log.debug(
+                    "Member %s joined a voice channel that is not in a team channel.",
+                    member.id,
+                )
                 return
 
             # Make sure the member joined the team's voice channel
             if after.channel != team.voice_channel:
-                _log.debug('Member %s joined a voice channel that is not the team\'s voice channel.', member.id)
+                _log.debug(
+                    "Member %s joined a voice channel that is not the team's voice channel.",
+                    member.id,
+                )
                 return
 
             practice = team.ongoing_practice
             if not practice:
-                _log.debug('Member %s joined a voice channel that is not in an ongoing practice.', member.id)
+                _log.debug(
+                    "Member %s joined a voice channel that is not in an ongoing practice.",
+                    member.id,
+                )
                 return
 
             try:
@@ -200,26 +237,38 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
                 return
 
         elif before.channel and not after.channel:
-            _log.debug('Member %s left a voice channel.', member.id)
+            _log.debug("Member %s left a voice channel.", member.id)
 
             category = before.channel.category
             if not category:
-                _log.debug('Member %s left a voice channel that is not in a category.', member.id)
+                _log.debug(
+                    "Member %s left a voice channel that is not in a category.",
+                    member.id,
+                )
                 return
 
             try:
                 team = Team.from_channel(category.id, member.guild.id, bot=self.bot)
             except Exception:
-                _log.debug('Member %s left a voice channel that is not in a team channel.', member.id)
+                _log.debug(
+                    "Member %s left a voice channel that is not in a team channel.",
+                    member.id,
+                )
                 return
 
             if before.channel != team.voice_channel:
-                _log.debug('Member %s left a voice channel that is not the team\'s voice channel.', member.id)
+                _log.debug(
+                    "Member %s left a voice channel that is not the team's voice channel.",
+                    member.id,
+                )
                 return
 
             practice = team.ongoing_practice
             if not practice:
-                _log.debug('Member %s left a voice channel that is not in an ongoing practice.', member.id)
+                _log.debug(
+                    "Member %s left a voice channel that is not in an ongoing practice.",
+                    member.id,
+                )
                 return
 
             try:
@@ -249,7 +298,11 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
                         if practice:
                             try:
                                 await practice.handle_member_leave(member=member)
-                            except (MemberNotOnTeam, MemberNotInPractice, MemberNotAttendingPractice):
+                            except (
+                                MemberNotOnTeam,
+                                MemberNotInPractice,
+                                MemberNotAttendingPractice,
+                            ):
                                 pass
 
             after_category = after.channel.category

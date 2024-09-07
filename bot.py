@@ -159,14 +159,14 @@ def wrap_extension(coro: DecoFunc[P, T]) -> DecoFunc[P, T]:
 
 
 class DbContextManager:
-    """A simple context manager used to manage database Connectionections.
+    """A simple context manager used to manage database connections.
 
     Attributes
     ----------
     bot: :class:`FuryBot`
         The bot instance.
     timeout: :class:`float`
-        The timeout for acquiring a Connectionection.
+        The timeout for acquiring a connection.
     """
 
     __slots__: Tuple[str, ...] = (
@@ -214,7 +214,7 @@ class DbContextManager:
 
 
 class FuryBot(commands.Bot):
-    """The main fury bot instance. This bot subclass contains many useful utiities
+    """The main fury bot instance. This bot subclass contains many useful utilities
     shared between all extensions / cogs.
 
     Parameters
@@ -284,7 +284,7 @@ class FuryBot(commands.Bot):
         Parameters
         ----------
         uri: :class:`str`
-            The Postgres Connectionection URI.
+            The Postgres connection URI.
         **kwargs:
             Extra keyword arguments to pass to :meth:`asyncpg.create_pool`.
         """
@@ -382,7 +382,7 @@ class FuryBot(commands.Bot):
 
         return self.global_profanity_finder
 
-    def add_custom_prodanity_finder(self, guild_id: int, finder: GuildProfanityFinder, /):
+    def add_custom_profanity_finder(self, guild_id: int, finder: GuildProfanityFinder, /):
         self.guild_profanity_finders[guild_id] = finder
 
     def remove_custom_profanity_finder(self, guild_id: int, /) -> Optional[GuildProfanityFinder]:
@@ -712,19 +712,19 @@ class FuryBot(commands.Bot):
         """
         return self.loop.run_in_executor(self.thread_pool, functools.partial(func, *args, **kwargs))
 
-    @wrap_extension
+    @wrap_extension  # type: ignore
     async def load_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
         return await super().load_extension(name, package=package)
 
-    @wrap_extension
+    @wrap_extension  # type: ignore
     async def reload_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
         return await super().reload_extension(name, package=package)
 
-    @wrap_extension
+    @wrap_extension  # type: ignore
     async def unload_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
         return await super().unload_extension(name, package=package)
 
-    @cache_loader("TEAMS")
+    @cache_loader("TEAMS")  # type: ignore
     async def _cache_setup_teams(self, connection: ConnectionType) -> None:
         team_data = await connection.fetch("SELECT * FROM teams.settings")
         team_members_data = await connection.fetch("SELECT * FROM teams.members")
@@ -738,7 +738,7 @@ class FuryBot(commands.Bot):
             team = await Team.from_record(dict(row), members, bot=self)
             self._team_cache.setdefault(team.guild_id, {})[team.id] = team
 
-    @cache_loader("SCRIMS")
+    @cache_loader("SCRIMS")  # type: ignore
     async def _cache_setup_scrims(self, connection: ConnectionType) -> None:
         scrim_records = await connection.fetch("SELECT * FROM teams.scrims")
 
@@ -779,13 +779,13 @@ class FuryBot(commands.Bot):
         view = ApproveOrDenyImage(self, request)
         self.add_view(view, message_id=data["message_id"])
 
-    @cache_loader("IMAGE_REQUESTS")
+    @cache_loader("IMAGE_REQUESTS")  # type: ignore
     async def _cache_setup_image_requests(self, connection: ConnectionType) -> None:
         image_requests = await connection.fetch("SELECT * FROM image_requests")
         for request in image_requests:
             self.create_task(self._load_image_request(request))
 
-    @cache_loader("PRACTICES")
+    @cache_loader("PRACTICES")  # type: ignore
     async def _cache_setup_practices(self, connection: ConnectionType) -> None:
         practice_data = await connection.fetch("SELECT * FROM teams.practice")
         practice_member_data = await connection.fetch("SELECT * FROM teams.practice_member")
@@ -820,12 +820,12 @@ class FuryBot(commands.Bot):
                 practice.id
             ] = practice
 
-    @cache_loader("PROFANITY_FILTER")
+    @cache_loader("PROFANITY_FILTER")  # type: ignore
     async def _cache_setup_profanity_filter(self, connection: ConnectionType) -> None:
         pattern = await GuildProfanityFinder.get_default_pattern()
         self.global_profanity_finder = GuildProfanityFinder(pattern, guild_id=None)
 
-    @cache_loader("LINKS")
+    @cache_loader("LINKS")  # type: ignore
     async def _cache_setup_links(self, connection: ConnectionType) -> None:
         settings = await connection.fetch("SELECT * FROM links.settings")
         actions = await connection.fetch("SELECT * FROM links.actions")
@@ -835,7 +835,7 @@ class FuryBot(commands.Bot):
             self.add_link_settings(settings)
 
         for action in actions:
-            settings = self.get_link_setting(action["settings_id"])
+            settings = self.get_link_setting(action["settings_id"]) 
             assert settings
 
             settings.add_action(LinkAction(bot=self, data=dict(action)))

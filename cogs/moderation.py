@@ -54,6 +54,8 @@ class Moderation(BaseCog):
         await member.add_roles(role)
         return await interaction.response.send_message(f'I\'ve assigned {role.mention} to {member.mention}', ephemeral=True)
 
+    # TODO: Add a command that times out a person and deletes their past like 
+    # 10 messages or something.
 
 async def setup(bot: FuryBot):
     await bot.add_cog(Moderation(bot))

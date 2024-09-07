@@ -87,7 +87,7 @@ class Owner(BaseCog):
                     module = importlib.import_module(module_name)
                 except Exception as exc:
                     status.exceptions.append(exc)
-                    status.statuses.append('Failed to load module, unknown exception occured.')
+                    status.statuses.append('Failed to load module, unknown exception occurred.')
                     statuses[module_name] = status
                     continue
 
@@ -111,7 +111,7 @@ class Owner(BaseCog):
                         status.statuses.append(ctx.tick(True, label='Reloaded extension without problems.'))
                     except Exception as exc:
                         status.exceptions.append(exc)
-                        status.statuses.append('Failed to reload module, unknown exception occured.')
+                        status.statuses.append('Failed to reload module, unknown exception occurred.')
 
                 status.statuses.append(ctx.tick(True, label='Reloaded entire module without problems.'))
                 statuses[module_name] = status

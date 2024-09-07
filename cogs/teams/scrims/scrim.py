@@ -508,7 +508,7 @@ class Scrim:
                 f'UPDATE teams.scrims SET {column} = array_remove({column}, $1) WHERE id = $2', member_id, self.id
             )
 
-    async def reschedle(self, when: datetime.datetime, *, editor: discord.abc.User) -> None:
+    async def reschedule(self, when: datetime.datetime, *, editor: discord.abc.User) -> None:
         """Reschedules the scrim for the updated time.
 
         Parameters

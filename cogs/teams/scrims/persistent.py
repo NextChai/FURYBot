@@ -181,12 +181,17 @@ class HomeConfirm(discord.ui.View):
             return await interaction.response.edit_message(view=self, embed=self.embed)
 
         # We need to change the status and update the message,
-        # all requied members have voted
+        # all required members have voted
         await self.scrim.change_status(ScrimStatus.pending_away)
         await interaction.response.edit_message(view=None, embed=self.embed)
 
         # Now send to the other team
         channel = self.scrim.away_team.text_channel
+        if not channel:
+            # The channel was deleted, we need to cancel the scrim
+            # TODO: Impl this
+            raise Exception('Channel was deleted, need to cancel the scrim.')
+
         view = AwayConfirm(self.scrim)
         message = await channel.send(
             embed=view.embed, view=view, content='@everyone', allowed_mentions=discord.AllowedMentions.all()

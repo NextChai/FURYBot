@@ -32,14 +32,14 @@ if TYPE_CHECKING:
     from bot import FuryBot
     from cogs.teams.team import Team, TeamMember
 
-__all__: Tuple[str, ...] = ('Guildable', 'Teamable', 'Botable', 'TeamMemberable')
+__all__: Tuple[str, ...] = ('GuildAble', 'TeamAble', 'Botable', 'TeamMemberAble')
 
 
 class Botable(Protocol):
     def _get_bot(self) -> FuryBot: ...
 
 
-class Guildable(Botable, Protocol):
+class GuildAble(Botable, Protocol):
     def _get_guild_id(self) -> int: ...
 
     @property
@@ -47,7 +47,7 @@ class Guildable(Botable, Protocol):
         return self._get_bot().get_guild(self._get_guild_id())
 
 
-class Teamable(Guildable, Protocol):
+class TeamAble(GuildAble, Protocol):
     def _get_team_id(self) -> int: ...
 
     @property
@@ -57,7 +57,7 @@ class Teamable(Guildable, Protocol):
         return team
 
 
-class TeamMemberable(Teamable, Protocol):
+class TeamMemberAble(TeamAble, Protocol):
     def _get_member_id(self) -> int: ...
 
     @property

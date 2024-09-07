@@ -1,4 +1,4 @@
-""" 
+"""
 The MIT License (MIT)
 
 Copyright (c) 2020-present NextChai
@@ -27,27 +27,27 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 import discord
 from discord import app_commands
 from discord.ext import tasks
 
-from utils import BaseCog, Guildable, human_timedelta
+from utils import BaseCog, GuildAble, human_timedelta
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
     from ..team import Team
 
-__all__: Tuple[str, ...] = ('PracticeLeaderboard', 'PracticeLeaderboardCog')
+__all__: Tuple[str, ...] = ("PracticeLeaderboard", "PracticeLeaderboardCog")
 
 _log = logging.getLogger(__name__)
 _log.setLevel(logging.DEBUG)
 
 
 @dataclasses.dataclass(init=True, kw_only=True)
-class PracticeLeaderboard(Guildable):
+class PracticeLeaderboard(GuildAble):
     """Represents a practice leaderboard for a specific guild.
 
     A guild can have multiple practice leaderboards, each in a different channel.
@@ -92,7 +92,11 @@ class PracticeLeaderboard(Guildable):
         if guild is None:
             return None
 
-        return cast(Optional[discord.TextChannel], guild.get_channel(self.channel_id))
+        channel = guild.get_channel(self.channel_id)
+        if not isinstance(channel, discord.TextChannel):
+            return None
+
+        return channel
 
     @property
     def role(self) -> Optional[discord.Role]:
@@ -101,7 +105,7 @@ class PracticeLeaderboard(Guildable):
         if guild is None:
             return None
 
-        return cast(Optional[discord.Role], guild.get_role(self.role_id))
+        return guild.get_role(self.role_id)
 
     async def fetch_message(self) -> Optional[discord.Message]:
         """|coro|
@@ -126,7 +130,7 @@ class PracticeLeaderboard(Guildable):
     async def resend_message(self, embed: discord.Embed) -> discord.Message:
         """|coro|
 
-        Resends the leaderboard message to not get API banned.
+        Re-sends the leaderboard message to not get API banned.
 
         Parameters
         ----------
@@ -149,14 +153,14 @@ class PracticeLeaderboard(Guildable):
 
         channel = self.channel
         if not channel:
-            raise ValueError('Channel not found.')
+            raise ValueError("Channel not found.")
 
         message = await channel.send(embed=embed)
         self.message_id = message.id
 
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                'UPDATE teams.practice_leaderboards SET message_id = $1 WHERE id = $2;',
+                "UPDATE teams.practice_leaderboards SET message_id = $1 WHERE id = $2;",
                 message.id,
                 self.id,
             )
@@ -187,14 +191,14 @@ class PracticeLeaderboard(Guildable):
                     continue
 
                 try:
-                    await member.remove_roles(role, reason='Team member booted off leaderboard.')
+                    await member.remove_roles(role, reason="Team member booted off leaderboard.")
                 except discord.Forbidden:
                     pass
 
         self.top_team_id = team.id
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                'UPDATE teams.practice_leaderboards SET top_team_id = $1 WHERE id = $2;',
+                "UPDATE teams.practice_leaderboards SET top_team_id = $1 WHERE id = $2;",
                 team.id,
                 self.id,
             )
@@ -217,7 +221,7 @@ class PracticeLeaderboard(Guildable):
         Delete the leaderboard from the database and the message it is bound to.
         """
         async with self.bot.safe_connection() as connection:
-            await connection.execute('DELETE FROM teams.practice_leaderboards WHERE id = $1;', self.id)
+            await connection.execute("DELETE FROM teams.practice_leaderboards WHERE id = $1;", self.id)
 
         message = await self.fetch_message()
         if message is not None:
@@ -225,7 +229,7 @@ class PracticeLeaderboard(Guildable):
 
 
 class PracticeLeaderboardCog(BaseCog):
-    """The cog to manmage creating and deleting practice leaderboards for a given guild.
+    """The cog to manage creating and deleting practice leaderboards for a given guild.
 
     Will also handle updating the leaderboard.
 
@@ -241,8 +245,8 @@ class PracticeLeaderboardCog(BaseCog):
     """
 
     practice_leaderboard = app_commands.Group(
-        name='practice-leaderboard',
-        description='Manage practice leaderboards.',
+        name="practice-leaderboard",
+        description="Manage practice leaderboards.",
         guild_only=True,
         default_permissions=discord.Permissions(manage_channels=True),
     )
@@ -260,10 +264,10 @@ class PracticeLeaderboardCog(BaseCog):
         into memory and start the update loop.
         """
         async with self.bot.safe_connection() as connection:
-            data = await connection.fetch('SELECT * FROM teams.practice_leaderboards;')
+            data = await connection.fetch("SELECT * FROM teams.practice_leaderboards;")
 
         for entry in data:
-            self.leaderboard_cache.setdefault(entry['guild_id'], {})[entry['channel_id']] = PracticeLeaderboard(
+            self.leaderboard_cache.setdefault(entry["guild_id"], {})[entry["channel_id"]] = PracticeLeaderboard(
                 bot=self.bot, **dict(entry)
             )
 
@@ -293,7 +297,11 @@ class PracticeLeaderboardCog(BaseCog):
         if not teams:
             return []
 
-        ranked_teams = sorted(self.bot.get_teams(guild_id), key=lambda team: team.total_points, reverse=True)
+        ranked_teams = sorted(
+            self.bot.get_teams(guild_id),
+            key=lambda team: team.total_points,
+            reverse=True,
+        )
         return [(team, team.total_points) for team in ranked_teams]
 
     def create_leaderboard_embed(self, leaderboard: PracticeLeaderboard, teams: List[Tuple[Team, float]]) -> discord.Embed:
@@ -312,7 +320,7 @@ class PracticeLeaderboardCog(BaseCog):
             The leaderboard embed.
         """
         if not teams:
-            return discord.Embed(title='Leaderboard', description='No teams found.')
+            return discord.Embed(title="Leaderboard", description="No teams found.")
 
         top_team, top_points = teams[0]
         embed = top_team.embed(
@@ -324,40 +332,43 @@ class PracticeLeaderboardCog(BaseCog):
 
         practice_time = top_team.get_total_practice_time().total_seconds()
         embed.add_field(
-            name='Top Team',
-            value=f'{top_team.mention_members()}, great work! You have **{top_points:.2f} points**! You have '
-            f'practiced for **{human_timedelta(practice_time)}**! For your efforts, you\'ve been rewarded with the '
-            f'<@&{leaderboard.role_id}> role! This role will be reassigned if your team loses the #1 spot, so hold on tight!',
+            name="Top Team",
+            value=f"{top_team.mention_members()}, great work! You have **{top_points:.2f} points**! You have "
+            f"practiced for **{human_timedelta(practice_time)}**! For your efforts, you've been rewarded with the "
+            f"<@&{leaderboard.role_id}> role! This role will be reassigned if your team loses the #1 spot, so hold on tight!",
             inline=False,
         )
 
         embed.add_field(
-            name='Top 10 Teams',
-            value='\n'.join(
-                f'{count}. **{team.display_name}**, {points:.2f} points'
+            name="Top 10 Teams",
+            value="\n".join(
+                f"{count}. **{team.display_name}**, {points:.2f} points"
                 for count, (team, points) in enumerate(teams[:10], start=1)
             ),
             inline=False,
         )
 
         embed.add_field(
-            name='How Are Points Calculated?',
-            value='Points are calculated based on the total time your team has spent practicing '
-            'as well as how many people attended each practice. This is calculated using a logarithmic '
-            'function that takes into account the number of people who attended the practice and the '
-            'team size. This gives a larger bonus for smaller teams and a smaller bonus for larger teams. '
-            'This incentivizes teams to practice together to get the most points the fastest!',
+            name="How Are Points Calculated?",
+            value="Points are calculated based on the total time your team has spent practicing "
+            "as well as how many people attended each practice. This is calculated using a logarithmic "
+            "function that takes into account the number of people who attended the practice and the "
+            "team size. This gives a larger bonus for smaller teams and a smaller bonus for larger teams. "
+            "This incentivizes teams to practice together to get the most points the fastest!",
         )
 
         return embed
 
-    @practice_leaderboard.command(name='create', description='Create a practice leaderboard.')
+    @practice_leaderboard.command(name="create", description="Create a practice leaderboard.")
     @app_commands.describe(
-        channel='The channel the leaderboard should be posted in.',
-        role='The role to ping when a team is on top of the leaderboard.',
+        channel="The channel the leaderboard should be posted in.",
+        role="The role to ping when a team is on top of the leaderboard.",
     )
-    async def practcie_leaderboard_create(
-        self, interaction: discord.Interaction[FuryBot], role: discord.Role, channel: Optional[discord.TextChannel]
+    async def practice_leaderboard_create(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        role: discord.Role,
+        channel: Optional[discord.TextChannel],
     ) -> discord.InteractionMessage:
         """|coro|
 
@@ -377,7 +388,7 @@ class PracticeLeaderboardCog(BaseCog):
         if channel is None:
             if not isinstance(interaction.channel, discord.TextChannel):
                 return await interaction.edit_original_response(
-                    content='You need to use this command in a text channel or specify a channel.',
+                    content="You need to use this command in a text channel or specify a channel.",
                 )
 
             channel = interaction.channel
@@ -393,12 +404,12 @@ class PracticeLeaderboardCog(BaseCog):
         teams = self.bot.get_teams(interaction.guild.id)
         if not teams:
             return await interaction.edit_original_response(
-                content='Hey! There are no teams in this server!',
+                content="Hey! There are no teams in this server!",
             )
 
         embed = self.bot.Embed(
-            title='Creating Practice Leaderboard',
-            description='Hold tight! I\'m creating your practice leaderboard now....',
+            title="Creating Practice Leaderboard",
+            description="Hold tight! I'm creating your practice leaderboard now....",
         )
         message = await channel.send(embed=embed)
 
@@ -407,9 +418,9 @@ class PracticeLeaderboardCog(BaseCog):
 
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(
-                'INSERT INTO teams.practice_leaderboards(channel_id, guild_id, message_id, top_team_id, role_id) '
-                'VALUES ($1, $2, $3, $4, $5) '
-                'RETURNING *',
+                "INSERT INTO teams.practice_leaderboards(channel_id, guild_id, message_id, top_team_id, role_id) "
+                "VALUES ($1, $2, $3, $4, $5) "
+                "RETURNING *",
                 channel.id,
                 interaction.guild.id,
                 message.id,
@@ -425,15 +436,17 @@ class PracticeLeaderboardCog(BaseCog):
         await message.edit(embed=embed)
 
         return await interaction.edit_original_response(
-            content='Successfully created leaderboard! It automatically updates every 60 seconds.',
+            content="Successfully created leaderboard! It automatically updates every 60 seconds.",
         )
 
-    @practice_leaderboard.command(name='delete', description='Delete a practice leaderboard.')
+    @practice_leaderboard.command(name="delete", description="Delete a practice leaderboard.")
     @app_commands.describe(
-        channel='The channel the leaderboard should be deleted from.',
+        channel="The channel the leaderboard should be deleted from.",
     )
-    async def practcie_leaderboard_delete(
-        self, interaction: discord.Interaction[FuryBot], channel: Optional[discord.TextChannel]
+    async def practice_leaderboard_delete(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        channel: Optional[discord.TextChannel],
     ) -> discord.InteractionMessage:
         """|coro|
 
@@ -451,7 +464,7 @@ class PracticeLeaderboardCog(BaseCog):
         if channel is None:
             if not isinstance(interaction.channel, discord.TextChannel):
                 return await interaction.edit_original_response(
-                    content='You need to use this command in a text channel or specify a channel.',
+                    content="You need to use this command in a text channel or specify a channel.",
                 )
 
             channel = interaction.channel
@@ -459,13 +472,13 @@ class PracticeLeaderboardCog(BaseCog):
         existing_leaderboard = self.leaderboard_cache.get(interaction.guild.id, {}).get(channel.id)
         if existing_leaderboard is None:
             return await interaction.edit_original_response(
-                content='Hey! There\'s no leaderboard in that channel!',
+                content="Hey! There's no leaderboard in that channel!",
             )
 
         await existing_leaderboard.delete()
         self.leaderboard_cache[interaction.guild.id].pop(channel.id)
 
-        return await interaction.edit_original_response(content='Successfully deleted leaderboard!')
+        return await interaction.edit_original_response(content="Successfully deleted leaderboard!")
 
     @tasks.loop(minutes=10)
     async def update_leaderboards(self) -> None:
@@ -477,7 +490,7 @@ class PracticeLeaderboardCog(BaseCog):
         for guild_id, leaderboards in self.leaderboard_cache.items():
             guild = self.bot.get_guild(guild_id)
             if not guild:
-                _log.debug('Ignoring guild %s in update leaderboard.', guild_id)
+                _log.debug("Ignoring guild %s in update leaderboard.", guild_id)
                 continue
 
             for leaderboard in leaderboards.values():
@@ -490,7 +503,11 @@ class PracticeLeaderboardCog(BaseCog):
                     _log.debug("Change in top team for guild %s.", guild_id)
                     await leaderboard.change_top_team(top_team)
 
-                _log.debug('Updating message for leaderboard %s for guild %s.', leaderboard.id, guild_id)
+                _log.debug(
+                    "Updating message for leaderboard %s for guild %s.",
+                    leaderboard.id,
+                    guild_id,
+                )
                 message = await leaderboard.fetch_message()
                 if message is None:
                     continue
@@ -502,7 +519,7 @@ class PracticeLeaderboardCog(BaseCog):
                 if (discord.utils.utcnow() - message.created_at) >= datetime.timedelta(days=7):
                     await leaderboard.resend_message(embed)
 
-                _log.debug('Updated leaderboard %s for guild %s.', leaderboard.id, guild_id)
+                _log.debug("Updated leaderboard %s for guild %s.", leaderboard.id, guild_id)
 
     @update_leaderboards.before_loop
     async def before_update_leaderboards(self) -> None:
@@ -512,4 +529,4 @@ class PracticeLeaderboardCog(BaseCog):
         wait for the bot to be ready before starting the loop.
         """
         await self.bot.wait_until_ready()
-        _log.info('Starting practice leaderboard update loop.')
+        _log.info("Starting practice leaderboard update loop.")

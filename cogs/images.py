@@ -141,7 +141,6 @@ class DeniedImageReason(BaseModal):
         embed.add_field(name='Channel to Send In', value=mention_interaction_channel(self.request.channel))
         await interaction.response.edit_message(embed=embed, view=None)
 
-        # Send the reason to the user :blobpain:
         embed = self.bot.Embed(
             title='Upload Request Denied.',
             description=f'Your image upload request has been denied by a moderator, {interaction.user.mention}',
@@ -215,7 +214,7 @@ class ApproveOrDenyImage(discord.ui.View):
             )
         except discord.HTTPException:
             return await interaction.edit_original_response(
-                content=f'I was unable to download the attachmen to approve it, {interaction.user.mention}. You will need to upload it manually!',
+                content=f'I was unable to download the attachment to approve it, {interaction.user.mention}. You will need to upload it manually!',
             )
 
         content = f'Uploaded by {request.requester.mention}.'
@@ -369,7 +368,7 @@ class ImageRequests(BaseCog):
 
         # And alert the user of the request
         return await interaction.edit_original_response(
-            content=f'I\'ve submitted the request for this attachment to be uploaded. You will be notified if your request is approved.'
+            content='I\'ve submitted the request for this attachment to be uploaded. You will be notified if your request is approved.'
         )
 
 

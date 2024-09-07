@@ -93,7 +93,7 @@ class ScrimEventListener(BaseCog):
         if scrim is None:
             return
 
-        # If the scrim isn't scheduled we want to edit the messages and say that the scrim didnt start
+        # If the scrim isn't scheduled we want to edit the messages and say that the scrim didn't start
         if scrim.status is not ScrimStatus.scheduled:
             cancelled_embed = self._create_scrim_cancelled_message(self.bot, scrim)
 

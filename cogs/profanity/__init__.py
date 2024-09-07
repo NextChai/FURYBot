@@ -100,7 +100,7 @@ class Profanity(BaseCog):
         # Now we can re-build the profanity finder on our bot instance for this guild.
         pattern = GuildProfanityFinder.create_pattern_from_words(all_words)
         finder = GuildProfanityFinder(pattern, guild_id=rule.guild.id)
-        self.bot.add_custom_prodanity_finder(rule.guild.id, finder)
+        self.bot.add_custom_profanity_finder(rule.guild.id, finder)
 
     @commands.Cog.listener('on_automod_rule_delete')
     async def on_automod_rule_delete(self, rule: discord.AutoModRule):
@@ -119,7 +119,7 @@ class Profanity(BaseCog):
         if all_words:
             pattern = GuildProfanityFinder.create_pattern_from_words(all_words)
             finder = GuildProfanityFinder(pattern, guild_id=rule.guild.id)
-            self.bot.add_custom_prodanity_finder(rule.guild.id, finder)
+            self.bot.add_custom_profanity_finder(rule.guild.id, finder)
         else:
             # This guild no longer has any custom profanity filters, so we can remove it from our bot instance
             # and go back to the default one.
@@ -173,7 +173,7 @@ class Profanity(BaseCog):
         if all_words:
             pattern = GuildProfanityFinder.create_pattern_from_words(all_words)
             finder = GuildProfanityFinder(pattern, guild_id=rule.guild.id)
-            self.bot.add_custom_prodanity_finder(rule.guild.id, finder)
+            self.bot.add_custom_profanity_finder(rule.guild.id, finder)
         else:
             # This guild no longer has any custom profanity filters, so we can remove it from our bot instance
             # and go back to the default one.
