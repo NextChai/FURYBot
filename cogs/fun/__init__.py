@@ -83,13 +83,4 @@ class Fun(BaseCog):
 
 
 async def setup(bot: FuryBot) -> None:
-    """|coro|
-
-    The setup function for the cog.
-
-    Parameters
-    ----------
-    bot: :class:`FuryBot`
-        The bot instance.
-    """
     await bot.add_cog(Fun(bot))
