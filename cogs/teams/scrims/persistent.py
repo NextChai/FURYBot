@@ -190,7 +190,10 @@ class HomeConfirm(discord.ui.View):
         if not channel:
             # The channel was deleted, we need to cancel the scrim
             # TODO: Impl this
-            raise Exception('Channel was deleted, need to cancel the scrim.')
+            await self.scrim.cancel(reason='The away channel has been deleted.')
+            return await interaction.response.send_message(
+                'The away channel has been deleted. Cancelling the scrim...', ephemeral=True
+            )
 
         view = AwayConfirm(self.scrim)
         message = await channel.send(
@@ -292,7 +295,7 @@ class AwayForceConfirm(discord.ui.View):
                 'Hey, you aren\'t on this team so you can\'t vote!', ephemeral=True
             )
 
-        # Check if they've voted, if they havent then we need to yell at them
+        # Check if they've voted, if they haven't then we need to yell at them
         if interaction.user.id not in self.scrim.away_confirm_anyways_voter_ids:
             return await interaction.response.send_message(
                 'Hey, you haven\'t voted to force confirm this scrim yet!', ephemeral=True
@@ -311,7 +314,7 @@ class AwayForceConfirm(discord.ui.View):
         await self.scrim.edit(away_confirm_anyways_voter_ids=self.scrim.away_confirm_anyways_voter_ids)
 
         if len(self.scrim.away_confirm_anyways_voter_ids) < self.required_to_confirm:
-            # We don't have enough members to force econfirm
+            # We don't have enough members to force confirm
             return
 
         # We have enough! Confirm the scrim.
@@ -397,7 +400,7 @@ class AwayConfirm(discord.ui.View):
             embed.add_field(
                 name='How do I Scrim?',
                 value='10 minutes before the scrim is scheduled to begin, '
-                'FuryBot will create a chat for bothho teams to communicate. In this chat, '
+                'FuryBot will create a chat for both teams to communicate. In this chat, '
                 f'the home team, **{scrim.home_team.display_name}**, will create the private match for the away team, '
                 f'**{scrim.away_team.display_name}**, to join with. You decide how much and long you want to play. The scrim channel '
                 'will automatically be deleted after 5 hours. Please note you should use your private team voice chat for communication.',
@@ -478,7 +481,7 @@ class AwayConfirm(discord.ui.View):
 
     @discord.ui.button(label='Force Confirm', custom_id='force-confirm-confirm')
     @default_button_doc_string
-    async def force_confirn(self, interaction: discord.Interaction[FuryBot], button: ButtonType[Self]) -> None:
+    async def force_confirm(self, interaction: discord.Interaction[FuryBot], button: ButtonType[Self]) -> None:
         """Launches a vote to force confirm the scrim. This can be done if the team is unable to get a full team
         but still wants to scrim."""
         if self.scrim.per_team < 2:
@@ -523,10 +526,10 @@ class AwayConfirm(discord.ui.View):
         )
         await self.scrim.edit(away_confirm_anyways_message_id=message.id)
 
-    @discord.ui.button(label='Unconfirm', custom_id='away-confirm-unconfirm')
+    @discord.ui.button(label='Un-Confirm', custom_id='away-confirm-un-confirm')
     @default_button_doc_string
-    async def unconfirm(self, interaction: discord.Interaction[FuryBot], button: ButtonType[Self]) -> None:
-        """Allows a member to unconfirm their vote to scrim at that given time."""
+    async def un_confirm(self, interaction: discord.Interaction[FuryBot], button: ButtonType[Self]) -> None:
+        """Allows a member to un-confirm their vote to scrim at that given time."""
         try:
             await self.scrim.remove_vote(interaction.user.id, self.scrim.away_id)
         except ValueError:
