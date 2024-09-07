@@ -144,6 +144,34 @@ class Teams(BaseCog):
         view = TeamView(team, target=interaction)
         return await interaction.edit_original_response(embed=view.embed, view=view)
 
+    @team.command(name='Delete', description='Delete a team.')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(team='The team you want to delete.')
+    async def team_delete(
+        self, interaction: discord.Interaction[FuryBot], team: Optional[TEAM_TRANSFORM]
+    ) -> Optional[discord.InteractionMessage]:
+        """|coro|
+
+        A command used to delete a team.
+
+        Parameters
+        ----------
+        team: :class:`Team`
+            The team you want to delete.
+        """
+        await interaction.response.defer()
+
+        team = _maybe_team(interaction, team)
+        if team is None:
+            return await interaction.response.send_message(
+                'You must be in a team channel to use this command.', ephemeral=True
+            )
+
+        async with self.bot.safe_connection() as connection:
+            await team.delete(connection=connection)
+
+        return await interaction.edit_original_response(content=f'{team.display_name} has been deleted.')
+
     @scrim.command(name='create', description='Create a scrim')
     @app_commands.describe(
         team='The team you want to scrim against.',
@@ -204,15 +232,17 @@ class Teams(BaseCog):
         if not team_members:
             return await interaction.edit_original_response(content=f'{member.mention} is not on any teams.')
 
-        embed = self.bot.Embed(title=f'{member.display_name} Teams', author=member)
-        for team_member in team_members:
-            team = team_member.team
+        team_member = team_members[0]
+        team = team_member.team
 
-            embed.add_field(
-                name=team.display_name,
-                value=f'**Team Chat**: {team.text_channel.mention}\n**Is Sub**: {"Is a sub" if team_member.is_sub else "Is not a sub"}',
-                inline=False,
-            )
+        team_text_chat = team_members[0].team.text_channel
+
+        embed = self.bot.Embed(title=f'{member.display_name} Teams', author=member)
+        embed.add_field(
+            name=team.display_name,
+            value=f'**Team Chat**: {team_text_chat and team_text_chat.mention or "Text chat has been deleted!!"}\n**Is Sub**: {"Is a sub" if team_member.is_sub else "Is not a sub"}',
+            inline=False,
+        )
 
         return await interaction.edit_original_response(embed=embed)
 
