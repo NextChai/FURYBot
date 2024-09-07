@@ -54,8 +54,6 @@ from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
 from cogs.images import ApproveOrDenyImage, ImageRequest
-from cogs.links import AllowedItem, LinkAction, LinkSettings
-from cogs.links.settings import ExemptTarget
 from cogs.teams import Team
 from cogs.teams.practices import Practice
 from cogs.teams.scrims import Scrim, ScrimStatus
@@ -67,7 +65,6 @@ from utils import (
     Context,
     ErrorHandler,
     GuildProfanityFinder,
-    LinkFilter,
     TimerManager,
     _parse_environ_boolean,
     parse_initial_extensions,
@@ -248,8 +245,6 @@ class FuryBot(commands.Bot):
         if START_TIMER_MANAGER:
             self.timer_manager = TimerManager(bot=self)
 
-        self.link_filter: LinkFilter = LinkFilter(self)
-
         # Mapping[guild_id, Mapping[team_id, Team]]
         self._team_cache: Dict[int, Dict[int, Team]] = {}
 
@@ -263,9 +258,6 @@ class FuryBot(commands.Bot):
 
         # Mapping[guild_id, GuildProfanityFinder]
         self.guild_profanity_finders: Dict[int, GuildProfanityFinder] = {}
-
-        # Mapping[guild_id, LinkSettings]
-        self.link_settings: Dict[int, LinkSettings] = {}
 
         super().__init__(
             command_prefix=commands.when_mentioned_or("trev.", "trev"),
@@ -357,22 +349,6 @@ class FuryBot(commands.Bot):
             embed.set_author(name=author.name, icon_url=author.display_avatar.url)
 
         return embed
-
-    # Management for link settings
-    def get_link_setting(self, link_setting_id: int, /) -> Optional[LinkSettings]:
-        return self.link_settings.get(link_setting_id, None)
-
-    def get_link_setting_from_guild(self, guild_id: int, /) -> Optional[LinkSettings]:
-        return discord.utils.get(self.get_link_settings(), guild_id=guild_id)
-
-    def remove_link_settings(self, link_setting_id: int, /) -> Optional[LinkSettings]:
-        return self.link_settings.pop(link_setting_id, None)
-
-    def add_link_settings(self, settings: LinkSettings, /):
-        self.link_settings[settings.id] = settings
-
-    def get_link_settings(self) -> List[LinkSettings]:
-        return list(self.link_settings.values())
 
     # Management for custom profanity filters
     def get_profanity_finder(self, guild_id: int, /) -> Optional[GuildProfanityFinder]:
@@ -824,39 +800,6 @@ class FuryBot(commands.Bot):
     async def _cache_setup_profanity_filter(self, connection: ConnectionType) -> None:
         pattern = await GuildProfanityFinder.get_default_pattern()
         self.global_profanity_finder = GuildProfanityFinder(pattern, guild_id=None)
-
-    @cache_loader("LINKS")  # type: ignore
-    async def _cache_setup_links(self, connection: ConnectionType) -> None:
-        settings = await connection.fetch("SELECT * FROM links.settings")
-        actions = await connection.fetch("SELECT * FROM links.actions")
-
-        for entry in settings:
-            settings = LinkSettings(bot=self, data=dict(entry))
-            self.add_link_settings(settings)
-
-        for action in actions:
-            settings = self.get_link_setting(action["settings_id"]) 
-            assert settings
-
-            settings.add_action(LinkAction(bot=self, data=dict(action)))
-
-        allowed_items_data = await connection.fetch("SELECT * FROM links.allowed_items")
-        for allowed_item_data in allowed_items_data:
-            settings = self.get_link_setting(allowed_item_data["settings_id"])
-            assert settings
-
-            settings.add_allowed_item(AllowedItem(bot=self, data=dict(allowed_item_data)))
-
-        exempt_targets_data = await connection.fetch("SELECT * FROM links.exempt_targets")
-        for exempt_target_data in exempt_targets_data:
-            settings = self.get_link_setting(exempt_target_data["settings_id"])
-            assert settings
-
-            settings.add_exempt_target(ExemptTarget(bot=self, data=dict(exempt_target_data)))
-
-        # Now that out cache is full we can create the regex for each guild
-        # that will be used to check if a link is allowed or not.
-        self.link_filter.create_allowed_items_regex()
 
     # Hooks
     async def setup_hook(self) -> None:

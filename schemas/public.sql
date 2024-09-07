@@ -27,11 +27,3 @@ CREATE TABLE IF NOT EXISTS image_requests (
     message TEXT
     -- The message the user attached to the upload
 );
-
-CREATE TABLE IF NOT EXISTS links (
-    id SERIAL PRIMARY KEY,
-    guild_id BIGINT,
-    url TEXT,
-    added_at TIMESTAMP WITH TIME ZONE,
-    added_by TEXT
-);
