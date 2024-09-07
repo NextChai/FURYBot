@@ -66,6 +66,11 @@ def typing_accuracy(user_sentence: str, original_sentence: str) -> float:
     return 1 - abs(distance / len(original_sentence))
 
 
+def words_per_minute(sentence: str, time: float) -> float:
+    words = len(sentence.split())
+    return (words / time) * 60
+
+
 class TTPacket(NamedTuple):
     member_id: int
     sentence: str
@@ -151,10 +156,11 @@ class TypingTestView(BaseView):
             # Remove their packet from the cache
             self.packets.pop(message.author.id, None)
 
-        total_time = (message.created_at - packet.started_typing_at).total_seconds()
-        await message.reply(
-            f"You typed the sentence in `{total_time:.2f} seconds` with an accuracy of `{(accuracy * 100):.2f}%`!"
-        )
+            total_time = (message.created_at - packet.started_typing_at).total_seconds()
+            wpm = words_per_minute(packet.sentence, total_time)
+            await message.reply(
+                f"You typed the sentence in `{total_time:.2f} seconds` with an accuracy of `{(accuracy * 100):.2f}%`. That\'s `{wpm:.2f} WPM`!"
+            )
 
     @discord.ui.button(label='Start!', style=discord.ButtonStyle.green)
     async def start(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
