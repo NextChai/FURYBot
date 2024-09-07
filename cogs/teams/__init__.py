@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Annotated, List, Optional, Tuple, TypeAlias
 
 import discord
 from discord import app_commands
+from discord.ext import commands
 
 from .scrims.errors import CannotCreateScrim
 from utils import BaseCog, TimeTransformer
@@ -279,6 +280,70 @@ class Teams(BaseCog):
             The member you want to get the team status of.
         """
         return await self._team_get_func(interaction, member)
+
+    # Automatic listeners for team deletion
+    @commands.Cog.listener('on_guild_channel_delete')
+    async def team_automatic_deletion_detector(self, channel: discord.abc.GuildChannel) -> None:
+        if not isinstance(channel, discord.CategoryChannel):
+            return
+
+        assert channel.guild, 'This should not be possible'
+
+        # This was a category channel, let's check if it was a team
+        try:
+            team = Team.from_channel(channel.id, channel.guild.id, bot=self.bot)
+        except Exception:
+            # A team does not exist with this channel, we can ignore this
+            return
+
+        # A team does exist with this channel, delete it for the mod
+        async with self.bot.safe_connection() as connection:
+            await team.delete(connection=connection)
+
+    @commands.Cog.listener('on_guild_channel_delete')
+    async def team_automatic_text_voice_chat_deletion_detector(self, channel: discord.abc.GuildChannel) -> None:
+        """|coro|
+
+        Watches to see if a team's main text or voice chat has been deleted. If so, the channel is recreated automatically.
+        Having a team main text and voice chat is marked as essential for the team to function, and the default is that
+        the channel MUST exist for the team to exist.
+        """
+        if not isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
+            return
+
+        assert channel.guild, 'This should not be possible'
+
+        # This was a text channel, let's check if it was a team
+        try:
+            team = Team.from_channel(channel.id, channel.guild.id, bot=self.bot)
+        except Exception:
+            # A team does not exist with this channel, we can ignore this
+            return
+
+        category = channel.category
+        if category is None:
+            # The category has been deleted, we can assume that the team has been deleted or
+            # some other catastrophic event has occurred. We can delete the team, and in the case
+            # the team already doesn't exist, this will just be cleaning up the database.
+            async with self.bot.safe_connection() as connection:
+                return await team.delete(connection=connection)
+
+        # If this channel was the main team's text or voice chat, we need to recreate it
+        # and update the metadata that the bot holds.
+        if team.text_channel_id == channel.id:
+            new_channel = await category.create_text_channel(name='team-chat')
+            await team.edit(text_channel_id=new_channel.id)
+
+            # Notify the team that their chat has been recreated
+            notification_embed = self.bot.Embed(
+                title='Team Chat Recreated',
+                description=f'The team chat for {team.display_name} has been recreated due to it being deleted.',
+            )
+            await new_channel.send(embed=notification_embed)
+        elif team.voice_channel_id == channel.id:
+            new_channel = await category.create_voice_channel(name='team-voice')
+            await team.edit(voice_channel_id=new_channel.id)
+            return None
 
 
 async def setup(bot: FuryBot) -> None:
