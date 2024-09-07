@@ -24,12 +24,45 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 import discord
 
 if TYPE_CHECKING:
     from discord.interactions import InteractionChannel
+    from bot import FuryBot
+
+
+class ImageRequestSettings:
+    def __init__(self, *, data: Dict[str, Any], bot: FuryBot) -> None:
+        self.channel_id: int = data['channel_id']
+        self.guild_id: int = data['guild_id']
+        self.notification_role_id: Optional[int] = data['notification_role_id']
+
+        self._bot: FuryBot = bot
+
+    @property
+    def guild(self) -> Optional[discord.Guild]:
+        return self._bot.get_guild(self.guild_id)
+
+    @property
+    def channel(self) -> Optional[discord.abc.MessageableChannel]:
+        channel = self.guild and self.guild.get_channel(self.channel_id)
+        if not channel:
+            return None
+
+        # Prereq: Only moderators are allowed to select messageable channels
+        # when settings this. It is safe to assume its wide type.
+        return channel  # type: ignore
+
+    @property
+    def notification_role(self) -> Optional[discord.Role]:
+        if not self.guild:
+            return None
+        if not self.notification_role_id:
+            return None
+
+        return self.guild.get_role(self.notification_role_id)
 
 
 class ImageRequest:
@@ -58,13 +91,13 @@ class ImageRequest:
 
     def __init__(
         self,
-        requester: discord.Member,
+        requester: Union[discord.User, discord.Member],
         attachment: discord.Attachment,
         channel: InteractionChannel,
         message: Optional[str],
         id: Optional[int] = None,
     ) -> None:
-        self.requester: discord.Member = requester
+        self.requester: Union[discord.User, discord.Member] = requester
         self.attachment: discord.Attachment = attachment
         self.channel: InteractionChannel = channel
         self.message: Optional[str] = message

@@ -27,13 +27,9 @@ from __future__ import annotations
 from typing import List, Tuple
 
 __all__: Tuple[str, ...] = (
-    'IMAGE_REQUEST_CHANNEL_ID',
-    'IMAGE_NOTIFICATIONS_ROLE_ID',
     'FURY_GUILD',
 )
 
-IMAGE_REQUEST_CHANNEL_ID: int = 1040653616047980596
-IMAGE_NOTIFICATIONS_ROLE_ID: int = 1040662419355205794
 FURY_GUILD: int = 757664675864248360
 
 PROFANE_WORDS: List[str] = open('static/profane_words.txt', 'r').read().split(', ')

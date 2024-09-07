@@ -71,6 +71,18 @@ class DeniedImageReason(BaseModal):
         self.parent: ApproveOrDenyImage = parent
         self.request: ImageRequest = request
 
+    def _denied_embed(self, by: discord.abc.User) -> discord.Embed:
+        user = self.request.requester
+
+        embed = self.bot.Embed(
+            title='Image has been denied.',
+            description=f'This image upload from {user.mention} has been denied by a moderator, {by.mention}.',
+            author=user,
+        )
+        embed.add_field(name='Deny Reason', value=self.reason.value)
+        embed.add_field(name='Channel to Send In', value=mention_interaction_channel(self.request.channel))
+        return embed
+
     async def on_submit(self, interaction: discord.Interaction[FuryBot], /) -> None:
         """|coro|
 
@@ -82,34 +94,14 @@ class DeniedImageReason(BaseModal):
         interaction: :class:`discord.Interaction`
             The interaction that was created from submitting the modal.
         """
-        user = self.request.requester
-
-        embed = self.bot.Embed(
-            title='Image has been denied.',
-            description=f'This image upload from {user.mention} has been denied by a moderator, {interaction.user.mention}.',
-            author=user,
-        )
-        embed.add_field(name='Deny Reason', value=self.reason.value)
-        embed.add_field(name='Channel to Send In', value=mention_interaction_channel(self.request.channel))
-        await interaction.response.edit_message(embed=embed, view=None)
-
-        embed = self.bot.Embed(
-            title='Upload Request Denied.',
-            description=f'Your image upload request has been denied by a moderator, {interaction.user.mention}',
-            author=user,
-        )
-        embed.add_field(name='Deny Reason', value=self.reason.value)
-
-        try:
-            await user.send(embed=embed)
-        except discord.Forbidden:
-            pass
+        await interaction.response.defer()
 
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                'DELETE FROM image_requests WHERE id = $1',
-                self.request.id,
+                'UPDATE images.requests SET denied_reason = $1 WHERE id = $2', self.reason.value, self.request.id
             )
+
+        await interaction.edit_original_response(embed=self._denied_embed(by=interaction.user), view=None)
 
 
 class ApproveOrDenyImage(discord.ui.View):
@@ -162,28 +154,28 @@ class ApproveOrDenyImage(discord.ui.View):
             )
         except discord.NotFound:
             return await interaction.edit_original_response(
-                content=f'The attachment was deleted before I could approve it, {interaction.user.mention}. You will need to upload it manually if possible!',
+                content=f'The attachment was deleted before I could approve it, {interaction.user.mention}. You will need to upload it manually, if possible.',
             )
         except discord.HTTPException:
             return await interaction.edit_original_response(
-                content=f'I was unable to download the attachment to approve it, {interaction.user.mention}. You will need to upload it manually!',
+                content=f'I was unable to download the attachment to approve it, {interaction.user.mention}. You will need to upload it manually.',
             )
 
         content = f'Uploaded by {request.requester.mention}.'
         if request.message:
             content += f' Message: {request.message}'
 
-        # as of right now interaction.channel includes StageChannel, ForumChannel, and CategoryChannel - it can not resolve to this though.
-        assert not isinstance(request.channel, (discord.StageChannel, discord.ForumChannel, discord.CategoryChannel))
+        # as of right now interaction.channel includes ForumChannel and CategoryChannel - it can not resolve to this though.
+        assert not isinstance(request.channel, (discord.ForumChannel, discord.CategoryChannel))
 
         message = await request.channel.send(
             file=file, content=content, allowed_mentions=discord.AllowedMentions(users=[request.requester])
         )
 
-        # This information is no longer needed in the DB, we can remove it.
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                'DELETE FROM image_requests WHERE id = $1',
+                'UPDATE images.requests SET message_id = $1 WHERE id = $2',
+                message.id,
                 self.request.id,
             )
 

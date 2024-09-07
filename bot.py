@@ -45,7 +45,6 @@ from typing import (
     TypeAlias,
     TypeVar,
     Union,
-    cast,
 )
 
 import asyncpg
@@ -733,20 +732,16 @@ class FuryBot(commands.Bot):
         if not guild:
             return
 
-        channel = cast(
-            Optional[Union[discord.TextChannel, discord.VoiceChannel, discord.Thread]],
-            guild.get_channel(data["channel_id"]),
-        )
+        channel = guild.get_channel(data['channel_id'])
         if not channel:
             return
 
-        attachment_data = data.get("attachment")
-        if attachment_data is None:
-            return
+        attachment_data = data['attachment_payload']
+        requester = guild.get_member(data['requester_id']) or await guild.fetch_member(data['requester_id'])
 
         request = ImageRequest(
-            requester=await guild.fetch_member(data["requester_id"]),
-            attachment=discord.Attachment(data=data["attachment"], state=self._connection),
+            requester=requester,
+            attachment=discord.Attachment(data=attachment_data, state=self._connection),
             channel=channel,
             message=data["message"],
             id=data["id"],
@@ -757,7 +752,9 @@ class FuryBot(commands.Bot):
 
     @cache_loader("IMAGE_REQUESTS")  # type: ignore
     async def _cache_setup_image_requests(self, connection: ConnectionType) -> None:
-        image_requests = await connection.fetch("SELECT * FROM image_requests")
+        image_requests = await connection.fetch(
+            "SELECT * FROM images.requests WHERE denied_reason IS NULL OR message_id IS NULL;"
+        )
         for request in image_requests:
             self.create_task(self._load_image_request(request))
 
