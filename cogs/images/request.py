@@ -30,6 +30,7 @@ import discord
 
 if TYPE_CHECKING:
     from discord.interactions import InteractionChannel
+
     from bot import FuryBot
 
 

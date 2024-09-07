@@ -24,13 +24,13 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Optional, Dict
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from bot import FuryBot
-import nudenet
 import discord
+import nudenet
 from discord import app_commands
 
+from bot import FuryBot
 from utils import BaseCog
 
 from .request import ImageRequest, ImageRequestSettings

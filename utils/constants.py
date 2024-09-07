@@ -26,9 +26,7 @@ from __future__ import annotations
 
 from typing import List, Tuple
 
-__all__: Tuple[str, ...] = (
-    'FURY_GUILD',
-)
+__all__: Tuple[str, ...] = ('FURY_GUILD',)
 
 FURY_GUILD: int = 757664675864248360
 
