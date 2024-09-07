@@ -31,6 +31,7 @@ from typing import TYPE_CHECKING, List, Optional, Union
 import cachetools
 import discord
 from discord.ext import commands
+from discord import app_commands
 
 from utils import BaseCog, Context
 
@@ -145,26 +146,41 @@ class MessageTracker(BaseCog):
         await webhook_message.reply(embeds=embeds)
         self.message_webhook_cache.pop(message.id)
 
-    @commands.command(name='snipe', description='Snipe a deleted message.')
+    @commands.hybrid_command(name='snipe', description='Snipe a deleted message.')
     @commands.has_permissions(moderate_members=True)
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(
+        private="If response should be sent to you privately. Defaults `True`.",
+        channel='The channel to look in. Defaults to invoked channel.',
+    )
     @commands.guild_only()
-    async def snipe(self, ctx: Context, private: bool = False) -> discord.Message:
+    @app_commands.guild_only()
+    async def snipe(
+        self, ctx: Context, private: bool = True, channel: Optional[discord.abc.GuildChannel] = None
+    ) -> discord.Message:
         assert ctx.guild
 
         # Let's find the first message
         messages = list(self.message_cache.values()).copy()
         messages.sort(key=lambda m: m.created_at, reverse=True)
 
+        target_channel = channel or ctx.channel
         message = discord.utils.find(
-            lambda message: message.channel == ctx.channel and self.bot._connection._get_message(message.id) is None,
+            lambda message: message.channel == target_channel and self.bot._connection._get_message(message.id) is None,
             messages,
         )
-        sender = ctx.author.send if private else ctx.send
 
-        await ctx.message.add_reaction('✅')
+        await ctx.message.add_reaction('\N{WHITE HEAVY CHECK MARK}')
 
         if not message:
-            return await sender(f'No cached message was found in {ctx.channel.mention}')  # pyright: ignore
+            status = f'No cached message was found in <#{target_channel.id}>'
+            if ctx.interaction is None and private is True:
+                try:
+                    return await ctx.author.send(status)
+                except discord.HTTPException:
+                    return await ctx.author.send('Your DMs are disabled, I cannot DM you!')
+
+            return await ctx.send(f'No cached message was found in <#{target_channel.id}>', ephemeral=private)
 
         embed = self.bot.Embed(
             author=message.author, title='Sniped Message', description=message.content, timestamp=message.created_at
@@ -177,7 +193,10 @@ class MessageTracker(BaseCog):
             embed.add_field(name='Embeds', value=f'Continued {len(message.embeds)} embed(s), I\'ve attached them.')
             embeds.extend(message.embeds)
 
-        return await sender(embeds=embeds)
+        if ctx.interaction is None and private is True:
+            return await ctx.author.send(embeds=embeds)
+
+        return await ctx.send(embeds=embeds, ephemeral=private)
 
 
 async def setup(bot: FuryBot) -> None:
