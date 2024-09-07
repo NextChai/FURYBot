@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS teams.settings (
     text_channel_id BIGINT,
     voice_channel_id BIGINT,
     extra_channel_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT [],
-    name TEXT UNIQUE,
+    name TEXT,
     nickname TEXT,
     description TEXT,
     logo TEXT,
@@ -20,9 +20,9 @@ CREATE TABLE IF NOT EXISTS teams.members (
     is_sub BOOLEAN DEFAULT FALSE
 );
 
--- pending_scrimer: Pending for scrimmer to confirm
+-- pending_away: Pending for way team to confirm
 -- pending_host: Pending for host to confirm
--- scheduled: Scirm has been scheduled.
+-- scheduled: Scrim has been scheduled.
 CREATE TYPE teams.scrim_status AS ENUM ('pending_away', 'scheduled', 'pending_host');
 
 CREATE TABLE IF NOT EXISTS teams.scrims (
