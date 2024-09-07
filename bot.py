@@ -63,7 +63,6 @@ from utils import (
     START_TIMER_MANAGER,
     Context,
     ErrorHandler,
-    GuildProfanityFinder,
     TimerManager,
     _parse_environ_boolean,
     parse_initial_extensions,
@@ -253,11 +252,6 @@ class FuryBot(commands.Bot):
         # Mapping[guild_id, Mapping[team_id, Mapping[practice_id, Practice]]]
         self._team_practice_cache: Dict[int, Dict[int, Dict[int, Practice]]] = {}
 
-        self.global_profanity_finder: Optional[GuildProfanityFinder] = None
-
-        # Mapping[guild_id, GuildProfanityFinder]
-        self.guild_profanity_finders: Dict[int, GuildProfanityFinder] = {}
-
         super().__init__(
             command_prefix=commands.when_mentioned_or("trev.", "trev"),
             help_command=None,
@@ -348,20 +342,6 @@ class FuryBot(commands.Bot):
             embed.set_author(name=author.name, icon_url=author.display_avatar.url)
 
         return embed
-
-    # Management for custom profanity filters
-    def get_profanity_finder(self, guild_id: int, /) -> Optional[GuildProfanityFinder]:
-        custom_finder = self.guild_profanity_finders.get(guild_id, None)
-        if custom_finder is not None:
-            return custom_finder
-
-        return self.global_profanity_finder
-
-    def add_custom_profanity_finder(self, guild_id: int, finder: GuildProfanityFinder, /):
-        self.guild_profanity_finders[guild_id] = finder
-
-    def remove_custom_profanity_finder(self, guild_id: int, /) -> Optional[GuildProfanityFinder]:
-        return self.guild_profanity_finders.pop(guild_id, None)
 
     # Team management
     def get_teams(self, guild_id: int, /) -> List[Team]:
@@ -792,11 +772,6 @@ class FuryBot(commands.Bot):
             self._team_practice_cache.setdefault(practice.guild_id, {}).setdefault(practice.team_id, {})[
                 practice.id
             ] = practice
-
-    @cache_loader("PROFANITY_FILTER")  # type: ignore
-    async def _cache_setup_profanity_filter(self, connection: ConnectionType) -> None:
-        pattern = await GuildProfanityFinder.get_default_pattern()
-        self.global_profanity_finder = GuildProfanityFinder(pattern, guild_id=None)
 
     # Hooks
     async def setup_hook(self) -> None:

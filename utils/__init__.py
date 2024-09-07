@@ -36,7 +36,6 @@ from .context import *
 from .error_handler import *
 from .errors import *
 from .images import *
-from .profanity import *
 from .query import *
 from .time import *
 from .timers import *

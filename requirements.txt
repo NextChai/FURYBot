@@ -20,3 +20,4 @@ numpy
 Pillow
 python-Levenshtein
 psutil
+nudenet>=3.4.2
