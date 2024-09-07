@@ -319,11 +319,20 @@ class AwayForceConfirm(discord.ui.View):
 
         # Delete this message
         away_channel = self.scrim.away_team.text_channel
+        if away_channel is None:
+            # For whatever reason, this away channel has been deleted. We must cancel this scrim as the data
+            # has been invalidated.
+            return await self.scrim.cancel(reason='The away channel has been deleted.')
+
         message = await away_channel.fetch_message(cast(int, self.scrim.away_confirm_anyways_message_id))
         await message.delete()
 
         # Now update the home message
         home_channel = self.scrim.home_team.text_channel
+        if home_channel is None:
+            # Similar to before, if the home channel is also deleted, we must cancel the scrim.
+            return await self.scrim.cancel(reason='The home channel has been deleted.')
+
         message = await home_channel.fetch_message(self.scrim.home_message_id)
         view = HomeConfirm(self.scrim)
         await message.edit(view=None, embed=view.embed)
@@ -457,6 +466,13 @@ class AwayConfirm(discord.ui.View):
 
         # And update the other message from the home team's chat:
         home_message = await self.scrim.home_message()
+        if home_message is None:
+            # If the home message has been deleted, we must cancel the scrim
+            await interaction.response.send_message(
+                'The home message has been deleted. Cancelling the scrim...', ephemeral=True
+            )
+            return await self.scrim.cancel(reason='The home message has been deleted.')
+
         view = HomeConfirm(self.scrim)
         await home_message.edit(embed=view.embed)
 
@@ -471,6 +487,12 @@ class AwayConfirm(discord.ui.View):
             )
 
         away_text_channel = self.scrim.away_team.text_channel
+        if away_text_channel is None:
+            # This channel has been deleted, we must cancel the scrim
+            await interaction.response.send_message(
+                'The away channel has been deleted. Cancelling the scrim...', ephemeral=True
+            )
+            return await self.scrim.cancel(reason='The away channel has been deleted.')
 
         if self.scrim.away_confirm_anyways_message_id:
             url = f'https://discordapp.com/channels/{away_text_channel.guild.id}/{away_text_channel.id}/{self.scrim.away_confirm_anyways_message_id}'

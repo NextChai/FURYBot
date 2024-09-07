@@ -141,7 +141,7 @@ class ScrimPanel(BaseView):
         members: List[Union[discord.Member, discord.User]],
         *,
         add_vote: bool = True,
-    ) -> None:
+    ) -> Optional[discord.InteractionMessage]:
         await interaction.response.defer()
 
         home_team = self.scrim.home_team
@@ -165,6 +165,12 @@ class ScrimPanel(BaseView):
 
             view = HomeConfirm(self.scrim)
             home_message = await self.scrim.home_message()
+            if home_message is None:
+                # This home message has been deleted, we must cancel the scrim with the reason
+                # of it having invalid data.
+                await self.scrim.cancel(reason='The home team message has been deleted.')
+                return await interaction.edit_original_response(embed=self.embed, view=self)
+
             await home_message.edit(view=None, embed=view.embed)
 
             # Send the message to the other channel now
@@ -172,10 +178,10 @@ class ScrimPanel(BaseView):
             away_text_channel = self.scrim.away_team.text_channel
             if not away_text_channel:
                 # Ths channel, for some reason, has been deleted. We should cancel the scrim.
-                # TODO: Add this
-                raise NotImplementedError('The away team text channel has been deleted.')
+                await self.scrim.cancel(reason='The away team text channel has been deleted.')
+                return await interaction.edit_original_response(embed=self.embed, view=self)
 
-            away_message = await self.scrim.away_team.text_channel.send(embed=view.embed, view=view)
+            away_message = await away_text_channel.send(embed=view.embed, view=view)
             await self.scrim.edit(away_message_id=away_message.id)
 
         elif self.scrim.status is ScrimStatus.pending_away and self.scrim.away_all_voted:
@@ -184,6 +190,12 @@ class ScrimPanel(BaseView):
 
             view = HomeConfirm(self.scrim)
             home_message = await self.scrim.home_message()
+            if home_message is None:
+                # This home message has been deleted, we must cancel the scrim with the reason
+                # of it having invalid data.
+                await self.scrim.cancel(reason='The home team message has been deleted.')
+                return await interaction.edit_original_response(embed=self.embed, view=self)
+
             await home_message.edit(view=None, embed=view.embed)
 
             view = AwayConfirm(self.scrim)
@@ -227,6 +239,11 @@ class ScrimPanel(BaseView):
 
         # Update the home message
         home_message = await self.scrim.home_message()
+        if home_message is None:
+            # This home message has been deleted, we must cancel the scrim.
+            await self.scrim.cancel(reason='The home team message has been deleted.')
+            return await interaction.edit_original_response(embed=self.embed, view=self)
+
         view = HomeConfirm(self.scrim)
         await home_message.edit(embed=view.embed, view=None)
 

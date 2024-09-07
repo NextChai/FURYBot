@@ -32,6 +32,7 @@ import discord
 from discord.utils import MISSING
 from typing_extensions import Self
 
+from .errors import NoHomeTeamTextChannel
 from utils import QueryBuilder
 
 from . import ScrimStatus
@@ -164,6 +165,11 @@ class Scrim:
 
             # Now send the home message
             home_channel = home_team.text_channel
+
+            if home_channel is None:
+                # We can't create this scrim without a text channel
+                raise NoHomeTeamTextChannel()
+
             view = HomeConfirm(scrim)
 
             message = await home_channel.send(
@@ -278,7 +284,7 @@ class Scrim:
         """:class:`str`: The time the scrim is scheduled for in a human readable format."""
         return f'{discord.utils.format_dt(self.scheduled_for, "F")} ({discord.utils.format_dt(self.scheduled_for, "R")})'
 
-    async def home_message(self) -> discord.Message:
+    async def home_message(self) -> Optional[discord.Message]:
         """|coro|
 
         Returns
@@ -287,6 +293,9 @@ class Scrim:
             The message in the home team's text channel.
         """
         channel = self.home_team.text_channel
+        if channel is None:
+            return None
+
         return await channel.fetch_message(self.home_message_id)
 
     async def away_message(self) -> Optional[discord.Message]:
@@ -301,6 +310,9 @@ class Scrim:
             return None
 
         channel = self.away_team.text_channel
+        if channel is None:
+            return None
+
         return await channel.fetch_message(self.away_message_id)
 
     async def away_confirm_anyways_message(self) -> Optional[discord.Message]:
@@ -317,6 +329,9 @@ class Scrim:
             return
 
         channel = self.away_team.text_channel
+        if channel is None:
+            return None
+
         return await channel.fetch_message(self.away_confirm_anyways_message_id)
 
     async def edit(
@@ -391,7 +406,7 @@ class Scrim:
         async with self.bot.safe_connection() as connection:
             await builder(connection)
 
-    async def create_scrim_chat(self) -> discord.TextChannel:
+    async def create_scrim_chat(self) -> Optional[discord.TextChannel]:
         """|coro|
 
         A helper method to create the scrim chat and assign the correct permissions to those
@@ -399,8 +414,9 @@ class Scrim:
 
         Returns
         -------
-        :class:`discord.TextChannel`
-            The created text channel.
+        Optional[:class:`discord.TextChannel`]
+            The created text channel. ``None`` if the home category channel has been deleted and the scrim
+            has been cancelled.
         """
         overwrites: Mapping[Union[discord.Member, discord.Role], discord.PermissionOverwrite] = {
             m.member or await m.fetch_member(): discord.PermissionOverwrite(view_channel=True)
@@ -408,7 +424,12 @@ class Scrim:
         }
         overwrites[self.guild.default_role] = discord.PermissionOverwrite(view_channel=False)
 
-        channel = await self.home_team.category_channel.create_text_channel(
+        home_category_channel = self.home_team.category_channel
+        if home_category_channel is None:
+            # This has been deleted, we need to cancel the scrim.
+            return await self.cancel(reason='Home category channel has been deleted.')
+
+        channel = await home_category_channel.create_text_channel(
             name='scrim-chat',
             topic=f'Scrim chat for {self.home_team.display_name} vs {self.away_team.display_name}',
             overwrites=overwrites,
@@ -523,6 +544,10 @@ class Scrim:
 
         # Now let's update the messages, if any
         home_message = await self.home_message()
+        if home_message is None:
+            # This home message has been deleted, or the channel has been deleted. Cancel the scrim
+            return await self.cancel(reason='Home message has been deleted.')
+
         view = HomeConfirm(self)
         await home_message.edit(embed=view.embed)
         await home_message.reply(
@@ -540,7 +565,7 @@ class Scrim:
                 allowed_mentions=discord.AllowedMentions(everyone=True, users=False),
             )
 
-    async def cancel(self) -> None:
+    async def cancel(self, *, reason: Optional[str] = None) -> None:
         """|coro|
 
         Cancels the given scrim and deletes all messages associated with it
@@ -575,17 +600,18 @@ class Scrim:
         embed.set_footer(text='This scrim has been cancelled.')
 
         home_message = await self.home_message()
-        await home_message.edit(embed=embed, view=None)
-        await home_message.reply(
-            '@everyone, this scrim has been cancelled.',
-            allowed_mentions=discord.AllowedMentions(everyone=True),
-        )
+        if home_message is not None:
+            await home_message.edit(embed=embed, view=None)
+            await home_message.reply(
+                f'@everyone, this scrim has been cancelled. {reason}',
+                allowed_mentions=discord.AllowedMentions(everyone=True),
+            )
 
         away_message = await self.away_message()
         if away_message is not None:
             await away_message.edit(embed=embed, view=None)
             await away_message.reply(
-                '@everyone, this scrim has been cancelled.',
+                f'@everyone, this scrim has been cancelled. {reason}',
                 allowed_mentions=discord.AllowedMentions(everyone=True),
             )
 

@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Annotated, List, Optional, Tuple, TypeAlias
 import discord
 from discord import app_commands
 
+from .scrims.errors import CannotCreateScrim
 from utils import BaseCog, TimeTransformer
 
 from .errors import *
@@ -178,9 +179,12 @@ class Teams(BaseCog):
 
         home_team = Team.from_channel(interaction.channel.category.id, interaction.guild.id, bot=self.bot)
 
-        scrim = await Scrim.create(
-            when.dt, home_team=home_team, away_team=team, per_team=per_team, creator_id=interaction.user.id, bot=self.bot
-        )
+        try:
+            scrim = await Scrim.create(
+                when.dt, home_team=home_team, away_team=team, per_team=per_team, creator_id=interaction.user.id, bot=self.bot
+            )
+        except CannotCreateScrim as exc:
+            return await interaction.edit_original_response(content=str(exc))
 
         return await interaction.edit_original_response(
             content=f'A scrim for {scrim.scheduled_for_formatted()} has been created against {team.display_name}.'
