@@ -148,7 +148,12 @@ class ImageRequests(BaseCog):
                 requester=interaction.user, attachment=pending_attachment, channel=sender_channel, message=message
             )
             view = ApproveOrDenyImage(self.bot, request)
-            embed = await self._append_nsfw_classification(view.embed, file)
+
+            content_type = pending_attachment.content_type
+            if content_type and content_type.startswith('image/'):
+                embed = await self._append_nsfw_classification(view.embed, file)
+            else:
+                embed = view.embed
 
             # Send the request to the channel
             channel = settings.channel
