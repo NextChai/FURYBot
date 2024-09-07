@@ -51,9 +51,7 @@ class Notifier(BaseCog):
 
         members: List[discord.Member] = []
         async for member in guild.fetch_members(limit=None):
-            if member.id in moderators:
-                continue
-            if member.bot:
+            if (member.id in moderators) or member.bot:
                 continue
 
             try:
@@ -92,12 +90,30 @@ class Notifier(BaseCog):
         if not channel:
             return
 
+        member_mentions: List[str] = []
+        mutual_member_mentions: List[str] = []
+        for member in members:
+            if len(member.mutual_guilds) > 1:
+                # There is a good chance that this member is in more than 1 server with this bot,
+                # we'll let the staff know of this.
+                guild_names = ', '.join(mg.name for mg in member.mutual_guilds if mg != guild)
+                mutual_member_mentions.append(f'{member.mention} (`{member.id}`): {guild_names}')
+            else:
+                member_mentions.append(f'{member.mention} (`{member.id}`)')
+
         embed = self.bot.Embed(
             title='Members Have Dms Turned On',
-            description='The members below have their DMs turned on.\n\n{}'.format(
-                '\n'.join(member.mention for member in members)
-            ),
+            description=f'The members below have their DMs turned on.\n\n{member_mentions}',
         )
+
+        if mutual_member_mentions:
+            embed.add_field(name='Mutual Guild Enabled Dms', value='\n'.join(mutual_member_mentions))
+            embed.set_footer(
+                text='"Mutual guild enabled dms" are the members who share more than one server '
+                'with the bot and have their DMs turned on in at least one of the servers. This may '
+                'not mean that they have DMs turned on in this server.'
+            )
+
         await channel.send(embed=embed)
 
     @tasks.loop(hours=3)
