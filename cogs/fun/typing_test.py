@@ -25,7 +25,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Dict, NamedTuple, Optional, TypeAlias, Union
+from typing import TYPE_CHECKING, Dict, NamedTuple, Optional, Union
 
 import discord
 from typing_extensions import Self
@@ -37,10 +37,10 @@ from .grabber import SentenceGrabber
 if TYPE_CHECKING:
     from bot import FuryBot
 
-MISSING: TypeAlias = discord.utils.MISSING
+MISSING = discord.utils.MISSING
 
 
-# Implementation of levenstein distance between two sentences. Returns the distance between the two sentences as a float.
+# Implementation of levenshtein distance between two sentences. Returns the distance between the two sentences as a float.
 def levenshtein_distance(s1: str, s2: str) -> float:
     if len(s1) < len(s2):
         return levenshtein_distance(s2, s1)
@@ -146,29 +146,10 @@ class TypingTestView(BaseView):
             # If we were less than 60% accurate, we don't count it
             ratio_too_large = accuracy < 0.6
             if ratio_too_large:
-                return await message.reply(
-                    f"Woah there cowboy! You only got the sentence {(accuracy * 100):.2f}% correct!"
-                    "I'm not counting this, feel free to try again!"
-                )
+                return await message.reply(f"Woah there! You only got the sentence {(accuracy * 100):.2f}% correct...")
 
-            # This is a valid message, we can count it
-            async with self.bot.safe_connection() as connection:
-                await connection.execute(
-                    """INSERT INTO typing_test.history (
-                        member_id, guild_id, started_typing_at, ended_typing_at, accuracy, sentence
-                    ) VALUES(
-                        $1, $2, $3, $4, $5, $6
-                    )""",
-                    message.author.id,
-                    guild.id,
-                    packet.started_typing_at,
-                    message.created_at,
-                    accuracy,
-                    packet.sentence,
-                )
-
-                # Remove their packet from the cache
-                self.packets.pop(message.author.id, None)
+            # Remove their packet from the cache
+            self.packets.pop(message.author.id, None)
 
         total_time = (message.created_at - packet.started_typing_at).total_seconds()
         await message.reply(

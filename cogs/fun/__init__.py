@@ -43,8 +43,7 @@ class Fun(BaseCog):
     def __init__(self, bot: FuryBot) -> None:
         super().__init__(bot=bot)
 
-    @commands.hybrid_command(name='typingtest', description='Test your typing speed.')
-    @commands.is_owner()
+    @commands.hybrid_command(name='typing-test', description='Test your typing speed!')
     async def typing_test(self, ctx: Context) -> None:
         async with ctx.typing():
             view = TypingTestView(ctx=ctx)
