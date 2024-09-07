@@ -183,7 +183,7 @@ class ImageRequests(BaseCog):
                     'VALUES ($1, $2, $3, $4, $5, $6) '
                     'RETURNING *',
                     interaction.created_at,
-                    attachment.to_dict(),
+                    pending_attachment.to_dict(),
                     interaction.user.id,
                     sender_channel.id,
                     message,
@@ -195,7 +195,7 @@ class ImageRequests(BaseCog):
 
         # And alert the user of the request
         return await interaction.edit_original_response(
-            content='I\'ve submitted the request for this attachment to be uploaded. You will be notified if your request is approved.',
+            content='I\'ve submitted the request for your attachment(s) to be uploaded.',
         )
 
 
