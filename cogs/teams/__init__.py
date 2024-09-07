@@ -30,11 +30,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from .scrims.errors import CannotCreateScrim
 from utils import BaseCog, TimeTransformer
 
 from .errors import *
 from .scrims import Scrim
+from .scrims.errors import CannotCreateScrim
 from .team import Team
 from .transformers import TeamTransformer
 from .views import TeamView

@@ -33,9 +33,6 @@ from discord.ext import commands
 
 from utils import BaseCog
 
-from .errors import MemberNotAttendingPractice, MemberNotInPractice
-from .practice import PracticeStatus, Practice, PracticeMember
-from .leaderboard import PracticeLeaderboardCog
 from ..errors import MemberNotOnTeam
 from ..team import Team
 

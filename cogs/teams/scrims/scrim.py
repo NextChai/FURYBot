@@ -32,10 +32,10 @@ import discord
 from discord.utils import MISSING
 from typing_extensions import Self
 
-from .errors import NoHomeTeamTextChannel
 from utils import QueryBuilder
 
 from . import ScrimStatus
+from .errors import NoHomeTeamTextChannel
 from .persistent import AwayConfirm, AwayForceConfirm, HomeConfirm
 
 if TYPE_CHECKING:

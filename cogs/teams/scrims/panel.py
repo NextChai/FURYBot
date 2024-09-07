@@ -25,7 +25,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union, Any
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
 
 import discord
 from typing_extensions import Self, Unpack
