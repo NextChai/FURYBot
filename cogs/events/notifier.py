@@ -24,7 +24,6 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING, List, Optional, cast
 
 import discord
@@ -70,7 +69,10 @@ class Notifier(BaseCog):
                 guild.id,
             )
 
-        assert data is not None
+        if not data:
+            # Between creating the task and now, the guild was removed from the database.
+            # We'll just return
+            return
 
         moderators: List[int] = data['moderators'] or []
         if data['moderator_role_ids']:
@@ -118,7 +120,24 @@ class Notifier(BaseCog):
 
     @tasks.loop(hours=3)
     async def member_notifier_task(self) -> None:
-        await asyncio.gather(*[self._wrap_guild_member_sending(guild) for guild in self.bot.guilds])
+        async with self.bot.safe_connection() as connection:
+            guild_id_records = await connection.fetch(
+                'SELECT guild_id FROM infractions.settings WHERE notification_channel_id IS NOT NULL'
+            )
+
+            for record in guild_id_records:
+                guild_id = record['guild_id']
+                guild = self.bot.get_guild(guild_id)
+                if not guild:
+                    await connection.execute(
+                        'UPDATE infractions.settings SET notification_channel_id = NULL WHERE guild_id = $1',
+                        guild_id,
+                    )
+                    continue
+
+                self.bot.create_task(self._wrap_guild_member_sending(guild), name=f'notifier-{guild_id}')
+
+                await self._wrap_guild_member_sending(guild)
 
     @member_notifier_task.before_loop
     async def member_notifier_before_loop(self) -> None:
