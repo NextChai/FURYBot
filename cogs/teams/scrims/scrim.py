@@ -528,42 +528,6 @@ class Scrim:
                 f'UPDATE teams.scrims SET {column} = array_remove({column}, $1) WHERE id = $2', member_id, self.id
             )
 
-    async def reschedule(self, when: datetime.datetime, *, editor: discord.abc.User) -> None:
-        """Reschedules the scrim for the updated time.
-
-        Parameters
-        ----------
-        when: :class:`datetime.datetime`
-            The new time to schedule the scrim for.
-        editor: :class:`discord.abc.User`
-            The user who is rescheduling the scrim.
-        """
-        # Let's update the scrim's messages from the old time to the new time and update the scrim
-        await self.edit(scheduled_for=when)
-
-        # Now let's update the messages, if any
-        home_message = await self.home_message()
-        if home_message is None:
-            # This home message has been deleted, or the channel has been deleted. Cancel the scrim
-            return await self.cancel(reason='Home message has been deleted.')
-
-        view = HomeConfirm(self)
-        await home_message.edit(embed=view.embed)
-        await home_message.reply(
-            content=f'@everyone, this scrim has been rescheduled by {editor.mention}',
-            allowed_mentions=discord.AllowedMentions(everyone=True, users=False),
-        )
-
-        # Check for an away message, if any
-        away_message = await self.away_message()
-        if away_message is not None:
-            view = AwayConfirm(self)
-            await away_message.edit(embed=view.embed)
-            await away_message.reply(
-                content=f'@everyone, this scrim has been rescheduled by a moderator.',
-                allowed_mentions=discord.AllowedMentions(everyone=True, users=False),
-            )
-
     async def cancel(self, *, reason: Optional[str] = None) -> None:
         """|coro|
 

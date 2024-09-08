@@ -31,22 +31,21 @@ import discord
 from typing_extensions import Self, Unpack
 
 from utils import (
-    AfterModal,
     BaseView,
     BaseViewKwargs,
     SelectOneOfMany,
-    TimeTransformer,
     UserSelect,
     default_button_doc_string,
 )
 
 from .persistent import AwayConfirm, HomeConfirm
+from .scrim import ScrimStatus
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
     from ..team import Team
-    from .scrim import Scrim, ScrimStatus
+    from .scrim import Scrim
 
 
 __all__: Tuple[str, ...] = ('TeamScrimsPanel', 'ScrimPanel')
@@ -100,40 +99,6 @@ class ScrimPanel(BaseView):
 
         embed.set_footer(text=f'Scrim ID: {self.scrim.id}')
         return embed
-
-    async def _reschedule_scrim_after(
-        self, interaction: discord.Interaction[FuryBot], reschedule_input: discord.ui.TextInput[AfterModal]
-    ) -> None:
-        await interaction.response.defer()
-
-        # Let's try and parse this time
-        try:
-            transformed = await TimeTransformer('n/a').transform(interaction, reschedule_input.value)
-        except Exception as exc:
-            await interaction.edit_original_response(embed=self.embed, view=self)
-            return await interaction.followup.send(content=str(exc), ephemeral=True)
-
-        assert transformed.dt
-        await self.scrim.reschedule(transformed.dt, editor=interaction.user)
-        await interaction.edit_original_response(
-            content=f'I\'ve rescheduled this scrim for {self.scrim.scheduled_for_formatted()}.'
-        )
-
-    @discord.ui.button(label='Reschedule')
-    @default_button_doc_string
-    async def reschedule_scrim(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """Reschedule this scrim to a later date."""
-        # If this scrim has already started, we can't reschedule it
-        if self.scrim.scheduled_for < interaction.created_at:
-            return await interaction.response.send_message(
-                'This scrim has already started, you cannot reschedule it.', ephemeral=True
-            )
-
-        modal = AfterModal(self.bot, after=self._reschedule_scrim_after)
-        modal.add_item(
-            discord.ui.TextInput(label='When you want to reschedule this scrim to. For example: Tomorrow at 4pm.')
-        )
-        await interaction.response.send_modal(modal)
 
     async def _manage_member_assignment(
         self,
@@ -305,7 +270,7 @@ class TeamScrimsPanel(BaseView):
         embed.description = f'**{len(self.team.scrims)}** scrims total, **{hosted_scrims}** of which they are hosting.'
 
         if hosted_scrims == 0:
-            embed.add_field(name='No Scrims', value='This team has no scrims.')
+            embed.add_field(name='No Scrims', value='This team has hosted no scrims, only played in them.', inline=False)
 
         return embed
 
