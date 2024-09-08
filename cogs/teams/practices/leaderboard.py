@@ -342,7 +342,7 @@ class PracticeLeaderboardCog(BaseCog):
         embed.add_field(
             name="Top 10 Teams",
             value="\n".join(
-                f"{count}. **{team.display_name}**, {points:.2f} points"
+                f"{count}. **{team.display_name}**: {points:.2f} points"
                 for count, (team, points) in enumerate(teams[:10], start=1)
             ),
             inline=False,
