@@ -622,10 +622,9 @@ class Team:
         team_scores = [(team, team.total_points) for team in teams]
         return sorted(team_scores, key=lambda item: item[1], reverse=True).index((self, self.total_points)) + 1
 
-    async def sync(self) -> None:
-        """|coro|
-
-        Syncs the team's channels with the data in the team.
+    async def channel_overwrites(self) -> Dict[Union[discord.Role, discord.Member], discord.PermissionOverwrite]:
+        """Dict[Union[:class:`discord.Role`, :class:`discord.Member`], :class:`discord.PermissionOverwrite`]:
+        The channel overwrites for this team.
         """
         overwrites: Dict[Union[discord.Role, discord.Member], discord.PermissionOverwrite] = {
             self.guild.default_role: discord.PermissionOverwrite(read_messages=False)
@@ -637,6 +636,15 @@ class Team:
 
         for role in self.captain_roles:
             overwrites[role] = discord.PermissionOverwrite(view_channel=True)
+
+        return overwrites
+
+    async def sync(self) -> None:
+        """|coro|
+
+        Syncs the team's channels with the data in the team.
+        """
+        overwrites = await self.channel_overwrites()
 
         if self.category_channel:
             await self.category_channel.edit(overwrites=overwrites)
@@ -779,6 +787,14 @@ class Team:
 
         await self.sync()
 
+    async def add_extra_channel(self, channel_id: int, /) -> None:
+        await self.edit(extra_channel_ids=self.extra_channel_ids + [channel_id])
+        await self.sync()
+
+    async def remove_extra_channel(self, channel_id: int, /) -> None:
+        await self.edit(extra_channel_ids=[c_id for c_id in self.extra_channel_ids if c_id != channel_id])
+        await self.sync()
+
     async def edit(
         self,
         /,
@@ -855,17 +871,6 @@ class Team:
 
         async with self.bot.safe_connection() as connection:
             await builder(connection)
-
-        if any(
-            (
-                text_channel_id is not MISSING,
-                voice_channel_id is not MISSING,
-                category_channel_id is not MISSING,
-                sub_role_ids is not MISSING,
-                extra_channel_ids is not MISSING,
-            )
-        ):
-            await self.sync()
 
     async def delete(self, *, connection: ConnectionType, reason: Optional[str] = None) -> None:
         """|coro|

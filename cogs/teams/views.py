@@ -309,10 +309,7 @@ class TeamChannelsView(BaseView):
         meth = meth_mapping.get(channel_type_input.value, None)
         if meth:
             channel = await meth(name=channel_name_input.value)
-
-            extra_channel_ids = self.team.extra_channel_ids.copy()
-            extra_channel_ids.append(channel.id)
-            await self.team.edit(extra_channel_ids=extra_channel_ids)
+            await self.team.add_extra_channel(channel.id)
 
         return await interaction.edit_original_response(view=self, embed=self.embed)
 

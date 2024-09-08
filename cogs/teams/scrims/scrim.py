@@ -424,6 +424,12 @@ class Scrim:
         }
         overwrites[self.guild.default_role] = discord.PermissionOverwrite(view_channel=False)
 
+        # Append the captains to the overwrites as well
+        for captain_role in self.away_team.captain_roles:
+            overwrites[captain_role] = discord.PermissionOverwrite(view_channel=True)
+        for captain_role in self.home_team.captain_roles:
+            overwrites[captain_role] = discord.PermissionOverwrite(view_channel=True)
+
         home_category_channel = self.home_team.category_channel
         if home_category_channel is None:
             # This has been deleted, we need to cancel the scrim.
