@@ -88,7 +88,7 @@ initial_extensions: Tuple[str, ...] = (
     "cogs.events.notifier",
     "cogs.fun",
     "cogs.images",
-    "cogs.message_tracking",
+    "cogs.flvs",
     "cogs.moderation",
     "cogs.owner",
     "cogs.teams",
@@ -112,7 +112,10 @@ def cache_loader(
 
             _log.info("Loading %s cache from func %s", flag_name, func.__name__)
 
-            return await func(self, connection, *args, **kwargs)
+            res = await func(self, connection, *args, **kwargs)
+
+            _log.info("Finished loading %s cache from func %s", flag_name, func.__name__)
+            return res
 
         call_func.__cache_loader__ = True  # type: ignore
 
@@ -705,10 +708,18 @@ class FuryBot(commands.Bot):
             scrim.load_persistent_views()
             self._team_scrim_cache.setdefault(scrim.guild_id, {})[scrim.id] = scrim
 
-    async def _load_image_request(self, data: asyncpg.Record) -> None:
+    async def _load_image_request(self, data: asyncpg.Record, connection: ConnectionType) -> None:
         await self.wait_until_ready()
 
-        guild = self.get_guild(data["guild_id"])
+        # Fetch the request guild from the request_settings reference to images.request_settings
+        guild_id = await connection.fetchval(
+            'SELECT guild_id FROM images.request_settings WHERE id = $1', data['request_settings']
+        )
+        if not guild_id:
+            # This does not exist anymore, we cannot load it
+            return
+
+        guild = self.get_guild(guild_id)
         if not guild:
             return
 
@@ -736,7 +747,7 @@ class FuryBot(commands.Bot):
             "SELECT * FROM images.requests WHERE denied_reason IS NULL OR message_id IS NULL;"
         )
         for request in image_requests:
-            self.create_task(self._load_image_request(request))
+            await self._load_image_request(request, connection=connection)
 
     @cache_loader("PRACTICES")  # type: ignore
     async def _cache_setup_practices(self, connection: ConnectionType) -> None:
@@ -806,4 +817,7 @@ class FuryBot(commands.Bot):
                         exc_info=exc,
                     )
 
-        await asyncio.gather(*[_wrapped_cache_loader(func) for _, func in cache_loading_functions])
+        for _, func in cache_loading_functions:
+            self.create_task(_wrapped_cache_loader(func))
+
+        _log.debug("Finished loading cache entries.")
