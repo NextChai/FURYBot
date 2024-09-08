@@ -401,11 +401,19 @@ class TeamNamingView(BaseView):
             value=self.team.nickname or "Team has no nickname.",
             inline=False,
         )
-        embed.add_field(
-            name="Team Logo",
-            value=f"[Click here for logo.]({self.team.logo})." or "Team has no logo.",
-            inline=False,
-        )
+        
+        if self.team.logo:
+            embed.add_field(
+                name="Team Logo",
+                value=f"[Click here for logo.]({self.team.logo})." or "Team has no logo.",
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name='Team Logo',
+                value='Team has no logo.',
+                inline=False
+            )
 
         return embed
 

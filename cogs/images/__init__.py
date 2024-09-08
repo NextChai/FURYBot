@@ -30,7 +30,6 @@ import discord
 import nudenet
 from discord import app_commands
 
-from bot import FuryBot
 from utils import BaseCog
 
 from .request import ImageRequest, ImageRequestSettings

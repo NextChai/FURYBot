@@ -66,7 +66,7 @@ def _maybe_team(interaction: discord.Interaction[FuryBot], team: Optional[Team])
 
     try:
         return Team.from_channel(category.id, interaction.guild.id, bot=interaction.client)
-    except Exception:
+    except TeamNotFound:
         return None
 
 
@@ -145,7 +145,7 @@ class Teams(BaseCog):
         view = TeamView(team, target=interaction)
         return await interaction.edit_original_response(embed=view.embed, view=view)
 
-    @team.command(name='Delete', description='Delete a team.')
+    @team.command(name='delete', description='Delete a team.')
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.describe(team='The team you want to delete.')
     async def team_delete(
@@ -206,7 +206,12 @@ class Teams(BaseCog):
 
         await interaction.response.defer(ephemeral=True)
 
-        home_team = Team.from_channel(interaction.channel.category.id, interaction.guild.id, bot=self.bot)
+        try:
+            home_team = Team.from_channel(interaction.channel.category.id, interaction.guild.id, bot=self.bot)
+        except TeamNotFound:
+            return await interaction.edit_original_response(
+                content='You must be in a team channel to use this command. Could not find a team from this channel.'
+            )
 
         try:
             scrim = await Scrim.create(
@@ -292,7 +297,7 @@ class Teams(BaseCog):
         # This was a category channel, let's check if it was a team
         try:
             team = Team.from_channel(channel.id, channel.guild.id, bot=self.bot)
-        except Exception:
+        except TeamNotFound:
             # A team does not exist with this channel, we can ignore this
             return
 
@@ -316,7 +321,7 @@ class Teams(BaseCog):
         # This was a text channel, let's check if it was a team
         try:
             team = Team.from_channel(channel.id, channel.guild.id, bot=self.bot)
-        except Exception:
+        except TeamNotFound:
             # A team does not exist with this channel, we can ignore this
             return
 

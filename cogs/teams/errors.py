@@ -35,6 +35,12 @@ class MemberNotOnTeam(TeamException):
     pass
 
 
+class TeamNotFound(TeamException):
+    """Exception raised when a team is not found."""
+
+    pass
+
+
 class TeamDeleted(TeamException):
     def __init__(self, *, team_id: int) -> None:
         super().__init__(f'Team with id {team_id} has been deleted.', team_id)

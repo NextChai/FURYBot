@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union,
 import discord
 from typing_extensions import Self
 
+from .errors import TeamNotFound
 from utils import QueryBuilder, human_join
 
 if TYPE_CHECKING:
@@ -235,7 +236,7 @@ class Team:
 
         Raises
         -------
-        Exception
+        TeamNotFound
             A team belonging to the channel was not found.
         """
         teams = bot.get_teams(guild_id)
@@ -243,7 +244,7 @@ class Team:
             if team.has_channel(channel_id):
                 return team
 
-        raise Exception("No team with that channel exists.")
+        raise TeamNotFound("No team with that channel exists.")
 
     @classmethod
     async def from_record(

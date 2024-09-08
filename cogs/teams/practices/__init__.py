@@ -33,7 +33,7 @@ from discord.ext import commands
 
 from utils import BaseCog
 
-from ..errors import MemberNotOnTeam
+from ..errors import MemberNotOnTeam, TeamNotFound
 from ..team import Team
 
 # for imports and ease of use for other modules
@@ -89,7 +89,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
         # Let's try and get a team now
         try:
             team = Team.from_channel(category.id, interaction.guild.id, bot=self.bot)
-        except Exception:
+        except TeamNotFound:
             return await interaction.response.send_message("You must use this command in a team channel.", ephemeral=True)
 
         # Let's check and see if there's an active practice
@@ -205,7 +205,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
 
             try:
                 team = Team.from_channel(category.id, member.guild.id, bot=self.bot)
-            except Exception:
+            except TeamNotFound:
                 _log.debug(
                     "Member %s joined a voice channel that is not in a team channel.",
                     member.id,
@@ -246,7 +246,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
 
             try:
                 team = Team.from_channel(category.id, member.guild.id, bot=self.bot)
-            except Exception:
+            except TeamNotFound:
                 _log.debug(
                     "Member %s left a voice channel that is not in a team channel.",
                     member.id,
@@ -285,7 +285,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
                 # Check if the before category is a team category
                 try:
                     team = Team.from_channel(before_category.id, member.guild.id, bot=self.bot)
-                except Exception:
+                except TeamNotFound:
                     pass
                 else:
                     # We found a team, make sure the member was in the team's voice channel
@@ -307,7 +307,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
                 # Check if this new category is a team category
                 try:
                     team = Team.from_channel(after_category.id, member.guild.id, bot=self.bot)
-                except Exception:
+                except TeamNotFound:
                     pass
                 else:
                     # We found a team, make sure the member joined the team's voice channel
