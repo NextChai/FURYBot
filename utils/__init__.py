@@ -31,7 +31,6 @@ import discord
 
 from .bases import *
 from .cog import *
-from .constants import *
 from .context import *
 from .error_handler import *
 from .errors import *
