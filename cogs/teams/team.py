@@ -681,18 +681,8 @@ class Team:
 
         self.team_members[team_member.member_id] = team_member
 
-        # Update the channel now
-        category = self.category_channel
-
-        if category:
-            member = team_member.member or await team_member.fetch_member()
-            await category.set_permissions(member, view_channel=True)
-
-        if self.text_channel:
-            await self.text_channel.edit(sync_permissions=True)
-
-        if self.voice_channel:
-            await self.voice_channel.edit(sync_permissions=True)
+        # Now we can sync the permissions for this member
+        await self.sync()
 
         return team_member
 
@@ -719,24 +709,15 @@ class Team:
             # This member has left the guild, we can not edit the channels as a result.
             pass
         else:
+            # Remove this member and sync the channels
+            self.team_members.pop(team_member.member_id, None)
+
             if member.voice and force_voice_disconnect:
                 channel = member.voice.channel
                 if channel and channel in (self.voice_channel, *self.extra_channels):
                     await member.move_to(None, reason="Member removed from the team.")
 
-            category = self.category_channel
-            if category:
-                overwrites = category.overwrites
-                overwrites.pop(member, None)
-                await category.edit(overwrites=overwrites)
-
-            if self.text_channel:
-                await self.text_channel.edit(sync_permissions=True)
-            if self.voice_channel:
-                await self.voice_channel.edit(sync_permissions=True)
-
-        # Update the object
-        self.team_members.pop(team_member.member_id, None)
+            await self.sync()
 
     async def add_captain(self, role_id: int, /) -> None:
         """|coro|
@@ -766,16 +747,7 @@ class Team:
 
         self.captain_role_ids.append(role_id)
 
-        # Update the channel as well, if we can
-        category = self.category_channel
-        if not category:
-            return
-
-        role = self.guild.get_role(role_id)
-        if not role:
-            return
-
-        await category.set_permissions(role, view_channel=True)
+        await self.sync()
 
     async def remove_captain(self, role_id: int, /) -> None:
         """|coro|
@@ -805,16 +777,7 @@ class Team:
 
         self.captain_role_ids.remove(role_id)
 
-        # Update the channel as well
-        category = self.category_channel
-        if not category:
-            return
-
-        role = self.guild.get_role(role_id)
-        if not role:
-            return
-
-        await category.set_permissions(role, view_channel=False)
+        await self.sync()
 
     async def edit(
         self,
@@ -892,6 +855,17 @@ class Team:
 
         async with self.bot.safe_connection() as connection:
             await builder(connection)
+
+        if any(
+            (
+                text_channel_id is not MISSING,
+                voice_channel_id is not MISSING,
+                category_channel_id is not MISSING,
+                sub_role_ids is not MISSING,
+                extra_channel_ids is not MISSING,
+            )
+        ):
+            await self.sync()
 
     async def delete(self, *, connection: ConnectionType, reason: Optional[str] = None) -> None:
         """|coro|

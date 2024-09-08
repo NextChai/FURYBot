@@ -31,11 +31,12 @@ import discord
 from discord.ext import commands
 
 from utils import BaseCog
+from .scrim import ScrimStatus
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
-    from .scrim import Scrim, ScrimStatus
+    from .scrim import Scrim
 
 __all__: Tuple[str, ...] = ('ScrimEventListener',)
 
