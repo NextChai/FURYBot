@@ -439,7 +439,6 @@ class Scrim:
 
         return channel
 
-    # TODO: Move this to the edit method.
     async def change_status(
         self, status: Literal[ScrimStatus.scheduled, ScrimStatus.pending_away, ScrimStatus.pending_host], /
     ) -> None:

@@ -240,8 +240,6 @@ class PracticeMemberPanel(BaseView):
         view = PracticePanel(self.member.practice, target=interaction)
         return await interaction.response.edit_message(view=view, embed=view.embed)
 
-    # TODO: Add buttons for removing a history from this member.
-
 
 class PracticePanel(BaseView):
     """Represents the view for a practice.
@@ -454,7 +452,7 @@ class TeamPracticesPanel(BaseView):
         view = self.create_child(PracticePanel, practice)
         return await interaction.response.edit_message(view=view, embed=view.embed)
 
-    @discord.ui.button(label="Manage Practice")
+    @discord.ui.button(label="Manage a Practice")
     @default_button_doc_string
     async def manage_practice(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Manage a specific practice."""
@@ -488,6 +486,3 @@ class TeamPracticesPanel(BaseView):
 
         await interaction.followup.send("Successfully deleted all practice history.", ephemeral=True)
         return await interaction.edit_original_response(embed=self.embed, view=self)
-
-    # TODO: Add a button to view complete practice history (see ID)
-    # TODO: Add a button to get a practice by it's ID

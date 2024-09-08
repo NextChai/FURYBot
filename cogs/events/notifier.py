@@ -35,7 +35,6 @@ if TYPE_CHECKING:
     from bot import FuryBot
 
 
-# TODO: Maybe refactor this to a guild can have a large settings panel for things like this?
 class Notifier(BaseCog):
     def __init__(self, bot: FuryBot) -> None:
         self.bot: FuryBot = bot

@@ -39,6 +39,7 @@ from .scrims.errors import CannotCreateScrim
 from .team import Team
 from .transformers import TeamTransformer
 from .views import TeamView
+from .practices.panel import TeamPracticesPanel
 
 TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=False)]
 FRONT_END_TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=True)]
@@ -147,6 +148,21 @@ class Teams(BaseCog):
 
         view = TeamView(team, target=interaction)
         return await interaction.edit_original_response(embed=view.embed, view=view)
+
+    @team.command(name='practices', description='Manage a team\'s practices')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(team='The team you want to manage.')
+    async def team_practices(
+        self, interaction: discord.Interaction[FuryBot], team: Optional[TEAM_TRANSFORM]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer(ephemeral=True)
+
+        team = _maybe_team(interaction, team)
+        if team is None:
+            return await interaction.edit_original_response(content='You must be in a team channel to use this command.')
+
+        view = TeamPracticesPanel(team, target=interaction)
+        return await interaction.edit_original_response(view=view, embed=view.embed)
 
     @team.command(name='delete', description='Delete a team.')
     @app_commands.default_permissions(moderate_members=True)

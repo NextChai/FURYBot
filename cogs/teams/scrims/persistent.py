@@ -189,7 +189,6 @@ class HomeConfirm(discord.ui.View):
         channel = self.scrim.away_team.text_channel
         if not channel:
             # The channel was deleted, we need to cancel the scrim
-            # TODO: Impl this
             await self.scrim.cancel(reason='The away channel has been deleted.')
             return await interaction.response.send_message(
                 'The away channel has been deleted. Cancelling the scrim...', ephemeral=True
