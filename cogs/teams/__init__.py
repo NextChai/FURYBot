@@ -24,6 +24,7 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Annotated, List, Optional, Tuple, TypeAlias
 
 import discord
@@ -39,6 +40,9 @@ from .team import Team
 from .transformers import TeamTransformer
 from .views import TeamView
 
+TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=False)]
+FRONT_END_TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=True)]
+
 if TYPE_CHECKING:
     from bot import FuryBot
 
@@ -46,8 +50,7 @@ if TYPE_CHECKING:
 
 __all__: Tuple[str, ...] = ('Teams',)
 
-TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=False)]
-FRONT_END_TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=True)]
+_log = logging.getLogger(__name__)
 
 
 def _maybe_team(interaction: discord.Interaction[FuryBot], team: Optional[Team]) -> Optional[Team]:
@@ -302,6 +305,8 @@ class Teams(BaseCog):
             # A team does not exist with this channel, we can ignore this
             return
 
+        _log.debug('Team %s category channel was deleted, deleting team.', team.display_name)
+
         # A team does exist with this channel, delete it for the mod
         async with self.bot.safe_connection() as connection:
             await team.delete(
@@ -330,6 +335,7 @@ class Teams(BaseCog):
 
         category = channel.category
         if category is None:
+            _log.debug('Team %s category channel was deleted, deleting team.', team.display_name)
             # The category has been deleted, we can assume that the team has been deleted or
             # some other catastrophic event has occurred. We can delete the team, and in the case
             # the team already doesn't exist, this will just be cleaning up the database.
@@ -341,6 +347,7 @@ class Teams(BaseCog):
         # If this channel was the main team's text or voice chat, we need to recreate it
         # and update the metadata that the bot holds.
         if team.text_channel_id == channel.id:
+            _log.debug('Team %s text channel was deleted, recreating.', team.display_name)
             new_channel = await category.create_text_channel(name='team-chat')
             await team.edit(text_channel_id=new_channel.id)
 
@@ -350,10 +357,11 @@ class Teams(BaseCog):
                 description=f'The team chat for {team.display_name} has been recreated due to it being deleted.',
             )
             await new_channel.send(embed=notification_embed)
-        elif team.voice_channel_id == channel.id:
-            new_channel = await category.create_voice_channel(name='team-voice')
-            await team.edit(voice_channel_id=new_channel.id)
             return None
+        elif team.voice_channel_id == channel.id:
+            _log.debug('Team %s voice channel was deleted, recreating.', team.display_name)
+            new_channel = await category.create_voice_channel(name='team-voice')
+            return await team.edit(voice_channel_id=new_channel.id)
 
 
 async def setup(bot: FuryBot) -> None:
