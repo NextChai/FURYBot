@@ -55,11 +55,22 @@ class ImageRequests(BaseCog):
 
         return ImageRequestSettings(data=dict(data), bot=self.bot)
 
-    async def _append_nsfw_classification(self, embed: discord.Embed, file: discord.File) -> discord.Embed:
-        data = file.fp.read()
-        file.reset()
+    async def _append_nsfw_classification(self, embed: discord.Embed, attachment: discord.Attachment) -> discord.Embed:
+        data = await attachment.read()
 
-        detections: List[Dict[str, Any]] = await self.bot.wrap(self._detector.detect, data)
+        try:
+            detections: List[Dict[str, Any]] = await self.bot.wrap(self._detector.detect, data)
+        except Exception as exc:
+            if self.bot.error_handler:
+                await self.bot.error_handler.exception_manager.add_error(error=exc, event_name='NSFW Classification Error')
+
+            embed.add_field(
+                name='NSFW Classifications',
+                value='An error occurred while trying to classify this image. I have let the developer know.',
+                inline=False,
+            )
+            return embed
+
         nsfw_classifications: List[str] = []
 
         for detection in detections:
@@ -70,7 +81,7 @@ class ImageRequests(BaseCog):
             nsfw_classifications.append(f'{class_name}: **{score_percent}%**')
 
         if nsfw_classifications:
-            embed.add_field(name='NSFW Classifications', value='\n'.join(nsfw_classifications))
+            embed.add_field(name='NSFW Classifications', value='\n'.join(nsfw_classifications), inline=False)
 
         return embed
 
@@ -150,7 +161,7 @@ class ImageRequests(BaseCog):
 
             content_type = pending_attachment.content_type
             if content_type and content_type.startswith('image/'):
-                embed = await self._append_nsfw_classification(view.embed, file)
+                embed = await self._append_nsfw_classification(view.embed, pending_attachment)
             else:
                 embed = view.embed
 
