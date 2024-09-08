@@ -128,10 +128,12 @@ class ApproveOrDenyImage(discord.ui.View):
         embed = self.bot.Embed(
             title=f'Image requested by {self.request.requester.display_name}', author=self.request.requester
         )
-        embed.add_field(
-            name='Additional Message', value=self.request.message or "No message has been attached with this upload."
-        )
         embed.add_field(name='Channel to Send in', value=mention_interaction_channel(self.request.channel))
+
+        if self.request.message:
+            embed.add_field(name='Additional Message', value=self.request.message, inline=False)
+
+        embed.set_image(url=f'attachment://{self.request.attachment.filename}')
 
         return embed
 
@@ -145,6 +147,7 @@ class ApproveOrDenyImage(discord.ui.View):
             timestamp=interaction.created_at,
         )
         embed.add_field(name='Channel to Send In', value=mention_interaction_channel(self.request.channel))
+        embed.set_image(url=f'attachment://{request.attachment.filename}')
         await interaction.edit_original_response(embed=embed, view=None)
 
         # Try and download the attachment as a file so we can send it that way
@@ -182,7 +185,7 @@ class ApproveOrDenyImage(discord.ui.View):
         embed.add_field(name='Message Posted', value=f'[Jump to message]({message.jump_url})')
         await interaction.edit_original_response(embed=embed)
 
-    @discord.ui.button(label='Approve', style=discord.ButtonStyle.green)
+    @discord.ui.button(label='Approve', style=discord.ButtonStyle.green, custom_id='approve')
     @default_button_doc_string
     async def approve(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
@@ -192,7 +195,7 @@ class ApproveOrDenyImage(discord.ui.View):
 
         await self._approve(interaction)
 
-    @discord.ui.button(label='Approve Without Message', style=discord.ButtonStyle.gray)
+    @discord.ui.button(label='Approve Without Message', style=discord.ButtonStyle.gray, custom_id='approve-without-message')
     @default_button_doc_string
     async def approve_without_message(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
@@ -206,7 +209,7 @@ class ApproveOrDenyImage(discord.ui.View):
         self.request.message = None
         await self._approve(interaction)
 
-    @discord.ui.button(label='Deny', style=discord.ButtonStyle.red)
+    @discord.ui.button(label='Deny', style=discord.ButtonStyle.red, custom_id='deny')
     @default_button_doc_string
     async def deny(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Deny the image request by sending a message to the requester with the information and deleting the request from the database."""
