@@ -102,17 +102,18 @@ class HomeConfirm(discord.ui.View):
                 embed.add_field(name='Scrim Date and Time', value=scrim.scheduled_for_formatted())
             else:
                 embed = self.bot.Embed(
-                    title='Scrim Scheduled!',
+                    title='Scrim Scheduled',
                     description=f'A scrim on {scrim.scheduled_for_formatted()} **against {scrim.away_team.display_name}** has '
                     'been fully scheduled.',
                 )
                 embed.add_field(
                     name='How do I Scrim?',
-                    value='10 minutes before the scrim is scheduled to begin, '
+                    value='When the scrim is scheduled to begin, '
                     'FuryBot will create a chat for both teams to communicate. In this chat, '
                     f'the home team, **{scrim.home_team.display_name}**, will create the private match for the away team, '
                     f'**{scrim.away_team.display_name}**, to join with. You decide how much and long you want to play. The scrim channel '
-                    'will automatically be deleted after 5 hours. Please note you should use your private team voice chat for communication.',
+                    'will automatically be deleted after 5 hours. This chat is simply for the two teams to communicate, you should use '
+                    'your private team voice chat for communication.',
                     inline=False,
                 )
 
@@ -121,10 +122,7 @@ class HomeConfirm(discord.ui.View):
                     and len(self.scrim.away_confirm_anyways_voter_ids) >= self.scrim.per_team // 2
                 ):
                     force_started_value = f'The scrim was force started by: {", ".join(m.mention for m in self.scrim.away_confirm_anyways_voters)}'
-                else:
-                    force_started_value = 'The scrim was not force started.'
-
-                embed.add_field(name='Scrim Force Started?', value=force_started_value, inline=False)
+                    embed.add_field(name='Scrim Force Started?', value=force_started_value, inline=False)
 
             embed.add_field(
                 name='Confirmed Teammates',
@@ -398,11 +396,12 @@ class AwayConfirm(discord.ui.View):
             )
             embed.add_field(
                 name='How do I Scrim?',
-                value='10 minutes before the scrim is scheduled to begin, '
+                value='When the scrim is scheduled to begin, '
                 'FuryBot will create a chat for both teams to communicate. In this chat, '
                 f'the home team, **{scrim.home_team.display_name}**, will create the private match for the away team, '
                 f'**{scrim.away_team.display_name}**, to join with. You decide how much and long you want to play. The scrim channel '
-                'will automatically be deleted after 5 hours. Please note you should use your private team voice chat for communication.',
+                'will automatically be deleted after 5 hours. This chat is simply for the two teams to communicate, you should use '
+                'your private team voice chat for communication.',
                 inline=False,
             )
             embed.add_field(name='Confirmed Teammates', value=', '.join(m.mention for m in scrim.away_voters), inline=False)
@@ -415,10 +414,7 @@ class AwayConfirm(discord.ui.View):
                 force_started_value = (
                     f'The scrim was force started by: {", ".join(m.mention for m in self.scrim.away_confirm_anyways_voters)}'
                 )
-            else:
-                force_started_value = 'The scrim was not force started.'
-
-            embed.add_field(name='Scrim Force Started?', value=force_started_value, inline=False)
+                embed.add_field(name='Scrim Force Started?', value=force_started_value, inline=False)
 
             return embed
 
