@@ -147,9 +147,10 @@ class Teams(BaseCog):
 
     @team.command(name='delete', description='Delete a team.')
     @app_commands.default_permissions(moderate_members=True)
-    @app_commands.describe(team='The team you want to delete.')
+    @app_commands.describe(team='The team you want to delete.', reason='Reason for deleting the team, shows on audit logs.')
+    @app_commands.checks.bot_has_permissions(manage_channels=True)
     async def team_delete(
-        self, interaction: discord.Interaction[FuryBot], team: Optional[TEAM_TRANSFORM]
+        self, interaction: discord.Interaction[FuryBot], team: Optional[TEAM_TRANSFORM], reason: Optional[str] = None
     ) -> Optional[discord.InteractionMessage]:
         """|coro|
 
@@ -169,7 +170,7 @@ class Teams(BaseCog):
             )
 
         async with self.bot.safe_connection() as connection:
-            await team.delete(connection=connection)
+            await team.delete(connection=connection, reason=f'{interaction.user} - {reason or "No reason provided."}')
 
         return await interaction.edit_original_response(content=f'{team.display_name} has been deleted.')
 
@@ -303,7 +304,9 @@ class Teams(BaseCog):
 
         # A team does exist with this channel, delete it for the mod
         async with self.bot.safe_connection() as connection:
-            await team.delete(connection=connection)
+            await team.delete(
+                connection=connection, reason=f'Team {team.display_name} category channel was deleted, team was deleted.'
+            )
 
     @commands.Cog.listener('on_guild_channel_delete')
     async def team_automatic_text_voice_chat_deletion_detector(self, channel: discord.abc.GuildChannel) -> None:
@@ -331,7 +334,9 @@ class Teams(BaseCog):
             # some other catastrophic event has occurred. We can delete the team, and in the case
             # the team already doesn't exist, this will just be cleaning up the database.
             async with self.bot.safe_connection() as connection:
-                return await team.delete(connection=connection)
+                return await team.delete(
+                    connection=connection, reason='Team category was deleted, team automatically deleted.'
+                )
 
         # If this channel was the main team's text or voice chat, we need to recreate it
         # and update the metadata that the bot holds.

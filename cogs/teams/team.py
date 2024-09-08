@@ -893,29 +893,31 @@ class Team:
         async with self.bot.safe_connection() as connection:
             await builder(connection)
 
-    async def delete(self, *, connection: ConnectionType) -> None:
+    async def delete(self, *, connection: ConnectionType, reason: Optional[str] = None) -> None:
         """|coro|
 
         Deletes the team and all of its channels.
         """
         await connection.execute("DELETE FROM teams.settings WHERE id = $1", self.id)
 
+        self.bot.remove_team(self.id, self.guild_id)
+
+        reason = reason or "Team deleted automatically."
+
         voice_channel = self.voice_channel
         if voice_channel:
-            await voice_channel.delete()
+            await voice_channel.delete(reason=reason)
 
         text_channel = self.text_channel
         if text_channel:
-            await text_channel.delete()
+            await text_channel.delete(reason=reason)
 
         category_channel = self.category_channel
         if category_channel:
-            await category_channel.delete()
+            await category_channel.delete(reason=reason)
 
         for channel in self.extra_channels:
-            await channel.delete()
-
-        self.bot.remove_team(self.id, self.guild_id)
+            await channel.delete(reason=reason)
 
     async def delete_all_practice_history(self, *, connection: ConnectionType) -> None:
         """|coro|

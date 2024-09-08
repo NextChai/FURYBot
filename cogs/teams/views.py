@@ -401,7 +401,7 @@ class TeamNamingView(BaseView):
             value=self.team.nickname or "Team has no nickname.",
             inline=False,
         )
-        
+
         if self.team.logo:
             embed.add_field(
                 name="Team Logo",
@@ -409,11 +409,7 @@ class TeamNamingView(BaseView):
                 inline=False,
             )
         else:
-            embed.add_field(
-                name='Team Logo',
-                value='Team has no logo.',
-                inline=False
-            )
+            embed.add_field(name='Team Logo', value='Team has no logo.', inline=False)
 
         return embed
 
@@ -670,7 +666,7 @@ class TeamView(BaseView):
         await interaction.response.edit_message(content="This team has been deleted.", view=None, embed=None)
 
         async with self.bot.safe_connection() as connection:
-            await self.team.delete(connection=connection)
+            await self.team.delete(connection=connection, reason=f'Team deleted in team view by {interaction.user}')
 
     @discord.ui.button(label="Customization")
     @default_button_doc_string
