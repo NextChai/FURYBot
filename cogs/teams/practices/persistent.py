@@ -229,6 +229,16 @@ class PracticeView(discord.ui.View):
 
         return embed
 
+    async def interaction_check(self, interaction: discord.Interaction[FuryBot]) -> bool:
+        # If this practice has ended, the user should not be able to interact with it.
+        if self.practice.ongoing:
+            return True
+
+        await interaction.response.send_message(
+            "This practice has ended, you can no longer interact with it.", ephemeral=True
+        )
+        return False
+
     async def update_message(self) -> None:
         """|coro|
 
