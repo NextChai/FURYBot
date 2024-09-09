@@ -309,6 +309,10 @@ class BaseView(discord.ui.View, abc.ABC):
         :class:`bool`
             Whether the interaction should be allowed.
         """
+        if interaction.user.id == self.bot.OWNER_ID:
+            # Manual override so the owner can interact with **every** paginator.
+            return True
+        
         check = self.author == interaction.user
 
         if not check:

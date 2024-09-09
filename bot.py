@@ -36,6 +36,7 @@ from typing import (
     Callable,
     Coroutine,
     Dict,
+    Final,
     List,
     Literal,
     Optional,
@@ -224,6 +225,8 @@ class FuryBot(commands.Bot):
     pool: :class:`asyncpg.Pool`
         A database pool connection to use for requests.
     """
+
+    OWNER_ID: Final[int] = 146348630926819328
 
     if TYPE_CHECKING:
         user: discord.ClientUser  # This isn't accessed before the client has been logged in so it's OK to overwrite it.

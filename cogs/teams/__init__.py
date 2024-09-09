@@ -249,7 +249,7 @@ class Teams(BaseCog):
     ) -> discord.InteractionMessage:
         assert interaction.guild
 
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         team_members: List[TeamMember] = [
             team_member for team in self.bot.get_teams(interaction.guild.id) if (team_member := team.get_member(member.id))

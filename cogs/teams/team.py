@@ -872,13 +872,66 @@ class Team:
         async with self.bot.safe_connection() as connection:
             await builder(connection)
 
+    async def _cleanup_practices_for_delete(self, *, connection: ConnectionType) -> None:
+        # Cleans up the practices for this team. IE, if the members are the top
+        # practicers then their roles must be removed and whatnot
+
+        # Fetch the top practicer team right now
+        data = await connection.fetchrow(
+            'SELECT top_team_id, role_id FROM teams.practice_leaderboards WHERE guild_id = $1', self.guild_id
+        )
+        if not data:
+            # Nothing to clean up in particular
+            return
+
+        top_practicer_team_id = data['top_team_id']
+
+        if not top_practicer_team_id:
+            # Nothing to clean up in particular
+            return
+
+        # Check if this team is the top practicer team
+        if top_practicer_team_id != self.id:
+            # Nothing to clean up
+            return
+
+        # Alright, we need to clean up the top practicer team
+        # Alter the top_team_id to be None, and remove the roles from the members.
+        # We set it to None because the top_team_id will be updated in the next iteration of the leaderboard
+        # updater.
+        await connection.execute(
+            'UPDATE teams.practice_leaderboards SET top_team_id = NULL WHERE guild_id = $1', self.guild_id
+        )
+
+        # Remove the roles from the members
+        role = self.guild.get_role(data['role_id'])
+        if not role:
+            return
+
+        for member in self.members:
+            try:
+                member = member.member or await member.fetch_member()
+            except discord.NotFound:
+                continue
+
+            try:
+                await member.remove_roles(role, reason="Team deleted, team was top practicer.")
+            except discord.Forbidden:
+                pass
+
     async def delete(self, *, connection: ConnectionType, reason: Optional[str] = None) -> None:
         """|coro|
 
         Deletes the team and all of its channels.
         """
+
+        # Clean up the practices for this team, if needed
+        await self._cleanup_practices_for_delete(connection=connection)
+
+        # Now we can delete it from the database
         await connection.execute("DELETE FROM teams.settings WHERE id = $1", self.id)
 
+        # Remove this team from the bot's cache
         self.bot.remove_team(self.id, self.guild_id)
 
         reason = reason or "Team deleted automatically."

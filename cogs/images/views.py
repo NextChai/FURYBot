@@ -81,6 +81,7 @@ class DeniedImageReason(BaseModal):
         )
         embed.add_field(name='Deny Reason', value=self.reason.value)
         embed.add_field(name='Channel to Send In', value=mention_interaction_channel(self.request.channel))
+        embed.set_image(url=f'attachment://{self.request.attachment.filename}')
         return embed
 
     async def on_submit(self, interaction: discord.Interaction[FuryBot], /) -> None:
