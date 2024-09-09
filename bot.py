@@ -86,7 +86,7 @@ if RUNNING_DEVELOPMENT:
     _log.setLevel(logging.DEBUG)
 
 initial_extensions: Tuple[str, ...] = (
-    "cogs.events.notifier",
+    "cogs.infractions",
     "cogs.fun",
     "cogs.images",
     "cogs.flvs",
