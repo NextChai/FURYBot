@@ -53,7 +53,7 @@ import discord
 from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
-from cogs.images import ApproveOrDenyImage, ImageRequest
+from cogs.images import ApproveOrDenyImage, ImageRequest, AttachmentRequestSettings
 from cogs.teams import Team
 from cogs.teams.practices import Practice
 from cogs.teams.scrims import Scrim, ScrimStatus
@@ -714,20 +714,15 @@ class FuryBot(commands.Bot):
     async def _load_image_request(self, data: asyncpg.Record, connection: ConnectionType) -> None:
         await self.wait_until_ready()
 
-        # Fetch the request guild from the request_settings reference to images.request_settings
-        guild_id = await connection.fetchval(
-            'SELECT guild_id FROM images.request_settings WHERE id = $1', data['request_settings']
-        )
-        if not guild_id:
+        # Fetch the request guild
+        settings = await AttachmentRequestSettings.fetch_from_id(data['request_settings'], bot=self)
+        if not settings:
             # This does not exist anymore, we cannot load it
             return
 
-        guild = self.get_guild(guild_id)
-        if not guild:
-            return
-
-        channel = guild.get_channel(data['channel_id'])
-        if not channel:
+        guild = settings.guild
+        channel = settings.channel
+        if not guild or not channel:
             return
 
         attachment_data = data['attachment_payload']
@@ -736,7 +731,7 @@ class FuryBot(commands.Bot):
         request = ImageRequest(
             requester=requester,
             attachment=discord.Attachment(data=attachment_data, state=self._connection),
-            channel=channel,
+            channel=channel,  # type: ignore # TODO: Make this happy
             message=data["message"],
             id=data["id"],
         )

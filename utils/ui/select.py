@@ -66,7 +66,7 @@ ViewMixinT = TypeVar('ViewMixinT', bound='BaseView')
 AfterCallback: TypeAlias = Callable[[discord.Interaction['FuryBot'], List[T]], Any]
 
 
-class CleanupSelectHelper(Generic[ViewMixinT], discord.ui.Item[ViewMixinT]):
+class ViewChildrenSaver(Generic[ViewMixinT], discord.ui.Item[ViewMixinT]):
     """A helper class to manage the cleanup of a select. This dynamically removes
     all children from its parent and adds them back when the select is closed.
     """
@@ -138,7 +138,7 @@ class SelectOneOfMany(Generic[ViewMixinT]):
         await self._after(interaction, values)
 
 
-class RelaySelect(Generic[T, ViewMixinT], CleanupSelectHelper[ViewMixinT], discord.ui.Item[ViewMixinT]):
+class RelaySelect(Generic[T, ViewMixinT], ViewChildrenSaver[ViewMixinT], discord.ui.Item[ViewMixinT]):
     """A helper class that will redirect the callback of a select to a different callback.
     This is so we can dynamically handle the callback of a select without having to subclass
     it every time and create repeat code.
@@ -250,7 +250,7 @@ class SelectEater(Generic[P, ViewMixinT]):
 
         self._children: List[RelaySelect[Any, ViewMixinT]] = []
 
-        # It's safe to clear the parent's children becuase we have a copy of them.
+        # It's safe to clear the parent's children because we have a copy of them.
         parent.clear_items()
 
     def add_select(self, select: RelaySelect[Any, ViewMixinT]) -> None:

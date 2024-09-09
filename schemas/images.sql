@@ -3,7 +3,7 @@ CREATE SCHEMA IF NOT EXISTS images;
 CREATE TABLE IF NOT EXISTS images.request_settings (
     id SERIAL PRIMARY KEY,
     channel_id BIGINT, -- The ID of the channel to send to.
-    guild_id BIGINT, -- The ID of the guild related to
+    guild_id BIGINT UNIQUE, -- The ID of the guild related to
     notification_role_id BIGINT
 );
 

@@ -30,6 +30,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Coroutine,
     Dict,
     Generator,
     Generic,
@@ -48,12 +49,14 @@ from typing import (
 import discord
 from typing_extensions import Concatenate, NotRequired, ParamSpec, Self, TypeAlias, Unpack
 
+from .select import ViewChildrenSaver
+
 if TYPE_CHECKING:
     from bot import FuryBot
 
     from ..context import Context
 
-__all__: Tuple[str, ...] = ('BaseViewKwargs', 'BaseView', 'walk_parents', 'MultiSelector', 'find_home')
+__all__: Tuple[str, ...] = ('BaseViewKwargs', 'BaseView', 'walk_parents', 'MultiSelector', 'find_home', 'ConfirmationGetter')
 
 T = TypeVar('T')
 P = ParamSpec('P')
@@ -61,6 +64,7 @@ BT = TypeVar('BT', bound='FuryBot')
 TargetType: TypeAlias = Union['discord.Interaction[FuryBot]', 'Context']
 BaseViewInit: TypeAlias = Callable[Concatenate["BaseView", P], T]
 BaseViewT = TypeVar('BaseViewT', bound='BaseView')
+BotT = TypeVar('BotT', bound='discord.Client')
 
 QUESTION_MARK = "\N{BLACK QUESTION MARK ORNAMENT}"
 HOME = "\N{HOUSE BUILDING}"
@@ -134,8 +138,9 @@ class Stop(discord.ui.Button["BaseView"]):
 
     async def callback(self, interaction: discord.Interaction[FuryBot]) -> None:
         """|coro|
+
         When called, will respond to the interaction by editing the message
-        with the diabled view.
+        with the disabled view.
 
         Parameters
         ----------
@@ -265,17 +270,18 @@ class BaseView(discord.ui.View, abc.ABC):
     def _add_menu_children(self) -> None:
         children_cls = {type(child) for child in self.children}
         if self.parent is not None:
-            if GoBack not in children_cls:
+            if GoBack not in children_cls:  # type: ignore
                 self.add_item(GoBack(self.parent))
 
             home = find_home(self)
             if home and home is not self.parent and GoHome not in children_cls:
                 self.add_item(GoHome(home))
 
-        if Stop not in children_cls:
+        if Stop not in children_cls:  # type: ignore
             self.add_item(Stop(self))
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def embed(self) -> discord.Embed: ...
 
     def remove_stop_button(self) -> None:
@@ -312,7 +318,7 @@ class BaseView(discord.ui.View, abc.ABC):
         if interaction.user.id == self.bot.OWNER_ID:
             # Manual override so the owner can interact with **every** paginator.
             return True
-        
+
         check = self.author == interaction.user
 
         if not check:
@@ -327,13 +333,13 @@ class BaseView(discord.ui.View, abc.ABC):
         return await super().on_error(interaction, error, item)
 
 
-class _ChooseItemModal(discord.ui.Modal):
+class _ChooseItemModal(Generic[BaseViewT], discord.ui.Modal):
     def __init__(
         self,
         *,
         parent: MultiSelector[BaseViewT, Any],
         modal_title: str = 'Choose Item',
-        modal_item: Optional[discord.ui.TextInput[_ChooseItemModal]] = None,
+        modal_item: Optional[discord.ui.TextInput[Self]] = None,
     ) -> None:
         super().__init__(title=modal_title, timeout=None)
         self.parent: MultiSelector[BaseViewT, Any] = parent
@@ -407,10 +413,10 @@ class MultiSelector(Generic[BaseViewT, T], abc.ABC):
         items: List[T],
         per_page: int = 10,
         modal_title: str = 'Choose Item',
-        modal_item: Optional[discord.ui.TextInput[_ChooseItemModal]] = None,
+        modal_item: Optional[discord.ui.TextInput[_ChooseItemModal[BaseViewT]]] = None,
     ) -> None:
         self.modal_title: str = modal_title
-        self.modal_item: Optional[discord.ui.TextInput[_ChooseItemModal]] = modal_item
+        self.modal_item: Optional[discord.ui.TextInput[_ChooseItemModal[BaseViewT]]] = modal_item
 
         self.parent: BaseViewT = parent
         self._original_children: List[discord.ui.Item[BaseViewT]] = parent.children
@@ -458,3 +464,31 @@ class MultiSelector(Generic[BaseViewT, T], abc.ABC):
             await interaction.edit_original_response(embed=embed, view=self.parent)
         else:
             await interaction.response.edit_message(embed=embed, view=self.parent)
+
+
+class _ActionButton(Generic[BotT, BaseViewT], discord.ui.Button[BaseViewT]):
+    def __init__(self, getter: ConfirmationGetter[BotT, BaseViewT], value: bool, **kwargs: Any) -> None:
+        self._getter: ConfirmationGetter[BotT, BaseViewT] = getter
+        self._value: bool = value
+        super().__init__(**kwargs)
+
+    async def callback(self, interaction: discord.Interaction[BotT]) -> None:
+        return await self._getter.after(interaction, self._value)
+
+
+class ConfirmationGetter(Generic[BotT, BaseViewT], ViewChildrenSaver[BaseViewT]):
+    """Represents a confirmation getter. Will prompt the user to confirm or deny an action,
+    and call the after callback with the result of what they chose.
+    """
+
+    def __init__(
+        self, after: Callable[[discord.Interaction[BotT], bool], Coroutine[Any, Any, Any]], parent: BaseViewT
+    ) -> None:
+        super().__init__(parent)
+        self.after: Callable[[discord.Interaction[BotT], bool], Coroutine[Any, Any, Any]] = after
+        self.parent: BaseViewT = parent
+
+        # Calling super().__init__ clears and stores the children, we can add our
+        # own buttons now
+        self.parent.add_item(_ActionButton(self, value=True, label='Confirm', style=discord.ButtonStyle.green))
+        self.parent.add_item(_ActionButton(self, value=False, label='Cancel', style=discord.ButtonStyle.danger))

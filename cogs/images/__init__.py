@@ -33,6 +33,8 @@ from utils import BaseCog
 
 from .request import ImageRequest, ImageRequestSettings
 from .views import ApproveOrDenyImage
+from .settings import AttachmentRequestSettings
+from .panel import AttachmentRequestSettingsPanel
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -87,6 +89,25 @@ class ImageRequests(BaseCog):
             embed.add_field(name='NSFW Classifications', value='\n'.join(nsfw_classifications), inline=False)
 
         return embed
+
+    # launches the management panel for the attachment request feature
+    @app_commands.command(
+        name='attachment-request-manage', description='Manage or create the settings for the attachment request feature.'
+    )
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.guild_only()
+    async def attachment_request_settings(self, interaction: discord.Interaction[FuryBot]) -> None:
+        assert interaction.guild
+
+        await interaction.response.defer(ephemeral=True)
+
+        settings = await AttachmentRequestSettings.fetch_from_guild(interaction.guild.id, bot=self.bot)
+        if settings is None:
+            # TODO: Must be created
+            return
+
+        view = AttachmentRequestSettingsPanel(settings=settings, target=interaction)
+        return await interaction.edit_original_response(embed=view.embed, view=view)
 
     @app_commands.command(name='attachment-request', description='Request to have an attachment uploaded for you.')
     @app_commands.default_permissions(attach_files=True)
