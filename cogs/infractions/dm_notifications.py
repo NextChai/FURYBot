@@ -23,19 +23,17 @@ DEALINGS IN THE SOFTWARE.
 """
 
 from __future__ import annotations
-
 from typing import TYPE_CHECKING, List, Optional, cast
 
 import discord
 from discord.ext import tasks
-
 from utils import BaseCog
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
 
-class Notifier(BaseCog):
+class DmNotifications(BaseCog):
     def __init__(self, bot: FuryBot) -> None:
         self.bot: FuryBot = bot
         self.member_notifier_task.start()
@@ -141,7 +139,3 @@ class Notifier(BaseCog):
     @member_notifier_task.before_loop
     async def member_notifier_before_loop(self) -> None:
         await self.bot.wait_until_ready()
-
-
-async def setup(bot: FuryBot) -> None:
-    await bot.add_cog(Notifier(bot))
