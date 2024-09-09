@@ -27,7 +27,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import discord
-import nudenet
 from discord import app_commands
 
 from utils import BaseCog
@@ -36,15 +35,19 @@ from .request import ImageRequest, ImageRequestSettings
 from .views import ApproveOrDenyImage
 
 if TYPE_CHECKING:
-
     from bot import FuryBot
+
+    NudeDetector: Any  # Simply to make the linter happy
+else:
+
+    from nudenet.nudenet import NudeDetector
 
 
 class ImageRequests(BaseCog):
 
     def __init__(self, bot: FuryBot) -> None:
         super().__init__(bot)
-        self._detector = nudenet.NudeDetector()
+        self._detector = NudeDetector()
 
     async def _fetch_image_request_settings(self, guild_id: int) -> Optional[ImageRequestSettings]:
         async with self.bot.safe_connection() as connection:
