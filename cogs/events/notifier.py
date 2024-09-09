@@ -121,7 +121,7 @@ class Notifier(BaseCog):
     async def member_notifier_task(self) -> None:
         async with self.bot.safe_connection() as connection:
             guild_id_records = await connection.fetch(
-                'SELECT guild_id FROM infractions.settings WHERE notification_channel_id IS NOT NULL'
+                'SELECT guild_id FROM infractions.settings WHERE notification_channel_id IS NOT NULL AND enable_no_dms_open = TRUE'
             )
 
             for record in guild_id_records:
