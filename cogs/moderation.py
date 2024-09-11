@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 import discord
 from discord import app_commands
@@ -36,6 +36,15 @@ if TYPE_CHECKING:
 
 
 class Moderation(BaseCog):
+    def __init__(self, bot: FuryBot) -> None:
+        super().__init__(bot)
+
+        cleanup_context_command = app_commands.ContextMenu(
+            name='cleanup',
+            type=discord.AppCommandType.message,
+            callback=self.
+        )
+
     @app_commands.command(name='nick', description='Nick a member.')
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.describe(member='The member to change the nick for.', nick='The nick to use. Do not include for no nick.')
@@ -54,9 +63,25 @@ class Moderation(BaseCog):
         await member.add_roles(role)
         return await interaction.response.send_message(f'I\'ve assigned {role.mention} to {member.mention}', ephemeral=True)
 
-    # TODO: Add a command that times out a person and deletes their past like
-    # 10 messages or something.
+    async def _cleanup_n_messages(
+        self, interaction: discord.Interaction[FuryBot], to: discord.Member, location: discord.abc.MessageableChannel, n: int
+    ) -> discord.InteractionMessage: ...
 
+    @app_commands.command(name='cleanup', description='Cleanup messages from a user in a channel.')
+    @app_commands.rename(location='in', n='amount')
+    @app_commands.describe(
+        to='The member to cleanup messages from.',
+        location='The channel to cleanup messages in.',
+        n='The amount of messages to cleanup.',
+    )
+    async def cleanup(
+        self, interaction: discord.Interaction[FuryBot], to: discord.Member, location: discord.abc.MessageableChannel, n: int
+    ) -> discord.InteractionMessage:
+        return await self._cleanup_n_messages(interaction, to, location, n)
+
+
+    async def cleanup_context_command(self, interaction: discord.Interaction[FuryBot]) -> None:
+        ...
 
 async def setup(bot: FuryBot):
     await bot.add_cog(Moderation(bot))
