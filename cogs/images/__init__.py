@@ -31,8 +31,8 @@ from discord import app_commands
 
 from utils import BaseCog
 
-from .request import ImageRequest, ImageRequestSettings
-from .views import ApproveOrDenyImage
+from .request import ImageRequest
+from .views import ApproveOrDenyImage, DoesWantToCreateAttachmentSettings
 from .settings import AttachmentRequestSettings
 from .panel import AttachmentRequestSettingsPanel
 
@@ -50,15 +50,6 @@ class ImageRequests(BaseCog):
     def __init__(self, bot: FuryBot) -> None:
         super().__init__(bot)
         self._detector = NudeDetector()
-
-    async def _fetch_image_request_settings(self, guild_id: int) -> Optional[ImageRequestSettings]:
-        async with self.bot.safe_connection() as connection:
-            data = await connection.fetchrow('SELECT * FROM images.request_settings WHERE guild_id = $1', guild_id)
-
-        if not data:
-            return None
-
-        return ImageRequestSettings(data=dict(data), bot=self.bot)
 
     async def _append_nsfw_classification(self, embed: discord.Embed, attachment: discord.Attachment) -> discord.Embed:
         data = await attachment.read()
@@ -96,15 +87,17 @@ class ImageRequests(BaseCog):
     )
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.guild_only()
-    async def attachment_request_settings(self, interaction: discord.Interaction[FuryBot]) -> None:
+    async def attachment_request_settings(
+        self, interaction: discord.Interaction[FuryBot]
+    ) -> Optional[discord.InteractionMessage]:
         assert interaction.guild
 
         await interaction.response.defer(ephemeral=True)
 
         settings = await AttachmentRequestSettings.fetch_from_guild(interaction.guild.id, bot=self.bot)
         if settings is None:
-            # TODO: Must be created
-            return
+            view = DoesWantToCreateAttachmentSettings(target=interaction)
+            return await interaction.edit_original_response(embed=view.embed, view=view)
 
         view = AttachmentRequestSettingsPanel(settings=settings, target=interaction)
         return await interaction.edit_original_response(embed=view.embed, view=view)
@@ -153,7 +146,7 @@ class ImageRequests(BaseCog):
 
         # Try and resolve the image request settings from this guild first. If there are none then we need to
         # tell the user they cannot use this command
-        settings = await self._fetch_image_request_settings(guild_id=guild.id)
+        settings = await AttachmentRequestSettings.fetch_from_guild(guild.id, bot=self.bot)
         if settings is None:
             return await interaction.followup.send(
                 'This server does not have image request settings enabled. Contact an admin to set it up!', ephemeral=True

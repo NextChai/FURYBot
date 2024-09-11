@@ -482,11 +482,14 @@ class ConfirmationGetter(Generic[BotT, BaseViewT], ViewChildrenSaver[BaseViewT])
     """
 
     def __init__(
-        self, after: Callable[[discord.Interaction[BotT], bool], Coroutine[Any, Any, Any]], parent: BaseViewT
+        self,
+        after: Callable[[discord.Interaction[BotT], bool], Coroutine[Any, Any, Any]],
+        parent: BaseViewT,
     ) -> None:
         super().__init__(parent)
         self.after: Callable[[discord.Interaction[BotT], bool], Coroutine[Any, Any, Any]] = after
         self.parent: BaseViewT = parent
+        self.parent.clear_items()
 
         # Calling super().__init__ clears and stores the children, we can add our
         # own buttons now

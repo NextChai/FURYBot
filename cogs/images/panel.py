@@ -135,9 +135,11 @@ class AttachmentRequestSettingsPanel(BaseView):
             return await interaction.edit_original_response(embed=self.embed, view=self)
 
         await self.settings.delete()
-        return await interaction.edit_original_response(content='Attachment Request Settings have been deleted.', view=None)
+        return await interaction.edit_original_response(
+            content='Attachment Request Settings have been deleted.', view=None, embed=None
+        )
 
-    @discord.ui.button(label='Delete Attachment Request Settings', style=discord.ButtonStyle.red, row=1)
+    @discord.ui.button(label='Delete All Settings', style=discord.ButtonStyle.red, row=1)
     async def delete_settings(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> discord.InteractionMessage:

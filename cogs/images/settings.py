@@ -95,8 +95,12 @@ class AttachmentRequestSettings:
         return cls(data=dict(data), bot=bot)
 
     @property
-    def channel(self) -> Optional[discord.abc.MessageableChannel]:
-        channel = self.bot.get_channel(self.channel_id)
+    def channel(self) -> Optional[discord.TextChannel]:
+        guild = self.guild
+        if not guild:
+            return None
+
+        channel = guild.get_channel(self.channel_id)
         if not channel:
             return None
 

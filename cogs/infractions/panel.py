@@ -24,33 +24,20 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Union
+from typing_extensions import Unpack, Self
 
 import discord
 from discord import app_commands
 
-from .dm_notifications import DmNotifications
-from .panel import InfractionsSettingsPanel
-from .settings import InfractionsSettings
+from utils import BaseView, BaseViewKwargs, ChannelSelect, RoleSelect, ConfirmationGetter
 
 if TYPE_CHECKING:
     from bot import FuryBot
+    from .settings import InfractionsSettings
 
 
-class Infractions(DmNotifications):
-    infractions = app_commands.Group(name='infractions', description='Manage infractions.', guild_only=True)
-
-    @infractions.command(name='manage', description='Manage infraction settings.')
-    @app_commands.default_permissions(moderate_members=True)
-    @app_commands.guild_only()
-    async def infractions_manage(self, interaction: discord.Interaction[FuryBot]) -> discord.InteractionMessage:
-        assert interaction.guild is not None
-        await interaction.response.defer(ephemeral=True)
-
-        settings = await InfractionsSettings.fetch_from_guild_id(interaction.guild.id, bot=self.bot)
-        if not settings:
-            ...  # Handle the creation of settings, if wanted
-
-
-async def setup(bot: FuryBot) -> None:
-    await bot.add_cog(Infractions(bot))
+class InfractionsSettingsPanel(BaseView):
+    def __init__(self, settings: InfractionsSettings, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+        self.settings: InfractionsSettings = settings

@@ -263,8 +263,6 @@ class PracticeLeaderboardCog(BaseCog):
         A helper method called when the co is loaded. This will load all the leaderboards from the database
         into memory and start the update loop.
         """
-        await self.bot.wait_until_ready()
-
         async with self.bot.safe_connection() as connection:
             data = await connection.fetch("SELECT * FROM teams.practice_leaderboards;")
 
@@ -272,17 +270,7 @@ class PracticeLeaderboardCog(BaseCog):
                 guild_id = entry["guild_id"]
                 channel_id = entry["channel_id"]
 
-                guild = self.bot.get_guild(guild_id)
-                channel = guild and guild.get_channel(channel_id)
-
-                if not guild or not channel:
-                    await connection.execute(
-                        "DELETE FROM teams.practice_leaderboards WHERE id = $1;",
-                        entry["id"],
-                    )
-                    continue
-
-                self.leaderboard_cache.setdefault(guild.id, {})[channel.id] = PracticeLeaderboard(
+                self.leaderboard_cache.setdefault(guild_id, {})[channel_id] = PracticeLeaderboard(
                     bot=self.bot, **dict(entry)
                 )
 

@@ -27,9 +27,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 
 import discord
-from typing_extensions import Self
+from typing_extensions import Self, Unpack
 
-from utils import BaseModal, default_button_doc_string
+from .panel import AttachmentRequestSettingsPanel
+
+from .settings import AttachmentRequestSettings
+from utils import BaseModal, default_button_doc_string, BaseView, BaseViewKwargs, ConfirmationGetter
 
 from .request import ImageRequest
 
@@ -41,6 +44,39 @@ if TYPE_CHECKING:
 
 def mention_interaction_channel(channel: InteractionChannel) -> str:
     return f'<#{channel.id}>'
+
+
+class DoesWantToCreateAttachmentSettings(BaseView):
+
+    def __init__(self, **kwargs: Unpack[BaseViewKwargs]) -> None:
+        super().__init__(**kwargs)
+
+        # Abuses the confirmation getter to do this for us nicely
+        ConfirmationGetter(self._handle_response, self)
+
+    @property
+    def embed(self) -> discord.Embed:
+        return self.bot.Embed(
+            title='Attachment Request Settings',
+            description='Would you like to create attachment request settings?',
+        )
+
+    async def _handle_response(
+        self, interaction: discord.Interaction[FuryBot], should_create: bool
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+        if not should_create:
+            return await interaction.edit_original_response(
+                content='Alright, no attachment settings will be created.', view=None, embed=None
+            )
+
+        assert interaction.guild_id is not None
+        assert interaction.channel_id is not None
+        # TODO: Allow user to say where to create, I just don't care
+
+        settings = await AttachmentRequestSettings.create(interaction.guild_id, interaction.channel_id, bot=self.bot)
+        panel = AttachmentRequestSettingsPanel(settings, target=interaction)
+        return await interaction.edit_original_response(embed=None, view=panel)
 
 
 class DeniedImageReason(BaseModal):

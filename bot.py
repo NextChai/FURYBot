@@ -731,7 +731,7 @@ class FuryBot(commands.Bot):
         request = ImageRequest(
             requester=requester,
             attachment=discord.Attachment(data=attachment_data, state=self._connection),
-            channel=channel,  # type: ignore # TODO: Make this happy
+            channel=channel,
             message=data["message"],
             id=data["id"],
         )
