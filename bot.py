@@ -673,19 +673,19 @@ class FuryBot(commands.Bot):
         """
         return self.loop.run_in_executor(self.thread_pool, functools.partial(func, *args, **kwargs))
 
-    @wrap_extension  # type: ignore
+    @wrap_extension
     async def load_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
         return await super().load_extension(name, package=package)
 
-    @wrap_extension  # type: ignore
+    @wrap_extension
     async def reload_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
         return await super().reload_extension(name, package=package)
 
-    @wrap_extension  # type: ignore
+    @wrap_extension
     async def unload_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
         return await super().unload_extension(name, package=package)
 
-    @cache_loader("TEAMS")  # type: ignore
+    @cache_loader("TEAMS")
     async def _cache_setup_teams(self, connection: ConnectionType) -> None:
         team_data = await connection.fetch("SELECT * FROM teams.settings")
         team_members_data = await connection.fetch("SELECT * FROM teams.members")
@@ -699,7 +699,7 @@ class FuryBot(commands.Bot):
             team = await Team.from_record(dict(row), members, bot=self)
             self._team_cache.setdefault(team.guild_id, {})[team.id] = team
 
-    @cache_loader("SCRIMS")  # type: ignore
+    @cache_loader("SCRIMS")
     async def _cache_setup_scrims(self, connection: ConnectionType) -> None:
         scrim_records = await connection.fetch("SELECT * FROM teams.scrims")
 
@@ -739,7 +739,7 @@ class FuryBot(commands.Bot):
         view = ApproveOrDenyImage(self, request)
         self.add_view(view, message_id=data["message_id"])
 
-    @cache_loader("IMAGE_REQUESTS")  # type: ignore
+    @cache_loader("IMAGE_REQUESTS")
     async def _cache_setup_image_requests(self, connection: ConnectionType) -> None:
         image_requests = await connection.fetch(
             "SELECT * FROM images.requests WHERE denied_reason IS NULL OR message_id IS NULL;"
@@ -747,7 +747,7 @@ class FuryBot(commands.Bot):
         for request in image_requests:
             await self._load_image_request(request, connection=connection)
 
-    @cache_loader("PRACTICES")  # type: ignore
+    @cache_loader("PRACTICES")
     async def _cache_setup_practices(self, connection: ConnectionType) -> None:
         practice_data = await connection.fetch("SELECT * FROM teams.practice")
         practice_member_data = await connection.fetch("SELECT * FROM teams.practice_member")
