@@ -29,12 +29,11 @@ from typing import TYPE_CHECKING, Optional
 import discord
 from typing_extensions import Self, Unpack
 
+from utils import BaseModal, BaseView, BaseViewKwargs, ConfirmationGetter, default_button_doc_string
+
 from .panel import AttachmentRequestSettingsPanel
-
-from .settings import AttachmentRequestSettings
-from utils import BaseModal, default_button_doc_string, BaseView, BaseViewKwargs, ConfirmationGetter
-
 from .request import ImageRequest
+from .settings import AttachmentRequestSettings
 
 if TYPE_CHECKING:
     from discord.interactions import InteractionChannel

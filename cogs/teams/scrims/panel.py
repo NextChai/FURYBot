@@ -30,13 +30,7 @@ from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
 import discord
 from typing_extensions import Self, Unpack
 
-from utils import (
-    BaseView,
-    BaseViewKwargs,
-    SelectOneOfMany,
-    UserSelect,
-    default_button_doc_string,
-)
+from utils import BaseView, BaseViewKwargs, SelectOneOfMany, UserSelect, default_button_doc_string
 
 from .persistent import AwayConfirm, HomeConfirm
 from .scrim import ScrimStatus

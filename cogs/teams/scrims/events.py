@@ -31,6 +31,7 @@ import discord
 from discord.ext import commands
 
 from utils import BaseCog
+
 from .scrim import ScrimStatus
 
 if TYPE_CHECKING:

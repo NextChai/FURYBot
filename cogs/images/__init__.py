@@ -31,10 +31,10 @@ from discord import app_commands
 
 from utils import BaseCog
 
-from .request import ImageRequest
-from .views import ApproveOrDenyImage, DoesWantToCreateAttachmentSettings
-from .settings import AttachmentRequestSettings
 from .panel import AttachmentRequestSettingsPanel
+from .request import ImageRequest
+from .settings import AttachmentRequestSettings
+from .views import ApproveOrDenyImage, DoesWantToCreateAttachmentSettings
 
 if TYPE_CHECKING:
     from bot import FuryBot

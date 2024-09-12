@@ -32,8 +32,9 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union,
 import discord
 from typing_extensions import Self
 
-from .errors import TeamNotFound
 from utils import QueryBuilder, human_join
+
+from .errors import TeamNotFound
 
 if TYPE_CHECKING:
     from bot import ConnectionType, FuryBot

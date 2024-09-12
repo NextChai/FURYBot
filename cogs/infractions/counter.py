@@ -25,11 +25,11 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import logging
+
 import discord
 from discord.ext import commands
 
 from utils import BaseCog
-
 
 _log = logging.getLogger(__name__)
 

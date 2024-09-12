@@ -34,12 +34,12 @@ from discord.ext import commands
 from utils import BaseCog, TimeTransformer
 
 from .errors import *
+from .practices.panel import TeamPracticesPanel
 from .scrims import Scrim
 from .scrims.errors import CannotCreateScrim
 from .team import Team
 from .transformers import TeamTransformer
 from .views import TeamView
-from .practices.panel import TeamPracticesPanel
 
 TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=False)]
 FRONT_END_TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=True)]

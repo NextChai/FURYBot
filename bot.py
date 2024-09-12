@@ -53,7 +53,7 @@ import discord
 from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
-from cogs.images import ApproveOrDenyImage, ImageRequest, AttachmentRequestSettings
+from cogs.images import ApproveOrDenyImage, AttachmentRequestSettings, ImageRequest
 from cogs.teams import Team
 from cogs.teams.practices import Practice
 from cogs.teams.scrims import Scrim, ScrimStatus

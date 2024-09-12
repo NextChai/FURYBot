@@ -24,10 +24,10 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Any, List, Optional, Type, Union
-from typing_extensions import Self
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
 
 import discord
+from typing_extensions import Self
 
 from utils import QueryBuilder
 

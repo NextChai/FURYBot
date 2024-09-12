@@ -23,9 +23,11 @@ DEALINGS IN THE SOFTWARE.
 """
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, Dict, Optional, Type
-from typing_extensions import Self
+
 import discord
+from typing_extensions import Self
 
 from utils import QueryBuilder
 

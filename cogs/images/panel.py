@@ -25,15 +25,16 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Union
-from typing_extensions import Unpack, Self
 
 import discord
 from discord import app_commands
+from typing_extensions import Self, Unpack
 
-from utils import BaseView, BaseViewKwargs, ChannelSelect, RoleSelect, ConfirmationGetter
+from utils import BaseView, BaseViewKwargs, ChannelSelect, ConfirmationGetter, RoleSelect
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
     from .settings import AttachmentRequestSettings
 
 

@@ -24,11 +24,10 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-
 import os
-import cachetools
-from typing import TYPE_CHECKING, Final, Union, List
+from typing import TYPE_CHECKING, Final, List, Union
 
+import cachetools
 import discord
 from discord.ext import commands
 
