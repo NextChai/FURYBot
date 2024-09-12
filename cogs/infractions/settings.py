@@ -45,6 +45,7 @@ class InfractionsSettings:
         self.moderator_ids: List[int] = data['moderators'] or []  # List of user iDS
         self.moderator_role_ids: List[int] = data['moderator_roles'] or []  # List of role IDs
         self.enable_no_dms_open: bool = data['enable_no_dms_open']
+        self.enable_infraction_counter: bool = data['enable_infraction_counter']
 
     @classmethod
     async def create(cls: Type[Self], guild_id: int, /, *, bot: FuryBot) -> Self:
@@ -152,6 +153,7 @@ class InfractionsSettings:
         moderator_ids: List[int] = MISSING,
         moderator_role_ids: List[int] = MISSING,
         enable_no_dms_open: bool = MISSING,
+        enable_infraction_counter: bool = MISSING,
     ) -> None:
         builder = QueryBuilder('infractions.settings')
         builder.add_condition('guild_id', self.guild_id)
@@ -171,6 +173,10 @@ class InfractionsSettings:
         if enable_no_dms_open is not MISSING:
             self.enable_no_dms_open = enable_no_dms_open
             builder.add_arg('enable_no_dms_open', enable_no_dms_open)
+
+        if enable_infraction_counter is not MISSING:
+            self.enable_infraction_counter = enable_infraction_counter
+            builder.add_arg('enable_infraction_counter', enable_infraction_counter)
 
         async with self.bot.safe_connection() as connection:
             await builder(connection)

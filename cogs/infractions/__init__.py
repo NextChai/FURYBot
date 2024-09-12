@@ -30,7 +30,7 @@ import discord
 from discord import app_commands
 
 from .dm_notifications import DmNotifications
-from .panel import InfractionsSettingsPanel
+from .panel import DoesWantToCreateInfractionsSettings, InfractionsSettingsPanel
 from .settings import InfractionsSettings
 
 if TYPE_CHECKING:
@@ -49,7 +49,11 @@ class Infractions(DmNotifications):
 
         settings = await InfractionsSettings.fetch_from_guild_id(interaction.guild.id, bot=self.bot)
         if not settings:
-            ...  # Handle the creation of settings, if wanted
+            view = DoesWantToCreateInfractionsSettings(target=interaction)
+            return await interaction.edit_original_response(view=view, embed=view.embed)
+
+        panel = InfractionsSettingsPanel(settings=settings, target=interaction)
+        return await interaction.edit_original_response(view=panel, embed=panel.embed)
 
 
 async def setup(bot: FuryBot) -> None:
