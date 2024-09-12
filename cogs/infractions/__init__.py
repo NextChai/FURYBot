@@ -55,6 +55,63 @@ class Infractions(DmNotifications):
         panel = InfractionsSettingsPanel(settings=settings, target=interaction)
         return await interaction.edit_original_response(view=panel, embed=panel.embed)
 
+    @infractions.command(name='count', description='Count the amount of infractions a member has.')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(
+        member='The member to count infractions for.',
+    )
+    @app_commands.guild_only()
+    async def infractions_count(
+        self, interaction: discord.Interaction[FuryBot], member: discord.Member
+    ) -> discord.InteractionMessage:
+        assert interaction.guild is not None
+        await interaction.response.defer(ephemeral=True)
+
+        settings = self.bot.get_infractions_settings(interaction.guild.id)
+        if not settings:
+            return await interaction.edit_original_response(
+                content='No infractions settings found. Try `/infractions manage` to create them.'
+            )
+
+        if not settings.enable_infraction_counter:
+            return await interaction.edit_original_response(
+                content='Infraction counter is disabled. Enable it in the settings to use this command'
+            )
+
+        count = await settings.fetch_infractions_count_from(member.id)
+        return await interaction.edit_original_response(content=f'{member.mention} has **{count} total infractions**.')
+
+    @infractions.command(name='recent', description='Show the hyperlink to the most recent infraction.')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(
+        member='The member to show the most recent infraction for.',
+    )
+    @app_commands.guild_only()
+    async def infractions_recent(
+        self, interaction: discord.Interaction[FuryBot], member: discord.Member
+    ) -> discord.InteractionMessage:
+        assert interaction.guild is not None
+        await interaction.response.defer(ephemeral=True)
+
+        settings = self.bot.get_infractions_settings(interaction.guild.id)
+        if not settings:
+            return await interaction.edit_original_response(
+                content='No infractions settings found. Try `/infractions manage` to create them.'
+            )
+
+        if not settings.enable_infraction_counter:
+            return await interaction.edit_original_response(
+                content='Infraction counter is disabled. Enable it in the settings to use this command'
+            )
+
+        infraction = await settings.fetch_most_recent_infraction_from(member.id)
+        if not infraction:
+            return await interaction.edit_original_response(content=f'{member.mention} has no infractions.')
+
+        return await interaction.edit_original_response(
+            content=f'{member.mention}\'s most recent infraction: [**Jump**]({infraction.url})'
+        )
+
 
 async def setup(bot: FuryBot) -> None:
     await bot.add_cog(Infractions(bot))

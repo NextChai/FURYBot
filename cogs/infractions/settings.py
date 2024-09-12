@@ -37,6 +37,20 @@ if TYPE_CHECKING:
 MISSING = discord.utils.MISSING
 
 
+class PreviousPartialInfraction:
+
+    def __init__(self, *, data: Dict[str, Any], settings: InfractionsSettings) -> None:
+        self.guild_id: int = data['guild_id']
+        self.user_id: int = data['user_id']
+        self.message_id: int = data['message_id']
+        self.channel_id: int = data['channel_id']
+        self.settings: InfractionsSettings = settings
+
+    @property
+    def url(self) -> str:
+        return f'https://discord.com/channels/{self.settings.guild_id}/{self.channel_id}/{self.message_id}'
+
+
 class InfractionsSettings:
     def __init__(self, *, data: Dict[str, Any], bot: FuryBot) -> None:
         self.bot: FuryBot = bot
@@ -178,3 +192,56 @@ class InfractionsSettings:
             await connection.execute('DELETE FROM infractions.settings WHERE guild_id = $1', self.guild_id)
 
         self.bot.remove_infractions_settings(self.guild_id)
+
+    async def fetch_infractions_count_from(self, user_id: int, /) -> int:
+        async with self.bot.safe_connection() as connection:
+            count = await connection.fetchval(
+                '''
+                SELECT COUNT(*) as count 
+                FROM infractions.member_counter 
+                WHERE guild_id = $1 AND user_id = $2
+                ''',
+                self.guild_id,
+                user_id,
+            )
+
+            if count is None:
+                return 0
+
+            return count
+
+    async def add_infraction_for(self, user_id: int, /, *, in_channel: int, message_id: int) -> None:
+        if not self.notification_channel_id:
+            # We cannot do anything without a notification channel
+            # TODO: Maybe some sort of error?
+            return
+
+        async with self.bot.safe_connection() as connection:
+            await connection.execute(
+                '''
+                INSERT INTO infractions.member_counter(guild_id, user_id, message_id, channel_id)
+                VALUES ($1, $2, $3, $4)
+                ''',
+                self.guild_id,
+                user_id,
+                message_id,
+                in_channel,
+            )
+
+    async def fetch_most_recent_infraction_from(self, user_id: int) -> Optional[PreviousPartialInfraction]:
+        async with self.bot.safe_connection() as connection:
+            record = await connection.fetchrow(
+                '''
+                SELECT message_id, channel_id
+                FROM infractions.member_counter
+                WHERE guild_id = $1 AND user_id = $2
+                ORDER BY message_id DESC
+                LIMIT 1
+                ''',
+                self.guild_id,
+                user_id,
+            )
+            if not record:
+                return None
+
+            return PreviousPartialInfraction(data=dict(record), settings=self)

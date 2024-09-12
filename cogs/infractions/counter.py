@@ -59,7 +59,24 @@ class InfractionCounter(BaseCog):
                 message.channel.id,
             )
 
-        # TODO: Pending InfractionSettings class finalization
-        # TODO: Add "enable_infraction_counter" to InfractionSettings
-        # TODO: Add "enable_infractioN_counter" to the development and main clients
-        raise
+        settings = self.bot.get_infractions_settings(guild.id)
+        if not settings:
+            # No settings found
+            return
+
+        if not settings.enable_infraction_counter:
+            # Infraction counter is disabled
+            return
+
+        # Check if the message was sent in the correct channel, ie the infractions notification channel
+        notification_channel = settings.notification_channel
+        if notification_channel and message.channel.id != notification_channel.id:
+            return
+
+        # We know the following:
+        # (1) the message type is of auto_moderation_action
+        # (2) the guild has settings
+        # (3) the message was sent in the correct infractions notification channel, and
+        # (4) the infraction counter is enabled
+        # We can now proceed to increment the infraction counter for the member
+        await settings.add_infraction_for(message.author.id, in_channel=message.channel.id, message_id=message.id)
