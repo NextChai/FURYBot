@@ -60,7 +60,7 @@ class DmNotifications(BaseCog):
         return members
 
     async def _wrap_guild_member_sending(self, guild: discord.Guild):
-        async with self.bot.safe_connection() as connection:
+        async with self.bot.safe_connection() as connection: 
             data = await connection.fetchrow(
                 'SELECT notification_channel_id, moderators, moderator_role_ids FROM infractions.settings WHERE guild_id = $1',
                 guild.id,

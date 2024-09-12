@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Optional
 
 import discord
 from discord import app_commands
@@ -40,10 +40,11 @@ class Moderation(BaseCog):
         super().__init__(bot)
 
         cleanup_context_command = app_commands.ContextMenu(
-            name='cleanup',
+            name='Cleanup 10 Messages',
             type=discord.AppCommandType.message,
-            callback=self.
+            callback=self.cleanup_10_messages_context_command_callback,
         )
+        self.bot.tree.add_command(cleanup_context_command)
 
     @app_commands.command(name='nick', description='Nick a member.')
     @app_commands.default_permissions(moderate_members=True)
@@ -64,8 +65,23 @@ class Moderation(BaseCog):
         return await interaction.response.send_message(f'I\'ve assigned {role.mention} to {member.mention}', ephemeral=True)
 
     async def _cleanup_n_messages(
-        self, interaction: discord.Interaction[FuryBot], to: discord.Member, location: discord.abc.MessageableChannel, n: int
-    ) -> discord.InteractionMessage: ...
+        self,
+        interaction: discord.Interaction[FuryBot],
+        to: discord.Member,
+        n: int,
+        location: Optional[discord.abc.MessageableChannel] = None,
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer(ephemeral=True)
+        if location is None:
+            if interaction.channel is None:
+                return await interaction.edit_original_response(
+                    content='Could not obtain the channel you requested, try again later or in a different channel.'
+                )
+
+            location = interaction.channel  # type: ignore # Technically an interaction channel qualifies this constraint.
+
+        # TODO: Finish this
+        raise
 
     @app_commands.command(name='cleanup', description='Cleanup messages from a user in a channel.')
     @app_commands.rename(location='in', n='amount')
@@ -75,13 +91,19 @@ class Moderation(BaseCog):
         n='The amount of messages to cleanup.',
     )
     async def cleanup(
-        self, interaction: discord.Interaction[FuryBot], to: discord.Member, location: discord.abc.MessageableChannel, n: int
+        self,
+        interaction: discord.Interaction[FuryBot],
+        to: discord.Member,
+        n: int,
+        location: Optional[discord.abc.MessageableChannel],
     ) -> discord.InteractionMessage:
-        return await self._cleanup_n_messages(interaction, to, location, n)
+        return await self._cleanup_n_messages(interaction, to, n, location)
 
+    async def cleanup_10_messages_context_command_callback(
+        self, interaction: discord.Interaction[FuryBot], member: discord.Member
+    ) -> discord.InteractionMessage:
+        return await self._cleanup_n_messages(interaction, member, 10, None)
 
-    async def cleanup_context_command(self, interaction: discord.Interaction[FuryBot]) -> None:
-        ...
 
 async def setup(bot: FuryBot):
     await bot.add_cog(Moderation(bot))
