@@ -57,6 +57,7 @@ from cogs.images import ApproveOrDenyImage, AttachmentRequestSettings, ImageRequ
 from cogs.teams import Team
 from cogs.teams.practices import Practice
 from cogs.teams.scrims import Scrim, ScrimStatus
+from cogs.infractions import InfractionsSettings
 from utils import (
     BYPASS_SETUP_HOOK,
     BYPASS_SETUP_HOOK_CACHE_LOADING,
@@ -258,6 +259,9 @@ class FuryBot(commands.Bot):
         # Mapping[guild_id, Mapping[team_id, Mapping[practice_id, Practice]]]
         self._team_practice_cache: Dict[int, Dict[int, Dict[int, Practice]]] = {}
 
+        # Mapping[guild_id, InfractionsSettings]
+        self._infractions_settings: Dict[int, InfractionsSettings] = {}
+
         super().__init__(
             command_prefix=commands.when_mentioned_or("trev.", "trev"),
             help_command=None,
@@ -348,6 +352,47 @@ class FuryBot(commands.Bot):
             embed.set_author(name=author.name, icon_url=author.display_avatar.url)
 
         return embed
+
+    # Infractions settings management
+    def get_infractions_settings(self, guild_id: int, /) -> Optional[InfractionsSettings]:
+        """Get the infractions settings for a guild.
+
+        Parameters
+        ----------
+        guild_id: :class:`int`
+            The guild ID to get the settings for.
+
+        Returns
+        -------
+        Optional[:class:`InfractionsSettings`]
+            The infractions settings for the guild.
+        """
+        return self._infractions_settings.get(guild_id)
+
+    def add_infractions_settings(self, settings: InfractionsSettings, /) -> None:
+        """Add infractions settings to the cache.
+
+        Parameters
+        ----------
+        settings: :class:`InfractionsSettings`
+            The settings to add.
+        """
+        self._infractions_settings[settings.guild_id] = settings
+
+    def remove_infractions_settings(self, guild_id: int, /) -> Optional[InfractionsSettings]:
+        """Remove infractions settings from the cache.
+
+        Parameters
+        ----------
+        guild_id: :class:`int`
+            The guild ID to remove the settings for.
+
+        Returns
+        -------
+        Optional[:class:`InfractionsSettings`]
+            The settings that were removed, if they existed.
+        """
+        return self._infractions_settings.pop(guild_id, None)
 
     # Team management
     def get_teams(self, guild_id: int, /) -> List[Team]:
@@ -684,6 +729,14 @@ class FuryBot(commands.Bot):
     @wrap_extension
     async def unload_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
         return await super().unload_extension(name, package=package)
+
+    @cache_loader('INFRACTIONS_SETTINGS')
+    async def _cache_infractions_settings(self, connection: ConnectionType) -> None:
+        infraction_settings = await connection.fetch('SELECT * FROM infractions.settings')
+
+        for record in infraction_settings:
+            settings = InfractionsSettings(data=dict(record), bot=self)
+            self.add_infractions_settings(settings)
 
     @cache_loader("TEAMS")
     async def _cache_setup_teams(self, connection: ConnectionType) -> None:

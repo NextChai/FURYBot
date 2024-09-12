@@ -62,17 +62,9 @@ class InfractionsSettings:
                 )
                 assert record is not None
 
-        return cls(data=dict(record), bot=bot)
-
-    @classmethod
-    async def fetch_from_guild_id(cls: Type[Self], guild_id: int, /, *, bot: FuryBot) -> Optional[Self]:
-        async with bot.safe_connection() as connection:
-            data = await connection.fetchrow('SELECT * FROM infractions.settings WHERE guild_id = $1', guild_id)
-
-        if not data:
-            return None
-
-        return cls(data=dict(data), bot=bot)
+        instance = cls(data=dict(record), bot=bot)
+        bot.add_infractions_settings(instance)
+        return instance
 
     @property
     def notification_channel(self) -> Optional[discord.TextChannel]:
@@ -184,3 +176,5 @@ class InfractionsSettings:
     async def delete(self) -> None:
         async with self.bot.safe_connection() as connection:
             await connection.execute('DELETE FROM infractions.settings WHERE guild_id = $1', self.guild_id)
+
+        self.bot.remove_infractions_settings(self.guild_id)
