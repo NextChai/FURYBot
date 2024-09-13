@@ -203,6 +203,8 @@ class ImageRequests(BaseCog):
                 view=view, embed=embed, content=content, file=file, allowed_mentions=allowed_mentions
             )
 
+            has_sent_request = True
+
             # Insert into the DB now
             async with self.bot.safe_connection() as connection:
                 data = await connection.fetchrow(
