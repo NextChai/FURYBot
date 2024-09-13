@@ -120,7 +120,7 @@ class Owner(BaseCog):
             for module_name, status in statuses.items():
                 for exception in status.exceptions:
                     await self.bot.error_handler.log_error(
-                        exception, ctx=ctx, event_name=f'reload-command-fail:{module_name}'
+                        exception, target=ctx, event_name=f'reload-command-fail:{module_name}'
                     )
 
                 embed.add_field(
