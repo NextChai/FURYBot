@@ -210,6 +210,17 @@ class InfractionsSettings:
 
             return count
 
+    async def clear_infractions(self, user_id: int, /) -> None:
+        async with self.bot.safe_connection() as connection:
+            await connection.execute(
+                '''
+                DELETE FROM infractions.member_counter
+                WHERE guild_id = $1 AND user_id = $2
+                ''',
+                self.guild_id,
+                user_id,
+            )
+
     async def add_infraction_for(self, user_id: int, /, *, in_channel: int, message_id: int) -> None:
         if not self.notification_channel_id:
             # We cannot do anything without a notification channel
