@@ -9,6 +9,7 @@ testing.py
 _.py
 profane.txt
 furybot/
+.venv/
 
 # Logs
 logs
