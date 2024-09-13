@@ -44,6 +44,8 @@ class Moderation(BaseCog):
             type=discord.AppCommandType.user,
             callback=self.cleanup_10_messages_context_command_callback,
         )
+        cleanup_context_command.default_permissions = discord.Permissions(moderate_members=True)
+
         self.bot.tree.add_command(cleanup_context_command)
 
     @app_commands.command(name='nick', description='Nick a member.')
@@ -92,7 +94,7 @@ class Moderation(BaseCog):
         )
 
     @app_commands.command(name='cleanup', description='Cleanup messages from a user in a channel.')
-    @app_commands.rename(location='in', n='amount')
+    @app_commands.rename(location='in', n='amount', to='from')
     @app_commands.describe(
         to='The member to cleanup messages from.',
         location='The channel to cleanup messages in.',

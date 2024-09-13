@@ -94,6 +94,8 @@ class Teams(BaseCog):
             callback=self.team_get_context_menu,
             type=discord.AppCommandType.user,
         )
+        context_menu.default_permissions = discord.Permissions(moderate_members=True)
+
         self.bot.tree.add_command(context_menu)
 
     async def cog_unload(self) -> None:
