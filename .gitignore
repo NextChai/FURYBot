@@ -5,11 +5,11 @@ __pycache__/
 config.py
 txt/
 clean.txt
-profanity.txt
 testing.py
 _.py
 profane.txt
 furybot/
+.venv/
 
 # Logs
 logs

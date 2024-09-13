@@ -16,22 +16,5 @@ CREATE TABLE IF NOT EXISTS timer_storage(
     expires TIMESTAMP WITH TIME ZONE
 );
 
-CREATE TABLE IF NOT EXISTS image_requests (
-    id BIGSERIAL PRIMARY KEY,
-    attachment_payload JSONB,
-    requester_id BIGINT,
-    guild_id BIGINT,
-    channel_id BIGINT,
-    message_id BIGINT,
-    -- For the persistent view, can be None
-    message TEXT
-    -- The message the user attached to the upload
-);
 
-CREATE TABLE IF NOT EXISTS links (
-    id SERIAL PRIMARY KEY,
-    guild_id BIGINT,
-    url TEXT,
-    added_at TIMESTAMP WITH TIME ZONE,
-    added_by TEXT
-);
+

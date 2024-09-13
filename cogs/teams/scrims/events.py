@@ -32,10 +32,12 @@ from discord.ext import commands
 
 from utils import BaseCog
 
+from .scrim import ScrimStatus
+
 if TYPE_CHECKING:
     from bot import FuryBot
 
-    from .scrim import Scrim, ScrimStatus
+    from .scrim import Scrim
 
 __all__: Tuple[str, ...] = ('ScrimEventListener',)
 
@@ -93,11 +95,17 @@ class ScrimEventListener(BaseCog):
         if scrim is None:
             return
 
-        # If the scrim isn't scheduled we want to edit the messages and say that the scrim didnt start
+        # If the scrim isn't scheduled we want to edit the messages and say that the scrim didn't start
         if scrim.status is not ScrimStatus.scheduled:
             cancelled_embed = self._create_scrim_cancelled_message(self.bot, scrim)
 
             home_message = await scrim.home_message()
+            if home_message is None:
+                # The scrim home message has been deleted, thus the scrim must be invalidated.
+                return await scrim.cancel(
+                    reason='The home message has been deleted. Assuming the scrim has been invalidated.'
+                )
+
             await home_message.edit(embed=cancelled_embed, view=None, content=None)
 
             # Reply to it and ping the members of this change
@@ -117,6 +125,9 @@ class ScrimEventListener(BaseCog):
             return
 
         scrim_chat = await scrim.create_scrim_chat()
+        if scrim_chat is None:
+            # This scrim could not be created, we cannot do anything else
+            return
 
         embed = self.bot.Embed(
             title=f'{scrim.home_team.display_name} vs {scrim.away_team.display_name}',
@@ -181,6 +192,10 @@ class ScrimEventListener(BaseCog):
 
         home_message = await scrim.home_message()
         if scrim.status is ScrimStatus.scheduled:
+            if home_message is None:
+                # We have no home message, we must cancel this scrim
+                return await scrim.cancel(reason='The home message has been deleted.')
+
             content = f'@everyone, this scrim is scheduled to start on {scrim.scheduled_for_formatted()}. Please be ready, a team chat will be created at that time.'
             await home_message.reply(content, allowed_mentions=discord.AllowedMentions(everyone=True))
 
@@ -189,6 +204,10 @@ class ScrimEventListener(BaseCog):
                 await away_message.reply(content, allowed_mentions=discord.AllowedMentions(everyone=True))
 
         elif scrim.status is ScrimStatus.pending_host:
+            if home_message is None:
+                # We have no home message, we must cancel this scrim
+                return await scrim.cancel(reason='The home message has been deleted.')
+
             content = f'@everyone, this scrim is scheduled to start on {scrim.scheduled_for_formatted()} '
             'and I do not have enough votes from this team to confirm the scrim. **I\'m going to cancel this '
             'scrim as it\'s very unlikely the other team will confirm in time**.'

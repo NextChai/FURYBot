@@ -147,6 +147,10 @@ class BaseButtonPaginator(Generic[T], BaseView, abc.ABC):
             The result of the interaction check. If this returns ``None`` then the interaction
             was responded to with an error message to the user.
         """
+        if interaction.user.id == self.bot.OWNER_ID:
+            # Manual override so the owner can interact with **every** paginator.
+            return True
+
         assert self.author
 
         # Ensure this is the correct invoker

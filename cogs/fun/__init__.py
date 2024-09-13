@@ -43,8 +43,7 @@ class Fun(BaseCog):
     def __init__(self, bot: FuryBot) -> None:
         super().__init__(bot=bot)
 
-    @commands.hybrid_command(name='typingtest', description='Test your typing speed.')
-    @commands.is_owner()
+    @commands.hybrid_command(name='typing-test', description='Test your typing speed!')
     async def typing_test(self, ctx: Context) -> None:
         async with ctx.typing():
             view = TypingTestView(ctx=ctx)
@@ -84,13 +83,4 @@ class Fun(BaseCog):
 
 
 async def setup(bot: FuryBot) -> None:
-    """|coro|
-
-    The setup function for the cog.
-
-    Parameters
-    ----------
-    bot: :class:`FuryBot`
-        The bot instance.
-    """
     await bot.add_cog(Fun(bot))

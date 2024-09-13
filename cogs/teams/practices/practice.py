@@ -33,10 +33,10 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import discord
 
-from utils import Teamable, TeamMemberable, human_timedelta
+from utils import TeamAble, TeamMemberAble, human_timedelta
 
 from ..errors import MemberNotOnTeam
-from .errors import *
+from .errors import MemberAlreadyInPractice, MemberNotAttendingPractice, MemberNotInPractice
 from .persistent import PracticeView
 
 if TYPE_CHECKING:
@@ -52,16 +52,16 @@ _log.setLevel(logging.DEBUG)  # A temporary placeholder until everything is done
 BONUS_STRENGTH: float = 0.2
 
 
-class PracticeMemberHistory(TeamMemberable, Teamable):
+class PracticeMemberHistory(TeamMemberAble, TeamAble):
     """Represents the join leave history for the given practice member. A member can join
     and leave a voice channel more than once during a given practice session. This means we need
     to keep track of a complete history.
 
     This inherits the following bases:
 
-    - :class:`Guildable`
-    - :class:`TeamMemberable`
-    - :class:`Teamable`
+    - :class:`GuildAble`
+    - :class:`TeamMemberAble`
+    - :class:`TeamAble`
 
     Parameters
     ----------
@@ -121,16 +121,16 @@ class PracticeMemberHistory(TeamMemberable, Teamable):
         return self.left_at - self.joined_at
 
 
-class PracticeMember(TeamMemberable, Teamable):
+class PracticeMember(TeamMemberAble, TeamAble):
     """Represents a member that is attending or not attending a practice session.
     A member can be attending or not attending a practice session. If they mark themselves as
     not attending, they will have a reason why.
 
     This inherits the following bases:
 
-    - :class:`Guildable`
-    - :class:`TeamMemberable`
-    - :class:`Teamable`
+    - :class:`GuildAble`
+    - :class:`TeamMemberAble`
+    - :class:`TeamAble`
 
     Parameters
     ----------
@@ -249,7 +249,7 @@ class PracticeMember(TeamMemberable, Teamable):
         Deletes this member from this practice, deleting their history for this practice as well.
         """
         async with self.practice.bot.safe_connection() as connection:
-            await connection.execute("DELETE FROM teans.practice_member WHERE id = $1", self.id)
+            await connection.execute("DELETE FROM teams.practice_member WHERE id = $1", self.id)
             await connection.execute(
                 "DELETE FROM teams.practice_member_history WHERE member_id = $1 AND practice_id = $2",
                 self.member_id,
@@ -297,7 +297,7 @@ class PracticeMember(TeamMemberable, Teamable):
     async def handle_leave(self, *, when: Optional[datetime.datetime] = None) -> PracticeMemberHistory:
         """|coro|
 
-        Will handle the current member leaving the given voice channel for this pracitce. This will edit the current instance of :class:`PracticeMemberHistory`
+        Will handle the current member leaving the given voice channel for this practice. This will edit the current instance of :class:`PracticeMemberHistory`
         and return it to the caller.
 
         Parameters
@@ -337,18 +337,18 @@ class PracticeStatus(enum.Enum):
     completed = 'completed'
 
 
-class Practice(Teamable):
+class Practice(TeamAble):
     """Represents a practice for a given team.
 
     A practice can have up to N members and needs to be in a voice channel. The member that starts a practice
     must be in the teams voice channel and will be the only one that can start a practice. There can not be more
     than one practice at a time. The minimum amount of a time for a practice is 10 minutes, any less than that will be
-    thrown out automaitcally.
+    thrown out automatically.
 
     This inherits the following bases:
 
-    - :class:`Guildable`
-    - :class:`Teamable`
+    - :class:`GuildAble`
+    - :class:`TeamAble`
 
     Parameters
     ----------
@@ -535,7 +535,7 @@ class Practice(Teamable):
         return f'{discord.utils.format_dt(self.ended_at, "F")} ({discord.utils.format_dt(self.ended_at, "R")})'
 
     def get_total_practice_time(self) -> Optional[datetime.timedelta]:
-        """Optional[:class:`datetime.timedelta`]: The total time this practicve was. This will be ``None`` if the practice has not ended."""
+        """Optional[:class:`datetime.timedelta`]: The total time this practice was. This will be ``None`` if the practice has not ended."""
         if not self.ended_at:
             return None
 
@@ -552,7 +552,7 @@ class Practice(Teamable):
         """
         embed = self.team.embed(
             title=f'{self.team.display_name} Practice Ended.',
-            description=f'This practice started by {self.started_by.mention} has come to an end.\n\n'
+            description=f'This practice started by {self.started_by.mention} has come to an end.\n'
             f'- **Started At**: {self.format_start_time()}\n'
             f'- **Ended At**: {self.format_end_time()}\n',
         )
@@ -560,7 +560,7 @@ class Practice(Teamable):
         practice_members_formatted = '\n'.join(
             [f'{m.mention}: {human_timedelta(m.get_total_practice_time().total_seconds())}' for m in self.attending_members]
         )
-        excused_members_fornmatted = ', '.join([m.mention for m in self.excused_members])
+        excused_members_formatted = ', '.join([m.mention for m in self.excused_members])
 
         embed.add_field(
             name='Attended Members',
@@ -568,10 +568,10 @@ class Practice(Teamable):
             inline=False,
         )
 
-        if excused_members_fornmatted:
+        if excused_members_formatted:
             embed.add_field(
                 name='Excused Members',
-                value=f'The following members could not make it to this practice session: {excused_members_fornmatted}',
+                value=f'The following members could not make it to this practice session: {excused_members_formatted}',
                 inline=False,
             )
 
@@ -641,7 +641,7 @@ class Practice(Teamable):
     ) -> PracticeMember:
         """|coro|
 
-        Called when a member joins a given pracice session. This will create a new :class:`PracticeMember` and
+        Called when a member joins a given practice session. This will create a new :class:`PracticeMember` and
         add it to the cache.
 
         This function will check to ensure the passed member is on the given team. If they are not, this will
@@ -766,13 +766,19 @@ class Practice(Teamable):
 
         embed = await self.fetch_end_embed()
 
-        # NOTE: Add a note for if only one member joins the pracrice session.
+        # NOTE: Add a note for if only one member joins the practice session.
         if len(self.attending_members) == 1:
             embed.insert_field_at(
                 0, name='Warning', value='There is only one member that attended this practice session.', inline=False
             )
 
-        message = await self.team.text_channel.fetch_message(self.message_id)
+        # We can only reply to the message if the team text channel is still around.
+        # In the case it's not, some muppet has deleted it.
+        team_text_channel = self.team.text_channel
+        if not team_text_channel:
+            return
+
+        message = await team_text_channel.fetch_message(self.message_id)
         await message.reply(
             embed=embed,
             allowed_mentions=discord.AllowedMentions(roles=self.team.captain_roles),

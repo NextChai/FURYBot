@@ -65,7 +65,7 @@ class TeamTransformer(app_commands.Transformer):
         # This will only be called if clamp_teams is True.
         channel = interaction.channel
         if channel is None or isinstance(channel, discord.PartialMessageable):
-            # dpy couldnt resolve this channel (maybe not in cache?)
+            # dpy couldn't resolve this channel (maybe not in cache?)
             return []
 
         guild = channel.guild
@@ -75,7 +75,7 @@ class TeamTransformer(app_commands.Transformer):
         guild_teams = interaction.client.get_teams(guild.id)
         team = discord.utils.find(lambda team: team.has_channel(channel.id), guild_teams)
         if not team:
-            # This command wasnt invoked in a team chat
+            # This command wasn't invoked in a team chat
             return []
 
         # Great, now let's get all similar teams matching the teams name.

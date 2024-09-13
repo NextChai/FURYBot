@@ -24,16 +24,16 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-from typing import List, Tuple
 
-__all__: Tuple[str, ...] = (
-    'IMAGE_REQUEST_CHANNEL_ID',
-    'IMAGE_NOTIFICATIONS_ROLE_ID',
-    'FURY_GUILD',
-)
+class CannotCreateScrim(Exception):
+    """Raised when a scrim cannot be created."""
 
-IMAGE_REQUEST_CHANNEL_ID: int = 1040653616047980596
-IMAGE_NOTIFICATIONS_ROLE_ID: int = 1040662419355205794
-FURY_GUILD: int = 757664675864248360
+    def __str__(self) -> str:
+        return "Cannot create scrim."
 
-PROFANE_WORDS: List[str] = open('static/profane_words.txt', 'r').read().split(', ')
+
+class NoHomeTeamTextChannel(CannotCreateScrim):
+    """Raised when there is no home team text channel."""
+
+    def __str__(self) -> str:
+        return "No home team text channel."

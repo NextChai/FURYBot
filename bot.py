@@ -36,6 +36,7 @@ from typing import (
     Callable,
     Coroutine,
     Dict,
+    Final,
     List,
     Literal,
     Optional,
@@ -45,7 +46,6 @@ from typing import (
     TypeAlias,
     TypeVar,
     Union,
-    cast,
 )
 
 import asyncpg
@@ -53,9 +53,8 @@ import discord
 from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
-from cogs.images import ApproveOrDenyImage, ImageRequest
-from cogs.links import AllowedItem, LinkAction, LinkSettings
-from cogs.links.settings import ExemptTarget
+from cogs.images import ApproveOrDenyImage, AttachmentRequestSettings, ImageRequest
+from cogs.infractions import InfractionsSettings
 from cogs.teams import Team
 from cogs.teams.practices import Practice
 from cogs.teams.scrims import Scrim, ScrimStatus
@@ -66,8 +65,6 @@ from utils import (
     START_TIMER_MANAGER,
     Context,
     ErrorHandler,
-    GuildProfanityFinder,
-    LinkFilter,
     TimerManager,
     _parse_environ_boolean,
     parse_initial_extensions,
@@ -90,10 +87,10 @@ if RUNNING_DEVELOPMENT:
     _log.setLevel(logging.DEBUG)
 
 initial_extensions: Tuple[str, ...] = (
-    "cogs.events.notifier",
+    "cogs.infractions",
     "cogs.fun",
     "cogs.images",
-    "cogs.message_tracking",
+    "cogs.flvs",
     "cogs.moderation",
     "cogs.owner",
     "cogs.teams",
@@ -117,7 +114,10 @@ def cache_loader(
 
             _log.info("Loading %s cache from func %s", flag_name, func.__name__)
 
-            return await func(self, connection, *args, **kwargs)
+            res = await func(self, connection, *args, **kwargs)
+
+            _log.info("Finished loading %s cache from func %s", flag_name, func.__name__)
+            return res
 
         call_func.__cache_loader__ = True  # type: ignore
 
@@ -159,14 +159,14 @@ def wrap_extension(coro: DecoFunc[P, T]) -> DecoFunc[P, T]:
 
 
 class DbContextManager:
-    """A simple context manager used to manage database Connectionections.
+    """A simple context manager used to manage database connections.
 
     Attributes
     ----------
     bot: :class:`FuryBot`
         The bot instance.
     timeout: :class:`float`
-        The timeout for acquiring a Connectionection.
+        The timeout for acquiring a connection.
     """
 
     __slots__: Tuple[str, ...] = (
@@ -214,7 +214,7 @@ class DbContextManager:
 
 
 class FuryBot(commands.Bot):
-    """The main fury bot instance. This bot subclass contains many useful utiities
+    """The main fury bot instance. This bot subclass contains many useful utilities
     shared between all extensions / cogs.
 
     Parameters
@@ -226,6 +226,8 @@ class FuryBot(commands.Bot):
     pool: :class:`asyncpg.Pool`
         A database pool connection to use for requests.
     """
+
+    OWNER_ID: Final[int] = 146348630926819328
 
     if TYPE_CHECKING:
         user: discord.ClientUser  # This isn't accessed before the client has been logged in so it's OK to overwrite it.
@@ -248,8 +250,6 @@ class FuryBot(commands.Bot):
         if START_TIMER_MANAGER:
             self.timer_manager = TimerManager(bot=self)
 
-        self.link_filter: LinkFilter = LinkFilter(self)
-
         # Mapping[guild_id, Mapping[team_id, Team]]
         self._team_cache: Dict[int, Dict[int, Team]] = {}
 
@@ -259,13 +259,8 @@ class FuryBot(commands.Bot):
         # Mapping[guild_id, Mapping[team_id, Mapping[practice_id, Practice]]]
         self._team_practice_cache: Dict[int, Dict[int, Dict[int, Practice]]] = {}
 
-        self.global_profanity_finder: Optional[GuildProfanityFinder] = None
-
-        # Mapping[guild_id, GuildProfanityFinder]
-        self.guild_profanity_finders: Dict[int, GuildProfanityFinder] = {}
-
-        # Mapping[guild_id, LinkSettings]
-        self.link_settings: Dict[int, LinkSettings] = {}
+        # Mapping[guild_id, InfractionsSettings]
+        self._infractions_settings: Dict[int, InfractionsSettings] = {}
 
         super().__init__(
             command_prefix=commands.when_mentioned_or("trev.", "trev"),
@@ -275,6 +270,10 @@ class FuryBot(commands.Bot):
             strip_after_prefix=True,
             allowed_mentions=discord.AllowedMentions.none(),
             max_messages=5000,
+            activity=discord.Game(
+                name='Rocket League',
+                timestamps={'start': discord.utils.utcnow(), 'end': None},
+            ),
         )
 
     @classmethod
@@ -284,7 +283,7 @@ class FuryBot(commands.Bot):
         Parameters
         ----------
         uri: :class:`str`
-            The Postgres Connectionection URI.
+            The Postgres connection URI.
         **kwargs:
             Extra keyword arguments to pass to :meth:`asyncpg.create_pool`.
         """
@@ -358,35 +357,46 @@ class FuryBot(commands.Bot):
 
         return embed
 
-    # Management for link settings
-    def get_link_setting(self, link_setting_id: int, /) -> Optional[LinkSettings]:
-        return self.link_settings.get(link_setting_id, None)
+    # Infractions settings management
+    def get_infractions_settings(self, guild_id: int, /) -> Optional[InfractionsSettings]:
+        """Get the infractions settings for a guild.
 
-    def get_link_setting_from_guild(self, guild_id: int, /) -> Optional[LinkSettings]:
-        return discord.utils.get(self.get_link_settings(), guild_id=guild_id)
+        Parameters
+        ----------
+        guild_id: :class:`int`
+            The guild ID to get the settings for.
 
-    def remove_link_settings(self, link_setting_id: int, /) -> Optional[LinkSettings]:
-        return self.link_settings.pop(link_setting_id, None)
+        Returns
+        -------
+        Optional[:class:`InfractionsSettings`]
+            The infractions settings for the guild.
+        """
+        return self._infractions_settings.get(guild_id)
 
-    def add_link_settings(self, settings: LinkSettings, /):
-        self.link_settings[settings.id] = settings
+    def add_infractions_settings(self, settings: InfractionsSettings, /) -> None:
+        """Add infractions settings to the cache.
 
-    def get_link_settings(self) -> List[LinkSettings]:
-        return list(self.link_settings.values())
+        Parameters
+        ----------
+        settings: :class:`InfractionsSettings`
+            The settings to add.
+        """
+        self._infractions_settings[settings.guild_id] = settings
 
-    # Management for custom profanity filters
-    def get_profanity_finder(self, guild_id: int, /) -> Optional[GuildProfanityFinder]:
-        custom_finder = self.guild_profanity_finders.get(guild_id, None)
-        if custom_finder is not None:
-            return custom_finder
+    def remove_infractions_settings(self, guild_id: int, /) -> Optional[InfractionsSettings]:
+        """Remove infractions settings from the cache.
 
-        return self.global_profanity_finder
+        Parameters
+        ----------
+        guild_id: :class:`int`
+            The guild ID to remove the settings for.
 
-    def add_custom_prodanity_finder(self, guild_id: int, finder: GuildProfanityFinder, /):
-        self.guild_profanity_finders[guild_id] = finder
-
-    def remove_custom_profanity_finder(self, guild_id: int, /) -> Optional[GuildProfanityFinder]:
-        return self.guild_profanity_finders.pop(guild_id, None)
+        Returns
+        -------
+        Optional[:class:`InfractionsSettings`]
+            The settings that were removed, if they existed.
+        """
+        return self._infractions_settings.pop(guild_id, None)
 
     # Team management
     def get_teams(self, guild_id: int, /) -> List[Team]:
@@ -724,6 +734,14 @@ class FuryBot(commands.Bot):
     async def unload_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
         return await super().unload_extension(name, package=package)
 
+    @cache_loader('INFRACTIONS_SETTINGS')
+    async def _cache_infractions_settings(self, connection: ConnectionType) -> None:
+        infraction_settings = await connection.fetch('SELECT * FROM infractions.settings')
+
+        for record in infraction_settings:
+            settings = InfractionsSettings(data=dict(record), bot=self)
+            self.add_infractions_settings(settings)
+
     @cache_loader("TEAMS")
     async def _cache_setup_teams(self, connection: ConnectionType) -> None:
         team_data = await connection.fetch("SELECT * FROM teams.settings")
@@ -750,27 +768,26 @@ class FuryBot(commands.Bot):
             scrim.load_persistent_views()
             self._team_scrim_cache.setdefault(scrim.guild_id, {})[scrim.id] = scrim
 
-    async def _load_image_request(self, data: asyncpg.Record) -> None:
+    async def _load_image_request(self, data: asyncpg.Record, connection: ConnectionType) -> None:
         await self.wait_until_ready()
 
-        guild = self.get_guild(data["guild_id"])
-        if not guild:
+        # Fetch the request guild
+        settings = await AttachmentRequestSettings.fetch_from_id(data['request_settings'], bot=self)
+        if not settings:
+            # This does not exist anymore, we cannot load it
             return
 
-        channel = cast(
-            Optional[Union[discord.TextChannel, discord.VoiceChannel, discord.Thread]],
-            guild.get_channel(data["channel_id"]),
-        )
-        if not channel:
+        guild = settings.guild
+        channel = settings.channel
+        if not guild or not channel:
             return
 
-        attachment_data = data.get("attachment")
-        if attachment_data is None:
-            return
+        attachment_data = data['attachment_payload']
+        requester = guild.get_member(data['requester_id']) or await guild.fetch_member(data['requester_id'])
 
         request = ImageRequest(
-            requester=await guild.fetch_member(data["requester_id"]),
-            attachment=discord.Attachment(data=data["attachment"], state=self._connection),
+            requester=requester,
+            attachment=discord.Attachment(data=attachment_data, state=self._connection),
             channel=channel,
             message=data["message"],
             id=data["id"],
@@ -781,9 +798,11 @@ class FuryBot(commands.Bot):
 
     @cache_loader("IMAGE_REQUESTS")
     async def _cache_setup_image_requests(self, connection: ConnectionType) -> None:
-        image_requests = await connection.fetch("SELECT * FROM image_requests")
+        image_requests = await connection.fetch(
+            "SELECT * FROM images.requests WHERE denied_reason IS NULL OR message_id IS NULL;"
+        )
         for request in image_requests:
-            self.create_task(self._load_image_request(request))
+            await self._load_image_request(request, connection=connection)
 
     @cache_loader("PRACTICES")
     async def _cache_setup_practices(self, connection: ConnectionType) -> None:
@@ -820,44 +839,6 @@ class FuryBot(commands.Bot):
                 practice.id
             ] = practice
 
-    @cache_loader("PROFANITY_FILTER")
-    async def _cache_setup_profanity_filter(self, connection: ConnectionType) -> None:
-        pattern = await GuildProfanityFinder.get_default_pattern()
-        self.global_profanity_finder = GuildProfanityFinder(pattern, guild_id=None)
-
-    @cache_loader("LINKS")
-    async def _cache_setup_links(self, connection: ConnectionType) -> None:
-        settings = await connection.fetch("SELECT * FROM links.settings")
-        actions = await connection.fetch("SELECT * FROM links.actions")
-
-        for entry in settings:
-            settings = LinkSettings(bot=self, data=dict(entry))
-            self.add_link_settings(settings)
-
-        for action in actions:
-            settings = self.get_link_setting(action["settings_id"])
-            assert settings
-
-            settings.add_action(LinkAction(bot=self, data=dict(action)))
-
-        allowed_items_data = await connection.fetch("SELECT * FROM links.allowed_items")
-        for allowed_item_data in allowed_items_data:
-            settings = self.get_link_setting(allowed_item_data["settings_id"])
-            assert settings
-
-            settings.add_allowed_item(AllowedItem(bot=self, data=dict(allowed_item_data)))
-
-        exempt_targets_data = await connection.fetch("SELECT * FROM links.exempt_targets")
-        for exempt_target_data in exempt_targets_data:
-            settings = self.get_link_setting(exempt_target_data["settings_id"])
-            assert settings
-
-            settings.add_exempt_target(ExemptTarget(bot=self, data=dict(exempt_target_data)))
-
-        # Now that out cache is full we can create the regex for each guild
-        # that will be used to check if a link is allowed or not.
-        self.link_filter.create_allowed_items_regex()
-
     # Hooks
     async def setup_hook(self) -> None:
         if BYPASS_SETUP_HOOK:
@@ -891,4 +872,7 @@ class FuryBot(commands.Bot):
                         exc_info=exc,
                     )
 
-        await asyncio.gather(*[_wrapped_cache_loader(func) for _, func in cache_loading_functions])
+        for _, func in cache_loading_functions:
+            self.create_task(_wrapped_cache_loader(func))
+
+        _log.debug("Finished loading cache entries.")

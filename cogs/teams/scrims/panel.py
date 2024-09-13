@@ -25,28 +25,21 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
 
 import discord
 from typing_extensions import Self, Unpack
 
-from utils import (
-    AfterModal,
-    BaseView,
-    BaseViewKwargs,
-    SelectOneOfMany,
-    TimeTransformer,
-    UserSelect,
-    default_button_doc_string,
-)
+from utils import BaseView, BaseViewKwargs, SelectOneOfMany, UserSelect, default_button_doc_string
 
 from .persistent import AwayConfirm, HomeConfirm
+from .scrim import ScrimStatus
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
     from ..team import Team
-    from .scrim import Scrim, ScrimStatus
+    from .scrim import Scrim
 
 
 __all__: Tuple[str, ...] = ('TeamScrimsPanel', 'ScrimPanel')
@@ -101,47 +94,13 @@ class ScrimPanel(BaseView):
         embed.set_footer(text=f'Scrim ID: {self.scrim.id}')
         return embed
 
-    async def _reschedule_scrim_after(
-        self, interaction: discord.Interaction[FuryBot], reschedule_input: discord.ui.TextInput[AfterModal]
-    ) -> None:
-        await interaction.response.defer()
-
-        # Let's try and parse this time
-        try:
-            transformed = await TimeTransformer('n/a').transform(interaction, reschedule_input.value)
-        except Exception as exc:
-            await interaction.edit_original_response(embed=self.embed, view=self)
-            return await interaction.followup.send(content=str(exc), ephemeral=True)
-
-        assert transformed.dt
-        await self.scrim.reschedle(transformed.dt, editor=interaction.user)
-        await interaction.edit_original_response(
-            content=f'I\'ve rescheduled this scrim for {self.scrim.scheduled_for_formatted()}.'
-        )
-
-    @discord.ui.button(label='Reschedule')
-    @default_button_doc_string
-    async def reschedule_scrim(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
-        """Reschedule this scrim to a later date."""
-        # If this scrim has already started, we can't reschedule it
-        if self.scrim.scheduled_for < interaction.created_at:
-            return await interaction.response.send_message(
-                'This scrim has already started, you cannot reschedule it.', ephemeral=True
-            )
-
-        modal = AfterModal(self.bot, after=self._reschedule_scrim_after)
-        modal.add_item(
-            discord.ui.TextInput(label='When you want to reschedule this scrim to. For example: Tomorrow at 4pm.')
-        )
-        await interaction.response.send_modal(modal)
-
     async def _manage_member_assignment(
         self,
         interaction: discord.Interaction[FuryBot],
         members: List[Union[discord.Member, discord.User]],
         *,
         add_vote: bool = True,
-    ) -> None:
+    ) -> Optional[discord.InteractionMessage]:
         await interaction.response.defer()
 
         home_team = self.scrim.home_team
@@ -165,11 +124,23 @@ class ScrimPanel(BaseView):
 
             view = HomeConfirm(self.scrim)
             home_message = await self.scrim.home_message()
+            if home_message is None:
+                # This home message has been deleted, we must cancel the scrim with the reason
+                # of it having invalid data.
+                await self.scrim.cancel(reason='The home team message has been deleted.')
+                return await interaction.edit_original_response(embed=self.embed, view=self)
+
             await home_message.edit(view=None, embed=view.embed)
 
             # Send the message to the other channel now
             view = AwayConfirm(self.scrim)
-            away_message = await self.scrim.away_team.text_channel.send(embed=view.embed, view=view)
+            away_text_channel = self.scrim.away_team.text_channel
+            if not away_text_channel:
+                # Ths channel, for some reason, has been deleted. We should cancel the scrim.
+                await self.scrim.cancel(reason='The away team text channel has been deleted.')
+                return await interaction.edit_original_response(embed=self.embed, view=self)
+
+            away_message = await away_text_channel.send(embed=view.embed, view=view)
             await self.scrim.edit(away_message_id=away_message.id)
 
         elif self.scrim.status is ScrimStatus.pending_away and self.scrim.away_all_voted:
@@ -178,6 +149,12 @@ class ScrimPanel(BaseView):
 
             view = HomeConfirm(self.scrim)
             home_message = await self.scrim.home_message()
+            if home_message is None:
+                # This home message has been deleted, we must cancel the scrim with the reason
+                # of it having invalid data.
+                await self.scrim.cancel(reason='The home team message has been deleted.')
+                return await interaction.edit_original_response(embed=self.embed, view=self)
+
             await home_message.edit(view=None, embed=view.embed)
 
             view = AwayConfirm(self.scrim)
@@ -221,6 +198,11 @@ class ScrimPanel(BaseView):
 
         # Update the home message
         home_message = await self.scrim.home_message()
+        if home_message is None:
+            # This home message has been deleted, we must cancel the scrim.
+            await self.scrim.cancel(reason='The home team message has been deleted.')
+            return await interaction.edit_original_response(embed=self.embed, view=self)
+
         view = HomeConfirm(self.scrim)
         await home_message.edit(embed=view.embed, view=None)
 
@@ -256,7 +238,7 @@ class TeamScrimsPanel(BaseView):
         The team to manage the scrims for.
     """
 
-    def __init__(self, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, team: Team, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.team: Team = team
 
@@ -282,7 +264,7 @@ class TeamScrimsPanel(BaseView):
         embed.description = f'**{len(self.team.scrims)}** scrims total, **{hosted_scrims}** of which they are hosting.'
 
         if hosted_scrims == 0:
-            embed.add_field(name='No Scrims', value='This team has no scrims.')
+            embed.add_field(name='No Scrims', value='This team has hosted no scrims, only played in them.', inline=False)
 
         return embed
 
@@ -316,6 +298,6 @@ class TeamScrimsPanel(BaseView):
         )
 
         # The AutoRemoveSelect automatically removes all children
-        # and adds itslef. Once the select has been completed it will
+        # and adds itself. Once the select has been completed it will
         # add the children back and call the "_manage_a_scrim_callback" callback for us.
         return await interaction.response.edit_message(view=self)

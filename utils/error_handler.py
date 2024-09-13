@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 import datetime
 import logging
 import os
 import sys
 import traceback
 from collections import defaultdict
+from functools import partial
 from typing import TYPE_CHECKING, Any, DefaultDict, Dict, Generator, List, Optional, Tuple, TypeAlias, Union
 
 import discord
@@ -33,69 +33,39 @@ def _resolve_role_mention(role: Union[int, str]) -> str:
     return f'<@&{role}>'
 
 
-class ExceptionManager:
-    """A simple exception handler that sends all exceptions to a error
-    Webhook and then logs them to the console.
-
-    This class handles cooldowns with a simple lock, so you dont have to worry about
-    rate limiting your webhook and getting banned :).
-
-    .. note::
-
-        If some code is raising MANY errors VERY fast and you're not there to fix it,
-        this will take care of things for you.
+class PacketManager:
+    """An extension to the error handler that keeps track of errors and sends them to a webhook.
 
     Attributes
     ----------
     bot: :class:`FuryBot`
         The bot instance.
-    cooldown: :class:`datetime.timedelta`
-        The cooldown between sending errors. This defaults to 5 seconds.
     errors: Dict[:class:`str`, List[Dict[:class:`str`, :class:`Any`]]]
-        A mapping of tracbacks to their error information.
-    code_blocker: :class:`str`
-        The code blocker used to format Discord codeblocks.
-    error_webhook: :class:`discord.Webhook`
-        The error webhook used to send errors.
+        A mapping of trace backs to their error information.
     """
 
-    __slots__: Tuple[str, ...] = ('bot', 'cooldown', '_lock', '_most_recent', 'errors', 'code_blocker', 'error_webhook')
+    __slots__: Tuple[str, ...] = ('bot', 'cooldown', '_lock', '_most_recent', 'errors', '_code_blocker', '_error_webhook')
 
-    def __init__(self, bot: FuryBot, *, cooldown: datetime.timedelta = datetime.timedelta(seconds=5)) -> None:
+    def __init__(self, bot: FuryBot) -> None:
         self.bot: FuryBot = bot
-        self.cooldown: datetime.timedelta = cooldown
-
-        self._lock: asyncio.Lock = asyncio.Lock()
-        self._most_recent: Optional[datetime.datetime] = None
 
         self.errors: DefaultDict[str, List[Traceback]] = defaultdict(list)
-        self.code_blocker: str = '```py\n{}```'
-        self.error_webhook: discord.Webhook = discord.Webhook.from_url(
+
+        self._code_blocker: str = '```py\n{}```'
+        self._error_webhook: discord.Webhook = discord.Webhook.from_url(
             os.environ['EXCEPTION_WEBHOOK_URL'], session=bot.session, bot_token=bot.http.token
         )
 
-    def _yield_code_chunks(self, iterable: str, *, chunksize: int = 2000) -> Generator[str, None, None]:
-        cbs: int = len(self.code_blocker) - 2  # code blocker size
+    def _yield_code_chunks(self, iterable: str, *, chunks: int = 2000) -> Generator[str, None, None]:
+        code_blocker_size: int = len(self._code_blocker) - 2
 
-        for i in range(0, len(iterable), chunksize - cbs):
-            yield self.code_blocker.format(iterable[i : i + chunksize - cbs])
+        for i in range(0, len(iterable), chunks - code_blocker_size):
+            yield self._code_blocker.format(iterable[i : i + chunks - code_blocker_size])
 
-    async def release_error(self, traceback: str, packet: Traceback) -> None:
-        """|coro|
-
-        Releases an error to the webhook and logs it to the console. It is not recommended
-        to call this yourself, call :meth:`add_error` instead.
-
-        Parameters
-        ----------
-        traceback: :class:`str`
-            The traceback of the error.
-        packet: :class:`dict`
-            The additional information about the error.
-        """
+    async def _release_error(self, traceback: str, packet: Traceback) -> None:
         _log.error('Releasing error to log', exc_info=packet['exception'])
 
-        embed = discord.Embed(title=f'An error has occured in {packet["command"]}', timestamp=packet['time'])
+        embed = discord.Embed(title=f'An error has occurred in {packet["command"]}', timestamp=packet['time'])
         embed.add_field(
             name='Metadata',
             value='\n'.join([f'**{k.title()}**: {v}' for k, v in packet.items()]),
@@ -108,9 +78,9 @@ class ExceptionManager:
 
             embed.set_author(name=str(self.bot.user), icon_url=self.bot.user.display_avatar.url)
 
-        webhook = self.error_webhook
+        webhook = self._error_webhook
         if webhook.is_partial():
-            self.error_webhook = webhook = await self.error_webhook.fetch()
+            self._error_webhook = webhook = await self._error_webhook.fetch()
 
         code_chunks = list(self._yield_code_chunks(traceback))
 
@@ -136,7 +106,7 @@ class ExceptionManager:
         self,
         *,
         error: BaseException,
-        target: Optional[Context] = None,
+        target: Optional[Union[Context, discord.Interaction[FuryBot]]] = None,
         event_name: Optional[str] = None,
     ) -> None:
         """|coro|
@@ -157,8 +127,12 @@ class ExceptionManager:
         author: Optional[Union[discord.Member, discord.User]] = None
 
         if target is not None:
-            created = target.message.created_at
-            author = target.author
+            if isinstance(target, Context):
+                created = target.message.created_at
+                author = target.author
+            else:
+                author = target.user
+                created = target.created_at
 
         packet: Traceback = {'exception': error, 'time': created, 'command': 'no command'}
 
@@ -177,26 +151,7 @@ class ExceptionManager:
         traceback_string = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
         self.errors[traceback_string].append(packet)
 
-        async with self._lock:
-            # I want all other errors to be released after this one, which is why
-            # lock is here. If you have code that calls MANY errors VERY fast,
-            # this will ratelimit the webhook. We dont want that.
-
-            if not self._most_recent:
-                self._most_recent = discord.utils.utcnow()
-                await self.release_error(traceback_string, packet)
-            else:
-                time_between = created - self._most_recent
-
-                if time_between > self.cooldown:
-                    self._most_recent = discord.utils.utcnow()
-                    return await self.release_error(traceback_string, packet)
-                else:  # We have to wait
-                    _log.debug('Waiting %s seconds to release error', time_between.total_seconds())
-                    await asyncio.sleep(time_between.total_seconds())
-
-                    self._most_recent = discord.utils.utcnow()
-                    return await self.release_error(traceback_string, packet)
+        await self._release_error(traceback_string, packet)
 
 
 class ErrorHandler:
@@ -215,21 +170,19 @@ class ErrorHandler:
     bot: :class:`FuryBot`
         The bot instance.
         error_webhook_l
-    exception_manager: :class:`ExceptionManager`
-        The exception manager instance that's used to release errors.
     """
 
     def __init__(self, bot: FuryBot) -> None:
         self.bot: FuryBot = bot
 
-        self.exception_manager: ExceptionManager = ExceptionManager(bot)
+        self.__packet_manager: PacketManager = PacketManager(bot)
         self.inject()
 
     def inject(self) -> None:
         """A helper method to inject the error handler into the bot."""
-        self.bot.tree.on_error = self.handle_interaction_error
-        self.bot.on_error = self.on_error
-        self.bot.on_command_error = self.handle_context_error  # type: ignore
+        self.bot.tree.on_error = self.handle_tree_on_error
+        self.bot.on_error = self.handle_on_error
+        self.bot.on_command_error = self.handle_on_command_error  # type: ignore
 
     def eject(self) -> None:
         """A helper method to eject the error handler from the bot."""
@@ -237,11 +190,15 @@ class ErrorHandler:
         self.bot.on_error = super(commands.Bot, self.bot).on_error
         self.bot.on_command_error = super(commands.Bot, self.bot).on_command_error
 
+    @property
+    def packet_manager(self) -> PacketManager:
+        return self.__packet_manager
+
     async def log_error(
         self,
         exception: BaseException,
         *,
-        ctx: Context,
+        target: Union[Context, discord.Interaction[FuryBot], None] = None,
         event_name: Optional[Any] = None,
     ) -> None:
         """|coro|
@@ -253,109 +210,137 @@ class ErrorHandler:
         ----------
         exception: :class:`BaseException`
             The exception to log.
-        origin: Union[:class:`Context`, :class:`discord.Interaction`]
-            The origin of the error.
-        sender: Optional[Callable[..., Awaitable[Optional[:class:`discord.WebhookMessage`]]]]
-            A sender callable to alert the user of the error.
+        origin: Optional[Union[:class:`Context`, :class:`discord.Interaction`]]
+            The origin of the error. Can be a context or an interaction.
+        event_name: Optional[:class:`str`]
+            The name of the event that raised the error.
         """
-        await ctx.send(
-            'Oh no! Something went wrong! I\'ve notified the developer to get this issue fixed, my apologies!',
-            ephemeral=True,
-        )
+        if isinstance(target, Context):
+            await target.send(
+                'Oh no! Something went wrong! I\'ve notified the developer to get this issue fixed, my apologies!',
+                ephemeral=True,
+            )
+        elif isinstance(target, discord.Interaction):
+            if not target.response.is_done():
+                await target.response.defer()
 
-        await self.exception_manager.add_error(error=exception, target=ctx, event_name=event_name)
+            await target.followup.send(
+                'Oh no! Something went wrong! I\'ve notified the developer to get this issue fixed, my apologies!',
+                ephemeral=True,
+            )
 
-    async def _handle_error(self, ctx: Context, error: Exception) -> Optional[discord.Message]:
+        await self.__packet_manager.add_error(error=exception, target=target, event_name=event_name)
+
+    async def _attempt_handle_known_error(
+        self, target: Union[Context, discord.Interaction[FuryBot]], error: Exception
+    ) -> Optional[discord.Message]:
         # We need to try and defer the given context if it has not been done yet.
-        if ctx.interaction and not ctx.interaction.response.is_done():
-            await ctx.defer(ephemeral=True)
+        if isinstance(target, Context):
+            ctx = target
+            if ctx.interaction and not ctx.interaction.response.is_done():
+                await ctx.defer(ephemeral=True)
+
+            sender = partial(ctx.send, ephemeral=True)
+        else:
+            interaction = target
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
+
+            sender = partial(interaction.followup.send, ephemeral=True)
 
         while hasattr(error, 'original'):
             error = getattr(error, 'original')
 
         if isinstance(error, (AutocompleteValidationException, BadArgument)):
-            return await ctx.send(str(error), ephemeral=True)
+            return await sender(
+                str(error),
+            )
 
         elif isinstance(error, app_commands.CommandInvokeError):
             # Something bad happened here, oh no!
-            return await self.log_error(error.original, ctx=ctx)
+            return await self.log_error(error.original, target=target)
         elif isinstance(error, app_commands.TransformerError):
-            await ctx.send(content=f'Failed to convert `{error.value}` to a {error.type.name.title()}!', ephemeral=True)
+            await sender(
+                content=f'Failed to convert `{error.value}` to a {error.type.name.title()}!',
+            )
 
             # This is a development error as well, but we don't need to pass a sender
-            return await self.log_error(error, ctx=ctx)
+            return await self.log_error(error, target=target)
         elif isinstance(error, app_commands.CheckFailure):
             if isinstance(error, app_commands.NoPrivateMessage):
-                return await ctx.send(str(error), ephemeral=True)
+                return await sender(
+                    str(error),
+                )
             elif isinstance(error, app_commands.MissingRole):
                 role: str = _resolve_role_mention(error.missing_role)
-                return await ctx.send(f'You are missing the {role} role to run this command!', ephemeral=True)
+                return await sender(
+                    f'You are missing the {role} role to run this command!',
+                )
             elif isinstance(error, app_commands.MissingAnyRole):
                 roles = (_resolve_role_mention(role) for role in error.missing_roles)
-                return await ctx.send(
+                return await sender(
                     f'You\'re missing one of the following roles to run this command: {", ".join(roles)}',
-                    ephemeral=True,
                 )
             elif isinstance(error, (app_commands.MissingPermissions, app_commands.BotMissingPermissions)):
                 fmt = 'I\'m' if isinstance(error, app_commands.BotMissingPermissions) else 'You are'
-                return await ctx.send(
+                return await sender(
                     f'{fmt} missing the following permissions to run this command: {", ".join([p.replace("_", " ").title() for p in error.missing_permissions])}',
-                    ephemeral=True,
                 )
         elif isinstance(error, (app_commands.CommandOnCooldown, commands.CommandOnCooldown)):
             retry_after = discord.utils.utcnow() + datetime.timedelta(seconds=error.retry_after)
-            return await ctx.send(
+            return await sender(
                 f'Ope! You\'ve hit this command\'s cooldown, try again in {discord.utils.format_dt(retry_after, "R")}',
-                ephemeral=True,
             )
         elif isinstance(error, app_commands.CommandSignatureMismatch):
             await self.bot.tree.sync()
-            return await ctx.send(
-                'Oh shoot! There\'s a mismatch in my commands, I\'ve synced them, try again!', ephemeral=True
+            return await sender(
+                'Oh shoot! There\'s a mismatch in my commands, I\'ve synced them, try again!',
             )
         elif isinstance(error, commands.MissingRequiredArgument):
-            return await ctx.send(f'Oop! You forgot to provide a value for `{error.param.name}`.', ephemeral=True)
+            return await sender(
+                f'Oop! You forgot to provide a value for `{error.param.name}`.',
+            )
         elif isinstance(error, commands.MissingRequiredArgument):
-            return await ctx.send(f'Oop! You forgot to provide a value for `{error.param.name}`.', ephemeral=True)
+            return await sender(
+                f'Oop! You forgot to provide a value for `{error.param.name}`.',
+            )
         elif isinstance(error, commands.TooManyArguments):
-            return await ctx.send(f'Oop! You provided too many arguments for this command.', ephemeral=True)
+            return await sender(
+                f'Oop! You provided too many arguments for this command.',
+            )
         elif isinstance(error, commands.BadArgument):
             fmt = (
                 str(error)
                 if not (argument := getattr(error, 'argument', None))
                 else f'Value for `{argument}` is not valid - {str(error)}'
             )
-            return await ctx.send(f'Oop! You provided an invalid value. {fmt}', ephemeral=True)
+            return await sender(
+                f'Oop! You provided an invalid value. {fmt}',
+            )
         elif isinstance(error, commands.CommandNotFound):
             return
         elif isinstance(error, commands.CheckFailure):
-            return await ctx.send(f'Ope! {error}', ephemeral=True)
+            return await sender(
+                f'Ope! {error}',
+            )
         elif isinstance(error, commands.DisabledCommand):
-            return await ctx.send(f'Oop! This command is disabled.', ephemeral=True)
+            return await sender(
+                f'Oop! This command is disabled.',
+            )
         elif isinstance(error, commands.MaxConcurrencyReached):
-            return await ctx.send(
-                f'Oop! This command is currently running too many instances. Try again in a few minutes.', ephemeral=True
+            return await sender(
+                f'Oop! This command is currently running too many instances. Try again in a few minutes.',
             )
 
-        await self.log_error(error, ctx=ctx)
+        await self.log_error(error, target=target)
 
-    async def handle_interaction_error(self, interaction: discord.Interaction[FuryBot], error: Exception) -> None:
-        """|coro|
+    async def handle_tree_on_error(self, interaction: discord.Interaction[FuryBot], error: Exception) -> None:
+        await self._attempt_handle_known_error(interaction, error=error)
 
-        Parameters
-        ----------
-        interaction: :class:`discord.Interaction`
-            An instance of the interaction that created the error.
-        error: :class:`app_commands.AppCommandError`
-            The error that was raised.
-        """
-        context = await self.bot.get_context(origin=interaction)
-        await self._handle_error(context, error=error)
+    async def handle_on_command_error(self, ctx: Context, error: Exception):
+        await self._attempt_handle_known_error(target=ctx, error=error)
 
-    async def handle_context_error(self, ctx: Context, error: Exception):
-        await self._handle_error(ctx, error=error)
-
-    async def on_error(self, event_method: str, *args: Any, **kwargs: Any) -> None:
+    async def handle_on_error(self, event_method: str, *args: Any, **kwargs: Any) -> None:
         """|coro|
 
         A method called whenever there's an exception raised while processing an event.
@@ -375,7 +360,7 @@ class ErrorHandler:
         if not error:
             raise
 
-        await self.exception_manager.add_error(error=error, target=None, event_name=event_method)
+        await self.__packet_manager.add_error(error=error, target=None, event_name=event_method)
 
 
 async def setup(bot: FuryBot) -> None:

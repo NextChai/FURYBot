@@ -24,18 +24,25 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Annotated, List, Optional, Tuple, TypeAlias
 
 import discord
 from discord import app_commands
+from discord.ext import commands
 
 from utils import BaseCog, TimeTransformer
 
 from .errors import *
+from .practices.panel import TeamPracticesPanel
 from .scrims import Scrim
+from .scrims.errors import CannotCreateScrim
 from .team import Team
 from .transformers import TeamTransformer
 from .views import TeamView
+
+TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=False)]
+FRONT_END_TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=True)]
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -44,8 +51,7 @@ if TYPE_CHECKING:
 
 __all__: Tuple[str, ...] = ('Teams',)
 
-TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=False)]
-FRONT_END_TEAM_TRANSFORM: TypeAlias = app_commands.Transform[Team, TeamTransformer(clamp_teams=True)]
+_log = logging.getLogger(__name__)
 
 
 def _maybe_team(interaction: discord.Interaction[FuryBot], team: Optional[Team]) -> Optional[Team]:
@@ -64,7 +70,7 @@ def _maybe_team(interaction: discord.Interaction[FuryBot], team: Optional[Team])
 
     try:
         return Team.from_channel(category.id, interaction.guild.id, bot=interaction.client)
-    except Exception:
+    except TeamNotFound:
         return None
 
 
@@ -143,6 +149,50 @@ class Teams(BaseCog):
         view = TeamView(team, target=interaction)
         return await interaction.edit_original_response(embed=view.embed, view=view)
 
+    @team.command(name='practices', description='Manage a team\'s practices')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(team='The team you want to manage.')
+    async def team_practices(
+        self, interaction: discord.Interaction[FuryBot], team: Optional[TEAM_TRANSFORM]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer(ephemeral=True)
+
+        team = _maybe_team(interaction, team)
+        if team is None:
+            return await interaction.edit_original_response(content='You must be in a team channel to use this command.')
+
+        view = TeamPracticesPanel(team, target=interaction)
+        return await interaction.edit_original_response(view=view, embed=view.embed)
+
+    @team.command(name='delete', description='Delete a team.')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(team='The team you want to delete.', reason='Reason for deleting the team, shows on audit logs.')
+    @app_commands.checks.bot_has_permissions(manage_channels=True)
+    async def team_delete(
+        self, interaction: discord.Interaction[FuryBot], team: Optional[TEAM_TRANSFORM], reason: Optional[str] = None
+    ) -> Optional[discord.InteractionMessage]:
+        """|coro|
+
+        A command used to delete a team.
+
+        Parameters
+        ----------
+        team: :class:`Team`
+            The team you want to delete.
+        """
+        await interaction.response.defer()
+
+        team = _maybe_team(interaction, team)
+        if team is None:
+            return await interaction.response.send_message(
+                'You must be in a team channel to use this command.', ephemeral=True
+            )
+
+        async with self.bot.safe_connection() as connection:
+            await team.delete(connection=connection, reason=f'{interaction.user} - {reason or "No reason provided."}')
+
+        return await interaction.edit_original_response(content=f'{team.display_name} has been deleted.')
+
     @scrim.command(name='create', description='Create a scrim')
     @app_commands.describe(
         team='The team you want to scrim against.',
@@ -176,11 +226,19 @@ class Teams(BaseCog):
 
         await interaction.response.defer(ephemeral=True)
 
-        home_team = Team.from_channel(interaction.channel.category.id, interaction.guild.id, bot=self.bot)
+        try:
+            home_team = Team.from_channel(interaction.channel.category.id, interaction.guild.id, bot=self.bot)
+        except TeamNotFound:
+            return await interaction.edit_original_response(
+                content='You must be in a team channel to use this command. Could not find a team from this channel.'
+            )
 
-        scrim = await Scrim.create(
-            when.dt, home_team=home_team, away_team=team, per_team=per_team, creator_id=interaction.user.id, bot=self.bot
-        )
+        try:
+            scrim = await Scrim.create(
+                when.dt, home_team=home_team, away_team=team, per_team=per_team, creator_id=interaction.user.id, bot=self.bot
+            )
+        except CannotCreateScrim as exc:
+            return await interaction.edit_original_response(content=str(exc))
 
         return await interaction.edit_original_response(
             content=f'A scrim for {scrim.scheduled_for_formatted()} has been created against {team.display_name}.'
@@ -191,7 +249,7 @@ class Teams(BaseCog):
     ) -> discord.InteractionMessage:
         assert interaction.guild
 
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         team_members: List[TeamMember] = [
             team_member for team in self.bot.get_teams(interaction.guild.id) if (team_member := team.get_member(member.id))
@@ -200,15 +258,17 @@ class Teams(BaseCog):
         if not team_members:
             return await interaction.edit_original_response(content=f'{member.mention} is not on any teams.')
 
-        embed = self.bot.Embed(title=f'{member.display_name} Teams', author=member)
-        for team_member in team_members:
-            team = team_member.team
+        team_member = team_members[0]
+        team = team_member.team
 
-            embed.add_field(
-                name=team.display_name,
-                value=f'**Team Chat**: {team.text_channel.mention}\n**Is Sub**: {"Is a sub" if team_member.is_sub else "Is not a sub"}',
-                inline=False,
-            )
+        team_text_chat = team_members[0].team.text_channel
+
+        embed = self.bot.Embed(title=f'{member.display_name} Teams', author=member)
+        embed.add_field(
+            name=team.display_name,
+            value=f'**Team Chat**: {team_text_chat and team_text_chat.mention or "Text chat has been deleted!!"}\n**Is Sub**: {"Is a sub" if team_member.is_sub else "Is not a sub"}',
+            inline=False,
+        )
 
         return await interaction.edit_original_response(embed=embed)
 
@@ -245,6 +305,79 @@ class Teams(BaseCog):
             The member you want to get the team status of.
         """
         return await self._team_get_func(interaction, member)
+
+    # Automatic listeners for team deletion
+    @commands.Cog.listener('on_guild_channel_delete')
+    async def team_automatic_deletion_detector(self, channel: discord.abc.GuildChannel) -> None:
+        if not isinstance(channel, discord.CategoryChannel):
+            return
+
+        assert channel.guild, 'This should not be possible'
+
+        # This was a category channel, let's check if it was a team
+        try:
+            team = Team.from_channel(channel.id, channel.guild.id, bot=self.bot)
+        except TeamNotFound:
+            # A team does not exist with this channel, we can ignore this
+            return
+
+        _log.debug('Team %s category channel was deleted, deleting team.', team.display_name)
+
+        # A team does exist with this channel, delete it for the mod
+        async with self.bot.safe_connection() as connection:
+            await team.delete(
+                connection=connection, reason=f'Team {team.display_name} category channel was deleted, team was deleted.'
+            )
+
+    @commands.Cog.listener('on_guild_channel_delete')
+    async def team_automatic_text_voice_chat_deletion_detector(self, channel: discord.abc.GuildChannel) -> None:
+        """|coro|
+
+        Watches to see if a team's main text or voice chat has been deleted. If so, the channel is recreated automatically.
+        Having a team main text and voice chat is marked as essential for the team to function, and the default is that
+        the channel MUST exist for the team to exist.
+        """
+        if not isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
+            return
+
+        assert channel.guild, 'This should not be possible'
+
+        # This was a text channel, let's check if it was a team
+        try:
+            team = Team.from_channel(channel.id, channel.guild.id, bot=self.bot)
+        except TeamNotFound:
+            # A team does not exist with this channel, we can ignore this
+            return
+
+        category = channel.category
+        if category is None:
+            _log.debug('Team %s category channel was deleted, deleting team.', team.display_name)
+            # The category has been deleted, we can assume that the team has been deleted or
+            # some other catastrophic event has occurred. We can delete the team, and in the case
+            # the team already doesn't exist, this will just be cleaning up the database.
+            async with self.bot.safe_connection() as connection:
+                return await team.delete(
+                    connection=connection, reason='Team category was deleted, team automatically deleted.'
+                )
+
+        # If this channel was the main team's text or voice chat, we need to recreate it
+        # and update the metadata that the bot holds.
+        if team.text_channel_id == channel.id:
+            _log.debug('Team %s text channel was deleted, recreating.', team.display_name)
+            new_channel = await category.create_text_channel(name='team-chat')
+            await team.edit(text_channel_id=new_channel.id)
+
+            # Notify the team that their chat has been recreated
+            notification_embed = self.bot.Embed(
+                title='Team Chat Recreated',
+                description=f'The team chat for {team.display_name} has been recreated due to it being deleted.',
+            )
+            await new_channel.send(embed=notification_embed)
+            return None
+        elif team.voice_channel_id == channel.id:
+            _log.debug('Team %s voice channel was deleted, recreating.', team.display_name)
+            new_channel = await category.create_voice_channel(name='team-voice')
+            return await team.edit(voice_channel_id=new_channel.id)
 
 
 async def setup(bot: FuryBot) -> None:

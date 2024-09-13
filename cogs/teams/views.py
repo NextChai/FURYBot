@@ -1,4 +1,4 @@
-""" 
+"""
 The MIT License (MIT)
 
 Copyright (c) 2020-present NextChai
@@ -66,7 +66,7 @@ class TeamMemberView(BaseView):
         The team the member is in.
     """
 
-    def __init__(self, member: discord.Member, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, member: discord.Member, team: Team, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.member: discord.Member = member
         self.team: Team = team
@@ -74,14 +74,17 @@ class TeamMemberView(BaseView):
     @property
     def embed(self) -> discord.Embed:
         """:class:`discord.Embed`: The embed for this view."""
-        embed = self.team.embed(title='Manage Team Member.', author=self.member)
+        embed = self.team.embed(title="Manage Team Member.", author=self.member)
 
         team_member = cast(TeamMember, self.team.get_member(self.member.id))
-        embed.add_field(name='Is Sub?', value='Member is a sub.' if team_member.is_sub else 'Member is not a sub.')
+        embed.add_field(
+            name="Is Sub?",
+            value="Member is a sub." if team_member.is_sub else "Member is not a sub.",
+        )
 
         return embed
 
-    @discord.ui.button(label='Toggle Role')
+    @discord.ui.button(label="Toggle Role")
     @default_button_doc_string
     async def toggle_role(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
@@ -95,7 +98,7 @@ class TeamMemberView(BaseView):
 
         return await interaction.edit_original_response(embed=self.embed, view=self)
 
-    @discord.ui.button(label='Remove Member')
+    @discord.ui.button(label="Remove Member")
     @default_button_doc_string
     async def remove_member(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
@@ -109,7 +112,7 @@ class TeamMemberView(BaseView):
         view = TeamMembersView(self.team, target=interaction)
         return await interaction.edit_original_response(embed=view.embed, view=view)
 
-    @discord.ui.button(label='View Practice Statistics')
+    @discord.ui.button(label="View Practice Statistics")
     @default_button_doc_string
     async def view_practice_statistics(
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
@@ -136,7 +139,7 @@ class TeamMembersView(BaseView):
         The team to manage.
     """
 
-    def __init__(self, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, team: Team, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.team: Team = team
 
@@ -149,16 +152,18 @@ class TeamMembersView(BaseView):
             member_metadata.append(f'{member.mention}: {"**Is a sub.**" if member.is_sub else "**On the main roster.**"}')
 
         embed = self.team.embed(
-            title=f'Team Members',
-            description='Use the buttons below to manage team members.\n\n{}'.format(
-                "\n".join(member_metadata) or 'Team has no members.'
+            title="Team Members",
+            description="Use the buttons below to manage team members.\n\n{}".format(
+                "\n".join(member_metadata) or "Team has no members."
             ),
         )
 
         return embed
 
     async def _manage_member_after(
-        self, interaction: discord.Interaction[FuryBot], members: List[Union[discord.Member, discord.User]]
+        self,
+        interaction: discord.Interaction[FuryBot],
+        members: List[Union[discord.Member, discord.User]],
     ) -> None:
         await interaction.response.defer()
 
@@ -168,13 +173,13 @@ class TeamMembersView(BaseView):
         team_member = self.team.get_member(member.id)
         if not team_member:
             await interaction.edit_original_response(embed=self.embed, view=self)
-            await interaction.followup.send('This member is not on the team.', ephemeral=True)
+            await interaction.followup.send("This member is not on the team.", ephemeral=True)
             return
 
         view = self.create_child(TeamMemberView, member=member, team=self.team)
         await interaction.edit_original_response(embed=view.embed, view=view)
 
-    @discord.ui.button(label='Manage Member')
+    @discord.ui.button(label="Manage Member")
     @default_button_doc_string
     async def manage_member(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Manage this member on the team. You can remove them from it and demote them to a sub."""
@@ -203,33 +208,42 @@ class TeamMembersView(BaseView):
 
         await interaction.edit_original_response(embed=self.embed, view=self)
 
-    @discord.ui.button(label='Add Members')
+    @discord.ui.button(label="Add Members")
     @default_button_doc_string
     async def add_members(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Add members to this team."""
         UserSelect(after=self._manage_member_assignment, parent=self)
         return await interaction.response.edit_message(view=self)
 
-    @discord.ui.button(label='Remove Members')
+    @discord.ui.button(label="Remove Members")
     @default_button_doc_string
     async def remove_members(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Remove members from this team."""
-        UserSelect(after=functools.partial(self._manage_member_assignment, remove_member=True), parent=self)
+        UserSelect(
+            after=functools.partial(self._manage_member_assignment, remove_member=True),
+            parent=self,
+        )
         return await interaction.response.edit_message(view=self)
 
-    @discord.ui.button(label='Add Subs')
+    @discord.ui.button(label="Add Subs")
     @default_button_doc_string
     async def add_subs(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Add subs to this team."""
-        UserSelect(after=functools.partial(self._manage_member_assignment, assign_sub=True), parent=self)
+        UserSelect(
+            after=functools.partial(self._manage_member_assignment, assign_sub=True),
+            parent=self,
+        )
 
         return await interaction.response.edit_message(view=self)
 
-    @discord.ui.button(label='Remove Subs')
+    @discord.ui.button(label="Remove Subs")
     @default_button_doc_string
     async def remove_subs(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Remove subs from this team."""
-        UserSelect(after=functools.partial(self._manage_member_assignment, assign_sub=True, remove_member=True), parent=self)
+        UserSelect(
+            after=functools.partial(self._manage_member_assignment, assign_sub=True, remove_member=True),
+            parent=self,
+        )
         return await interaction.response.edit_message(view=self)
 
 
@@ -243,22 +257,32 @@ class TeamChannelsView(BaseView):
         The team to manage the scrims for.
     """
 
-    def __init__(self, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, team: Team, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.team: Team = team
 
     @property
     def embed(self) -> discord.Embed:
         """discord.Embed: The embed for this view."""
-        embed = self.team.embed(title=f'Channels.')
+        embed = self.team.embed(title="Channels.")
 
-        embed.add_field(name='Category Channel', value=self.team.category_channel.mention)
-        embed.add_field(name='Text Channel', value=self.team.text_channel.mention)
-        embed.add_field(name='Voice Channel', value=self.team.voice_channel.mention)
-        embed.add_field(
-            name='Extra Channels',
-            value='\n'.join([c.mention for c in self.team.extra_channels]) or 'Team has no extra channels.',
-        )
+        category_channel = self.team.category_channel
+        if category_channel:
+            embed.add_field(name="Category Channel", value=category_channel.mention)
+
+        text_channel = self.team.text_channel
+        if text_channel:
+            embed.add_field(name="Text Channel", value=text_channel.mention)
+
+        voice_channel = self.team.voice_channel
+        if voice_channel:
+            embed.add_field(name="Voice Channel", value=voice_channel.mention)
+
+        if self.team.extra_channels:
+            embed.add_field(
+                name="Extra Channels",
+                value="\n".join([c.mention for c in self.team.extra_channels]) or "Team has no extra channels.",
+            )
 
         return embed
 
@@ -267,34 +291,38 @@ class TeamChannelsView(BaseView):
         interaction: discord.Interaction[FuryBot],
         channel_name_input: discord.ui.TextInput[AfterModal],
         channel_type_input: discord.ui.TextInput[AfterModal],
-    ) -> None:
+    ) -> discord.InteractionMessage:
         await interaction.response.defer()
 
+        category_channel = self.team.category_channel
+        if category_channel is None:
+            return await interaction.edit_original_response(
+                content="This team has no category channel to create the extra channel in.",
+                view=self,
+            )
+
         meth_mapping = {
-            'text': self.team.category_channel.create_text_channel,
-            'voice': self.team.category_channel.create_voice_channel,
+            "text": category_channel.create_text_channel,
+            "voice": category_channel.create_voice_channel,
         }
 
         meth = meth_mapping.get(channel_type_input.value, None)
         if meth:
             channel = await meth(name=channel_name_input.value)
+            await self.team.add_extra_channel(channel.id)
 
-            extra_channel_ids = self.team.extra_channel_ids.copy()
-            extra_channel_ids.append(channel.id)
-            await self.team.edit(extra_channel_ids=extra_channel_ids)
+        return await interaction.edit_original_response(view=self, embed=self.embed)
 
-        await interaction.edit_original_response(view=self, embed=self.embed)
-
-    @discord.ui.button(label='Create Extra Channel')
+    @discord.ui.button(label="Create Extra Channel")
     @default_button_doc_string
     async def create_extra_channel(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Allows the user to create an extra channel for the team."""
         modal = AfterModal(
             self.bot,
             self._create_extra_channel_after,
-            discord.ui.TextInput(label='Channel Name', placeholder='Enter the channel name...'),
-            discord.ui.TextInput(label='Channel Type', placeholder='"text" or "voice"...'),
-            title='Create Extra Channel',
+            discord.ui.TextInput(label="Channel Name", placeholder="Enter the channel name..."),
+            discord.ui.TextInput(label="Channel Type", placeholder='"text" or "voice"...'),
+            title="Create Extra Channel",
             timeout=None,
         )
         await interaction.response.send_modal(modal)
@@ -318,12 +346,12 @@ class TeamChannelsView(BaseView):
 
         await interaction.edit_original_response(view=self, embed=self.embed)
 
-    @discord.ui.button(label='Delete Extra Channels')
+    @discord.ui.button(label="Delete Extra Channels")
     @default_button_doc_string
     async def delete_extra_channel(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Allows the user to delete an extra channel for the team."""
         if not self.team.extra_channels:
-            return await interaction.response.send_message('This team has no extra channels.', ephemeral=True)
+            return await interaction.response.send_message("This team has no extra channels.", ephemeral=True)
 
         SelectOneOfMany(
             self,
@@ -331,11 +359,11 @@ class TeamChannelsView(BaseView):
                 discord.SelectOption(label=channel.name, value=str(channel.id)) for channel in self.team.extra_channels
             ],
             after=self._delete_extra_channels_after,
-            placeholder='Select the channels to delete...',
+            placeholder="Select the channels to delete...",
         )
         return await interaction.response.edit_message(view=self)
 
-    @discord.ui.button(label='Sync Channels')
+    @discord.ui.button(label="Sync Channels")
     @default_button_doc_string
     async def sync_channels(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Syncs the channels for the team."""
@@ -354,64 +382,92 @@ class TeamNamingView(BaseView):
         The team to manage the scrims for.
     """
 
-    def __init__(self, team: Team, **kwargs: Unpack[BaseViewKwargs]) -> None:
+    def __init__(self, team: Team, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.team: Team = team
 
     @property
     def embed(self) -> discord.Embed:
         """The embed for this view."""
-        embed = self.team.embed(title='Customization', description=self.team.description or 'Team has no description.')
-        embed.add_field(name='Team Nickname', value=self.team.nickname or 'Team has no nickname.', inline=False)
-        embed.add_field(
-            name='Team Logo', value=f'[Click here for logo.]({self.team.logo}).' or 'Team has no logo.', inline=False
+        embed = self.team.embed(
+            title="Customization",
+            description=self.team.description or "Team has no description.",
         )
+        embed.add_field(
+            name="Team Nickname",
+            value=self.team.nickname or "Team has no nickname.",
+            inline=False,
+        )
+
+        if self.team.logo:
+            embed.add_field(
+                name="Team Logo",
+                value=f"[Click here for logo.]({self.team.logo})." or "Team has no logo.",
+                inline=False,
+            )
+        else:
+            embed.add_field(name='Team Logo', value='Team has no logo.', inline=False)
 
         return embed
 
     async def _perform_after(
-        self, interaction: discord.Interaction[FuryBot], text_input: discord.ui.TextInput[AfterModal], *, kwarg: str
+        self,
+        interaction: discord.Interaction[FuryBot],
+        text_input: discord.ui.TextInput[AfterModal],
+        *,
+        kwarg: str,
     ) -> None:
         await interaction.response.defer()
 
-        await self.team.edit(**{kwarg: text_input.value})
+        await self.team.edit(**{kwarg: text_input.value})  # type: ignore
         await interaction.edit_original_response(embed=self.embed, view=self)
 
     async def _rename_after(
-        self, interaction: discord.Interaction[FuryBot], text_input: discord.ui.TextInput[AfterModal]
+        self,
+        interaction: discord.Interaction[FuryBot],
+        text_input: discord.ui.TextInput[AfterModal],
     ) -> None:
-        await self._perform_after(interaction, text_input, kwarg='name')
+        await self._perform_after(interaction, text_input, kwarg="name")
 
     async def _change_nickname_after(
-        self, interaction: discord.Interaction[FuryBot], text_input: discord.ui.TextInput[AfterModal]
+        self,
+        interaction: discord.Interaction[FuryBot],
+        text_input: discord.ui.TextInput[AfterModal],
     ) -> None:
-        await self._perform_after(interaction, text_input, kwarg='nickname')
+        await self._perform_after(interaction, text_input, kwarg="nickname")
 
     async def _change_description_after(
-        self, interaction: discord.Interaction[FuryBot], text_input: discord.ui.TextInput[AfterModal]
+        self,
+        interaction: discord.Interaction[FuryBot],
+        text_input: discord.ui.TextInput[AfterModal],
     ) -> None:
-        await self._perform_after(interaction, text_input, kwarg='description')
-        await self.team.text_channel.edit(topic=text_input.value)
+        await self._perform_after(interaction, text_input, kwarg="description")
+
+        text_channel = self.team.text_channel
+        if text_channel:
+            await text_channel.edit(topic=text_input.value)
 
     async def _change_logo_after(
-        self, interaction: discord.Interaction[FuryBot], text_input: discord.ui.TextInput[AfterModal]
+        self,
+        interaction: discord.Interaction[FuryBot],
+        text_input: discord.ui.TextInput[AfterModal],
     ) -> None:
-        await self._perform_after(interaction, text_input, kwarg='logo')
+        await self._perform_after(interaction, text_input, kwarg="logo")
 
-    @discord.ui.button(label='Rename')
+    @discord.ui.button(label="Rename")
     @default_button_doc_string
     async def rename(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Rename this team."""
         modal = AfterModal(
             self.bot,
             self._rename_after,
-            discord.ui.TextInput(label='New Name', placeholder='Enter a new name...', max_length=100),
-            title='Rename Team',
+            discord.ui.TextInput(label="New Name", placeholder="Enter a new name...", max_length=100),
+            title="Rename Team",
             timeout=None,
         )
         await interaction.response.send_modal(modal)
 
-    @discord.ui.button(label='Change Nickname')
+    @discord.ui.button(label="Change Nickname")
     @default_button_doc_string
     async def change_nickname(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Change the nickname of this team."""
@@ -419,14 +475,18 @@ class TeamNamingView(BaseView):
         modal = AfterModal(
             self.bot,
             self._change_nickname_after,
-            discord.ui.TextInput(label='New Nickname', placeholder='Enter a new nickname...', max_length=100),
-            title='Change Team Nickname',
+            discord.ui.TextInput(
+                label="New Nickname",
+                placeholder="Enter a new nickname...",
+                max_length=100,
+            ),
+            title="Change Team Nickname",
             timeout=None,
         )
 
         await interaction.response.send_modal(modal)
 
-    @discord.ui.button(label='Change Description')
+    @discord.ui.button(label="Change Description")
     @default_button_doc_string
     async def change_description(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Change the description of this team."""
@@ -434,19 +494,19 @@ class TeamNamingView(BaseView):
             self.bot,
             self._change_description_after,
             discord.ui.TextInput(
-                label='Update Description',
-                placeholder='Enter a new description...',
+                label="Update Description",
+                placeholder="Enter a new description...",
                 max_length=1024,
                 required=False,
                 style=discord.TextStyle.long,
             ),
-            title='Change Team Description',
+            title="Change Team Description",
             timeout=None,
         )
 
         return await interaction.response.send_modal(modal)
 
-    @discord.ui.button(label='Change Logo')
+    @discord.ui.button(label="Change Logo")
     @default_button_doc_string
     async def change_logo(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Change the logo of this team."""
@@ -455,12 +515,12 @@ class TeamNamingView(BaseView):
             self.bot,
             self._change_logo_after,
             discord.ui.TextInput(
-                label='Update Logo',
-                placeholder='Enter a new logo...',
+                label="Update Logo",
+                placeholder="Enter a new logo...",
                 required=False,
                 style=discord.TextStyle.short,
             ),
-            title='Change Team Logo',
+            title="Change Team Logo",
             timeout=None,
         )
 
@@ -488,19 +548,23 @@ class TeamCaptainsView(BaseView):
     @property
     def embed(self) -> discord.Embed:
         embed = self.team.embed(
-            title='Captains',
-            description='Use the buttons below to manage team captain roles. This team '
-            f'has **{len(self.team.captain_role_ids)}** captain(s).',
+            title="Captains",
+            description="Use the buttons below to manage team captain roles. This team "
+            f"has **{len(self.team.captain_role_ids)}** captain(s).",
         )
         embed.add_field(
-            name='Current Captains',
-            value='\n'.join(r.mention for r in self.team.captain_roles) or 'This team has no current captains.',
+            name="Current Captains",
+            value="\n".join(r.mention for r in self.team.captain_roles) or "This team has no current captains.",
         )
 
         return embed
 
     async def handle_captain_action(
-        self, interaction: discord.Interaction[FuryBot], roles: List[discord.Role], *, add: bool = True
+        self,
+        interaction: discord.Interaction[FuryBot],
+        roles: List[discord.Role],
+        *,
+        add: bool = True,
     ) -> None:
         await interaction.response.defer()
 
@@ -513,7 +577,7 @@ class TeamCaptainsView(BaseView):
 
         await interaction.edit_original_response(embed=self.embed, view=self)
 
-    @discord.ui.button(label='Add Captains')
+    @discord.ui.button(label="Add Captains")
     @default_button_doc_string
     async def add_captain(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Add a captain role to this team."""
@@ -522,7 +586,7 @@ class TeamCaptainsView(BaseView):
 
         return await interaction.response.edit_message(view=self)
 
-    @discord.ui.button(label='Remove Captains')
+    @discord.ui.button(label="Remove Captains")
     @default_button_doc_string
     async def remove_captain(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Remove a captain role from this team."""
@@ -549,91 +613,101 @@ class TeamView(BaseView):
         """The embed for this view."""
         embed = self.team.embed(
             title=self.team.display_name,
-            description=self.team.description or 'Team has no description.',
+            description=self.team.description or "Team has no description.",
         )
 
         embed.add_field(
-            name='Members',
+            name="Members",
             value=", ".join([m.mention for m in self.team.team_members.values() if m.is_sub is False])
             or "Team has no members.",
             inline=False,
         )
         embed.add_field(
-            name='Subs',
+            name="Subs",
             value=", ".join([m.mention for m in self.team.team_members.values() if m.is_sub])
             or "Team has no dedicated subs.",
             inline=False,
         )
 
         embed.add_field(
-            name='Captains',
+            name="Captains",
             value=", ".join(r.mention for r in self.team.captain_roles) or "Team has no captains.",
             inline=False,
         )
 
         embed.add_field(
-            name='Channels',
-            value=", ".join(c.mention for c in [self.team.text_channel, self.team.voice_channel, *self.team.extra_channels]),
+            name="Channels",
+            value=", ".join(
+                c.mention
+                for c in [
+                    self.team.text_channel,
+                    self.team.voice_channel,
+                    *self.team.extra_channels,
+                ]
+                if c is not None
+            ),
             inline=False,
         )
 
-        embed.set_footer(text=f'Team ID: {self.team.id}')
+        embed.set_footer(text=f"Team ID: {self.team.id}")
         return embed
 
     async def _delete_team_after(
-        self, interaction: discord.Interaction[FuryBot], confirm_input: discord.ui.TextInput[AfterModal]
+        self,
+        interaction: discord.Interaction[FuryBot],
+        confirm_input: discord.ui.TextInput[AfterModal],
     ) -> None:
-        if confirm_input.value.lower() != 'delete':
-            return await interaction.response.send_message('Aborted as `delete` was not typed.', ephemeral=True)
+        if confirm_input.value.lower() != "delete":
+            return await interaction.response.send_message("Aborted as `delete` was not typed.", ephemeral=True)
 
-        await interaction.response.edit_message(content='This team has been deleted.', view=None, embed=None)
+        await interaction.response.edit_message(content="This team has been deleted.", view=None, embed=None)
 
         async with self.bot.safe_connection() as connection:
-            await self.team.delete(connection=connection)
+            await self.team.delete(connection=connection, reason=f'Team deleted in team view by {interaction.user}')
 
-    @discord.ui.button(label='Customization')
+    @discord.ui.button(label="Customization")
     @default_button_doc_string
     async def customization(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Launches the customization view for this team to rename it, change description, etc."""
         view = self.create_child(TeamNamingView, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
-    @discord.ui.button(label='Channels')
+    @discord.ui.button(label="Channels")
     @default_button_doc_string
     async def channels(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Launches a view to manage the team\'s extra channels."""
         view = self.create_child(TeamChannelsView, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
-    @discord.ui.button(label='Scrims')
+    @discord.ui.button(label="Scrims")
     @default_button_doc_string
     async def scrims(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Launches a view to manage the team\'s scrims."""
         view = self.create_child(TeamScrimsPanel, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
-    @discord.ui.button(label='Members')
+    @discord.ui.button(label="Members")
     @default_button_doc_string
     async def members(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Manage the team\'s members."""
         view = self.create_child(TeamMembersView, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
-    @discord.ui.button(label='Captains')
+    @discord.ui.button(label="Captains")
     @default_button_doc_string
     async def captains(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Manage the team\'s captains."""
         view = self.create_child(TeamCaptainsView, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
-    @discord.ui.button(label='Practices')
+    @discord.ui.button(label="Practices")
     @default_button_doc_string
     async def practices(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Manage the team\'s practices."""
         view = self.create_child(TeamPracticesPanel, self.team)
         return await interaction.response.edit_message(embed=view.embed, view=view)
 
-    @discord.ui.button(label='Delete Team', style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Delete Team", style=discord.ButtonStyle.danger)
     @default_button_doc_string
     async def delete(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Delete this team."""
@@ -641,11 +715,11 @@ class TeamView(BaseView):
             self.bot,
             self._delete_team_after,
             discord.ui.TextInput(
-                label='Delete Team Confirmation',
+                label="Delete Team Confirmation",
                 placeholder='Type "DELETE" to confirm...',
                 max_length=6,
             ),
-            title='Delete Team?',
+            title="Delete Team?",
             timeout=None,
         )
 

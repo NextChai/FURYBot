@@ -24,7 +24,6 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING, List, Optional, cast
 
 import discord
@@ -36,8 +35,7 @@ if TYPE_CHECKING:
     from bot import FuryBot
 
 
-# TODO: Maybe refactor this to a guild can have a large settings panel for things like this?
-class Notifier(BaseCog):
+class DmNotifications(BaseCog):
     def __init__(self, bot: FuryBot) -> None:
         self.bot: FuryBot = bot
         self.member_notifier_task.start()
@@ -51,9 +49,7 @@ class Notifier(BaseCog):
 
         members: List[discord.Member] = []
         async for member in guild.fetch_members(limit=None):
-            if member.id in moderators:
-                continue
-            if member.bot:
+            if (member.id in moderators) or member.bot:
                 continue
 
             try:
@@ -72,7 +68,10 @@ class Notifier(BaseCog):
                 guild.id,
             )
 
-        assert data is not None
+        if not data:
+            # Between creating the task and now, the guild was removed from the database.
+            # We'll just return
+            return
 
         moderators: List[int] = data['moderators'] or []
         if data['moderator_role_ids']:
@@ -92,22 +91,53 @@ class Notifier(BaseCog):
         if not channel:
             return
 
+        member_mentions: List[str] = []
+        mutual_member_mentions: List[str] = []
+        for member in members:
+            if len(member.mutual_guilds) > 1:
+                # There is a good chance that this member is in more than 1 server with this bot,
+                # we'll let the staff know of this.
+                guild_names = ', '.join(mg.name for mg in member.mutual_guilds if mg != guild)
+                mutual_member_mentions.append(f'{member.mention} (`{member.id}`): {guild_names}')
+            else:
+                member_mentions.append(f'{member.mention} (`{member.id}`)')
+
         embed = self.bot.Embed(
             title='Members Have Dms Turned On',
-            description='The members below have their DMs turned on.\n\n{}'.format(
-                '\n'.join(member.mention for member in members)
-            ),
+            description=f'The members below have their DMs turned on.\n\n{member_mentions}',
         )
+
+        if mutual_member_mentions:
+            embed.add_field(name='Mutual Guild Enabled Dms', value='\n'.join(mutual_member_mentions))
+            embed.set_footer(
+                text='"Mutual guild enabled dms" are the members who share more than one server '
+                'with the bot and have their DMs turned on in at least one of the servers. This may '
+                'not mean that they have DMs turned on in this server.'
+            )
+
         await channel.send(embed=embed)
 
     @tasks.loop(hours=3)
     async def member_notifier_task(self) -> None:
-        await asyncio.gather(*[self._wrap_guild_member_sending(guild) for guild in self.bot.guilds])
+        async with self.bot.safe_connection() as connection:
+            guild_id_records = await connection.fetch(
+                'SELECT guild_id FROM infractions.settings WHERE notification_channel_id IS NOT NULL AND enable_no_dms_open = TRUE'
+            )
+
+            for record in guild_id_records:
+                guild_id = record['guild_id']
+                guild = self.bot.get_guild(guild_id)
+                if not guild:
+                    await connection.execute(
+                        'UPDATE infractions.settings SET notification_channel_id = NULL WHERE guild_id = $1',
+                        guild_id,
+                    )
+                    continue
+
+                self.bot.create_task(self._wrap_guild_member_sending(guild), name=f'notifier-{guild_id}')
+
+                await self._wrap_guild_member_sending(guild)
 
     @member_notifier_task.before_loop
     async def member_notifier_before_loop(self) -> None:
         await self.bot.wait_until_ready()
-
-
-async def setup(bot: FuryBot) -> None:
-    await bot.add_cog(Notifier(bot))

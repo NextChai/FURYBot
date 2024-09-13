@@ -34,6 +34,8 @@ from typing_extensions import Self
 
 from utils import QueryBuilder, human_join
 
+from .errors import TeamNotFound
+
 if TYPE_CHECKING:
     from bot import ConnectionType, FuryBot
 
@@ -235,18 +237,15 @@ class Team:
 
         Raises
         -------
-        Exception
+        TeamNotFound
             A team belonging to the channel was not found.
         """
         teams = bot.get_teams(guild_id)
-        if teams is []:
-            raise Exception("No team with that channel exists.")
-
         for team in teams:
             if team.has_channel(channel_id):
                 return team
 
-        raise Exception("No team with that channel exists.")
+        raise TeamNotFound("No team with that channel exists.")
 
     @classmethod
     async def from_record(
@@ -260,7 +259,7 @@ class Team:
         """|coro|
 
         Fetch the team from the database and return its instance. This will only be called in
-        :meth:`FurtBot.setup_hook` as all other instances should use the bots cache.
+        :meth:`FuryBot.setup_hook` as all other instances should use the bots cache.
 
         Parameters
         ----------
@@ -279,10 +278,7 @@ class Team:
             The fetched team.
         """
         members = {
-            entry["member_id"]: TeamMember(
-                bot, guild_id=data["guild_id"], **dict(entry)
-            )
-            for entry in member_data or []
+            entry["member_id"]: TeamMember(bot, guild_id=data["guild_id"], **dict(entry)) for entry in member_data or []
         }
         team = cls(bot, **dict(data), team_members=members)
         bot.add_team(team)
@@ -290,9 +286,7 @@ class Team:
         return team
 
     @classmethod
-    async def create(
-        cls: Type[Self], name: str, /, *, guild: discord.Guild, bot: FuryBot
-    ) -> Self:
+    async def create(cls: Type[Self], name: str, /, *, guild: discord.Guild, bot: FuryBot) -> Self:
         """|coro|
 
         Used to create a new team.
@@ -308,16 +302,10 @@ class Team:
         """
         category = await guild.create_category(
             name=name,
-            overwrites={
-                guild.default_role: discord.PermissionOverwrite(read_messages=False)
-            },
+            overwrites={guild.default_role: discord.PermissionOverwrite(read_messages=False)},
         )
-        text_channel = await guild.create_text_channel(
-            name="team-chat", category=category
-        )
-        voice_channel = await guild.create_voice_channel(
-            name="Team Voice", category=category
-        )
+        text_channel = await guild.create_text_channel(name="team-chat", category=category)
+        voice_channel = await guild.create_voice_channel(name="Team Voice", category=category)
 
         async with bot.safe_connection() as connection:
             data = await connection.fetchrow(
@@ -357,33 +345,64 @@ class Team:
         return [member for member in self.members if member.is_sub]
 
     @property
-    def text_channel(self) -> discord.TextChannel:
+    def text_channel(self) -> Optional[discord.TextChannel]:
         """:class:`discord.TextChannel`: The text channel this team is bound to."""
         guild = self.guild
-        return cast(discord.TextChannel, guild.get_channel(self.text_channel_id))
+        if not guild:
+            return None
+
+        channel = guild.get_channel(self.text_channel_id)
+        if not channel:
+            return None
+
+        if not isinstance(channel, discord.TextChannel):
+            raise Exception("Text channel is not a text channel.")
+
+        return channel
 
     @property
-    def voice_channel(self) -> discord.VoiceChannel:
+    def voice_channel(self) -> Optional[discord.VoiceChannel]:
         """:class:`discord.VoiceChannel`: The voice channel this team is bound to."""
         guild = self.guild
-        return cast(discord.VoiceChannel, guild.get_channel(self.voice_channel_id))
+        if not guild:
+            return None
+
+        channel = guild.get_channel(self.voice_channel_id)
+        if not channel:
+            return None
+
+        if not isinstance(channel, discord.VoiceChannel):
+            raise Exception("Voice channel is not a voice channel.")
+
+        return channel
 
     @property
-    def category_channel(self) -> discord.CategoryChannel:
+    def category_channel(self) -> Optional[discord.CategoryChannel]:
         """:class:`discord.CategoryChannel`: The category channel this team is bound to."""
         guild = self.guild
-        return cast(
-            discord.CategoryChannel, guild.get_channel(self.category_channel_id)
-        )
+        if not guild:
+            raise Exception("Guild not found.")
+
+        channel = guild.get_channel(self.category_channel_id)
+        if not channel:
+            return None
+
+        if not isinstance(channel, discord.CategoryChannel):
+            raise Exception("Category channel is not a category channel.")
+
+        return channel
 
     @property
     def extra_channels(self) -> List[discord.abc.GuildChannel]:
         """List[:class:`discord.abc.GuildChannel`]: A list of all extra channels this team has."""
         guild = self.guild
-        return [
-            cast(discord.abc.GuildChannel, guild.get_channel(channel_id))
-            for channel_id in self.extra_channel_ids
-        ]
+        channels: List[discord.abc.GuildChannel] = []
+        for channel_id in self.extra_channel_ids:
+            channel = guild.get_channel(channel_id)
+            if channel:
+                channels.append(channel)
+
+        return channels
 
     @property
     def scrims(self) -> List[Scrim]:
@@ -404,11 +423,7 @@ class Team:
     def captain_roles(self) -> List[discord.Role]:
         """List[:class:`discord.Role`]: A list of all captain roles for this team."""
         guild = self.guild
-        return [
-            role
-            for role_id in self.captain_role_ids
-            if (role := guild.get_role(role_id))
-        ]
+        return [role for role_id in self.captain_role_ids if (role := guild.get_role(role_id))]
 
     @property
     def display_name(self) -> str:
@@ -418,9 +433,7 @@ class Team:
     @property
     def total_points(self) -> float:
         """:class:`float`: The total points for this team based on their practices."""
-        practice_points = list(
-            points for practice in self.practices if (points := practice.total_points)
-        )
+        practice_points = list(points for practice in self.practices if (points := practice.total_points))
         if not practice_points:
             return 0
 
@@ -439,9 +452,7 @@ class Team:
         :class:`str`
             The mentions.
         """
-        return human_join(
-            (member.mention for member in self.members), delimiter=delimiter
-        )
+        return human_join((member.mention for member in self.members), delimiter=delimiter)
 
     def embed(
         self,
@@ -464,9 +475,7 @@ class Team:
         author: Union[:class:`discord.User`, :class:`discord.Member`]
             The author of the embed.
         """
-        embed = self.bot.Embed(
-            title=title, description=description, url=url, author=author
-        )
+        embed = self.bot.Embed(title=title, description=description, url=url, author=author)
 
         if author is None:
             embed.set_thumbnail(url=self.logo)
@@ -488,11 +497,7 @@ class Team:
         -------
         :class:`bool`
         """
-        return (
-            channel_id
-            in [self.category_channel_id, self.text_channel_id, self.voice_channel_id]
-            + self.extra_channel_ids
-        )
+        return channel_id in [self.category_channel_id, self.text_channel_id, self.voice_channel_id] + self.extra_channel_ids
 
     def get_member(self, member_id: int, /) -> Optional[TeamMember]:
         """Gets a member from this team based upon the given ID.
@@ -529,9 +534,7 @@ class Team:
                 continue
 
             previous_ended_at = self.practices[i - 1].ended_at
-            if (
-                previous_ended_at is None
-            ):  # This should't happen but if it does, we'll just skip it.
+            if previous_ended_at is None:  # This should't happen but if it does, we'll just skip it.
                 continue
 
             if (ended_at - previous_ended_at).days < 8:
@@ -618,21 +621,15 @@ class Team:
         # Count up all the teams scores, rank them, then get the rank of the team we're looking for
         teams = self.bot.get_teams(self.guild_id)
         team_scores = [(team, team.total_points) for team in teams]
-        return (
-            sorted(team_scores, key=lambda item: item[1], reverse=True).index(
-                (self, self.total_points)
-            )
-            + 1
-        )
+        return sorted(team_scores, key=lambda item: item[1], reverse=True).index((self, self.total_points)) + 1
 
-    async def sync(self) -> None:
-        """|coro|
-
-        Syncs the team's channels with the data in the team.
+    async def channel_overwrites(self) -> Dict[Union[discord.Role, discord.Member], discord.PermissionOverwrite]:
+        """Dict[Union[:class:`discord.Role`, :class:`discord.Member`], :class:`discord.PermissionOverwrite`]:
+        The channel overwrites for this team.
         """
-        overwrites: Dict[
-            Union[discord.Role, discord.Member], discord.PermissionOverwrite
-        ] = {self.guild.default_role: discord.PermissionOverwrite(read_messages=False)}
+        overwrites: Dict[Union[discord.Role, discord.Member], discord.PermissionOverwrite] = {
+            self.guild.default_role: discord.PermissionOverwrite(read_messages=False)
+        }
 
         for member in self.team_members.values():
             discord_member = member.member or await member.fetch_member()
@@ -641,15 +638,26 @@ class Team:
         for role in self.captain_roles:
             overwrites[role] = discord.PermissionOverwrite(view_channel=True)
 
-        await self.category_channel.edit(overwrites=overwrites)
+        return overwrites
 
-        await self.text_channel.edit(sync_permissions=True)
-        await self.voice_channel.edit(sync_permissions=True)
+    async def sync(self) -> None:
+        """|coro|
+
+        Syncs the team's channels with the data in the team.
+        """
+        overwrites = await self.channel_overwrites()
+
+        if self.category_channel:
+            await self.category_channel.edit(overwrites=overwrites)
+
+        if self.text_channel:
+            await self.text_channel.edit(sync_permissions=True)
+
+        if self.voice_channel:
+            await self.voice_channel.edit(sync_permissions=True)
 
         for channel in self.extra_channels:
-            await channel._edit(
-                {"sync_permissions": True}, reason="Syncing team channels."
-            )
+            await channel._edit({"sync_permissions": True}, reason="Syncing team channels.")
 
     async def add_team_member(self, member_id: int, is_sub: bool = False) -> TeamMember:
         """|coro|
@@ -678,25 +686,16 @@ class Team:
             )
 
         assert member_record
-        team_member = TeamMember(
-            self.bot, guild_id=self.guild_id, **dict(member_record)
-        )
+        team_member = TeamMember(self.bot, guild_id=self.guild_id, **dict(member_record))
 
         self.team_members[team_member.member_id] = team_member
 
-        # Update the channel now
-        category = self.category_channel
-        member = team_member.member or await team_member.fetch_member()
-        await category.set_permissions(member, view_channel=True)
-
-        await self.text_channel.edit(sync_permissions=True)
-        await self.voice_channel.edit(sync_permissions=True)
+        # Now we can sync the permissions for this member
+        await self.sync()
 
         return team_member
 
-    async def remove_team_member(
-        self, team_member: TeamMember, /, force_voice_disconnect: bool = False
-    ) -> None:
+    async def remove_team_member(self, team_member: TeamMember, /, force_voice_disconnect: bool = False) -> None:
         """|coro|
 
         A method used to remove this member from its team.
@@ -719,21 +718,15 @@ class Team:
             # This member has left the guild, we can not edit the channels as a result.
             pass
         else:
+            # Remove this member and sync the channels
+            self.team_members.pop(team_member.member_id, None)
+
             if member.voice and force_voice_disconnect:
                 channel = member.voice.channel
                 if channel and channel in (self.voice_channel, *self.extra_channels):
                     await member.move_to(None, reason="Member removed from the team.")
 
-            category = self.category_channel
-            overwrites = category.overwrites
-            overwrites.pop(member, None)
-            await category.edit(overwrites=overwrites)
-
-            await self.text_channel.edit(sync_permissions=True)
-            await self.voice_channel.edit(sync_permissions=True)
-
-        # Update the object
-        self.team_members.pop(team_member.member_id, None)
+            await self.sync()
 
     async def add_captain(self, role_id: int, /) -> None:
         """|coro|
@@ -763,10 +756,7 @@ class Team:
 
         self.captain_role_ids.append(role_id)
 
-        # Update the channel as well
-        category = self.category_channel
-        role = cast(discord.Role, self.guild.get_role(role_id))
-        await category.set_permissions(role, view_channel=True)
+        await self.sync()
 
     async def remove_captain(self, role_id: int, /) -> None:
         """|coro|
@@ -796,10 +786,15 @@ class Team:
 
         self.captain_role_ids.remove(role_id)
 
-        # Update the channel as well
-        category = self.category_channel
-        role = cast(discord.Role, self.guild.get_role(role_id))
-        await category.set_permissions(role, view_channel=False)
+        await self.sync()
+
+    async def add_extra_channel(self, channel_id: int, /) -> None:
+        await self.edit(extra_channel_ids=self.extra_channel_ids + [channel_id])
+        await self.sync()
+
+    async def remove_extra_channel(self, channel_id: int, /) -> None:
+        await self.edit(extra_channel_ids=[c_id for c_id in self.extra_channel_ids if c_id != channel_id])
+        await self.sync()
 
     async def edit(
         self,
@@ -878,35 +873,84 @@ class Team:
         async with self.bot.safe_connection() as connection:
             await builder(connection)
 
-    async def delete(self, *, connection: ConnectionType) -> None:
+    async def _cleanup_practices_for_delete(self, *, connection: ConnectionType) -> None:
+        # Cleans up the practices for this team. IE, if the members are the top
+        # practicers then their roles must be removed and whatnot
+
+        # Fetch the top practicer team right now
+        data = await connection.fetchrow(
+            'SELECT top_team_id, role_id FROM teams.practice_leaderboards WHERE guild_id = $1', self.guild_id
+        )
+        if not data:
+            # Nothing to clean up in particular
+            return
+
+        top_practicer_team_id = data['top_team_id']
+
+        if not top_practicer_team_id:
+            # Nothing to clean up in particular
+            return
+
+        # Check if this team is the top practicer team
+        if top_practicer_team_id != self.id:
+            # Nothing to clean up
+            return
+
+        # Alright, we need to clean up the top practicer team
+        # Alter the top_team_id to be None, and remove the roles from the members.
+        # We set it to None because the top_team_id will be updated in the next iteration of the leaderboard
+        # updater.
+        await connection.execute(
+            'UPDATE teams.practice_leaderboards SET top_team_id = NULL WHERE guild_id = $1', self.guild_id
+        )
+
+        # Remove the roles from the members
+        role = self.guild.get_role(data['role_id'])
+        if not role:
+            return
+
+        for member in self.members:
+            try:
+                member = member.member or await member.fetch_member()
+            except discord.NotFound:
+                continue
+
+            try:
+                await member.remove_roles(role, reason="Team deleted, team was top practicer.")
+            except discord.Forbidden:
+                pass
+
+    async def delete(self, *, connection: ConnectionType, reason: Optional[str] = None) -> None:
         """|coro|
 
         Deletes the team and all of its channels.
         """
+
+        # Clean up the practices for this team, if needed
+        await self._cleanup_practices_for_delete(connection=connection)
+
+        # Now we can delete it from the database
         await connection.execute("DELETE FROM teams.settings WHERE id = $1", self.id)
 
-        try:
-            await self.voice_channel.delete()
-        except discord.HTTPException:
-            pass
+        # Remove this team from the bot's cache
+        self.bot.remove_team(self.id, self.guild_id)
 
-        try:
-            await self.text_channel.delete()
-        except discord.HTTPException:
-            pass
+        reason = reason or "Team deleted automatically."
 
-        try:
-            await self.category_channel.delete()
-        except discord.HTTPException:
-            pass
+        voice_channel = self.voice_channel
+        if voice_channel:
+            await voice_channel.delete(reason=reason)
+
+        text_channel = self.text_channel
+        if text_channel:
+            await text_channel.delete(reason=reason)
+
+        category_channel = self.category_channel
+        if category_channel:
+            await category_channel.delete(reason=reason)
 
         for channel in self.extra_channels:
-            try:
-                await channel.delete()
-            except discord.HTTPException:
-                pass
-
-        self.bot.remove_team(self.id, self.guild_id)
+            await channel.delete(reason=reason)
 
     async def delete_all_practice_history(self, *, connection: ConnectionType) -> None:
         """|coro|
@@ -914,9 +958,7 @@ class Team:
         Deletes all practice history for this team.
         """
         # (1) Delete all practice history
-        await connection.execute(
-            "DELETE FROM team.practice WHERE team_id = $1", self.id
-        )
+        await connection.execute("DELETE FROM team.practice WHERE team_id = $1", self.id)
 
         # (2) Clear the bot's cache for this
         self.bot.clear_practices_for(self.id, self.guild_id)
