@@ -58,7 +58,7 @@ class ImageRequests(BaseCog):
             detections: List[Dict[str, Any]] = await self.bot.wrap(self._detector.detect, data)
         except Exception as exc:
             if self.bot.error_handler:
-                await self.bot.error_handler.exception_manager.add_error(error=exc, event_name='NSFW Classification Error')
+                await self.bot.error_handler.log_error(exc, target=None, event_name='NSFW Classification Error')
 
             embed.add_field(
                 name='NSFW Classifications',
