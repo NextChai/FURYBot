@@ -218,7 +218,7 @@ class ApproveOrDenyImage(discord.ui.View):
                 self.request.id,
             )
 
-        embed.add_field(name='Message Posted', value=f'[Jump to message]({message.jump_url})')
+        embed.add_field(name='Message Posted', value=f'[**Jump to Message**]({message.jump_url})', inline=False)
         await interaction.edit_original_response(embed=embed)
 
     @discord.ui.button(label='Approve', style=discord.ButtonStyle.green, custom_id='approve')
