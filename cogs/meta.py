@@ -49,6 +49,7 @@ class Meta(BaseCog):
             voice = 0
             stage = 0
             forum = 0
+            category = 0
 
             for guild in self.bot.guilds:
                 if guild.member_count:
@@ -63,13 +64,15 @@ class Meta(BaseCog):
                         stage += 1
                     elif isinstance(channel, discord.ForumChannel):
                         forum += 1
+                    else:
+                        category += 1
 
             total_members = "{:,}".format(total_members)
 
             embed = self.bot.Embed(
                 title='Chai',
                 description=f'A bot focused on moderation and utility safe for a school environment which serves '
-                f'**{total_members} members** across **{len(self.bot.guilds)}**.',
+                f'**{total_members} members** across **{len(self.bot.guilds)}** servers.',
             )
             embed.add_field(
                 name="Stats",
@@ -77,7 +80,8 @@ class Meta(BaseCog):
                 f"Client Started: {discord.utils.format_dt(self.bot.load_time, style='R')}",
             )
             embed.add_field(
-                name='Channels', value=f'{text + voice + stage} total\n{text} text\n{voice} voice\n{stage} stage'
+                name='Channels',
+                value=f'{text + voice + stage + category + forum} total\n{text} text\n{voice} voice\n{stage} stage\n{forum} forum\n{category} category',
             )
 
             memory_usage = self.process.memory_full_info().uss / 1024**2
