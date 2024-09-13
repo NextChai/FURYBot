@@ -58,6 +58,7 @@ from cogs.infractions import InfractionsSettings
 from cogs.teams import Team
 from cogs.teams.practices import Practice
 from cogs.teams.scrims import Scrim, ScrimStatus
+from cogs.logging import LoggingSettings
 from utils import (
     BYPASS_SETUP_HOOK,
     BYPASS_SETUP_HOOK_CACHE_LOADING,
@@ -262,6 +263,9 @@ class FuryBot(commands.Bot):
         # Mapping[guild_id, InfractionsSettings]
         self._infractions_settings: Dict[int, InfractionsSettings] = {}
 
+        # Mapping[guild_id, LoggingSettings]
+        self._logging_settings: Dict[int, LoggingSettings] = {}
+
         super().__init__(
             command_prefix=commands.when_mentioned_or("trev.", "trev"),
             help_command=None,
@@ -356,6 +360,47 @@ class FuryBot(commands.Bot):
             embed.set_author(name=author.name, icon_url=author.display_avatar.url)
 
         return embed
+
+    # Logging settings management
+    def get_logging_settings(self, guild_id: int, /) -> Optional[LoggingSettings]:
+        """Get the logging settings for a guild.
+
+        Parameters
+        ----------
+        guild_id: :class:`int`
+            The guild ID to get the settings for.
+
+        Returns
+        -------
+        Optional[:class:`LoggingSettings`]
+            The logging settings for the guild.
+        """
+        return self._logging_settings.get(guild_id)
+
+    def add_logging_settings(self, settings: LoggingSettings, /) -> None:
+        """Add logging settings to the cache.
+
+        Parameters
+        ----------
+        settings: :class:`LoggingSettings`
+            The settings to add.
+        """
+        self._logging_settings[settings.guild_id] = settings
+
+    def remove_logging_settings(self, guild_id: int, /) -> Optional[LoggingSettings]:
+        """Remove logging settings from the cache.
+
+        Parameters
+        ----------
+        guild_id: :class:`int`
+            The guild ID to remove the settings for.
+
+        Returns
+        -------
+        Optional[:class:`LoggingSettings`]
+            The settings that were removed, if they existed.
+        """
+        return self._logging_settings.pop(guild_id, None)
 
     # Infractions settings management
     def get_infractions_settings(self, guild_id: int, /) -> Optional[InfractionsSettings]:
@@ -733,6 +778,15 @@ class FuryBot(commands.Bot):
     @wrap_extension
     async def unload_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
         return await super().unload_extension(name, package=package)
+
+    @cache_loader("LOGGING_SETTINGS")
+    async def _cache_logging_settings(self, connection: ConnectionType) -> None:
+        logging_settings = await connection.fetch("SELECT * FROM logging.settings")
+
+        for record in logging_settings:
+            settings = LoggingSettings(data=dict(record), bot=self)
+            await settings.propagate_cache(connection=connection)
+            self.add_logging_settings(settings)
 
     @cache_loader('INFRACTIONS_SETTINGS')
     async def _cache_infractions_settings(self, connection: ConnectionType) -> None:
