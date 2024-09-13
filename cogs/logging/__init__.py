@@ -32,7 +32,7 @@ from discord.ext import commands
 from discord import app_commands
 
 from utils import BaseCog, Context
-from .settings import LoggingSettings as LoggingSettings, LoggingEvent as LoggingEvent, ALL_EVENTS
+from .settings import LoggingSettings, LoggingEvent as LoggingEvent, ALL_EVENTS
 
 if TYPE_CHECKING:
     from bot import FuryBot
