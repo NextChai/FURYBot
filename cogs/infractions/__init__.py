@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 import discord
 from discord import app_commands
@@ -39,7 +39,12 @@ if TYPE_CHECKING:
 
 
 class Infractions(DmNotifications, InfractionCounter):
-    infractions = app_commands.Group(name='infractions', description='Manage infractions.', guild_only=True)
+    infractions = app_commands.Group(
+        name='infractions',
+        description='Manage infractions.',
+        guild_only=True,
+        default_permissions=discord.Permissions(moderate_members=True),
+    )
 
     @infractions.command(name='manage', description='Manage infraction settings.')
     @app_commands.default_permissions(moderate_members=True)
@@ -112,6 +117,43 @@ class Infractions(DmNotifications, InfractionCounter):
         return await interaction.edit_original_response(
             content=f'{member.mention}\'s most recent infraction: [**Jump**]({infraction.url})'
         )
+
+    @infractions.command(
+        name='clear', description='Clear the infraction history for a target. This only deletes the database data.'
+    )
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.guild_only()
+    @app_commands.describe(
+        target='The target to clear. A role clears the all members with the role. A member clears only the member.',
+    )
+    async def infractions_clear(
+        self, interaction: discord.Interaction[FuryBot], target: Union[discord.Member, discord.Role]
+    ) -> discord.InteractionMessage:
+        assert interaction.guild is not None
+        await interaction.response.defer(ephemeral=True)
+
+        settings = self.bot.get_infractions_settings(interaction.guild.id)
+        if not settings:
+            return await interaction.edit_original_response(
+                content='No infractions settings found. Try `/infractions manage` to create them.'
+            )
+
+        if not settings.enable_infraction_counter:
+            return await interaction.edit_original_response(
+                content='Infraction counter is disabled. Enable it in the settings to use this command'
+            )
+
+        if isinstance(target, discord.Role):
+            members = target.members
+            for member in members:
+                await settings.clear_infractions(member.id)
+
+            return await interaction.edit_original_response(
+                content=f'Cleared all infractions for **{len(members)}** members that have the {target.mention} role.'
+            )
+
+        await settings.clear_infractions(target.id)
+        return await interaction.edit_original_response(content=f'Cleared all infractions for {target.mention}.')
 
 
 async def setup(bot: FuryBot) -> None:
