@@ -116,7 +116,7 @@ class ShortTime:
         data = {k: int(v) for k, v in match.groupdict(default=0).items()}
         now = datetime.datetime.now(pytz.timezone('US/Eastern'))
 
-        dt = now + relativedelta(**data)
+        dt = now + relativedelta(**data)  # type: ignore
         self.dt = dt.replace(tzinfo=datetime.timezone.utc)
 
     @classmethod
@@ -162,7 +162,7 @@ class HumanTime:
     calendar: Any = parsedatetime.Calendar(version=parsedatetime.VERSION_CONTEXT_STYLE)
 
     def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None) -> None:
-        now = now or datetime.datetime.utcnow()
+        now = now or datetime.datetime.now(datetime.timezone.utc)
         dt, status = self.calendar.parseDT(argument, sourceTime=now)
         if not status.hasDateOrTime:
             raise BadArgument('invalid time provided, try e.g. "tomorrow" or "3 days"', tzinfo=pytz.timezone('US/Eastern'))
@@ -308,7 +308,7 @@ class TimeTransformer(app_commands.Transformer):
         if match is not None and match.group(0):
             data = {k: int(v) for k, v in match.groupdict(default=0).items()}
             remaining = value[match.end() :].strip()
-            result.dt = now + relativedelta(**data)
+            result.dt = now + relativedelta(**data)  # type: ignore
             return await result._check_constraints(now, remaining)
 
         if value.endswith('from now'):
