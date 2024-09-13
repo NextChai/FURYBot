@@ -41,7 +41,7 @@ class Moderation(BaseCog):
 
         cleanup_context_command = app_commands.ContextMenu(
             name='Cleanup 10 Messages',
-            type=discord.AppCommandType.message,
+            type=discord.AppCommandType.user,
             callback=self.cleanup_10_messages_context_command_callback,
         )
         self.bot.tree.add_command(cleanup_context_command)
