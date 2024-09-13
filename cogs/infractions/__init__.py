@@ -32,12 +32,13 @@ from discord import app_commands
 from .dm_notifications import DmNotifications
 from .panel import DoesWantToCreateInfractionsSettings, InfractionsSettingsPanel
 from .settings import InfractionsSettings as InfractionsSettings
+from .counter import InfractionCounter
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
 
-class Infractions(DmNotifications):
+class Infractions(DmNotifications, InfractionCounter):
     infractions = app_commands.Group(name='infractions', description='Manage infractions.', guild_only=True)
 
     @infractions.command(name='manage', description='Manage infraction settings.')
