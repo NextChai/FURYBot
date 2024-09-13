@@ -54,10 +54,10 @@ from discord.ext import commands
 from typing_extensions import Concatenate, Self
 
 from cogs.images import ApproveOrDenyImage, AttachmentRequestSettings, ImageRequest
+from cogs.infractions import InfractionsSettings
 from cogs.teams import Team
 from cogs.teams.practices import Practice
 from cogs.teams.scrims import Scrim, ScrimStatus
-from cogs.infractions import InfractionsSettings
 from utils import (
     BYPASS_SETUP_HOOK,
     BYPASS_SETUP_HOOK_CACHE_LOADING,
@@ -270,6 +270,10 @@ class FuryBot(commands.Bot):
             strip_after_prefix=True,
             allowed_mentions=discord.AllowedMentions.none(),
             max_messages=5000,
+            activity=discord.Game(
+                name='Rocket League',
+                timestamps={'start': discord.utils.utcnow(), 'end': None},
+            ),
         )
 
     @classmethod

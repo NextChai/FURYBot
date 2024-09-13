@@ -29,10 +29,10 @@ from typing import TYPE_CHECKING, Union
 import discord
 from discord import app_commands
 
+from .counter import InfractionCounter
 from .dm_notifications import DmNotifications
 from .panel import DoesWantToCreateInfractionsSettings, InfractionsSettingsPanel
 from .settings import InfractionsSettings as InfractionsSettings
-from .counter import InfractionCounter
 
 if TYPE_CHECKING:
     from bot import FuryBot

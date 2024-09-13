@@ -32,8 +32,9 @@ import discord
 from discord import app_commands
 from typing_extensions import Self, Unpack
 
-from .settings import InfractionsSettings
 from utils import BaseView, BaseViewKwargs, ChannelSelect, ConfirmationGetter, RoleSelect, UserSelect, human_join
+
+from .settings import InfractionsSettings
 
 if TYPE_CHECKING:
     from bot import FuryBot

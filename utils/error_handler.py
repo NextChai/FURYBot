@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import datetime
-from functools import partial
 import logging
 import os
 import sys
 import traceback
 from collections import defaultdict
+from functools import partial
 from typing import TYPE_CHECKING, Any, DefaultDict, Dict, Generator, List, Optional, Tuple, TypeAlias, Union
 
 import discord
