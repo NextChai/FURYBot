@@ -155,6 +155,28 @@ class Infractions(DmNotifications, InfractionCounter):
         await settings.clear_infractions(target.id)
         return await interaction.edit_original_response(content=f'Cleared all infractions for {target.mention}.')
 
+    # Clears all the infraction history in the guild without a target
+    @infractions.command(name='clear-all', description='Clear the infraction history for all members in the guild.')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.guild_only()
+    async def infractions_clear_all(self, interaction: discord.Interaction[FuryBot]) -> discord.InteractionMessage:
+        assert interaction.guild is not None
+        await interaction.response.defer(ephemeral=True)
+
+        settings = self.bot.get_infractions_settings(interaction.guild.id)
+        if not settings:
+            return await interaction.edit_original_response(
+                content='No infractions settings found. Try `/infractions manage` to create them.'
+            )
+
+        if not settings.enable_infraction_counter:
+            return await interaction.edit_original_response(
+                content='Infraction counter is disabled. Enable it in the settings to use this command'
+            )
+
+        await settings.clear_all_infractions()
+        return await interaction.edit_original_response(content='Cleared all infractions for all members in the guild.')
+
 
 async def setup(bot: FuryBot) -> None:
     await bot.add_cog(Infractions(bot))

@@ -210,6 +210,16 @@ class InfractionsSettings:
 
             return count
 
+    async def clear_all_infractions(self) -> None:
+        async with self.bot.safe_connection() as connection:
+            await connection.execute(
+                '''
+                DELETE FROM infractions.member_counter
+                WHERE guild_id = $1
+                ''',
+                self.guild_id,
+            )
+
     async def clear_infractions(self, user_id: int, /) -> None:
         async with self.bot.safe_connection() as connection:
             await connection.execute(
