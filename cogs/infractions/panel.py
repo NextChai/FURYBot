@@ -32,8 +32,7 @@ import discord
 from discord import app_commands
 from typing_extensions import Self, Unpack
 
-from utils import BaseView, BaseViewKwargs, ChannelSelect, RoleSelect, UserSelect, human_join
-from ...utils.ui.view import ConfirmationGetter
+from utils import BaseView, BaseViewKwargs, ChannelSelect, RoleSelect, UserSelect, human_join, ConfirmationGetter
 
 if TYPE_CHECKING:
     from bot import FuryBot
