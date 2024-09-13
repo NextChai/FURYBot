@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 import discord
 from discord import app_commands
@@ -41,7 +41,7 @@ class Moderation(BaseCog):
 
         cleanup_context_command = app_commands.ContextMenu(
             name='Cleanup 10 Messages',
-            type=discord.AppCommandType.message,
+            type=discord.AppCommandType.user,
             callback=self.cleanup_10_messages_context_command_callback,
         )
         self.bot.tree.add_command(cleanup_context_command)
@@ -69,19 +69,27 @@ class Moderation(BaseCog):
         interaction: discord.Interaction[FuryBot],
         to: discord.Member,
         n: int,
-        location: Optional[discord.abc.MessageableChannel] = None,
+        location: Optional[Union[discord.Thread, discord.StageChannel, discord.TextChannel, discord.VoiceChannel]] = None,
     ) -> discord.InteractionMessage:
         await interaction.response.defer(ephemeral=True)
-        if location is None:
-            if interaction.channel is None:
-                return await interaction.edit_original_response(
-                    content='Could not obtain the channel you requested, try again later or in a different channel.'
-                )
 
-            location = interaction.channel  # type: ignore # Technically an interaction channel qualifies this constraint.
+        loc = location or interaction.channel
+        if loc is None:
+            return await interaction.edit_original_response(
+                content='Could not obtain the channel you requested, try again later or in a different channel.'
+            )
+        elif isinstance(loc, (discord.ForumChannel, discord.CategoryChannel, discord.DMChannel, discord.GroupChannel)):
+            # These are not supported
+            return await interaction.edit_original_response(
+                content='I cannot cleanup messages in this channel type, please try again in a different channel.'
+            )
 
-        # TODO: Finish this
-        raise
+        deleted = await loc.purge(
+            limit=n, check=lambda m: m.author == to, oldest_first=False, reason=f'Cleanup request by {interaction.user.id}'
+        )
+        return await interaction.edit_original_response(
+            content=f'I have cleaned up {len(deleted)} messages from {to.mention} in <#{loc.id}>.'
+        )
 
     @app_commands.command(name='cleanup', description='Cleanup messages from a user in a channel.')
     @app_commands.rename(location='in', n='amount')
@@ -95,7 +103,7 @@ class Moderation(BaseCog):
         interaction: discord.Interaction[FuryBot],
         to: discord.Member,
         n: int,
-        location: Optional[discord.abc.MessageableChannel],
+        location: Optional[Union[discord.Thread, discord.StageChannel, discord.TextChannel, discord.VoiceChannel]] = None,
     ) -> discord.InteractionMessage:
         return await self._cleanup_n_messages(interaction, to, n, location)
 
