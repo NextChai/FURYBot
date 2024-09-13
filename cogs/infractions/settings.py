@@ -40,7 +40,6 @@ MISSING = discord.utils.MISSING
 class PreviousPartialInfraction:
 
     def __init__(self, *, data: Dict[str, Any], settings: InfractionsSettings) -> None:
-        self.guild_id: int = data['guild_id']
         self.user_id: int = data['user_id']
         self.message_id: int = data['message_id']
         self.channel_id: int = data['channel_id']
@@ -233,7 +232,7 @@ class InfractionsSettings:
         async with self.bot.safe_connection() as connection:
             record = await connection.fetchrow(
                 '''
-                SELECT message_id, channel_id
+                SELECT message_id, channel_id, user_id
                 FROM infractions.member_counter
                 WHERE guild_id = $1 AND user_id = $2
                 ORDER BY message_id DESC

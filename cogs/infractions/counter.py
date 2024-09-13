@@ -29,9 +29,11 @@ import logging
 import discord
 from discord.ext import commands
 
-from utils import BaseCog
+from utils import RUNNING_DEVELOPMENT, BaseCog
 
 _log = logging.getLogger(__name__)
+if RUNNING_DEVELOPMENT:
+    _log.setLevel(logging.DEBUG)
 
 
 class InfractionCounter(BaseCog):
@@ -48,6 +50,7 @@ class InfractionCounter(BaseCog):
     async def auto_mod_action_water(self, message: discord.Message) -> None:
         if message.type != discord.MessageType.auto_moderation_action:
             # Not of correct type
+            _log.debug('Message is not of type auto_moderation_action. Message ID: %s', message.id)
             return
 
         guild = message.guild
@@ -62,15 +65,22 @@ class InfractionCounter(BaseCog):
         settings = self.bot.get_infractions_settings(guild.id)
         if not settings:
             # No settings found
+            _log.debug('No infractions settings found for guild %s', guild.id)
             return
 
         if not settings.enable_infraction_counter:
             # Infraction counter is disabled
+            _log.debug('Infraction counter is disabled for guild %s', guild.id)
             return
 
         # Check if the message was sent in the correct channel, ie the infractions notification channel
         notification_channel = settings.notification_channel
         if notification_channel and message.channel.id != notification_channel.id:
+            _log.debug(
+                'Message was not sent in the infractions notification channel. Message ID: %s, Channel ID: %s',
+                message.id,
+                message.channel.id,
+            )
             return
 
         # We know the following:
@@ -79,4 +89,5 @@ class InfractionCounter(BaseCog):
         # (3) the message was sent in the correct infractions notification channel, and
         # (4) the infraction counter is enabled
         # We can now proceed to increment the infraction counter for the member
+        _log.debug('Adding infraction for user %s', message.author.id)
         await settings.add_infraction_for(message.author.id, in_channel=message.channel.id, message_id=message.id)
