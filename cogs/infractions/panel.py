@@ -39,7 +39,6 @@ if TYPE_CHECKING:
     from bot import FuryBot
 
 
-
 class ModeratorEditAction(enum.Enum):
     ADD = 'add'
     REMOVE = 'remove'
@@ -110,19 +109,35 @@ class InfractionsSettingsPanel(BaseView):
                 inline=False,
             )
 
+        enable_no_dms_open = settings.enable_no_dms_open
+        embed.add_field(
+            name='No DMs Open',
+            value=(
+                'Denotes if the bot should look for users with DMs open. If a user has DMs open, the bot will let the moderators know automatically. This is **enabled**.'
+                if enable_no_dms_open
+                else 'No DMs open setting is **disabled**. Enable it to monitor for members who have DMs open and get notified automatically.'
+            ),
+            inline=False,
+        )
+
+        status = 'enabled' if settings.enable_infraction_counter else 'disabled'
+        embed.add_field(
+            name='Infraction Counter',
+            value=f'The infraction counter is a feature that keeps track of the number of infractions a user has. This feature is enabled by default. This is **{status}**.',
+            inline=False,
+        )
+
         moderator_ids = settings.moderator_ids
         if moderator_ids:
             mod_mentions = human_join((f'<@{mod_id}>' for mod_id in moderator_ids))
             embed.add_field(
                 name='Moderators',
                 value=f'The users that are not affected by the infraction system.\n{mod_mentions}',
-                inline=False,
             )
         else:
             embed.add_field(
                 name='Moderators',
                 value='No moderators set. Moderators are users that are not affected by the infraction system. Use the buttons below to add some.',
-                inline=False,
             )
 
         moderator_role_ids = settings.moderator_role_ids
@@ -131,31 +146,12 @@ class InfractionsSettingsPanel(BaseView):
             embed.add_field(
                 name='Moderator Roles',
                 value=f'Members assigned a moderator roles are immune to the infraction system.\n{role_mentions}',
-                inline=False,
             )
         else:
             embed.add_field(
                 name='Moderator Roles',
                 value='No moderator roles set. Members assigned a moderator roles are immune to the infraction system. Use the buttons below to add some.',
-                inline=False,
             )
-
-        enable_no_dms_open = settings.enable_no_dms_open
-        embed.add_field(
-            name='No DMs Open Enabled',
-            value=(
-                'Denotes if the bot should look for users with DMs open. If a user has DMs open, the bot will let the moderators know automatically.'
-                if enable_no_dms_open
-                else 'No DMs open setting is disabled. Enable it to monitor for members who have DMs open and get notified automatically.'
-            ),
-            inline=False,
-        )
-
-        status = 'Enabled' if settings.enable_infraction_counter else 'Disabled'
-        embed.add_field(
-            name='Infraction Counter',
-            value=f'The infraction counter is a feature that keeps track of the number of infractions a user has. This feature is enabled by default.\n**Status**: {status}',
-        )
 
         return embed
 
@@ -229,7 +225,8 @@ class InfractionsSettingsPanel(BaseView):
         else:
             new_moderator_ids = self.settings.moderator_ids.copy()
             for user in users:
-                new_moderator_ids.remove(user.id)
+                if user.id in new_moderator_ids:
+                    new_moderator_ids.remove(user.id)
 
             await self.settings.edit(moderator_ids=new_moderator_ids)
 
@@ -283,7 +280,8 @@ class InfractionsSettingsPanel(BaseView):
         else:
             new_moderator_role_ids = self.settings.moderator_role_ids.copy()
             for role in roles:
-                new_moderator_role_ids.remove(role.id)
+                if role.id in new_moderator_role_ids:
+                    new_moderator_role_ids.remove(role.id)
 
             await self.settings.edit(moderator_role_ids=new_moderator_role_ids)
 
@@ -320,3 +318,17 @@ class InfractionsSettingsPanel(BaseView):
         )
 
         return await interaction.edit_original_response(embed=self.embed, view=self)
+
+    # And finally on the bottom row a delete button
+    @discord.ui.button(label='Delete Infraction Settings', style=discord.ButtonStyle.danger, row=3)
+    async def delete_infraction_settings(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        button: discord.ui.Button[Self],
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer()
+
+        await self.settings.delete()
+        return await interaction.edit_original_response(
+            content='Infraction settings have been deleted.', view=None, embed=None
+        )

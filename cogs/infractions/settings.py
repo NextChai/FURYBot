@@ -57,7 +57,7 @@ class InfractionsSettings:
         self.guild_id: int = data['guild_id']
         self.notification_channel_id: Optional[int] = data['notification_channel_id']
         self.moderator_ids: List[int] = data['moderators'] or []  # List of user iDS
-        self.moderator_role_ids: List[int] = data['moderator_roles'] or []  # List of role IDs
+        self.moderator_role_ids: List[int] = data['moderator_role_ids'] or []  # List of role IDs
         self.enable_no_dms_open: bool = data['enable_no_dms_open']
         self.enable_infraction_counter: bool = data['enable_infraction_counter']
 
@@ -71,6 +71,7 @@ class InfractionsSettings:
                     VALUES ($1)
                     ON CONFLICT (guild_id) 
                     DO NOTHING
+                    RETURNING *
                     ''',
                     guild_id,
                 )
@@ -174,7 +175,7 @@ class InfractionsSettings:
 
         if moderator_role_ids is not MISSING:
             self.moderator_role_ids = moderator_role_ids
-            builder.add_arg('moderator_roles', moderator_role_ids)
+            builder.add_arg('moderator_role_ids', moderator_role_ids)
 
         if enable_no_dms_open is not MISSING:
             self.enable_no_dms_open = enable_no_dms_open
