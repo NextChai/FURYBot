@@ -82,26 +82,37 @@ class LoggingSettings:
         # Denotes the logging channel ID, if set
         self.logging_channel_id: Optional[int] = data['logging_channel_id']
 
+        self.webhook_url: Optional[str] = data.get('webhook_url')
+
         # An internal mapping of logging events. Set during the bot's startup for
         # cache and updated automatically as needed.
         self._logging_events: Dict[str, LoggingEvent] = {}
 
     @classmethod
-    async def create(cls: Type[Self], guild_id: int, /, *, bot: FuryBot) -> Self:
+    async def create(cls: Type[Self], guild_id: int, logging_channel_id: int, /, *, bot: FuryBot) -> Self:
         async with bot.safe_connection() as connection:
             record = await connection.fetchrow(
                 '''
-                INSERT INTO logging.settings (guild_id)
+                INSERT INTO logging.settings (guild_id, logging_channel_id)
                 VALUES ($1)
-                ON CONFLICT (guild_id) DO NOTHING
+                ON CONFLICT (guild_id) DO UPDATE
+                SET logging_channel_id = EXCLUDED.logging_channel_id
                 RETURNING *;
                 ''',
                 guild_id,
+                logging_channel_id,
             )
             assert record is not None, 'Failed to create logging settings.'
 
-        instance = cls(data=dict(record), bot=bot)
-        bot.add_logging_settings(instance)
+            instance = cls(data=dict(record), bot=bot)
+            bot.add_logging_settings(instance)
+
+            # Create the webhook for the logging settings
+            logging_channel = instance.logging_channel
+            if logging_channel is not None:
+                webhook = await logging_channel.create_webhook(name='Logging Webhook')
+                await instance.edit(webhook_url=webhook.url, connection=connection)
+
         return instance
 
     @property
@@ -127,6 +138,14 @@ class LoggingSettings:
     @property
     def logging_events(self) -> List[LoggingEvent]:
         return list(self._logging_events.values())
+
+    @property
+    def logging_webhook(self) -> Optional[discord.Webhook]:
+        url = self.webhook_url
+        if url is None:
+            return None
+
+        return discord.Webhook.from_url(url, client=self.bot)
 
     def get_logging_event(self, event_type: str) -> Optional[LoggingEvent]:
         return self._logging_events.get(event_type)
@@ -156,15 +175,27 @@ class LoggingSettings:
             instance = LoggingEvent(**dict(record), settings=self)
             self.add_logging_event(instance)
 
-    async def edit(self, *, logging_channel_id: Optional[int] = MISSING) -> None:
+    async def edit(
+        self,
+        *,
+        logging_channel_id: Optional[int] = MISSING,
+        webhook_url: Optional[str] = MISSING,
+        connection: Optional[ConnectionType] = None,
+    ) -> None:
         builder = QueryBuilder('logging.settings')
         builder.add_condition('id', self.id)
 
         if logging_channel_id is not MISSING:
             self.logging_channel_id = logging_channel_id
             builder.add_arg('logging_channel_id', logging_channel_id)
+        if webhook_url is not MISSING:
+            self.webhook_url = webhook_url
+            builder.add_arg('webhook_url', webhook_url)
 
-        async with self.bot.safe_connection() as connection:
+        if connection is None:
+            async with self.bot.safe_connection() as connection:
+                await builder(connection=connection)
+        else:
             await builder(connection=connection)
 
     async def delete(self) -> None:
