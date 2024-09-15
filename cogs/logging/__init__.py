@@ -28,11 +28,12 @@ import enum
 from typing import TYPE_CHECKING, Annotated, List, Optional, Set
 
 import discord
-from discord.ext import commands
 from discord import app_commands
+from discord.ext import commands
 
 from utils import BaseCog, Context
-from .settings import LoggingSettings, LoggingEvent as LoggingEvent, ALL_EVENTS
+
+from .settings import ALL_EVENTS, LoggingEvent as LoggingEvent, LoggingSettings
 
 if TYPE_CHECKING:
     from bot import FuryBot

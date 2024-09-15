@@ -23,16 +23,17 @@ DEALINGS IN THE SOFTWARE.
 """
 
 from __future__ import annotations
+
 import dataclasses
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Type
 
 import discord
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Type
 from typing_extensions import Self
 
 from utils import QueryBuilder
 
 if TYPE_CHECKING:
-    from bot import FuryBot, ConnectionType
+    from bot import ConnectionType, FuryBot
 
 MISSING = discord.utils.MISSING
 

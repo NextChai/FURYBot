@@ -24,11 +24,12 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-import discord
-from typing import TYPE_CHECKING, Any, Concatenate, Coroutine, List, Optional, ParamSpec, Tuple, TypeVar, Callable
+import functools
+from typing import TYPE_CHECKING, Any, Callable, Concatenate, Coroutine, List, Optional, ParamSpec, Tuple, TypeVar
 
-from utils import BaseCog, human_join
-from ...utils.time import human_timedelta
+import discord
+
+from utils import BaseCog, human_join, human_timedelta
 
 T = TypeVar('T')
 P = ParamSpec('P')
@@ -46,6 +47,7 @@ def logging_event(
         Coroutine[Any, Any, Tuple[Optional[int], Optional[discord.Embed]]],
     ]
 ):
+    @functools.wraps(func)
     async def inner(self: LoggingEventsCog, *args: P.args, **kwargs: P.kwargs) -> None:
         guild_id, embed = await func(self, *args, **kwargs)
         if embed is None or guild_id is None:
@@ -176,6 +178,180 @@ class LoggingEventsCog(BaseCog):
             description=f'An action has been taken against <@{execution.user_id}> in <#{execution.channel_id}>.',
         )
 
+        # The action that was taken
         action = execution.action
+        actions_taken: List[str] = [
+            f'**Type**: {action.type.name.replace("_", " ").title()}',
+        ]
+
+        if action.duration:
+            actions_taken.append(f'**Duration**: {human_timedelta(action.duration.total_seconds())} seconds')
+        if action.custom_message:
+            actions_taken.append(f'**Message**: {action.custom_message}')
+
+        embed.add_field(name='Action Taken', value='\n'.join(actions_taken), inline=False)
+        embed.add_field(name='Content Trigger', value=execution.content, inline=False)
+
+        if execution.matched_keyword:
+            embed.add_field(name='Matched Keyword', value=execution.matched_keyword, inline=False)
+
+        if execution.matched_content:
+            embed.add_field(name='Matched Content', value=execution.matched_content, inline=False)
 
         return (execution.guild_id, embed)
+
+    def _embed_from_guild_channel(self, channel: discord.abc.GuildChannel) -> discord.Embed:
+        embed = self.bot.Embed(
+            title=f'Channel {channel.name} {channel.type.name.title()}',
+        )
+
+        return embed
+
+    @logging_event
+    async def on_guild_channel_delete(
+        self,
+        channel: discord.abc.GuildChannel,
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_guild_channel_create(
+        self,
+        channel: discord.abc.GuildChannel,
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_guild_channel_update(
+        self,
+        before: discord.abc.GuildChannel,
+        after: discord.abc.GuildChannel,
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_guild_update(
+        self, before: discord.Guild, after: discord.Guild
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_guild_emojis_update(
+        self,
+        guild: discord.Guild,
+        before: List[discord.Emoji],
+        after: List[discord.Emoji],
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_guild_stickers_update(
+        self,
+        guild: discord.Guild,
+        before: List[discord.Sticker],
+        after: List[discord.Sticker],
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_audit_log_entry_create(
+        self, entry: discord.AuditLogEntry
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_invite_create(self, invite: discord.Invite) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_invite_delete(self, invite: discord.Invite) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_member_join(self, member: discord.Member) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_raw_member_remove(self, member: discord.Member) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_member_update(
+        self,
+        before: discord.Member,
+        after: discord.Member,
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_user_update(
+        self,
+        before: discord.User,
+        after: discord.User,
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_member_ban(
+        self, guild: discord.Guild, user: discord.User
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_member_unban(
+        self,
+        guild: discord.Guild,
+        user: discord.User,
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_presence_update(
+        self,
+        before: discord.Member,
+        after: discord.Member,
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_raw_message_edit(
+        self,
+        payload: discord.RawMessageUpdateEvent,
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_raw_message_delete(
+        self,
+        payload: discord.RawMessageDeleteEvent,
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_raw_bulk_message_delete(
+        self,
+        payload: discord.RawBulkMessageDeleteEvent,
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_raw_poll_vote_add(
+        self, payload: discord.RawPollVoteActionEvent
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_raw_poll_vote_remove(
+        self, payload: discord.RawPollVoteActionEvent
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_raw_reaction_add(
+        self, payload: discord.RawReactionActionEvent
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_raw_reaction_remove(
+        self, payload: discord.RawReactionActionEvent
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_raw_reaction_clear(
+        self, payload: discord.RawReactionClearEvent
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_reaction_clear_emoji(self, reaction: discord.Reaction) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_guild_role_create(self, role: discord.Role) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_guild_role_delete(self, role: discord.Role) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+
+    @logging_event
+    async def on_guild_role_update(
+        self,
+        before: discord.Role,
+        after: discord.Role,
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
