@@ -56,6 +56,10 @@ class ImageRequests(BaseCog):
 
         try:
             detections: List[Dict[str, Any]] = await self.bot.wrap(self._detector.detect, data)
+        except AttributeError:
+            # The detector was unable to open this image correctly, and accessing some image
+            # attributes on a NoneType object caused an AttributeError.
+            return embed
         except Exception as exc:
             if self.bot.error_handler:
                 await self.bot.error_handler.log_error(exc, target=None, event_name='NSFW Classification Error')
