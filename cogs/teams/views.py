@@ -420,6 +420,13 @@ class TeamNamingView(BaseView):
         await interaction.response.defer()
 
         await self.team.edit(**{kwarg: text_input.value})  # type: ignore
+
+        # An edit, by itself, does not sync the team's actual text or voice channels.
+        # Thus, when something like this does happen, the team must be synced to ensure
+        # that the team chats are 1) up to date with the right names, and 2) Up to date with
+        # the right permissions.
+        await self.team.sync()
+
         await interaction.edit_original_response(embed=self.embed, view=self)
 
     async def _rename_after(
