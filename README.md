@@ -32,6 +32,10 @@ To assist with this, Fury has many useful team management features, including:
 
 Let's face it, kids love their memes. But, we all know that not all memes are appropriate. Fury has a built-in image request system that allows users to request images, or other attachments, to be sent in a channel. A request is sent off to the moderation team, who can approve or deny the request. If approved, the image is sent in the channel. If denied, the user is notified.
 
+<img width="585" alt="image" src="https://github.com/user-attachments/assets/519c9033-0709-4219-ad09-6dc371dc6383">
+<img width="789" alt="image" src="https://github.com/user-attachments/assets/42946cd5-3ee1-47a0-ae64-22652e95b1d9">
+
+
 ### Discord AutoMod Piggybacking
 
 Fury has trackers built on top of the Discord AutoMod system. This allows Fury to track the number of infractions a user has. This is useful for moderators who want to easily identify repeat offenders.
