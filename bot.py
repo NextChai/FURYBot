@@ -279,7 +279,7 @@ class FuryBot(commands.Bot):
         """
 
         def _encode_jsonb(value: Dict[Any, Any]) -> str:
-            return discord.utils._to_json(value)
+            return discord.utils._to_json(value)  # skipcq: PYL-W0212
 
         def _decode_jsonb(value: str) -> Dict[Any, Any]:
             return discord.utils._from_json(value)  # skipcq: PYL-W0212
