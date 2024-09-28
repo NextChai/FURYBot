@@ -411,7 +411,7 @@ class AwayConfirm(discord.ui.View):
             embed.add_field(name='Opposing Team:', value=', '.join(m.mention for m in scrim.home_voters), inline=False)
             return embed
 
-        elif scrim.status is ScrimStatus.scheduled:
+        if scrim.status is ScrimStatus.scheduled:
             embed = self.bot.Embed(
                 title='Scrim Scheduled',
                 description=f'Your scrim against **{scrim.home_team.display_name}** has been confirmed for '
