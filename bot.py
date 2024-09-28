@@ -142,7 +142,7 @@ def wrap_extension(coro: DecoFunc[P, T]) -> DecoFunc[P, T]:
         except Exception as exc:
             raise exc from None
 
-        _log.info(f'Loaded the "{ext_name}" extension in {time.time() - start:.2f} seconds')
+        _log.info('Loaded the "%s" extension in %s seconds', ext_name, time.time() - start)
         return result
 
     return wrapped
@@ -628,11 +628,13 @@ class FuryBot(commands.Bot):
         Called when the client has hit READY. Please note this can be called more than once during the clients
         uptime.
         """
-        _log.info(f"Logged in as {self.user.name}")
-        _log.info(
-            f"Connected to {len(self.guilds)} servers total watching over {sum([m_count for g in self.guilds if (m_count := g.member_count)]):,} members."
-        )
-        _log.info(f"Invite link: {discord.utils.oauth_url(self.user.id, permissions=discord.Permissions(0))}")
+        _log.info("Logged in as %s", self.user.name)
+
+        total_guilds = len(self.guilds)
+        _log.info("Connected to %s servers total.", total_guilds)
+
+        invite = discord.utils.oauth_url(self.user.id, permissions=discord.Permissions(0))
+        _log.info("Invite link: %s", invite)
 
     async def on_raw_member_remove(self, payload: discord.RawMemberRemoveEvent) -> None:
         """|coro|
@@ -849,7 +851,7 @@ class FuryBot(commands.Bot):
             if getattr(item[1], "__cache_loader__", None)
         ]
 
-        _log.info(f"Loading {len(cache_loading_functions)} cache entries.")
+        _log.info("Loading %s cache entries.", len(cache_loading_functions))
 
         async def _wrapped_cache_loader(
             cache_loading_function: Callable[..., Coroutine[Any, Any, Any]],
@@ -859,7 +861,8 @@ class FuryBot(commands.Bot):
                     await cache_loading_function(connection=connection)
                 except Exception as exc:
                     _log.warning(
-                        f"Failed to load cache entry {cache_loading_function.__name__}.",
+                        "Failed to load cache entry %s.",
+                        cache_loading_function.__name__,
                         exc_info=exc,
                     )
 

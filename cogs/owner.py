@@ -49,7 +49,7 @@ class Owner(BaseCog):
         try:
             importlib.reload(module)
         except Exception as exc:
-            _log.warning(f'Failed to reload module {extension}.', exc_info=exc)
+            _log.warning('Failed to reload module %s.', extension, exc_info=exc)
             raise exc
 
     @staticmethod
