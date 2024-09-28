@@ -245,7 +245,7 @@ class PracticeMember(TeamMemberAble, TeamAble):
             )
 
         # Remove from the practice's cache as well
-        self.practice._remove_member(self.member_id)
+        self.practice.remove_member(self.member_id)
 
     async def handle_join(self, *, when: Optional[datetime.datetime] = None) -> PracticeMemberHistory:
         """|coro|
@@ -423,7 +423,7 @@ class Practice(TeamAble):
         self._members[member.member_id] = member
         return member
 
-    def _remove_member(self, member_id: int) -> Optional[PracticeMember]:
+    def remove_member(self, member_id: int) -> Optional[PracticeMember]:
         self._members.pop(member_id, None)
 
     @property

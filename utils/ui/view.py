@@ -70,7 +70,7 @@ def _wrap_init(__init__: BaseViewInit[P, T]) -> BaseViewInit[P, T]:
     @functools.wraps(__init__)
     def wrapped(self: BaseView, *args: P.args, **kwargs: P.kwargs) -> T:
         result = __init__(self, *args, **kwargs)
-        self._add_menu_children()
+        self.add_menu_children()
         return result
 
     return wrapped
@@ -257,7 +257,7 @@ class BaseView(discord.ui.View, abc.ABC):
         self.guild: discord.Guild = target.guild
         super().__init__(timeout=kwargs.get('timeout', 360))
 
-    def _add_menu_children(self) -> None:
+    def add_menu_children(self) -> None:
         children_cls = {type(child) for child in self.children}
         if self.parent is not None:
             if GoBack not in children_cls:  # type: ignore
