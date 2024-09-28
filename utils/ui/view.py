@@ -94,7 +94,7 @@ def find_home(view: BaseView) -> Optional[BaseView]:
     """A method to find the home parent from a view."""
     parents = list(walk_parents(view))
     if not parents:
-        return
+        return None
 
     return parents[-1]
 
