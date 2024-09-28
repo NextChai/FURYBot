@@ -32,13 +32,9 @@ class TeamException(Exception):
 class MemberNotOnTeam(TeamException):
     """Exception raised when a member is not on a team."""
 
-    pass
-
 
 class TeamNotFound(TeamException):
     """Exception raised when a team is not found."""
-
-    pass
 
 
 class TeamDeleted(TeamException):
