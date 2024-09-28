@@ -61,9 +61,9 @@ from utils import (
 
 if TYPE_CHECKING:
     import datetime
-    from discord.types.embed import EmbedType
 
     import aiohttp
+    from discord.types.embed import EmbedType
 
 T = TypeVar("T")
 P = ParamSpec("P")
