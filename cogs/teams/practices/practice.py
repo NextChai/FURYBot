@@ -823,4 +823,5 @@ class Practice(TeamAble):
         async with self.bot.safe_connection() as connection:
             await connection.execute("DELETE FROM teams.practice WHERE id = $1", self.id)
         # Delete this practice from the bot's cache as well
-        self.bot._team_practice_cache.get(self.guild_id, {}).get(self.team_id, {}).pop(self.id, None)
+
+        self.bot.remove_practice(self.id, self.team_id, self.guild_id)
