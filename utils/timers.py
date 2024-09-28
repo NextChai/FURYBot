@@ -354,8 +354,8 @@ class TimerManager:
 
                 _log.debug('Calling call timer.')
                 await self.call_timer(timer)
-        except asyncio.CancelledError:
-            raise
+        except asyncio.CancelledError as e:  # skipcq: PYL-W0706
+            raise e
         except (OSError, discord.ConnectionClosed, asyncpg.PostgresConnectionError):
             self.restart_task()
         except Exception as e:
