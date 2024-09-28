@@ -26,6 +26,8 @@ To assist with this, Fury has many useful team management features, including:
 - **Team Member Management**: Have **both** a main and sub-roster for each team. This allows for more flexibility in managing team members.
 - **Team Captains**: Assign a team captain, or captains, to a team. Captains, who are often students, can look after their assigned teams and help manage them.
 
+<img width="1207" alt="image" src="https://github.com/user-attachments/assets/21aa3364-1b61-4b34-8f49-b913bf9f668a">
+
 ### Image Requests
 
 Let's face it, kids love their memes. But, we all know that not all memes are appropriate. Fury has a built-in image request system that allows users to request images, or other attachments, to be sent in a channel. A request is sent off to the moderation team, who can approve or deny the request. If approved, the image is sent in the channel. If denied, the user is notified.
