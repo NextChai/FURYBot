@@ -17,8 +17,6 @@ from .context import Context
 from .errors import *
 
 if TYPE_CHECKING:
-    import datetime
-
     from bot import FuryBot
 
 __all__: Tuple[str, ...] = ('ErrorHandler',)
