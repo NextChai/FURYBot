@@ -306,7 +306,7 @@ class TeamChannelsView(BaseView):
             "voice": category_channel.create_voice_channel,
         }
 
-        meth = meth_mapping.get(channel_type_input.value, None)
+        meth = meth_mapping.get(channel_type_input.value)
         if meth:
             channel = await meth(name=channel_name_input.value)
             await self.team.add_extra_channel(channel.id)
