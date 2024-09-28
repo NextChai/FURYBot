@@ -26,6 +26,26 @@ if TYPE_CHECKING:
     from bot import FuryBot
 
 
+class _AboutView(discord.ui.View):
+    """Denotes the view attached to the "about" command when sent to the
+    user. Contains links to the source code of the bot and the bot's support
+    server invite.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(timeout=None)
+
+        self.add_item(
+            discord.ui.Button(
+                url='https://github.com/trevorflahardy/Fury-Bot', custom_id='source-code-link', label='Source Code'
+            )
+        )
+
+        self.add_item(
+            discord.ui.Button(url='discord.gg/mbUwbG4wAV', custom_id='support-server-link', label='Support Server')
+        )
+
+
 class Meta(BaseCog):
     def __init__(self, bot: FuryBot) -> None:
         self.bot: FuryBot = bot
@@ -57,29 +77,33 @@ class Meta(BaseCog):
                     else:
                         category += 1
 
-            total_members = "{:,}".format(total_members)
+            total_members = f'{total_members:,}'
 
             embed = self.bot.Embed(
-                title='Chai',
-                description=f'A bot focused on moderation and utility safe for a school environment which serves '
-                f'**{total_members} members** across **{len(self.bot.guilds)}** servers.',
+                title='Fury',
+                description=(
+                    f'A bot focused on moderation and utility safe for a school environment which serves '
+                    f'**{total_members} members** across **{len(self.bot.guilds)}** servers.'
+                ),
             )
             embed.add_field(
                 name="Stats",
                 value=f"Latency: `{round(self.bot.latency * 1000)} ms`\n"
                 f"Client Started: {discord.utils.format_dt(self.bot.load_time, style='R')}",
             )
-            embed.add_field(
-                name='Channels',
-                value=f'{text + voice + stage + category + forum} total\n{text} text\n{voice} voice\n{stage} stage\n{forum} forum\n{category} category',
-            )
 
             memory_usage = self.process.memory_full_info().uss / 1024**2
             cpu_usage = self.process.cpu_percent() / psutil.cpu_count()
-            embed.add_field(name='Process', value=f'{memory_usage:.2f} MiB\n{cpu_usage:.2f}% CPU')
+            embed.add_field(name='Current Process', value=f'{memory_usage:.2f} MiB\n{cpu_usage:.2f}% CPU')
+
+            embed.add_field(
+                name='Channels',
+                value=f'**{text + voice + stage + category + forum}** total\n{text} text, {voice} voice, {stage} stage, {forum} forum, {category} category.',
+                inline=False,
+            )
 
             embed.set_thumbnail(url=str(self.bot.user.display_avatar))
-            await ctx.send(embed=embed)
+            await ctx.send(embed=embed, view=_AboutView())
 
 
 async def setup(bot: FuryBot) -> None:
