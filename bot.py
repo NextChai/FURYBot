@@ -28,7 +28,6 @@ from typing import (
     Dict,
     Final,
     List,
-    Literal,
     Optional,
     ParamSpec,
     Tuple,
@@ -62,6 +61,7 @@ from utils import (
 
 if TYPE_CHECKING:
     import datetime
+    from discord.types.embed import EmbedType
 
     import aiohttp
 
@@ -309,7 +309,7 @@ class FuryBot(commands.Bot):
         colour: Optional[Union[int, discord.Colour]] = None,
         color: Optional[Union[int, discord.Colour]] = None,
         title: Optional[Any] = None,
-        type: Literal["rich", "image", "video", "gifv", "article", "link"] = "rich",
+        type: EmbedType = "rich",
         url: Optional[Any] = None,
         description: Optional[Any] = None,
         timestamp: Optional[datetime.datetime] = None,

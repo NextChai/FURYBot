@@ -118,7 +118,7 @@ class BaseButtonPaginator(Generic[T], BaseView, abc.ABC):
         """
         return self.format_page(self.pages[self._current_page_index])
 
-    async def interaction_check(self, interaction: discord.Interaction[FuryBot], /) -> Optional[bool]:
+    async def interaction_check(self, interaction: discord.Interaction[FuryBot]) -> Optional[bool]:
         """|coro|
 
         The base interaction check for the given view.

@@ -74,7 +74,7 @@ class PacketManager:
         for i in range(0, len(iterable), chunks - code_blocker_size):
             yield self._code_blocker.format(iterable[i : i + chunks - code_blocker_size])
 
-    async def _release_error(self, traceback: str, packet: Traceback) -> None:
+    async def _release_error(self, traceback_str: str, packet: Traceback) -> None:
         _log.error('Releasing error to log', exc_info=packet['exception'])
 
         embed = discord.Embed(title=f'An error has occurred in {packet["command"]}', timestamp=packet['time'])
@@ -94,7 +94,7 @@ class PacketManager:
         if webhook.is_partial():
             self._error_webhook = webhook = await self._error_webhook.fetch()
 
-        code_chunks = list(self._yield_code_chunks(traceback))
+        code_chunks = list(self._yield_code_chunks(traceback_str))
 
         embed.description = code_chunks.pop(0)
         await webhook.send(embed=embed, **kwargs)
