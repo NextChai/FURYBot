@@ -105,7 +105,7 @@ class TypingTestView(BaseView):
         return embed
 
     async def interaction_check(self, interaction: discord.Interaction[FuryBot]) -> bool:
-        if self.packets.get(interaction.user.id, None):
+        if self.packets.get(interaction.user.id):
             await interaction.response.send_message(
                 "You\'re already in a typing test! You cannot start two at one time!", ephemeral=True
             )
@@ -133,12 +133,12 @@ class TypingTestView(BaseView):
             if not message.guild:
                 return False
 
-            packet = self.packets.get(message.author.id, None)
+            packet = self.packets.get(message.author.id)
             return bool(packet)
 
         message = await self.bot.wait_for('message', check=check, timeout=60 * 5)
 
-        packet = self.packets.get(message.author.id, None)
+        packet = self.packets.get(message.author.id)
         if not packet:
             raise ValueError("Packet is missing, this should not happen.")
 
