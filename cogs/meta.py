@@ -89,7 +89,7 @@ class Meta(BaseCog):
 
             embed.add_field(
                 name='Channels',
-                value=f'**{total}** Total\n{display_channels}',
+                value=f'**{total}** Total\n{display_channels}.',
                 inline=False,
             )
 
