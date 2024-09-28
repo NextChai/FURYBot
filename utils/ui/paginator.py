@@ -33,10 +33,11 @@ from typing_extensions import Self, TypeAlias, TypeVar, Unpack
 from .view import BaseView
 
 if TYPE_CHECKING:
+    from discord.ext import commands
+
     from bot import FuryBot
 
     from .view import BaseViewKwargs
-    from discord.ext import commands
 
 T = TypeVar('T')
 TargetType: TypeAlias = Union['discord.Interaction[FuryBot]', 'commands.Context[FuryBot]']
