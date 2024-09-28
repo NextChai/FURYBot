@@ -232,7 +232,8 @@ class ErrorHandler:
                 'Oh no! Something went wrong! I\'ve notified the developer to get this issue fixed, my apologies!',
                 ephemeral=True,
             )
-        elif isinstance(target, discord.Interaction):
+
+        if isinstance(target, discord.Interaction):
             if not target.response.is_done():
                 await target.response.defer()
 
@@ -268,59 +269,67 @@ class ErrorHandler:
                 str(error),
             )
 
-        elif isinstance(error, app_commands.CommandInvokeError):
+        if isinstance(error, app_commands.CommandInvokeError):
             # Something bad happened here, oh no!
             return await self.log_error(error.original, target=target)
-        elif isinstance(error, app_commands.TransformerError):
+
+        if isinstance(error, app_commands.TransformerError):
             await sender(
                 content=f'Failed to convert `{error.value}` to a {error.type.name.title()}!',
             )
 
             # This is a development error as well, but we don't need to pass a sender
             return await self.log_error(error, target=target)
-        elif isinstance(error, app_commands.CheckFailure):
+
+        if isinstance(error, app_commands.CheckFailure):
             if isinstance(error, app_commands.NoPrivateMessage):
                 return await sender(
                     str(error),
                 )
-            elif isinstance(error, app_commands.MissingRole):
+            if isinstance(error, app_commands.MissingRole):
                 role: str = _resolve_role_mention(error.missing_role)
                 return await sender(
                     f'You are missing the {role} role to run this command!',
                 )
-            elif isinstance(error, app_commands.MissingAnyRole):
+            if isinstance(error, app_commands.MissingAnyRole):
                 roles = (_resolve_role_mention(role) for role in error.missing_roles)
                 return await sender(
                     f'You\'re missing one of the following roles to run this command: {", ".join(roles)}',
                 )
-            elif isinstance(error, (app_commands.MissingPermissions, app_commands.BotMissingPermissions)):
+            if isinstance(error, (app_commands.MissingPermissions, app_commands.BotMissingPermissions)):
                 fmt = 'I\'m' if isinstance(error, app_commands.BotMissingPermissions) else 'You are'
                 return await sender(
                     f'{fmt} missing the following permissions to run this command: {", ".join([p.replace("_", " ").title() for p in error.missing_permissions])}',
                 )
-        elif isinstance(error, (app_commands.CommandOnCooldown, commands.CommandOnCooldown)):
+
+        if isinstance(error, (app_commands.CommandOnCooldown, commands.CommandOnCooldown)):
             retry_after = discord.utils.utcnow() + datetime.timedelta(seconds=error.retry_after)
             return await sender(
                 f'Ope! You\'ve hit this command\'s cooldown, try again in {discord.utils.format_dt(retry_after, "R")}',
             )
-        elif isinstance(error, app_commands.CommandSignatureMismatch):
+
+        if isinstance(error, app_commands.CommandSignatureMismatch):
             await self.bot.tree.sync()
             return await sender(
                 'Oh shoot! There\'s a mismatch in my commands, I\'ve synced them, try again!',
             )
-        elif isinstance(error, commands.MissingRequiredArgument):
+
+        if isinstance(error, commands.MissingRequiredArgument):
             return await sender(
                 f'Oop! You forgot to provide a value for `{error.param.name}`.',
             )
-        elif isinstance(error, commands.MissingRequiredArgument):
+
+        if isinstance(error, commands.MissingRequiredArgument):
             return await sender(
                 f'Oop! You forgot to provide a value for `{error.param.name}`.',
             )
-        elif isinstance(error, commands.TooManyArguments):
+
+        if isinstance(error, commands.TooManyArguments):
             return await sender(
                 'Oop! You provided too many arguments for this command.',
             )
-        elif isinstance(error, commands.BadArgument):
+
+        if isinstance(error, commands.BadArgument):
             fmt = (
                 str(error)
                 if not (argument := getattr(error, 'argument', None))
@@ -329,17 +338,21 @@ class ErrorHandler:
             return await sender(
                 f'Oop! You provided an invalid value. {fmt}',
             )
-        elif isinstance(error, commands.CommandNotFound):
+
+        if isinstance(error, commands.CommandNotFound):
             return
-        elif isinstance(error, commands.CheckFailure):
+
+        if isinstance(error, commands.CheckFailure):
             return await sender(
                 f'Ope! {error}',
             )
-        elif isinstance(error, commands.DisabledCommand):
+
+        if isinstance(error, commands.DisabledCommand):
             return await sender(
                 'Oop! This command is disabled.',
             )
-        elif isinstance(error, commands.MaxConcurrencyReached):
+
+        if isinstance(error, commands.MaxConcurrencyReached):
             return await sender(
                 'Oop! This command is currently running too many instances. Try again in a few minutes.',
             )

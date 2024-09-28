@@ -91,7 +91,8 @@ class HomeConfirm(discord.ui.View):
                 inline=False,
             )
             return embed
-        elif scrim.status in (ScrimStatus.pending_away, ScrimStatus.scheduled):
+
+        if scrim.status in (ScrimStatus.pending_away, ScrimStatus.scheduled):
             if scrim.status is ScrimStatus.pending_away:
                 embed = self.bot.Embed(
                     title=f'Waiting {scrim.away_team.display_name} Confirmation!',

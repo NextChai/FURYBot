@@ -70,7 +70,8 @@ class Moderation(BaseCog):
             return await interaction.edit_original_response(
                 content='Could not obtain the channel you requested, try again later or in a different channel.'
             )
-        elif isinstance(loc, (discord.ForumChannel, discord.CategoryChannel, discord.DMChannel, discord.GroupChannel)):
+
+        if isinstance(loc, (discord.ForumChannel, discord.CategoryChannel, discord.DMChannel, discord.GroupChannel)):
             # These are not supported
             return await interaction.edit_original_response(
                 content='I cannot cleanup messages in this channel type, please try again in a different channel.'

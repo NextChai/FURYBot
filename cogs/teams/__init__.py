@@ -384,7 +384,8 @@ class Teams(BaseCog):
             )
             await new_channel.send(embed=notification_embed)
             return None
-        elif team.voice_channel_id == channel.id:
+
+        if team.voice_channel_id == channel.id:
             _log.debug('Team %s voice channel was deleted, recreating.', team.display_name)
             new_channel = await category.create_voice_channel(name='team-voice')
             return await team.edit(voice_channel_id=new_channel.id)
