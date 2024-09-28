@@ -37,7 +37,7 @@ class _AboutView(discord.ui.View):
 
         self.add_item(discord.ui.Button(url='https://github.com/trevorflahardy/Fury-Bot', label='Source Code'))
 
-        self.add_item(discord.ui.Button(url='discord.gg/mbUwbG4wAV', label='Support Server'))
+        self.add_item(discord.ui.Button(url='https://discord.gg/mbUwbG4wAV', label='Support Server'))
 
 
 class Meta(BaseCog):
