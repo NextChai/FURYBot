@@ -54,5 +54,4 @@ class TeamMemberAble(TeamAble, Protocol):
 
     @property
     def mention(self) -> str:
-        member_id = self._get_member_id()
-        return f'<@{member_id}>'
+        return f'<@{self._get_member_id()}>'
