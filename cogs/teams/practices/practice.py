@@ -161,7 +161,7 @@ class PracticeMember(TeamMemberAble, TeamAble):
 
     def __eq__(self, __o: object) -> bool:
         try:
-            o_member_id = getattr(__o, 'member_id')
+            o_member_id = getattr(__o, 'member_id')  # skipcq: PTC-W0034
         except AttributeError:
             return False
 

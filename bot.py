@@ -309,14 +309,14 @@ class FuryBot(commands.Bot):
         colour: Optional[Union[int, discord.Colour]] = None,
         color: Optional[Union[int, discord.Colour]] = None,
         title: Optional[Any] = None,
-        type: EmbedType = "rich",
+        type: EmbedType = "rich",  # skipcq: PYL-W0622
         url: Optional[Any] = None,
         description: Optional[Any] = None,
         timestamp: Optional[datetime.datetime] = None,
         author: Optional[Union[discord.User, discord.Member]] = None,
     ) -> discord.Embed:
         """Get an instance of the bot's global :class:`discord.Embed` with the default
-        bot's color, "FurBot blue".
+        bot's color, "Fury blue".
 
         The parameters are the same as :class:`discord.Embed` except for one additional one.
 
