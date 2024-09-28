@@ -115,7 +115,7 @@ class TeamTransformer(app_commands.Transformer):
 
         return choices
 
-    async def transform(self, interaction: discord.Interaction[FuryBot], value: int, /) -> Team:
+    async def transform(self, interaction: discord.Interaction[FuryBot], value: int, /) -> Team:  #  skipcq: PYL-R0201
         """|coro|
 
         Transforms the given users input to a team.

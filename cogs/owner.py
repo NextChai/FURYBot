@@ -43,7 +43,8 @@ class Owner(BaseCog):
     async def cog_check(self, ctx: Context) -> bool:
         return await self.bot.is_owner(ctx.author)
 
-    def _reload_extension(self, extension: str) -> None:
+    @staticmethod
+    def _reload_extension(extension: str) -> None:
         module = importlib.import_module(extension)
 
         try:
