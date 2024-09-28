@@ -306,7 +306,7 @@ class ErrorHandler:
             )
         elif isinstance(error, commands.TooManyArguments):
             return await sender(
-                f'Oop! You provided too many arguments for this command.',
+                'Oop! You provided too many arguments for this command.',
             )
         elif isinstance(error, commands.BadArgument):
             fmt = (
@@ -325,11 +325,11 @@ class ErrorHandler:
             )
         elif isinstance(error, commands.DisabledCommand):
             return await sender(
-                f'Oop! This command is disabled.',
+                'Oop! This command is disabled.',
             )
         elif isinstance(error, commands.MaxConcurrencyReached):
             return await sender(
-                f'Oop! This command is currently running too many instances. Try again in a few minutes.',
+                'Oop! This command is currently running too many instances. Try again in a few minutes.',
             )
 
         await self.log_error(error, target=target)
