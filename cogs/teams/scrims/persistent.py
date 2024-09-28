@@ -481,7 +481,7 @@ class AwayConfirm(discord.ui.View):
         but still wants to scrim."""
         if self.scrim.per_team < 2:
             return await interaction.response.send_message(
-                f'You can not vote to force confirm if "per team" is less than 2.', ephemeral=True
+                'You can not vote to force confirm if "per team" is less than 2.', ephemeral=True
             )
 
         away_text_channel = self.scrim.away_team.text_channel

@@ -193,13 +193,13 @@ class Timer:
                 if not data:
                     raise TimerNotFound(self.id)
 
-                await conn.execute(f'DELETE FROM timers WHERE id = $1', self.id)
+                await conn.execute('DELETE FROM timers WHERE id = $1', self.id)
         else:
             data = await connection.fetchrow('SELECT * FROM timers WHERE id = $1', self.id)
             if not data:
                 raise TimerNotFound(self.id)
 
-            await connection.execute(f'DELETE FROM timers WHERE id = $1', self.id)
+            await connection.execute('DELETE FROM timers WHERE id = $1', self.id)
 
     async def edit(self, *, expires: datetime.datetime = MISSING) -> None:
         builder = QueryBuilder('timers')
@@ -258,7 +258,7 @@ class TimerManager:
         Optional[:class:`Timer`]
             The timer that is expired and should be dispatched.
         """
-        query = f"SELECT * FROM timers WHERE (expires IS NOT NULL AND expires < (timezone('utc', NOW()) + $1::interval)) ORDER BY expires LIMIT 1;"
+        query = "SELECT * FROM timers WHERE (expires IS NOT NULL AND expires < (timezone('utc', NOW()) + $1::interval)) ORDER BY expires LIMIT 1;"
         con = connection or self.bot.pool
 
         record = await con.fetchrow(query, datetime.timedelta(days=days))
@@ -397,7 +397,7 @@ class TimerManager:
         now = (now or discord.utils.utcnow()).astimezone(datetime.timezone.utc)
 
         delta = (when - now).total_seconds()
-        query = f"""INSERT INTO timers (event, extra, expires, created, precise)
+        query = """INSERT INTO timers (event, extra, expires, created, precise)
                    VALUES ($1, $2::jsonb, $3, $4, $5)
                    RETURNING *;
                 """
@@ -443,9 +443,9 @@ class TimerManager:
         """
         if connection is None:
             async with self.bot.safe_connection() as conn:
-                data = await conn.fetchrow(f'SELECT * FROM timers WHERE id = $1', id)
+                data = await conn.fetchrow('SELECT * FROM timers WHERE id = $1', id)
         else:
-            data = await connection.fetchrow(f'SELECT * FROM timers WHERE id = $1', id)
+            data = await connection.fetchrow('SELECT * FROM timers WHERE id = $1', id)
 
         if not data:
             raise TimerNotFound(id)
@@ -463,6 +463,6 @@ class TimerManager:
             A list of :class:`Timer` objects.
         """
         async with self.bot.safe_connection() as conn:
-            data = await conn.fetch(f'SELECT * FROM timers')
+            data = await conn.fetch('SELECT * FROM timers')
 
         return [Timer(record=row, bot=self.bot) for row in data]
