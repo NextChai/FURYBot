@@ -670,7 +670,7 @@ class Team:
             await self.voice_channel.edit(sync_permissions=True, name='Voice Chat', reason='Syncing team channels.')
 
         for channel in self.extra_channels:
-            await channel._edit({"sync_permissions": True}, reason="Syncing team channels.")
+            await channel._edit({"sync_permissions": True}, reason="Syncing team channels.")  # skipcq: PYL-W0212
 
     async def add_team_member(self, member_id: int, is_sub: bool = False) -> TeamMember:
         """|coro|
