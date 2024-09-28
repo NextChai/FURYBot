@@ -56,8 +56,8 @@ class Moderation(BaseCog):
         await member.add_roles(role)
         return await interaction.response.send_message(f'I\'ve assigned {role.mention} to {member.mention}', ephemeral=True)
 
+    @staticmethod
     async def _cleanup_n_messages(
-        self,
         interaction: discord.Interaction[FuryBot],
         to: discord.Member,
         n: int,

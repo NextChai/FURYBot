@@ -50,7 +50,8 @@ class TeamTransformer(app_commands.Transformer):
     def type(self) -> discord.AppCommandOptionType:
         return discord.AppCommandOptionType.integer
 
-    def _get_similar_teams(self, interaction: discord.Interaction[FuryBot]) -> List[Team]:
+    @staticmethod
+    def _get_similar_teams(interaction: discord.Interaction[FuryBot]) -> List[Team]:
         # A helper to get all teams that are similar to the team this command was invoked on.
         # This will only be called if clamp_teams is True.
         channel = interaction.channel

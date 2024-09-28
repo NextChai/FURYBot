@@ -25,7 +25,9 @@ __all__: Tuple[str, ...] = ('Context',)
 
 
 class Context(commands.Context['FuryBot']):
-    def tick(self, opt: Optional[bool], label: Optional[str] = None) -> str:
+
+    @staticmethod
+    def tick(opt: Optional[bool], label: Optional[str] = None) -> str:
         lookup = {
             True: '✅',
             False: '❌',

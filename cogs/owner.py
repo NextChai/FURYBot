@@ -52,7 +52,8 @@ class Owner(BaseCog):
             _log.warning(f'Failed to reload module {extension}.', exc_info=exc)
             raise exc
 
-    def _is_discordpy_extension(self, spec: importlib.machinery.ModuleSpec, module: ModuleType) -> bool:
+    @staticmethod
+    def _is_discordpy_extension(spec: importlib.machinery.ModuleSpec, module: ModuleType) -> bool:
         spec.loader.exec_module(module)  # type: ignore
         return bool(getattr(module, 'setup', None))
 

@@ -55,8 +55,9 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
         guild_only=True,
     )
 
+    @staticmethod
     async def _fetch_current_voice_channel(
-        self, interaction: discord.Interaction[FuryBot], team: Team, target: discord.Member
+        interaction: discord.Interaction[FuryBot], team: Team, target: discord.Member
     ) -> Optional[Union[discord.VoiceChannel, discord.StageChannel]]:
         """Determines if a scrim can start and fetches the active voice channel of the user.
         If failed, will let the user know and return None. Else, returns the voice channel.
