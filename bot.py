@@ -253,7 +253,7 @@ class FuryBot(commands.Bot):
         self._infractions_settings: Dict[int, InfractionsSettings] = {}
 
         super().__init__(
-            command_prefix=commands.when_mentioned_or("trev.", "trev"),
+            command_prefix=commands.when_mentioned_or("trev.", "trev", 'fury', 'fury.'),
             help_command=None,
             description="A helpful moderation tool",
             intents=discord.Intents.all(),
