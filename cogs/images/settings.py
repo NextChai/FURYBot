@@ -49,22 +49,21 @@ class AttachmentRequestSettings:
         notification_role_id: Optional[int] = None,
     ) -> Self:
         async with bot.safe_connection() as connection:
-            async with connection.transaction():
-                record = await connection.fetchrow(
-                    '''
-                    INSERT INTO images.request_settings (guild_id, channel_id, notification_role_id)
-                    VALUES ($1, $2, $3)
-                    ON CONFLICT (guild_id)
-                    DO UPDATE SET channel_id = EXCLUDED.channel_id, notification_role_id = EXCLUDED.notification_role_id
-                    RETURNING *
-                    ''',
-                    guild_id,
-                    channel_id,
-                    notification_role_id,
-                )
+            record = await connection.fetchrow(
+                '''
+                INSERT INTO images.request_settings (guild_id, channel_id, notification_role_id)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (guild_id)
+                DO UPDATE SET channel_id = EXCLUDED.channel_id, notification_role_id = EXCLUDED.notification_role_id
+                RETURNING *
+                ''',
+                guild_id,
+                channel_id,
+                notification_role_id,
+            )
 
-                if not record:
-                    raise ValueError('Failed to create a new attachment request settings record.')
+            if not record:
+                raise ValueError('Failed to create a new attachment request settings record.')
 
         return cls(data=dict(record), bot=bot)
 

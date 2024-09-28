@@ -53,20 +53,19 @@ class InfractionsSettings:
     @classmethod
     async def create(cls: Type[Self], guild_id: int, /, *, bot: FuryBot) -> Self:
         async with bot.safe_connection() as connection:
-            async with connection.transaction():
-                record = await connection.fetchrow(
-                    '''
-                    INSERT INTO infractions.settings (guild_id)
-                    VALUES ($1)
-                    ON CONFLICT (guild_id) 
-                    DO NOTHING
-                    RETURNING *
-                    ''',
-                    guild_id,
-                )
+            record = await connection.fetchrow(
+                '''
+                INSERT INTO infractions.settings (guild_id)
+                VALUES ($1)
+                ON CONFLICT (guild_id) 
+                DO NOTHING
+                RETURNING *
+                ''',
+                guild_id,
+            )
 
-                if not record:
-                    raise ValueError('Failed to create a new infractions settings record.')
+            if not record:
+                raise ValueError('Failed to create a new infractions settings record.')
 
         instance = cls(data=dict(record), bot=bot)
         bot.add_infractions_settings(instance)
