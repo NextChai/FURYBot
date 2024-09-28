@@ -89,9 +89,9 @@ def parse_initial_extensions(extensions: Iterable[str]) -> Iterable[str]:
 def default_button_doc_string(func: ButtonCallback[BV]) -> ButtonCallback[BV]:
     default_doc = """
     |coro|
-    
+
     {doc}
-    
+
     Parameters
     ----------
     interaction: :class:`discord.Interaction`
