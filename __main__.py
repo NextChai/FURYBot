@@ -14,8 +14,6 @@ Full license terms are available in the LICENSE file at the root of the reposito
 
 from __future__ import annotations
 
-import dotenv
-
 import asyncio
 import logging
 import os
@@ -23,6 +21,7 @@ from typing import TYPE_CHECKING
 
 import aiohttp
 import discord
+import dotenv
 
 from bot import FuryBot
 
