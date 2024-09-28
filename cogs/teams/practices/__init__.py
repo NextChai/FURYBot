@@ -15,7 +15,7 @@ Full license terms are available in the LICENSE file at the root of the reposito
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple, Union
 
 import discord
 from discord import app_commands
@@ -55,45 +55,21 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
         guild_only=True,
     )
 
-    @practice.command(name="start", description="Start a practice for your team.")
-    async def practice_start(self, interaction: discord.Interaction[FuryBot]) -> None:
-        """|coro|
+    async def _fetch_current_voice_channel(
+        self, interaction: discord.Interaction[FuryBot], team: Team, target: discord.Member
+    ) -> Optional[Union[discord.VoiceChannel, discord.StageChannel]]:
+        """Determines if a scrim can start and fetches the active voice channel of the user.
+        If failed, will let the user know and return None. Else, returns the voice channel.
 
-        Start a new practice within a team channel. This command can only be used in a team channel by a member
-        on a team.
         """
-        if not interaction.guild:
-            raise ValueError('Invariant that guild invoke has failed.')
-
-        # Let's check to make sure this is a team channel first.
-        channel = interaction.channel
-        if not channel:
-            raise ValueError('channel has failed to parse')
-
-        member = interaction.user
-        if not isinstance(member, discord.Member):
-            return await interaction.response.send_message("You must be a in a server to use this command.", ephemeral=True)
-
-        category = getattr(channel, "category", None)
-        if category is None:
-            return await interaction.response.send_message("You must use this command in a team channel.", ephemeral=True)
-
-        # Let's try and get a team now
-        try:
-            team = Team.from_channel(category.id, interaction.guild.id, bot=self.bot)
-        except TeamNotFound:
-            return await interaction.response.send_message("You must use this command in a team channel.", ephemeral=True)
-
         # Let's check and see if there's an active practice
         if team.ongoing_practice is not None:
-            return await interaction.response.send_message(
-                "There is already an active practice for this team.", ephemeral=True
-            )
+            return await interaction.followup.send("There is already an active practice for this team.", ephemeral=True)
 
         # If this team does not have a voice channel, they are physically unable to do
         # a practice.
         if team.voice_channel is None:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 "This team does not have a voice channel. Please contact an administrator to get one.",
                 ephemeral=True,
             )
@@ -101,27 +77,29 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
         # If this team doesn't have a text channel either they cannot do a practice
         team_text_channel = team.text_channel
         if team_text_channel is None:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 "This team does not have a main text channel. Was it deleted? Why? Please contact an administrator to get one.",
                 ephemeral=True,
             )
 
         # Now we can verify they're in the team's voice channel
-        connected_channel = member.voice and member.voice.channel
+        connected_channel = target.voice and target.voice.channel
         if not connected_channel or connected_channel != team.voice_channel:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 "You must be in the team's voice channel to start a practice.",
                 ephemeral=True,
             )
 
-        await interaction.response.defer(ephemeral=True)
+        return connected_channel
 
-        embed = team.embed(
-            title="Creating Practice...",
-            description="Please wait while we create your practice.",
-        )
-        message = await team_text_channel.send(embed=embed)
-
+    async def _create_practice(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        team: Team,
+        member: discord.Member,
+        connected_channel: Union[discord.VoiceChannel, discord.StageChannel],
+        message: discord.Message,
+    ) -> Practice:
         # We can create a new practice now.
         async with self.bot.safe_connection() as connection:
             practice_data = await connection.fetchrow(
@@ -159,7 +137,60 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
             except MemberNotOnTeam:
                 pass
 
-        await interaction.edit_original_response(content="A new practice has been created.")
+        return practice
+
+    @practice.command(name="start", description="Start a practice for your team.")
+    async def practice_start(self, interaction: discord.Interaction[FuryBot]) -> None:
+        """|coro|
+
+        Start a new practice within a team channel. This command can only be used in a team channel by a member
+        on a team.
+        """
+        await interaction.response.defer(ephemeral=True)
+
+        if not interaction.guild:
+            raise ValueError('Invariant that guild invoke has failed.')
+
+        member = interaction.user
+        if not isinstance(member, discord.Member):
+            return await interaction.followup.send("You must be a in a server to use this command.", ephemeral=True)
+
+        category = interaction.channel and getattr(interaction.channel, "category", None)
+        if category is None:
+            return await interaction.followup.send("You must use this command in a team channel.", ephemeral=True)
+
+        # Let's try and get a team now
+        try:
+            team = Team.from_channel(category.id, interaction.guild.id, bot=self.bot)
+        except TeamNotFound:
+            return await interaction.followup.send("You must use this command in a team channel.", ephemeral=True)
+
+        connected_channel = await self._fetch_current_voice_channel(interaction, team, member)
+        if not connected_channel:
+            # This is an invalid practice start, return
+            return
+
+        # We know from _fetch_current_voice_channel that the team text channel exists, so we can safely
+        # get it here.
+        team_text_channel = team.text_channel
+        if not team_text_channel:
+            raise ValueError("Team text channel does not exist, this should never happen.")
+
+        embed = team.embed(
+            title="Creating Practice...",
+            description="Please wait while we create your practice.",
+        )
+        message = await team_text_channel.send(embed=embed)
+
+        await self._create_practice(
+            interaction=interaction,
+            team=team,
+            member=member,
+            connected_channel=connected_channel,
+            message=message,
+        )
+
+        await interaction.followup.send(content="A new practice has been created.", ephemeral=True)
 
     @commands.Cog.listener("on_voice_state_update")
     async def on_voice_state_update(

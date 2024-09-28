@@ -269,9 +269,12 @@ class Teams(BaseCog):
                 continue
 
             team_text_chat = team.text_channel
+            team_text_chat_mention = team_text_chat and team_text_chat.mention or '`<team-deleted>`'
+            is_sub = 'Is a sub' if instance.is_sub else 'Is not a sub'
+
             embed.add_field(
                 name=team.display_name,
-                value=f'**Team Chat**: {team_text_chat and team_text_chat.mention or "Text chat has been deleted!!"}\n**Is Sub**: {"Is a sub" if instance.is_sub else "Is not a sub"}',
+                value=f'**Team Chat**: {team_text_chat_mention}\n**Is Sub**: {is_sub}',
                 inline=False,
             )
 

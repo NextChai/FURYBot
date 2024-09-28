@@ -71,12 +71,18 @@ class ScrimPanel(BaseView):
         )
         embed.add_field(
             name='Home Team',
-            value=f'{home_team.display_name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.home_voters]) or "No home voters."}',
+            value=(
+                f'{home_team.display_name}\n**Confirmed Members**: '
+                f'{", ".join([m.mention for m in self.scrim.home_voters]) or "No home voters."}'
+            ),
             inline=False,
         )
         embed.add_field(
             name='Away Team',
-            value=f'{away_team.display_name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.away_voters]) or "No away voters."}',
+            value=(
+                f'{away_team.display_name}\n**Confirmed Members**: '
+                f'{", ".join([m.mention for m in self.scrim.away_voters]) or "No away voters."}'
+            ),
         )
 
         if self.scrim.status is ScrimStatus.scheduled and self.scrim.scheduled_for < discord.utils.utcnow():

@@ -125,9 +125,13 @@ class PracticeView(discord.ui.View):
         excused_member_mentions: List[str] = [member.mention for member in self.practice.excused_members]
         members_unattended_mentions: List[str] = [member.mention for member in self.practice.missing_members]
 
+        started_by_mention = started_by and started_by.mention or "`<not found>`"
         embed = team.embed(
             title=f"{team.display_name} Practice.",
-            description=f"A practice started by {started_by and started_by.mention or '`<not found>`'} on {self.practice.format_start_time()} is currently in progress has come to an end.",
+            description=(
+                f"A practice started by {started_by_mention} on {self.practice.format_start_time()} "
+                "is currently in progress has come to an end."
+            ),
         )
 
         # Show the members that attended the practice.
@@ -155,8 +159,10 @@ class PracticeView(discord.ui.View):
         if total_time:
             embed.add_field(
                 name="Total Practice Time",
-                value=f"In total, **todays practice was {human_timedelta(total_time.total_seconds())}**. More stats have been posted "
-                "in the practice completed message.",
+                value=(
+                    f"In total, **todays practice was {human_timedelta(total_time.total_seconds())}**. "
+                    "More stats have been posted in the practice completed message."
+                ),
             )
 
         return embed
@@ -178,10 +184,13 @@ class PracticeView(discord.ui.View):
                 color=discord.Color.red(),
             )
 
+        started_by_mention = started_by and started_by.mention or "`<not found>`"
         embed = team.embed(
             title=f"{team.display_name} Practice.",
-            description=f"A practice started by {started_by and started_by.mention or '`<not-found>`'} on {self.practice.format_start_time()} "
-            "is currently in progress.",
+            description=(
+                f"A practice started by {started_by_mention} on {self.practice.format_start_time()} "
+                "is currently in progress."
+            ),
         )
 
         voice_channel = team.voice_channel

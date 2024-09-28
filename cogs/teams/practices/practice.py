@@ -267,7 +267,17 @@ class PracticeMember(TeamMemberAble, TeamAble):
 
         async with self.practice.bot.safe_connection() as connection:
             practice_member_history_data = await connection.fetchrow(
-                "INSERT INTO teams.practice_member_history(joined_at, team_id, channel_id, guild_id, practice_id, member_id) VALUES($1, $2, $3, $4, $5, $6) RETURNING *",
+                """
+                INSERT INTO teams.practice_member_history(
+                    joined_at, 
+                    team_id, 
+                    channel_id, 
+                    guild_id, 
+                    practice_id, 
+                    member_id
+                ) 
+                VALUES($1, $2, $3, $4, $5, $6) 
+                RETURNING *""",
                 when,
                 self.practice.team_id,
                 self.practice.channel_id,
@@ -544,9 +554,10 @@ class Practice(TeamAble):
             # so we can safety return an empty embed here (this should never happen though)
             return discord.Embed()
 
+        started_by = self.started_by and self.started_by.mention or "`<not-found>`"
         embed = team.embed(
             title=f'{team.display_name} Practice Ended.',
-            description=f'This practice started by {self.started_by and self.started_by.mention or "`<not-found>`"} has come to an end.\n'
+            description=f'This practice started by {started_by} has come to an end.\n'
             f'- **Started At**: {self.format_start_time()}\n'
             f'- **Ended At**: {self.format_end_time()}\n',
         )
@@ -623,7 +634,15 @@ class Practice(TeamAble):
 
         async with self.bot.safe_connection() as connection:
             practice_member_data = await connection.fetchrow(
-                "INSERT INTO teams.practice_member (member_id, practice_id, attending, reason) VALUES ($1, $2, $3, $4) RETURNING *",
+                """
+                INSERT INTO teams.practice_member (
+                    member_id, 
+                    practice_id, 
+                    attending, 
+                    reason
+                ) 
+                VALUES ($1, $2, $3, $4) 
+                RETURNING *""",
                 member.id,
                 self.id,
                 False,
