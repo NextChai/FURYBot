@@ -262,7 +262,7 @@ class ErrorHandler:
             sender = partial(interaction.followup.send, ephemeral=True)
 
         while hasattr(error, 'original'):
-            error = getattr(error, 'original')
+            error = getattr(error, 'original')  # skipcq: PTC-W0034
 
         if isinstance(error, (AutocompleteValidationException, BadArgument)):
             return await sender(
