@@ -92,7 +92,7 @@ class Meta(BaseCog):
 
             embed.add_field(
                 name='Channels',
-                value=f'**{text + voice + stage + category + forum}** total\n{text} text, {voice} voice, {stage} stage, {forum} forum, {category} category.',
+                value=f'**{text + voice + stage + category + forum}** total\n{text} text, {voice} voice, {stage} stage, {forum} forum, and {category} category.',
                 inline=False,
             )
 
