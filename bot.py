@@ -282,7 +282,7 @@ class FuryBot(commands.Bot):
             return discord.utils._to_json(value)
 
         def _decode_jsonb(value: str) -> Dict[Any, Any]:
-            return discord.utils._from_json(value)
+            return discord.utils._from_json(value)  # skipcq: PYL-W0212
 
         old_init = kwargs.pop("init", None)
 
@@ -822,11 +822,11 @@ class FuryBot(commands.Bot):
 
             member_data = practice_member_mapping.get(practice.id, {})
             for data in member_data.values():
-                member = practice._add_member(dict(data))
+                member = practice.add_member(dict(data))
 
                 member_practice_history = practice_member_history_mapping.get(practice.id, {}).get(member.member_id, [])
                 for history_entry in member_practice_history:
-                    member._add_history(dict(history_entry))
+                    member.add_history(dict(history_entry))
 
             self._team_practice_cache.setdefault(practice.guild_id, {}).setdefault(practice.team_id, {})[
                 practice.id

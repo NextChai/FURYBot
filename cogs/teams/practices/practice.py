@@ -185,12 +185,12 @@ class PracticeMember(TeamMemberAble, TeamAble):
     def _get_member_id(self) -> int:
         return self.member_id
 
-    def _add_history(self, data: Dict[str, Any]) -> PracticeMemberHistory:
+    def add_history(self, data: Dict[str, Any]) -> PracticeMemberHistory:
         practice_member_history = PracticeMemberHistory(member=self, data=data)
         self._history.append(practice_member_history)
         return practice_member_history
 
-    def _remove_history(self, history: PracticeMemberHistory) -> None:
+    def remove_history(self, history: PracticeMemberHistory) -> None:
         self._history.remove(history)
 
     @property
@@ -288,7 +288,7 @@ class PracticeMember(TeamMemberAble, TeamAble):
             if not practice_member_history_data:
                 raise ValueError("Failed to create practice member history.")
 
-            practice_member_history = self._add_history(dict(practice_member_history_data))
+            practice_member_history = self.add_history(dict(practice_member_history_data))
 
         return practice_member_history
 
@@ -418,7 +418,7 @@ class Practice(TeamAble):
         return self.bot
 
     # Methods to manage member cache
-    def _add_member(self, practice_member_data: Dict[str, Any]) -> PracticeMember:
+    def add_member(self, practice_member_data: Dict[str, Any]) -> PracticeMember:
         member = PracticeMember(practice=self, data=practice_member_data)
         self._members[member.member_id] = member
         return member
@@ -651,7 +651,7 @@ class Practice(TeamAble):
             if not practice_member_data:
                 raise ValueError("Failed to create practice member.")
 
-        attending_member = self._add_member(dict(practice_member_data))
+        attending_member = self.add_member(dict(practice_member_data))
 
         await self.view.update_message()
         return attending_member
@@ -712,7 +712,7 @@ class Practice(TeamAble):
                 if not practice_member_data:
                     raise ValueError("Failed to create practice member.")
 
-            attending_member = self._add_member(dict(practice_member_data))
+            attending_member = self.add_member(dict(practice_member_data))
         else:
             # Check if they manually selected not attending.
             if not attending_member.attending:
