@@ -81,14 +81,15 @@ class Meta(BaseCog):
             total = sum(channel_counts.values())
             display_channels = human_join(
                 [
-                    f'**{count}** {channel_type.name.replace("_", " ").title()}'
+                    f'**{count}** {channel_type.name.replace("_", " ").lower()}'
                     for channel_type, count in channel_counts.items()
-                ]
+                ],
+                delimiter=', ',
             )
 
             embed.add_field(
                 name='Channels',
-                value=f'**{total}** total\n{display_channels}',
+                value=f'**{total}** Total\n{display_channels}',
                 inline=False,
             )
 
