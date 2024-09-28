@@ -383,7 +383,7 @@ class ErrorHandler:
 
         _, error, _ = sys.exc_info()
         if not error:
-            raise
+            raise RuntimeError('No error was passed to the error handler.')
 
         await self.__packet_manager.add_error(error=error, target=None, event_name=event_method)
 
