@@ -648,13 +648,13 @@ class Team:
         overwrites = await self.channel_overwrites()
 
         if self.category_channel:
-            await self.category_channel.edit(overwrites=overwrites)
+            await self.category_channel.edit(overwrites=overwrites, name=self.name, reason='Syncing team channels.')
 
         if self.text_channel:
-            await self.text_channel.edit(sync_permissions=True)
+            await self.text_channel.edit(sync_permissions=True, name='team-chat', reason='Syncing team channels.')
 
         if self.voice_channel:
-            await self.voice_channel.edit(sync_permissions=True)
+            await self.voice_channel.edit(sync_permissions=True, name='Voice Chat', reason='Syncing team channels.')
 
         for channel in self.extra_channels:
             await channel._edit({"sync_permissions": True}, reason="Syncing team channels.")
