@@ -70,17 +70,16 @@ class TeamMember:
         return hash(self.member_id)
 
     @property
-    def team(self) -> Team:
+    def team(self) -> Optional[Team]:
         """:class:`Team`: The team that this member is on."""
         team = self.bot.get_team(self.team_id, guild_id=self.guild_id)
-        assert team
         return team
 
     @property
     def member(self) -> Optional[discord.Member]:
         """Optional[:class:`discord.Member`]: A Discord member object."""
-        guild = self.team.guild
-        return guild.get_member(self.member_id)
+        guild = self.team and self.team.guild
+        return guild and guild.get_member(self.member_id)
 
     @property
     def mention(self) -> str:
@@ -92,7 +91,11 @@ class TeamMember:
 
         Removes the member from the team.
         """
-        return await self.team.remove_team_member(self)
+        team = self.team
+        if team is None:
+            return
+
+        return await team.remove_team_member(self)
 
     async def demote(self) -> None:
         """|coro|
@@ -104,6 +107,11 @@ class TeamMember:
         Exception
             The member is already a sub.
         """
+        team = self.team
+        if not team:
+            # TODO: Proper exception.
+            raise Exception('Team has been deleted.')
+
         if self.is_sub:
             raise Exception("Can not demote a sub.")
 
@@ -112,7 +120,7 @@ class TeamMember:
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 "UPDATE teams.members SET is_sub = True WHERE team_id = $1 AND member_id = $2",
-                self.team.id,
+                team.id,
                 self.member_id,
             )
 
@@ -126,6 +134,10 @@ class TeamMember:
         Exception
             The member is already on the main roster.
         """
+        team = self.team
+        if not team:
+            raise Exception('Team has been deleted.')
+
         if not self.is_sub:
             raise Exception("Can not promote a player on the main roster.")
 
@@ -134,7 +146,7 @@ class TeamMember:
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 "UPDATE teams.members SET is_sub = False WHERE team_id = $1 AND member_id = $2",
-                self.team.id,
+                team.id,
                 self.member_id,
             )
 
@@ -143,8 +155,16 @@ class TeamMember:
 
         A method to fetch the :class:`discord.Member` represented by this
         :class:`TeamMember`.
+
+        Raises
+        ------
+        Exception
+            The guild was not found.
         """
-        guild = self.team.guild
+        guild = self.team and self.team.guild
+        if not guild:
+            raise Exception("Guild not found.")
+
         return await guild.fetch_member(self.member_id)
 
 
@@ -307,7 +327,10 @@ class Team:
                 voice_channel.id,
                 name,
             )
-            assert data
+
+            if not data:
+                # Something wrong with our query or the database
+                raise Exception("Failed to create a new team.")
 
         team = cls(bot, **dict(data), team_members={})
         bot.add_team(team)
@@ -675,7 +698,9 @@ class Team:
                 is_sub,
             )
 
-        assert member_record
+            if not member_record:
+                raise Exception("Failed to add a new member to the team.")
+
         team_member = TeamMember(self.bot, guild_id=self.guild_id, **dict(member_record))
 
         self.team_members[team_member.member_id] = team_member

@@ -374,7 +374,8 @@ class PracticeLeaderboardCog(BaseCog):
         channel: Optional[:class:`discord.TextChannel`]
             The channel to post the leaderboard in. If not provided, the channel the command was used in will be used.
         """
-        assert interaction.guild
+        if not interaction.guild:
+            raise ValueError("Interaction must be in a guild.")
 
         await interaction.response.defer(ephemeral=True)
 
@@ -420,7 +421,8 @@ class PracticeLeaderboardCog(BaseCog):
                 top_team.id,
                 role.id,
             )
-            assert data
+            if not data:
+                raise ValueError("Failed to create leaderboard.")
 
         leaderboard = PracticeLeaderboard(bot=self.bot, **dict(data))
         self.leaderboard_cache.setdefault(interaction.guild.id, {})[channel.id] = leaderboard
@@ -450,7 +452,8 @@ class PracticeLeaderboardCog(BaseCog):
         channel: Optional[:class:`discord.TextChannel`]
             The channel to delete the leaderboard from. If not provided, the channel the command was used in will be used.
         """
-        assert interaction.guild
+        if not interaction.guild:
+            raise ValueError("Interaction must be in a guild.")
 
         await interaction.response.defer(ephemeral=True)
 

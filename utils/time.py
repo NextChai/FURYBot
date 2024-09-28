@@ -259,7 +259,8 @@ class TimeTransformer(app_commands.Transformer):
         remaining: :class:`str`
             The remaining arguments.
         """
-        assert self.dt is not None
+        if not self.dt:
+            raise BadArgument('Invalid time provided.')
 
         if self.dt < now:
             raise BadArgument('This time is in the past.')

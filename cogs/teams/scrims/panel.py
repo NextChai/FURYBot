@@ -55,18 +55,28 @@ class ScrimPanel(BaseView):
     @property
     def embed(self) -> discord.Embed:
         """:class:`discord.Embed`: The embed for this view."""
+        home_team = self.scrim.home_team
+        away_team = self.scrim.away_team
+        if not home_team or not away_team:
+            # One of these teams has been deleted, we can only return a dump embed with the anticipation
+            # that the scrim will be cancelled.
+            return self.bot.Embed(
+                title='Team Scrim Information',
+                description='This scrim has been cancelled due to a team being deleted.',
+            )
+
         embed = self.team.embed(
             title='Team Scrim Information',
             description=f'This scrim was originally scheduled for {self.scrim.scheduled_for_formatted()}. This scrim is currently **{self.scrim.status.value.replace("_", " ").title()}**.',
         )
         embed.add_field(
             name='Home Team',
-            value=f'{self.scrim.home_team.display_name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.home_voters]) or "No home voters."}',
+            value=f'{home_team.display_name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.home_voters]) or "No home voters."}',
             inline=False,
         )
         embed.add_field(
             name='Away Team',
-            value=f'{self.scrim.away_team.display_name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.away_voters]) or "No away voters."}',
+            value=f'{away_team.display_name}\n**Confirmed Members**: {", ".join([m.mention for m in self.scrim.away_voters]) or "No away voters."}',
         )
 
         if self.scrim.status is ScrimStatus.scheduled and self.scrim.scheduled_for < discord.utils.utcnow():
@@ -79,7 +89,7 @@ class ScrimPanel(BaseView):
                 name='Scrim In Progress', value=f'This scrim is **currently in progress**.{addition}', inline=False
             )
 
-        embed.set_author(name=self.scrim.home_team.display_name, icon_url=self.scrim.home_team.logo)
+        embed.set_author(name=home_team.display_name, icon_url=home_team.logo)
 
         embed.set_footer(text=f'Scrim ID: {self.scrim.id}')
         return embed
@@ -95,6 +105,10 @@ class ScrimPanel(BaseView):
 
         home_team = self.scrim.home_team
         away_team = self.scrim.away_team
+
+        if not home_team or not away_team:
+            # One of these teams has been deleted, we must cancel this scrim
+            return await self.scrim.cancel(reason='One of the teams has been deleted.')
 
         for member in members:
             home_member = home_team.get_member(member.id)
@@ -124,7 +138,7 @@ class ScrimPanel(BaseView):
 
             # Send the message to the other channel now
             view = AwayConfirm(self.scrim)
-            away_text_channel = self.scrim.away_team.text_channel
+            away_text_channel = away_team.text_channel
             if not away_text_channel:
                 # Ths channel, for some reason, has been deleted. We should cancel the scrim.
                 await self.scrim.cancel(reason='The away team text channel has been deleted.')
@@ -242,10 +256,13 @@ class TeamScrimsPanel(BaseView):
             if scrim.home_team == self.team:
                 hosted_scrims += 1
 
+            home_team_display_name = scrim.home_team and scrim.home_team.display_name or '<Team Deleted>'
+            away_team_display_name = scrim.away_team and scrim.away_team.display_name or '<Team Deleted>'
+
             embed.add_field(
                 name=f'Scrim {discord.utils.format_dt(scrim.scheduled_for, "R")}',
-                value=f'**Team Created Scrim**: {scrim.home_team.display_name}\n'
-                f'**Away Team**: {scrim.away_team.display_name}\n'
+                value=f'**Team Created Scrim**: {home_team_display_name}\n'
+                f'**Away Team**: {away_team_display_name}\n'
                 f'**Status**: {scrim.status.value.title()}\n'
                 f'**Home Team Confirmed**: {", ".join([m.mention for m in scrim.home_voters]) or "No home votes."}\n'
                 f'**Away Team Confirmed**: {", ".join([m.mention for m in scrim.away_voters]) or "No away votes."}\n',

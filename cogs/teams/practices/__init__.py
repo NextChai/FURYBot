@@ -53,7 +53,6 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
         name="practice",
         description="Manage and start practices.",
         guild_only=True,
-        default_permissions=discord.Permissions(moderate_members=True),
     )
 
     @practice.command(name="start", description="Start a practice for your team.")
@@ -63,14 +62,17 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
         Start a new practice within a team channel. This command can only be used in a team channel by a member
         on a team.
         """
-        assert interaction.guild
+        if not interaction.guild:
+            raise ValueError('Invariant that guild invoke has failed.')
 
         # Let's check to make sure this is a team channel first.
         channel = interaction.channel
-        assert channel
+        if not channel:
+            raise ValueError('channel has failed to parse')
 
         member = interaction.user
-        assert isinstance(member, discord.Member)
+        if not isinstance(member, discord.Member):
+            return await interaction.response.send_message("You must be a in a server to use this command.", ephemeral=True)
 
         category = getattr(channel, "category", None)
         if category is None:
@@ -137,7 +139,8 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
                 interaction.user.id,
                 message.id,
             )
-            assert practice_data
+            if not practice_data:
+                raise ValueError("Failed to create a practice.")
 
             practice = Practice(bot=self.bot, data=dict(practice_data))
 

@@ -40,7 +40,11 @@ class Infractions(DmNotifications, InfractionCounter):
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.guild_only()
     async def infractions_manage(self, interaction: discord.Interaction[FuryBot]) -> discord.InteractionMessage:
-        assert interaction.guild is not None
+        if interaction.guild is None:
+            # This shouldn't happen because of the check invariant, but in case it does resolve to a
+            # guild then we need to let the developer know to address the issue,
+            raise ValueError('This command should only be used in a guild.')
+
         await interaction.response.defer(ephemeral=True)
 
         settings = self.bot.get_infractions_settings(interaction.guild.id)
@@ -60,7 +64,11 @@ class Infractions(DmNotifications, InfractionCounter):
     async def infractions_count(
         self, interaction: discord.Interaction[FuryBot], member: discord.Member
     ) -> discord.InteractionMessage:
-        assert interaction.guild is not None
+        if interaction.guild is None:
+            # This shouldn't happen because of the check invariant, but in case it does resolve to a
+            # guild then we need to let the developer know to address the issue,
+            raise ValueError('This command should only be used in a guild.')
+
         await interaction.response.defer(ephemeral=True)
 
         settings = self.bot.get_infractions_settings(interaction.guild.id)
@@ -86,7 +94,11 @@ class Infractions(DmNotifications, InfractionCounter):
     async def infractions_recent(
         self, interaction: discord.Interaction[FuryBot], member: discord.Member
     ) -> discord.InteractionMessage:
-        assert interaction.guild is not None
+        if interaction.guild is None:
+            # This shouldn't happen because of the check invariant, but in case it does resolve to a
+            # guild then we need to let the developer know to address the issue,
+            raise ValueError('This command should only be used in a guild.')
+
         await interaction.response.defer(ephemeral=True)
 
         settings = self.bot.get_infractions_settings(interaction.guild.id)
@@ -119,7 +131,11 @@ class Infractions(DmNotifications, InfractionCounter):
     async def infractions_clear(
         self, interaction: discord.Interaction[FuryBot], target: Union[discord.Member, discord.Role]
     ) -> discord.InteractionMessage:
-        assert interaction.guild is not None
+        if interaction.guild is None:
+            # This shouldn't happen because of the check invariant, but in case it does resolve to a
+            # guild then we need to let the developer know to address the issue,
+            raise ValueError('This command should only be used in a guild.')
+
         await interaction.response.defer(ephemeral=True)
 
         settings = self.bot.get_infractions_settings(interaction.guild.id)
@@ -150,7 +166,11 @@ class Infractions(DmNotifications, InfractionCounter):
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.guild_only()
     async def infractions_clear_all(self, interaction: discord.Interaction[FuryBot]) -> discord.InteractionMessage:
-        assert interaction.guild is not None
+        if interaction.guild is None:
+            # This shouldn't happen because of the check invariant, but in case it does resolve to a
+            # guild then we need to let the developer know to address the issue,
+            raise ValueError('This command should only be used in a guild.')
+
         await interaction.response.defer(ephemeral=True)
 
         settings = self.bot.get_infractions_settings(interaction.guild.id)

@@ -56,9 +56,9 @@ class TeamMemberView(BaseView):
         The team the member is in.
     """
 
-    def __init__(self, member: discord.Member, team: Team, **kwargs: Any) -> None:
+    def __init__(self, member: Union[discord.Member, discord.User], team: Team, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.member: discord.Member = member
+        self.member: Union[discord.Member, discord.User] = member
         self.team: Team = team
 
     @property
@@ -109,7 +109,11 @@ class TeamMemberView(BaseView):
     ) -> None:
         """View the practice statistics for this member."""
         team_member = self.team.get_member(self.member.id)
-        assert team_member
+        if not team_member:
+            # This member has been removed while the view was open.
+            return await interaction.response.send_message(
+                "This member is not on the team. Were they removed?", ephemeral=True
+            )
 
         view = self.create_child(PracticeMemberStatistics, team_member, self.member)
         await interaction.response.edit_message(view=view, embed=view.embed)
@@ -158,13 +162,11 @@ class TeamMembersView(BaseView):
         await interaction.response.defer()
 
         member = members[0]
-        assert isinstance(member, discord.Member)
 
         team_member = self.team.get_member(member.id)
         if not team_member:
             await interaction.edit_original_response(embed=self.embed, view=self)
-            await interaction.followup.send("This member is not on the team.", ephemeral=True)
-            return
+            return await interaction.followup.send("This member is not on the team.", ephemeral=True)
 
         view = self.create_child(TeamMemberView, member=member, team=self.team)
         await interaction.edit_original_response(embed=view.embed, view=view)

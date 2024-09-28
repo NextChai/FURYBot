@@ -146,7 +146,8 @@ class Scrim:
                 status.value,
                 when,
             )
-            assert data
+            if not data:
+                raise ValueError('Failed to create scrim.')
 
             clean = dict(data)
             clean['status'] = status  # Fix the status
@@ -188,18 +189,14 @@ class Scrim:
         return scrim
 
     @property
-    def home_team(self) -> Team:
+    def home_team(self) -> Optional[Team]:
         """:class:`Team`: The home team."""
-        team = self.bot.get_team(self.home_id, guild_id=self.guild_id)
-        assert team
-        return team
+        return self.bot.get_team(self.home_id, guild_id=self.guild_id)
 
     @property
-    def away_team(self) -> Team:
+    def away_team(self) -> Optional[Team]:
         """:class:`Team`: The away team."""
-        team = self.bot.get_team(self.away_id, guild_id=self.guild_id)
-        assert team
-        return team
+        return self.bot.get_team(self.away_id, guild_id=self.guild_id)
 
     @property
     def guild(self) -> discord.Guild:
@@ -214,7 +211,11 @@ class Scrim:
         --------
         List[:class:`TeamMember`]
         """
-        members = self.home_team.team_members
+        home_team = self.home_team
+        if not home_team:
+            return []
+
+        members = home_team.team_members
         return [member for (member_id, member) in members.items() if member_id in self.home_voter_ids]
 
     @property
@@ -225,7 +226,11 @@ class Scrim:
         --------
         List[:class:`TeamMember`]
         """
-        members = self.away_team.team_members
+        away_team = self.away_team
+        if not away_team:
+            return []
+
+        members = away_team.team_members
         return [member for (member_id, member) in members.items() if member_id in self.away_voter_ids]
 
     @property
@@ -236,7 +241,11 @@ class Scrim:
         -------
         List[:class:`TeamMember`]
         """
-        members = self.away_team.team_members
+        away_team = self.away_team
+        if not away_team:
+            return []
+
+        members = away_team.team_members
         return [member for (member_id, member) in members.items() if member_id in self.away_confirm_anyways_voter_ids]
 
     @property
@@ -282,7 +291,7 @@ class Scrim:
         :class:`discord.Message`
             The message in the home team's text channel.
         """
-        channel = self.home_team.text_channel
+        channel = self.home_team and self.home_team.text_channel
         if channel is None:
             return None
 
@@ -299,7 +308,7 @@ class Scrim:
         if not self.away_message_id:
             return None
 
-        channel = self.away_team.text_channel
+        channel = self.away_team and self.away_team.text_channel
         if channel is None:
             return None
 
@@ -318,7 +327,7 @@ class Scrim:
         if not self.away_confirm_anyways_message_id:
             return
 
-        channel = self.away_team.text_channel
+        channel = self.away_team and self.away_team.text_channel
         if channel is None:
             return None
 
@@ -408,6 +417,11 @@ class Scrim:
             The created text channel. ``None`` if the home category channel has been deleted and the scrim
             has been cancelled.
         """
+        if not self.home_team or not self.away_team:
+            # One or more teams has been deleted, cancel this scrim.
+            await self.cancel(reason='One or more teams have been deleted.')
+            return
+
         overwrites: Mapping[Union[discord.Member, discord.Role], discord.PermissionOverwrite] = {
             m.member or await m.fetch_member(): discord.PermissionOverwrite(view_channel=True)
             for m in [*self.away_team.team_members.values(), *self.home_team.team_members.values()]

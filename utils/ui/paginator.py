@@ -142,7 +142,8 @@ class BaseButtonPaginator(Generic[T], BaseView, abc.ABC):
             # Manual override so the owner can interact with **every** paginator.
             return True
 
-        assert self.author
+        if not self.author:
+            raise ValueError('The author must be set for the paginator to work.')
 
         # Ensure this is the correct invoker
         if self.author.id != interaction.user.id:

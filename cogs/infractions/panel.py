@@ -57,7 +57,8 @@ class DoesWantToCreateInfractionsSettings(BaseView):
         await interaction.response.defer()
 
         guild_id = interaction.guild_id
-        assert guild_id is not None
+        if guild_id is None:
+            raise ValueError('guild_id is None in a guild only command.')
 
         if should_create:
             settings = await InfractionsSettings.create(guild_id, bot=self.bot)

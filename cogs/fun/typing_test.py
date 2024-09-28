@@ -133,7 +133,8 @@ class TypingTestView(BaseView):
             raise ValueError("Packet is missing, this should not happen.")
 
         guild = message.guild
-        assert guild, "Guild is not available somehow?"
+        if not guild:
+            raise ValueError("Guild is not available in guild only command.")
 
         async with self.channel.typing():
             accuracy = typing_accuracy(message.content, packet.sentence)

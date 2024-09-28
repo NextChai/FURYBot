@@ -64,7 +64,9 @@ class InfractionsSettings:
                     ''',
                     guild_id,
                 )
-                assert record is not None
+
+                if not record:
+                    raise ValueError('Failed to create a new infractions settings record.')
 
         instance = cls(data=dict(record), bot=bot)
         bot.add_infractions_settings(instance)
@@ -83,7 +85,9 @@ class InfractionsSettings:
         if not channel:
             return None
 
-        assert isinstance(channel, discord.TextChannel)
+        if not isinstance(channel, discord.TextChannel):
+            raise ValueError('Notification channel is not a text channel.')
+
         return channel
 
     @property

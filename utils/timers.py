@@ -395,8 +395,9 @@ class TimerManager:
 
         async with self.bot.safe_connection() as conn:
             row = await conn.fetchrow(query, *sanitized_args)
-
-        assert row is not None
+            if not row:
+                # This has failed, we should raise an error.
+                raise RuntimeError('Failed to create timer.')
 
         # only set the data check if it can be waited on
         if delta <= (86400 * 40):  # 40 days

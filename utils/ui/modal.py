@@ -51,7 +51,7 @@ class BaseModal(discord.ui.Modal):
 
     async def on_error(self, interaction: discord.Interaction[FuryBot], error: Exception) -> None:
         if self.bot.error_handler:
-            return await self.bot.error_handler.handle_interaction_error(error=error, interaction=interaction)
+            return await self.bot.error_handler.handle_tree_on_error(error=error, interaction=interaction)
 
         return await super().on_error(interaction, error)
 
@@ -73,7 +73,7 @@ class AfterModal(BaseModal):
         # Remove the unused kwargs we don't pass to the callback
         self._after_kwargs: Dict[str, Any] = kwargs
 
-        self._added_children: Tuple[discord.ui.Item[Self]] = children
+        self._added_children: Tuple[discord.ui.Item[Self]] = children  # type: ignore
         for child in children:
             self.add_item(child)
 

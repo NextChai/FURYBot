@@ -32,7 +32,8 @@ class SentenceGrabber:
         min_sentence_length: int = 5,
         max_sentence_length: int = 50,
     ) -> None:
-        assert content or filename, 'You must provide either content or a filename.'
+        if not self.content and not self.filename:
+            raise ValueError('You must provide either content or a filename.')
 
         self.content: Optional[List[str]] = content
         self.filename: Optional[str] = filename
@@ -82,7 +83,8 @@ class SentenceGrabber:
         return self.grab()
 
     def grab(self) -> str:
-        assert self.content, 'You must provide content or use the class as a context manager with a file.'
+        if not self.content:
+            raise ValueError('You must provide content or use the class as a context manager with a file.')
 
         self.__index += 1
         if self.__index >= len(self.content):
@@ -90,7 +92,7 @@ class SentenceGrabber:
 
         sentence = self.content[self.__index]
 
-        # Remove all puntuations and strip the sentence
+        # Remove all punctuations and strip the sentence
         sentence = PUNCTUATION_REGEX.sub('', sentence).strip()
 
         # Ensure that if there's any new lines, we replace them with a space

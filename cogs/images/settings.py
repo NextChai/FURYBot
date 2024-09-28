@@ -62,7 +62,9 @@ class AttachmentRequestSettings:
                     channel_id,
                     notification_role_id,
                 )
-                assert record is not None
+
+                if not record:
+                    raise ValueError('Failed to create a new attachment request settings record.')
 
         return cls(data=dict(record), bot=bot)
 
@@ -96,7 +98,9 @@ class AttachmentRequestSettings:
         if not channel:
             return None
 
-        assert isinstance(channel, discord.TextChannel)
+        if not isinstance(channel, discord.TextChannel):
+            raise ValueError('The channel is not a text channel.')
+
         return channel
 
     @property

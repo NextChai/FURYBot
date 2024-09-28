@@ -62,6 +62,16 @@ class HomeConfirm(discord.ui.View):
         """:class:`discord.Embed`: A discord embed to display information about the current state of the scrim to the home team."""
         scrim = self.scrim
 
+        if not scrim.home_team or not scrim.away_team:
+            # One or more of these teams have been deleted. If this happens, return an embed
+            # with little to no info with the understanding that the scrim will be cancelled.
+            return self.bot.Embed(
+                title='Scrim Cancelled',
+                description=(
+                    'One or more of the teams involved in this scrim have been deleted. The scrim has been cancelled.'
+                ),
+            )
+
         if scrim.status is ScrimStatus.pending_host:
             embed = self.bot.Embed(
                 title='Confirm The Scrim',
@@ -146,7 +156,13 @@ class HomeConfirm(discord.ui.View):
             ``True`` if the interaction passes the check, ``False`` if it fails, and ``None`` if the check is not
             applicable to the interaction.
         """
-        members = self.scrim.home_team.team_members
+        home_team = self.scrim.home_team
+        if not home_team:
+            return await interaction.response.send_message(
+                'The home team has been deleted. This has been disabled.', ephemeral=True
+            )
+
+        members = home_team.team_members
         if interaction.user.id not in members:
             return await interaction.response.send_message(
                 'Hey, you aren\'t on this team so you can\'t vote!', ephemeral=True
@@ -174,7 +190,7 @@ class HomeConfirm(discord.ui.View):
         await interaction.response.edit_message(view=None, embed=self.embed)
 
         # Now send to the other team
-        channel = self.scrim.away_team.text_channel
+        channel = self.scrim.away_team and self.scrim.away_team.text_channel
         if not channel:
             # The channel was deleted, we need to cancel the scrim
             await self.scrim.cancel(reason='The away channel has been deleted.')
@@ -276,7 +292,13 @@ class AwayForceConfirm(discord.ui.View):
             ``True`` if the interaction passes the check, ``False`` if it fails, and ``None`` if the check is not
             applicable to the interaction.
         """
-        members = self.scrim.away_team.team_members
+        away_team = self.scrim.away_team
+        if away_team is None:
+            return await interaction.response.send_message(
+                'The away team has been deleted. This has been disabled.', ephemeral=True
+            )
+
+        members = away_team.team_members
         if interaction.user.id not in members:
             return await interaction.response.send_message(
                 'Hey, you aren\'t on this team so you can\'t vote!', ephemeral=True
@@ -308,7 +330,7 @@ class AwayForceConfirm(discord.ui.View):
         await self.scrim.change_status(ScrimStatus.scheduled)
 
         # Delete this message
-        away_channel = self.scrim.away_team.text_channel
+        away_channel = self.scrim.away_team and self.scrim.away_team.text_channel
         if away_channel is None:
             # For whatever reason, this away channel has been deleted. We must cancel this scrim as the data
             # has been invalidated.
@@ -318,7 +340,7 @@ class AwayForceConfirm(discord.ui.View):
         await message.delete()
 
         # Now update the home message
-        home_channel = self.scrim.home_team.text_channel
+        home_channel = self.scrim.home_team and self.scrim.home_team.text_channel
         if home_channel is None:
             # Similar to before, if the home channel is also deleted, we must cancel the scrim.
             return await self.scrim.cancel(reason='The home channel has been deleted.')
@@ -359,13 +381,23 @@ class AwayConfirm(discord.ui.View):
         """:class:`discord.Embed`: The embed to show for this view."""
         scrim = self.scrim
 
+        if not scrim.home_team or not scrim.away_team:
+            # One or more of these teams have been deleted. If this happens, return an embed
+            # with little to no info with the understanding that the scrim will be cancelled.
+            return self.bot.Embed(
+                title='Scrim Cancelled',
+                description=(
+                    'One or more of the teams involved in this scrim have been deleted. The scrim has been cancelled.'
+                ),
+            )
+
         if scrim.status is ScrimStatus.pending_host:
             raise Exception('Scrim status did not transition correctly.')
 
         if scrim.status is ScrimStatus.pending_away:
             embed = self.bot.Embed(
                 title='Scrim Incoming!',
-                description=f'Team **{self.scrim.home_team.display_name}** would like to scrim your team on '
+                description=f'Team **{scrim.home_team.display_name}** would like to scrim your team on '
                 f'{scrim.scheduled_for_formatted()}. Do you want to scrim? Press "Confirm" below to do so. '
                 f'**{scrim.per_team - len(scrim.away_voter_ids)} vote(s) are needed** before the scrim '
                 'is officially confirmed.',
@@ -381,7 +413,7 @@ class AwayConfirm(discord.ui.View):
         elif scrim.status is ScrimStatus.scheduled:
             embed = self.bot.Embed(
                 title='Scrim Scheduled',
-                description=f'Your scrim against **{self.scrim.home_team.display_name}** has been confirmed for '
+                description=f'Your scrim against **{scrim.home_team.display_name}** has been confirmed for '
                 f'{scrim.scheduled_for_formatted()}.',
             )
             embed.add_field(
@@ -426,7 +458,13 @@ class AwayConfirm(discord.ui.View):
             ``True`` if the interaction passes the check, ``False`` if it fails, and ``None`` if the check is not
             applicable to the interaction.
         """
-        members = self.scrim.away_team.team_members
+        away_team = self.scrim.away_team
+        if not away_team:
+            return await interaction.response.send_message(
+                'The away team has been deleted. This has been disabled.', ephemeral=True
+            )
+
+        members = away_team.team_members
         if interaction.user.id not in members:
             return await interaction.response.send_message(
                 'Hey, you aren\'t on this team so you can\'t vote!', ephemeral=True
@@ -474,7 +512,7 @@ class AwayConfirm(discord.ui.View):
                 'You can not vote to force confirm if "per team" is less than 2.', ephemeral=True
             )
 
-        away_text_channel = self.scrim.away_team.text_channel
+        away_text_channel = self.scrim.away_team and self.scrim.away_team.text_channel
         if away_text_channel is None:
             # This channel has been deleted, we must cancel the scrim
             await interaction.response.send_message(

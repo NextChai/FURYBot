@@ -84,7 +84,9 @@ class ImageRequests(BaseCog):
     async def attachment_request_settings(
         self, interaction: discord.Interaction[FuryBot]
     ) -> Optional[discord.InteractionMessage]:
-        assert interaction.guild
+        if not interaction.guild:
+            # This should never happen, but just in case
+            return
 
         await interaction.response.defer(ephemeral=True)
 
@@ -129,7 +131,9 @@ class ImageRequests(BaseCog):
         await interaction.response.defer(ephemeral=True)
 
         guild = interaction.guild
-        assert guild
+        if not guild:
+            # This should never happen, but just in case
+            return
 
         sender_channel = interaction.channel
         if not sender_channel:
@@ -212,7 +216,10 @@ class ImageRequests(BaseCog):
                     message,
                     moderator_message.id,
                 )
-                assert data
+
+                if not data:
+                    # Something is wrong with the DB here
+                    raise ValueError('Failed to insert the image request into the database.')
 
                 request.id = data['id']
 

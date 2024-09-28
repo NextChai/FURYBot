@@ -59,10 +59,10 @@ class DoesWantToCreateAttachmentSettings(BaseView):
                 content='Alright, no attachment settings will be created.', view=None, embed=None
             )
 
-        assert interaction.guild_id is not None
-        assert interaction.channel_id is not None
-        # TODO: Allow user to say where to create, I just don't care
+        if interaction.guild_id is None or interaction.channel_id is None:
+            raise ValueError('Guild ID or Channel ID is None when trying to create attachment settings.')
 
+        # TODO: Allow user to say where to create
         settings = await AttachmentRequestSettings.create(interaction.guild_id, interaction.channel_id, bot=self.bot)
         panel = AttachmentRequestSettingsPanel(settings, target=interaction)
         return await interaction.edit_original_response(embed=None, view=panel)
@@ -195,7 +195,8 @@ class ApproveOrDenyImage(discord.ui.View):
             content += f' Message: {request.message}'
 
         # as of right now interaction.channel includes ForumChannel and CategoryChannel - it can not resolve to this though.
-        assert not isinstance(request.channel, (discord.ForumChannel, discord.CategoryChannel))
+        if isinstance(request.channel, (discord.ForumChannel, discord.CategoryChannel)):
+            raise ValueError('The channel cannot be sent to.')
 
         message = await request.channel.send(
             file=file, content=content, allowed_mentions=discord.AllowedMentions(users=[request.requester])

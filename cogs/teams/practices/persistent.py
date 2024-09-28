@@ -14,7 +14,7 @@ Full license terms are available in the LICENSE file at the root of the reposito
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 import discord
 from typing_extensions import Self
@@ -50,9 +50,9 @@ class UnableToAttendModal(discord.ui.Modal):
         required=True,
     )
 
-    def __init__(self, *, practice: Practice, member: discord.Member) -> None:
+    def __init__(self, *, practice: Practice, member: Union[discord.Member, discord.User]) -> None:
         self.practice: Practice = practice
-        self.member: discord.Member = member
+        self.member: Union[discord.Member, discord.User] = member
         super().__init__(timeout=None, title="Why Can't You Attend?")
 
     async def interaction_check(self, interaction: discord.Interaction[FuryBot], /) -> Optional[bool]:
@@ -113,13 +113,21 @@ class PracticeView(discord.ui.View):
         team = self.practice.team
         started_by = self.practice.started_by
 
+        if not team:
+            # This team has been deleted while the user is still in the practice.
+            return self.practice.bot.Embed(
+                title="Team Deleted!",
+                description="This team has been deleted while this panel is active.",
+                color=discord.Color.red(),
+            )
+
         attending_member_mentions: List[str] = [member.mention for member in self.practice.attending_members]
         excused_member_mentions: List[str] = [member.mention for member in self.practice.excused_members]
         members_unattended_mentions: List[str] = [member.mention for member in self.practice.missing_members]
 
-        embed = self.practice.team.embed(
+        embed = team.embed(
             title=f"{team.display_name} Practice.",
-            description=f"A practice started by {started_by.mention} on {self.practice.format_start_time()} is currently in progress has come to an end.",
+            description=f"A practice started by {started_by and started_by.mention or '`<not found>`'} on {self.practice.format_start_time()} is currently in progress has come to an end.",
         )
 
         # Show the members that attended the practice.
@@ -144,13 +152,12 @@ class PracticeView(discord.ui.View):
             )
 
         total_time = self.practice.get_total_practice_time()
-        assert total_time
-
-        embed.add_field(
-            name="Total Practice Time",
-            value=f"In total, **todays practice was {human_timedelta(total_time.total_seconds())}**. More stats have been posted "
-            "in the practice completed message.",
-        )
+        if total_time:
+            embed.add_field(
+                name="Total Practice Time",
+                value=f"In total, **todays practice was {human_timedelta(total_time.total_seconds())}**. More stats have been posted "
+                "in the practice completed message.",
+            )
 
         return embed
 
@@ -163,13 +170,21 @@ class PracticeView(discord.ui.View):
         team = self.practice.team
         started_by = self.practice.started_by
 
+        if not team:
+            # This has been deleted while the user is still in the practice.
+            return self.practice.bot.Embed(
+                title="Team Deleted!",
+                description="This team has been deleted while this panel is active.",
+                color=discord.Color.red(),
+            )
+
         embed = team.embed(
             title=f"{team.display_name} Practice.",
-            description=f"A practice started by {started_by.mention} on {self.practice.format_start_time()} "
+            description=f"A practice started by {started_by and started_by.mention or '`<not-found>`'} on {self.practice.format_start_time()} "
             "is currently in progress.",
         )
 
-        voice_channel = self.practice.team.voice_channel
+        voice_channel = team.voice_channel
         if not voice_channel:
             # This team's main voice channel has been deleted WHILE the practice is ongoing.
             embed.add_field(
@@ -236,7 +251,7 @@ class PracticeView(discord.ui.View):
 
         This is called whenever a practice member joins or leaves a voice channel.
         """
-        team_text_channel = self.practice.team.text_channel
+        team_text_channel = self.practice.team and self.practice.team.text_channel
         if not team_text_channel:
             # This team text channel has been deleted, we cannot update anything
             return
@@ -255,5 +270,4 @@ class PracticeView(discord.ui.View):
         self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
     ) -> None:
         """Called when the user presses the "I Can't Attend" button.". Will spawn the unable to attend modal."""
-        assert isinstance(interaction.user, discord.Member)
         await interaction.response.send_modal(UnableToAttendModal(practice=self.practice, member=interaction.user))

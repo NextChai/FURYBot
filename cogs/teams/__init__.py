@@ -23,7 +23,7 @@ from discord.ext import commands
 
 from utils import BaseCog, TimeTransformer
 
-from .errors import *
+from .errors import TeamNotFound
 from .practices.panel import TeamPracticesPanel
 from .scrims import Scrim
 from .scrims.errors import CannotCreateScrim
@@ -45,7 +45,8 @@ _log = logging.getLogger(__name__)
 
 
 def _maybe_team(interaction: discord.Interaction[FuryBot], team: Optional[Team]) -> Optional[Team]:
-    assert interaction.guild
+    if not interaction.guild:
+        raise ValueError('This function can only be used when the interaction is in a guild.')
 
     if team is not None:
         return team
@@ -104,7 +105,8 @@ class Teams(BaseCog):
         name: :class:`str`
             The name of the team.
         """
-        assert interaction.guild
+        if not interaction.guild:
+            raise ValueError('Interaction guild is None in guild only command.')
 
         await interaction.response.defer()
 
@@ -197,7 +199,7 @@ class Teams(BaseCog):
         team: FRONT_END_TEAM_TRANSFORM,
         when: Annotated[TimeTransformer, TimeTransformer('n/a')],
         per_team: app_commands.Range[int, 2, 10],
-    ) -> discord.InteractionMessage:
+    ) -> Optional[discord.InteractionMessage]:
         """|coro|
 
         A command used to create a scrim.
@@ -211,12 +213,19 @@ class Teams(BaseCog):
         per_team: :class:`int`
             The amount of players per team. For ex: 5, 3, 2, etc.
         """
-        assert isinstance(interaction.channel, (discord.abc.GuildChannel, discord.Thread))
-        assert interaction.channel.category
-        assert interaction.guild
-        assert when.dt
-
         await interaction.response.defer(ephemeral=True)
+
+        if not isinstance(interaction.channel, (discord.abc.GuildChannel, discord.Thread)):
+            return await interaction.followup.send('This command can only be used in a Thread or Guild channel.')
+
+        if not interaction.channel.category:
+            return await interaction.followup.send('This command can only be used in a team channel.')
+
+        if not interaction.guild:
+            return await interaction.followup.send('This command can only be used in a guild.')
+
+        if not when.dt:
+            return await interaction.followup.send('Could not understand the time provided.')
 
         try:
             home_team = Team.from_channel(interaction.channel.category.id, interaction.guild.id, bot=self.bot)
@@ -238,36 +247,40 @@ class Teams(BaseCog):
 
     async def _team_get_func(
         self, interaction: discord.Interaction[FuryBot], member: discord.Member
-    ) -> discord.InteractionMessage:
-        assert interaction.guild
-
+    ) -> Optional[discord.InteractionMessage]:
         await interaction.response.defer(ephemeral=True)
 
-        team_members: List[TeamMember] = [
+        if not interaction.guild:
+            return await interaction.followup.send('This can only be used in a guild.')
+
+        member_instances: List[TeamMember] = [
             team_member for team in self.bot.get_teams(interaction.guild.id) if (team_member := team.get_member(member.id))
         ]
 
-        if not team_members:
+        if not member_instances:
             return await interaction.edit_original_response(content=f'{member.mention} is not on any teams.')
 
-        team_member = team_members[0]
-        team = team_member.team
-
-        team_text_chat = team_members[0].team.text_channel
-
         embed = self.bot.Embed(title=f'{member.display_name} Teams', author=member)
-        embed.add_field(
-            name=team.display_name,
-            value=f'**Team Chat**: {team_text_chat and team_text_chat.mention or "Text chat has been deleted!!"}\n**Is Sub**: {"Is a sub" if team_member.is_sub else "Is not a sub"}',
-            inline=False,
-        )
+        for instance in member_instances:
+            # Add a field to this embed for each team the member is in
+            team = instance.team
+            if team is None:
+                # This team is dead
+                continue
+
+            team_text_chat = team.text_channel
+            embed.add_field(
+                name=team.display_name,
+                value=f'**Team Chat**: {team_text_chat and team_text_chat.mention or "Text chat has been deleted!!"}\n**Is Sub**: {"Is a sub" if instance.is_sub else "Is not a sub"}',
+                inline=False,
+            )
 
         return await interaction.edit_original_response(embed=embed)
 
     @team.command(name='get', description='Get the team status of a member.')
     async def team_get(
         self, interaction: discord.Interaction[FuryBot], member: discord.Member
-    ) -> discord.InteractionMessage:
+    ) -> Optional[discord.InteractionMessage]:
         """|coro|
 
         Allows you to get the team status of a member.
@@ -283,7 +296,7 @@ class Teams(BaseCog):
 
     async def team_get_context_menu(
         self, interaction: discord.Interaction[FuryBot], member: discord.Member
-    ) -> discord.InteractionMessage:
+    ) -> Optional[discord.InteractionMessage]:
         """|coro|
 
         The context command for the team get command. This does not have decorators
@@ -304,7 +317,8 @@ class Teams(BaseCog):
         if not isinstance(channel, discord.CategoryChannel):
             return
 
-        assert channel.guild, 'This should not be possible'
+        if not channel.guild:
+            return
 
         # This was a category channel, let's check if it was a team
         try:
@@ -332,7 +346,8 @@ class Teams(BaseCog):
         if not isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
             return
 
-        assert channel.guild, 'This should not be possible'
+        if not channel.guild:
+            return
 
         # This was a text channel, let's check if it was a team
         try:

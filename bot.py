@@ -298,7 +298,8 @@ class FuryBot(commands.Bot):
                 await old_init(con)
 
         pool = await asyncpg.create_pool(uri, init=init, **kwargs)
-        assert pool
+        if not pool:
+            raise RuntimeError("Failed to create the pool.")
 
         return pool
 

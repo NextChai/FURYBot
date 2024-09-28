@@ -41,10 +41,8 @@ class TeamAble(GuildAble, Protocol):
     def _get_team_id(self) -> int: ...
 
     @property
-    def team(self) -> Team:
-        team = self._get_bot().get_team(self._get_team_id(), guild_id=self._get_guild_id())
-        assert team
-        return team
+    def team(self) -> Optional[Team]:
+        return self._get_bot().get_team(self._get_team_id(), guild_id=self._get_guild_id())
 
 
 class TeamMemberAble(TeamAble, Protocol):
@@ -52,7 +50,7 @@ class TeamMemberAble(TeamAble, Protocol):
 
     @property
     def team_member(self) -> Optional[TeamMember]:
-        return self.team.get_member(self._get_member_id())
+        return self.team and self.team.get_member(self._get_member_id())
 
     @property
     def mention(self) -> str:
