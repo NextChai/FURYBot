@@ -208,12 +208,16 @@ class ScrimEventListener(BaseCog):
                 # We have no home message, we must cancel this scrim
                 return await scrim.cancel(reason='The home message has been deleted.')
 
-            content = f'@everyone, this scrim is scheduled to start on {scrim.scheduled_for_formatted()} '
-            'and I do not have enough votes from this team to confirm the scrim. **I\'m going to cancel this '
-            'scrim as it\'s very unlikely the other team will confirm in time**.'
+            content = (
+                f'@everyone, this scrim is scheduled to start on {scrim.scheduled_for_formatted()} '
+                'and I do not have enough votes from this team to confirm the scrim. **I\'m going to cancel this '
+                'scrim as it\'s very unlikely the other team will confirm in time**.'
+            )
             await home_message.reply(content, allowed_mentions=discord.AllowedMentions(everyone=True))
             await scrim.cancel()
 
         elif scrim.status is ScrimStatus.pending_away:
-            content = f'@everyone, this scrim is scheduled to start on {scrim.scheduled_for_formatted()} and I\'m waiting '
-            f'on {scrim.per_team - len(scrim.away_voter_ids)} vote(s) from {scrim.away_team.display_name}.'
+            content = (
+                f'@everyone, this scrim is scheduled to start on {scrim.scheduled_for_formatted()} and I\'m waiting '
+                f'on {scrim.per_team - len(scrim.away_voter_ids)} vote(s) from {scrim.away_team.display_name}.'
+            )
