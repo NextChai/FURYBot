@@ -66,16 +66,12 @@ class AutocompleteValidationException(ApplicationCommandException):
     This inherits :class:`ApplicationCommandException`.
     """
 
-    pass
-
 
 class BadArgument(ApplicationCommandException):
     """An exception raised when a command argument is invalid.
 
     This inherits :class:`ApplicationCommandException`.
     """
-
-    pass
 
 
 class TimerNotFound(BaseException):
