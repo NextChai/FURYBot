@@ -433,7 +433,7 @@ class Team:
     @property
     def total_points(self) -> float:
         """:class:`float`: The total points for this team based on their practices."""
-        practice_points = list(points for practice in self.practices if (points := practice.total_points))
+        practice_points = [points for practice in self.practices if (points := practice.total_points)]
         if not practice_points:
             return 0
 

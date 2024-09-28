@@ -639,7 +639,7 @@ class FuryBot(commands.Bot):
         """
         _log.info(f"Logged in as {self.user.name}")
         _log.info(
-            f"Connected to {len(self.guilds)} servers total watching over {sum(list(m_count for g in self.guilds if (m_count := g.member_count))):,} members."
+            f"Connected to {len(self.guilds)} servers total watching over {sum([m_count for g in self.guilds if (m_count := g.member_count)]):,} members."
         )
         _log.info(f"Invite link: {discord.utils.oauth_url(self.user.id, permissions=discord.Permissions(0))}")
 
