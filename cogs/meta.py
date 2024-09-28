@@ -14,13 +14,14 @@ Full license terms are available in the LICENSE file at the root of the reposito
 
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
 import discord
 import psutil
 from discord.ext import commands
 
-from utils import BaseCog, Context
+from utils import BaseCog, Context, human_join
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -49,27 +50,14 @@ class Meta(BaseCog):
     async def about(self, ctx: Context) -> None:
         async with ctx.typing():
             total_members = 0
-            text = 0
-            voice = 0
-            stage = 0
-            forum = 0
-            category = 0
+            channel_counts: dict[discord.ChannelType, int] = defaultdict(int)
 
             for guild in self.bot.guilds:
                 if guild.member_count:
                     total_members += guild.member_count
 
                 for channel in guild.channels:
-                    if isinstance(channel, discord.TextChannel):
-                        text += 1
-                    elif isinstance(channel, discord.VoiceChannel):
-                        voice += 1
-                    elif isinstance(channel, discord.StageChannel):
-                        stage += 1
-                    elif isinstance(channel, discord.ForumChannel):
-                        forum += 1
-                    else:
-                        category += 1
+                    channel_counts[channel.type] += 1
 
             total_members = f'{total_members:,}'
 
@@ -90,9 +78,17 @@ class Meta(BaseCog):
             cpu_usage = self.process.cpu_percent() / psutil.cpu_count()
             embed.add_field(name='Current Process', value=f'{memory_usage:.2f} MiB\n{cpu_usage:.2f}% CPU')
 
+            total = sum(channel_counts.values())
+            display_channels = human_join(
+                [
+                    f'**{count}** {channel_type.name.replace("_", " ").title()}'
+                    for channel_type, count in channel_counts.items()
+                ]
+            )
+
             embed.add_field(
                 name='Channels',
-                value=f'**{text + voice + stage + category + forum}** total\n{text} text, {voice} voice, {stage} stage, {forum} forum, and {category} category.',
+                value=f'**{total}** total\n{display_channels}',
                 inline=False,
             )
 
