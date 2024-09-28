@@ -16,8 +16,6 @@ from __future__ import annotations
 
 import dotenv
 
-dotenv.load_dotenv()
-
 import asyncio
 import logging
 import os
@@ -30,6 +28,8 @@ from bot import FuryBot
 
 if TYPE_CHECKING:
     import asyncpg
+
+dotenv.load_dotenv()
 
 _log = logging.getLogger(__name__)
 
