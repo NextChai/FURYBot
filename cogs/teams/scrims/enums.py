@@ -14,7 +14,6 @@ Full license terms are available in the LICENSE file at the root of the reposito
 
 from __future__ import annotations
 
-
 import enum
 from typing import Tuple
 
