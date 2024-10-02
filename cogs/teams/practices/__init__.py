@@ -100,6 +100,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
         member: discord.Member,
         connected_channel: Union[discord.VoiceChannel, discord.StageChannel],
         message: discord.Message,
+        guild: discord.Guild,
     ) -> Practice:
         # We can create a new practice now.
         async with self.bot.safe_connection() as connection:
@@ -113,7 +114,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
                 interaction.created_at,
                 team.id,
                 connected_channel.id,
-                connected_channel.guild.id,
+                guild.id,
                 PracticeStatus.ongoing.value,
                 interaction.user.id,
                 message.id,
@@ -189,6 +190,7 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
             member=member,
             connected_channel=connected_channel,
             message=message,
+            guild=interaction.guild,
         )
 
         await interaction.followup.send(content="A new practice has been created.", ephemeral=True)
