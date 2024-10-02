@@ -65,31 +65,35 @@ class PracticeCog(PracticeLeaderboardCog, BaseCog):
         """
         # Let's check and see if there's an active practice
         if team.ongoing_practice is not None:
-            return await interaction.followup.send("There is already an active practice for this team.", ephemeral=True)
+            await interaction.followup.send("There is already an active practice for this team.", ephemeral=True)
+            return None
 
         # If this team does not have a voice channel, they are physically unable to do
         # a practice.
         if team.voice_channel is None:
-            return await interaction.followup.send(
+            await interaction.followup.send(
                 "This team does not have a voice channel. Please contact an administrator to get one.",
                 ephemeral=True,
             )
+            return None
 
         # If this team doesn't have a text channel either they cannot do a practice
         team_text_channel = team.text_channel
         if team_text_channel is None:
-            return await interaction.followup.send(
+            await interaction.followup.send(
                 "This team does not have a main text channel. Was it deleted? Why? Please contact an administrator to get one.",
                 ephemeral=True,
             )
+            return None
 
         # Now we can verify they're in the team's voice channel
         connected_channel = target.voice and target.voice.channel
         if not connected_channel or connected_channel != team.voice_channel:
-            return await interaction.followup.send(
+            await interaction.followup.send(
                 "You must be in the team's voice channel to start a practice.",
                 ephemeral=True,
             )
+            return None
 
         return connected_channel
 
