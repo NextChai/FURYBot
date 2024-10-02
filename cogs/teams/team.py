@@ -969,7 +969,7 @@ class Team:
         Deletes all practice history for this team.
         """
         # (1) Delete all practice history
-        await connection.execute("DELETE FROM team.practice WHERE team_id = $1", self.id)
+        await connection.execute("DELETE FROM teams.practice WHERE team_id = $1", self.id)
 
         # (2) Clear the bot's cache for this
         self.bot.clear_practices_for(self.id, self.guild_id)
