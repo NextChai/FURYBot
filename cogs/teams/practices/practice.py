@@ -808,12 +808,16 @@ class Practice(TeamAble):
         if not team or not team_text_channel:
             return
 
-        message = await team_text_channel.fetch_message(self.message_id)
-        await message.reply(
-            embed=embed,
-            allowed_mentions=discord.AllowedMentions(roles=team.captain_roles),
-            content=', '.join(r.mention for r in team.captain_roles),
-        )
+        try:
+            message = await team_text_channel.fetch_message(self.message_id)
+        except discord.NotFound:
+            pass
+        else:
+            await message.reply(
+                embed=embed,
+                allowed_mentions=discord.AllowedMentions(roles=team.captain_roles),
+                content=', '.join(r.mention for r in team.captain_roles),
+            )
 
     async def delete(self) -> None:
         """|coro|

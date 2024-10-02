@@ -266,8 +266,12 @@ class PracticeView(discord.ui.View):
             return
 
         message_id = self.practice.message_id
-        message = await team_text_channel.fetch_message(message_id)
-        await message.edit(view=self, embed=self.embed)
+        try:
+            message = await team_text_channel.fetch_message(message_id)
+        except discord.NotFound:
+            pass
+        else:
+            await message.edit(view=self, embed=self.embed)
 
     @discord.ui.button(
         label="I Can't Attend",
