@@ -103,7 +103,8 @@ class LoggingSettings:
                 guild_id,
                 logging_channel_id,
             )
-            assert record is not None, 'Failed to create logging settings.'
+            if not record:
+                raise ValueError('Failed to create logging settings.')
 
             instance = cls(data=dict(record), bot=bot)
             bot.add_logging_settings(instance)
@@ -225,7 +226,8 @@ class LoggingSettings:
                 self.id,
                 event_type,
             )
-            assert record is not None, 'Failed to add logging event.'
+            if not record:
+                raise ValueError('Failed to add logging event.')
 
         instance = LoggingEvent(**dict(record), settings=self)
         self.add_logging_event(instance)

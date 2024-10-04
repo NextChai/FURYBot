@@ -113,10 +113,14 @@ class Logging(BaseCog):
 
     def _get_known_invariant_settings(self, ctx: Context) -> LoggingSettings:
         guild_id = ctx.guild and ctx.guild.id
-        assert guild_id is not None  # Invariant set by guild_only() and guild_has_logging_settings()
+        if not guild_id:
+            raise ValueError('guild_id should be available in this context, invariant is broken. Please report this.')
 
         settings = self.bot.get_logging_settings(guild_id)
-        assert settings is not None  # Invariant set by guild_has_logging_settings()
+        if not settings:
+            raise ValueError(
+                'Logging settings should be available in this context, invariant is broken. Please report this.'
+            )
 
         return settings
 
