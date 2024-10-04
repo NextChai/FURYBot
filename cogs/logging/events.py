@@ -120,7 +120,7 @@ class LoggingEventsCog(BaseCog):
 
         return actions_fmt
 
-    def _embed_from_automod_rule(self, rule: discord.AutoModRule) -> discord.Embed:
+    def _embed_from_automod_rule(self, rule: discord.AutoModRule) -> discord.Embed:  # skipcq: PY-R1000
         status = 'active' if rule.enabled else 'inactive'
         activation = (
             'a message is sent' if rule.event_type is discord.AutoModRuleEventType else 'a user updates their profile'
