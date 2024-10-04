@@ -128,7 +128,10 @@ class Logging(BaseCog):
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_channels=True)
     @guild_has_logging_settings()
-    async def logging(self, ctx: Context) -> None: ...
+    async def logging(self, ctx: Context) -> None:
+        # TODO: For now, this callback has no functionality. Look into potentially updating this such that it shows the
+        # help for the command (?). Would need a default help command impl to be added back to the bot.
+        ...
 
     @logging.command(name='channel', description='View and change the current logging channel.')
     async def logging_channel(self, ctx: Context, channel: Optional[discord.TextChannel] = None) -> discord.Message:
