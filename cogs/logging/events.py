@@ -100,6 +100,26 @@ class LoggingEventsCog(BaseCog):
 
         return meta
 
+    @staticmethod
+    def _automod_actions_metadata(actions: List[discord.AutoModRuleAction]) -> List[str]:
+        actions_fmt: List[str] = []
+        for action in actions:
+            extra: List[str] = []
+            if action.channel_id:
+                extra.append(f'Channel <#{action.channel_id}>')
+
+            if action.duration:
+                extra.append(f'For {human_timedelta(action.duration.total_seconds())} seconds')
+
+            if action.custom_message:
+                extra.append(f'With message "{action.custom_message}"')
+
+            actions_fmt.append(
+                f'**{action.type.name.replace("_", " ").title()}**: {human_join(extra, delimiter="|") or "No extra info."}'
+            )
+
+        return actions_fmt
+
     def _embed_from_automod_rule(self, rule: discord.AutoModRule) -> discord.Embed:
         status = 'active' if rule.enabled else 'inactive'
         activation = (
@@ -122,22 +142,7 @@ class LoggingEventsCog(BaseCog):
             channels = human_join((channel.mention for channel in rule.exempt_channels))
             embed.add_field(name='Exempt Channels', value=channels, inline=False)
 
-        actions_fmt: List[str] = []
-        for action in rule.actions:
-            extra: List[str] = []
-            if action.channel_id:
-                extra.append(f'Channel <#{action.channel_id}>')
-
-            if action.duration:
-                extra.append(f'For {human_timedelta(action.duration.total_seconds())} seconds')
-
-            if action.custom_message:
-                extra.append(f'With message "{action.custom_message}"')
-
-            actions_fmt.append(
-                f'**{action.type.name.replace("_", " ").title()}**: {human_join(extra, delimiter="|") or "No extra info."}'
-            )
-
+        actions_fmt: List[str] = self._automod_actions_metadata(rule.actions)
         if actions_fmt:
             embed.add_field(name='Actions', value='\n'.join(actions_fmt), inline=False)
 
