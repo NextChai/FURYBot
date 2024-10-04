@@ -38,12 +38,12 @@ if TYPE_CHECKING:
 MISSING = discord.utils.MISSING
 
 # fmt: off
-ALL_EVENTS: Set[str] = set([
+ALL_EVENTS: Set[str] = {
     'automod_rule_create', 
     'automod_rule_update', 
     'automod_rule_delete', 
     'automod_action'
-])
+}
 # fmt: on
 
 

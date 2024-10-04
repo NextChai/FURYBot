@@ -310,8 +310,7 @@ class FuryBot(commands.Bot):
     @staticmethod
     def Embed(
         *,
-        colour: Optional[Union[int, discord.Colour]] = None,
-        color: Optional[Union[int, discord.Colour]] = None,
+        color: Optional[Union[int, discord.Color]] = None,
         title: Optional[Any] = None,
         type: EmbedType = "rich",  # skipcq: PYL-W0622
         url: Optional[Any] = None,
@@ -322,14 +321,6 @@ class FuryBot(commands.Bot):
         """Get an instance of the bot's global :class:`discord.Embed` with the default
         bot's color, "Fury blue".
 
-        The parameters are the same as :class:`discord.Embed` except for one additional one.
-
-        Parameters
-        ----------
-        author: Optional[Union[:class:`discord.User`, :class:`discord.Member`]]
-            An optional author of this embed. When passed, will call :meth:`Embed.set_author` and set
-            the author's name nad icon url.
-
         Returns
         -------
         :class:`discord.Embed`
@@ -339,13 +330,12 @@ class FuryBot(commands.Bot):
             description=description,
             url=url,
             color=color,
-            colour=colour,
             type=type,
             timestamp=timestamp,
         )
 
-        if not colour and not color:
-            embed.colour = discord.Colour.from_str("0x4EDBFC")
+        if not color:
+            embed.color = discord.Color.from_str("0x4EDBFC")
 
         if author:
             embed.set_author(name=author.name, icon_url=author.display_avatar.url)

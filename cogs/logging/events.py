@@ -75,7 +75,8 @@ def logging_event(
 
 class LoggingEventsCog(BaseCog):
 
-    def _automod_trigger_metadata(self, trigger: discord.AutoModTrigger) -> List[str]:
+    @staticmethod
+    def _automod_trigger_metadata(trigger: discord.AutoModTrigger) -> List[str]:
         meta: List[str] = [
             f'Type: {trigger.type.name.replace("_", " ").title()}',
         ]
@@ -103,7 +104,10 @@ class LoggingEventsCog(BaseCog):
 
         embed = self.bot.Embed(
             title=f'Automod Rule "{rule.name}"',
-            description=f'This rule has been created by <@{rule.creator_id}>. This new rule is currently **{status}**. It will trigger when **{activation}**.',
+            description=(
+                f'This rule has been created by <@{rule.creator_id}>. This new rule is currently **{status}**. ' 
+                f'It will trigger when **{activation}**.'
+                ),
         )
 
         if rule.exempt_roles:
@@ -147,7 +151,7 @@ class LoggingEventsCog(BaseCog):
     @logging_event
     async def on_automod_rule_create(self, rule: discord.AutoModRule) -> Tuple[Optional[int], Optional[discord.Embed]]:
         embed = self._embed_from_automod_rule(rule)
-        embed.color = discord.Colour.green()
+        embed.color = discord.Color.green()
         if embed.title:  # Simply to make type checker happy
             embed.title += ' Created'
 
@@ -156,7 +160,7 @@ class LoggingEventsCog(BaseCog):
     @logging_event
     async def on_automod_rule_update(self, rule: discord.AutoModRule) -> Tuple[Optional[int], Optional[discord.Embed]]:
         embed = self._embed_from_automod_rule(rule)
-        embed.color = discord.Colour.orange()
+        embed.color = discord.Color.orange()
         if embed.title:
             embed.title += ' Updated'
 
@@ -165,7 +169,7 @@ class LoggingEventsCog(BaseCog):
     @logging_event
     async def on_automod_rule_delete(self, rule: discord.AutoModRule) -> Tuple[Optional[int], Optional[discord.Embed]]:
         embed = self._embed_from_automod_rule(rule)
-        embed.color = discord.Colour.red()
+        embed.color = discord.Color.red()
         if embed.title:
             embed.title += ' Deleted'
 

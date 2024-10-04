@@ -65,7 +65,8 @@ class LoggingEventTransverter(commands.Converter[str], app_commands.Transformer)
     def __init__(self, logging_filter: LoggingEventFilter = LoggingEventFilter.ALL) -> None:
         self.logging_filter: LoggingEventFilter = logging_filter
 
-    def _user_input_to_event(self, user_input: str) -> str:
+    @staticmethod
+    def _user_input_to_event(user_input: str) -> str:
         if user_input.startswith('on_'):
             user_input = user_input[3:]
 
@@ -102,9 +103,9 @@ class LoggingEventTransverter(commands.Converter[str], app_commands.Transformer)
         else:
 
             if self.logging_filter is LoggingEventFilter.ENABLED:
-                choices = set((event.event_type for event in settings.logging_events))
+                choices = {event.event_type for event in settings.logging_events}
             elif self.logging_filter is LoggingEventFilter.DISABLED:
-                choices = ALL_EVENTS - set((event.event_type for event in settings.logging_events))
+                choices = ALL_EVENTS - {event.event_type for event in settings.logging_events}
 
         return [app_commands.Choice(name=event.replace('_', ' ').title(), value=event) for event in choices]
 
@@ -147,7 +148,10 @@ class Logging(BaseCog):
                 if logging_channel is None:
                     # This channel was probably deleted
                     return await ctx.send(
-                        f'The current logging channel was set to **{logging_channel_id}** but was deleted. No logs will be sent to the channel until it has been updated.'
+                        content=(
+                            f'The current logging channel was set to **{logging_channel_id}** but was deleted. '
+                            'No logs will be sent to the channel until it has been updated.'
+                        )
                     )
 
                 return await ctx.send(f'The current logging channel is set to {logging_channel.mention}')
