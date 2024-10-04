@@ -1,4 +1,4 @@
-""" 
+"""
 The MIT License (MIT)
 
 Copyright (c) 2020-present NextChai
@@ -25,7 +25,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import enum
-from typing import TYPE_CHECKING, Annotated, List, Optional, Set
+from typing import TYPE_CHECKING, Annotated, List, Optional, Set, Tuple
 
 import discord
 from discord import app_commands
@@ -33,10 +33,12 @@ from discord.ext import commands
 
 from utils import BaseCog, Context
 
-from .settings import ALL_EVENTS, LoggingEvent as LoggingEvent, LoggingSettings
+from .settings import ALL_EVENTS, LoggingEvent, LoggingSettings
 
 if TYPE_CHECKING:
     from bot import FuryBot
+
+__all__: Tuple[str, ...] = ('LoggingEventFilter', 'LoggingEvent', 'LoggingSettings', 'Logging')
 
 
 def guild_has_logging_settings():

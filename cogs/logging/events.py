@@ -1,4 +1,4 @@
-""" 
+"""
 The MIT License (MIT)
 
 Copyright (c) 2020-present NextChai
@@ -37,8 +37,7 @@ P = ParamSpec('P')
 if TYPE_CHECKING:
     from .settings import LoggingSettings
 
-# Marks a function as a logging event. Will take the event, get the logging settings,
-# then get the embed from the logger and send it to the settings, if applicable.
+__all__: Tuple[str, ...] = ('LoggingEventsCog', 'logging_event')
 
 
 def logging_event(
@@ -47,6 +46,11 @@ def logging_event(
         Coroutine[Any, Any, Tuple[Optional[int], Optional[discord.Embed]]],
     ]
 ):
+    """
+    Marks a function as a logging event. Will take the event, get the logging settings,
+    then get the embed from the logger and send it to the settings, if applicable.
+    """
+
     @functools.wraps(func)
     async def inner(self: LoggingEventsCog, *args: P.args, **kwargs: P.kwargs) -> None:
         guild_id, embed = await func(self, *args, **kwargs)
@@ -105,9 +109,9 @@ class LoggingEventsCog(BaseCog):
         embed = self.bot.Embed(
             title=f'Automod Rule "{rule.name}"',
             description=(
-                f'This rule has been created by <@{rule.creator_id}>. This new rule is currently **{status}**. ' 
+                f'This rule has been created by <@{rule.creator_id}>. This new rule is currently **{status}**. '
                 f'It will trigger when **{activation}**.'
-                ),
+            ),
         )
 
         if rule.exempt_roles:

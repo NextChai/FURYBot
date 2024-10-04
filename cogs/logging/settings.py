@@ -1,4 +1,4 @@
-""" 
+"""
 The MIT License (MIT)
 
 Copyright (c) 2020-present NextChai
@@ -25,7 +25,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Type
 
 import discord
 from typing_extensions import Self
@@ -35,13 +35,15 @@ from utils import QueryBuilder
 if TYPE_CHECKING:
     from bot import ConnectionType, FuryBot
 
+__all__: Tuple[str, ...] = ('LoggingEvent', 'LoggingSettings', 'ALL_EVENTS')
+
 MISSING = discord.utils.MISSING
 
 # fmt: off
 ALL_EVENTS: Set[str] = {
-    'automod_rule_create', 
-    'automod_rule_update', 
-    'automod_rule_delete', 
+    'automod_rule_create',
+    'automod_rule_update',
+    'automod_rule_delete',
     'automod_action'
 }
 # fmt: on
