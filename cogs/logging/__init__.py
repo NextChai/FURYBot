@@ -62,8 +62,8 @@ class LoggingEventFilter(enum.Enum):
 # This is easy to do with a converter but I'm not sure if there's a native way to support
 # this in app commands (no greedy equivalent yet iirc)
 class LoggingEventTransverter(commands.Converter[str], app_commands.Transformer):
-    def __init__(self, filter: LoggingEventFilter = LoggingEventFilter.ALL) -> None:
-        self.filter = filter
+    def __init__(self, logging_filter: LoggingEventFilter = LoggingEventFilter.ALL) -> None:
+        self.logging_filter: LoggingEventFilter = logging_filter
 
     def _user_input_to_event(self, user_input: str) -> str:
         if user_input.startswith('on_'):
@@ -97,13 +97,13 @@ class LoggingEventTransverter(commands.Converter[str], app_commands.Transformer)
         if settings is None:
             # This guild has no settings, so nothing is disabled nor enabled. If the filter is
             # not ALL, then we can just return an empty list.
-            if self.filter is not LoggingEventFilter.ALL:
+            if self.logging_filter is not LoggingEventFilter.ALL:
                 choices = set()
         else:
 
-            if self.filter is LoggingEventFilter.ENABLED:
+            if self.logging_filter is LoggingEventFilter.ENABLED:
                 choices = set((event.event_type for event in settings.logging_events))
-            elif self.filter is LoggingEventFilter.DISABLED:
+            elif self.logging_filter is LoggingEventFilter.DISABLED:
                 choices = ALL_EVENTS - set((event.event_type for event in settings.logging_events))
 
         return [app_commands.Choice(name=event.replace('_', ' ').title(), value=event) for event in choices]
