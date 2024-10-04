@@ -105,9 +105,9 @@ class LoggingEventsCog(BaseCog):
         embed = self.bot.Embed(
             title=f'Automod Rule "{rule.name}"',
             description=(
-                f'This rule has been created by <@{rule.creator_id}>. This new rule is currently **{status}**. ' 
+                f'This rule has been created by <@{rule.creator_id}>. This new rule is currently **{status}**. '
                 f'It will trigger when **{activation}**.'
-                ),
+            ),
         )
 
         if rule.exempt_roles:
