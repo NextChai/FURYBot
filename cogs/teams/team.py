@@ -1,25 +1,15 @@
 """
-The MIT License (MIT)
+Contributor-Only License v1.0
 
-Copyright (c) 2020-present NextChai
+This file is licensed under the Contributor-Only License. Usage is restricted to 
+non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+are prohibited except by the original owner.
 
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
+Modifications are allowed solely for contributing purposes and must not 
+misrepresent the original material. This license does not grant any 
+patent rights or trademark rights.
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+Full license terms are available in the LICENSE file at the root of the repository.
 """
 
 from __future__ import annotations
@@ -80,17 +70,16 @@ class TeamMember:
         return hash(self.member_id)
 
     @property
-    def team(self) -> Team:
+    def team(self) -> Optional[Team]:
         """:class:`Team`: The team that this member is on."""
         team = self.bot.get_team(self.team_id, guild_id=self.guild_id)
-        assert team
         return team
 
     @property
     def member(self) -> Optional[discord.Member]:
         """Optional[:class:`discord.Member`]: A Discord member object."""
-        guild = self.team.guild
-        return guild.get_member(self.member_id)
+        guild = self.team and self.team.guild
+        return guild and guild.get_member(self.member_id)
 
     @property
     def mention(self) -> str:
@@ -102,7 +91,11 @@ class TeamMember:
 
         Removes the member from the team.
         """
-        return await self.team.remove_team_member(self)
+        team = self.team
+        if team is None:
+            return
+
+        return await team.remove_team_member(self)
 
     async def demote(self) -> None:
         """|coro|
@@ -114,6 +107,11 @@ class TeamMember:
         Exception
             The member is already a sub.
         """
+        team = self.team
+        if not team:
+            # TODO: Proper exception.
+            raise Exception('Team has been deleted.')
+
         if self.is_sub:
             raise Exception("Can not demote a sub.")
 
@@ -122,7 +120,7 @@ class TeamMember:
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 "UPDATE teams.members SET is_sub = True WHERE team_id = $1 AND member_id = $2",
-                self.team.id,
+                team.id,
                 self.member_id,
             )
 
@@ -136,6 +134,10 @@ class TeamMember:
         Exception
             The member is already on the main roster.
         """
+        team = self.team
+        if not team:
+            raise Exception('Team has been deleted.')
+
         if not self.is_sub:
             raise Exception("Can not promote a player on the main roster.")
 
@@ -144,7 +146,7 @@ class TeamMember:
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 "UPDATE teams.members SET is_sub = False WHERE team_id = $1 AND member_id = $2",
-                self.team.id,
+                team.id,
                 self.member_id,
             )
 
@@ -153,8 +155,16 @@ class TeamMember:
 
         A method to fetch the :class:`discord.Member` represented by this
         :class:`TeamMember`.
+
+        Raises
+        ------
+        Exception
+            The guild was not found.
         """
-        guild = self.team.guild
+        guild = self.team and self.team.guild
+        if not guild:
+            raise Exception("Guild not found.")
+
         return await guild.fetch_member(self.member_id)
 
 
@@ -317,7 +327,10 @@ class Team:
                 voice_channel.id,
                 name,
             )
-            assert data
+
+            if not data:
+                # Something wrong with our query or the database
+                raise Exception("Failed to create a new team.")
 
         team = cls(bot, **dict(data), team_members={})
         bot.add_team(team)
@@ -433,7 +446,7 @@ class Team:
     @property
     def total_points(self) -> float:
         """:class:`float`: The total points for this team based on their practices."""
-        practice_points = list(points for practice in self.practices if (points := practice.total_points))
+        practice_points = [points for practice in self.practices if (points := practice.total_points)]
         if not practice_points:
             return 0
 
@@ -657,7 +670,7 @@ class Team:
             await self.voice_channel.edit(sync_permissions=True, name='Voice Chat', reason='Syncing team channels.')
 
         for channel in self.extra_channels:
-            await channel._edit({"sync_permissions": True}, reason="Syncing team channels.")
+            await channel._edit({"sync_permissions": True}, reason="Syncing team channels.")  # skipcq: PYL-W0212
 
     async def add_team_member(self, member_id: int, is_sub: bool = False) -> TeamMember:
         """|coro|
@@ -685,7 +698,9 @@ class Team:
                 is_sub,
             )
 
-        assert member_record
+            if not member_record:
+                raise Exception("Failed to add a new member to the team.")
+
         team_member = TeamMember(self.bot, guild_id=self.guild_id, **dict(member_record))
 
         self.team_members[team_member.member_id] = team_member
@@ -808,7 +823,6 @@ class Team:
         text_channel_id: int = MISSING,
         voice_channel_id: int = MISSING,
         extra_channel_ids: List[int] = MISSING,
-        sub_role_ids: List[int] = MISSING,
     ) -> None:
         """|coro|
 
@@ -866,9 +880,6 @@ class Team:
         if extra_channel_ids is not MISSING:
             builder.add_arg("extra_channel_ids", extra_channel_ids)
             self.extra_channel_ids = extra_channel_ids
-        if sub_role_ids is not MISSING:
-            builder.add_arg("sub_role_ids", sub_role_ids)
-            self.sub_role_ids = sub_role_ids
 
         async with self.bot.safe_connection() as connection:
             await builder(connection)
@@ -958,7 +969,7 @@ class Team:
         Deletes all practice history for this team.
         """
         # (1) Delete all practice history
-        await connection.execute("DELETE FROM team.practice WHERE team_id = $1", self.id)
+        await connection.execute("DELETE FROM teams.practice WHERE team_id = $1", self.id)
 
         # (2) Clear the bot's cache for this
         self.bot.clear_practices_for(self.id, self.guild_id)

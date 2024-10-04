@@ -1,25 +1,15 @@
 """
-The MIT License (MIT)
+Contributor-Only License v1.0
 
-Copyright (c) 2020-present NextChai
+This file is licensed under the Contributor-Only License. Usage is restricted to 
+non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+are prohibited except by the original owner.
 
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
+Modifications are allowed solely for contributing purposes and must not 
+misrepresent the original material. This license does not grant any 
+patent rights or trademark rights.
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+Full license terms are available in the LICENSE file at the root of the repository.
 """
 
 from __future__ import annotations
@@ -38,7 +28,6 @@ from typing import (
     Dict,
     Final,
     List,
-    Literal,
     Optional,
     ParamSpec,
     Tuple,
@@ -75,6 +64,7 @@ if TYPE_CHECKING:
     import datetime
 
     import aiohttp
+    from discord.types.embed import EmbedType
 
 T = TypeVar("T")
 P = ParamSpec("P")
@@ -153,7 +143,7 @@ def wrap_extension(coro: DecoFunc[P, T]) -> DecoFunc[P, T]:
         except Exception as exc:
             raise exc from None
 
-        _log.info(f'Loaded the "{ext_name}" extension in {time.time() - start:.2f} seconds')
+        _log.info('Loaded the "%s" extension in %s seconds', ext_name, time.time() - start)
         return result
 
     return wrapped
@@ -267,7 +257,7 @@ class FuryBot(commands.Bot):
         self._logging_settings: Dict[int, LoggingSettings] = {}
 
         super().__init__(
-            command_prefix=commands.when_mentioned_or("trev.", "trev"),
+            command_prefix=commands.when_mentioned_or("trev.", "trev", 'fury', 'fury.'),
             help_command=None,
             description="A helpful moderation tool",
             intents=discord.Intents.all(),
@@ -293,10 +283,10 @@ class FuryBot(commands.Bot):
         """
 
         def _encode_jsonb(value: Dict[Any, Any]) -> str:
-            return discord.utils._to_json(value)
+            return discord.utils._to_json(value)  # skipcq: PYL-W0212
 
         def _decode_jsonb(value: str) -> Dict[Any, Any]:
-            return discord.utils._from_json(value)
+            return discord.utils._from_json(value)  # skipcq: PYL-W0212
 
         old_init = kwargs.pop("init", None)
 
@@ -312,7 +302,8 @@ class FuryBot(commands.Bot):
                 await old_init(con)
 
         pool = await asyncpg.create_pool(uri, init=init, **kwargs)
-        assert pool
+        if not pool:
+            raise RuntimeError("Failed to create the pool.")
 
         return pool
 
@@ -322,14 +313,14 @@ class FuryBot(commands.Bot):
         colour: Optional[Union[int, discord.Colour]] = None,
         color: Optional[Union[int, discord.Colour]] = None,
         title: Optional[Any] = None,
-        type: Literal["rich", "image", "video", "gifv", "article", "link"] = "rich",
+        type: EmbedType = "rich",  # skipcq: PYL-W0622
         url: Optional[Any] = None,
         description: Optional[Any] = None,
         timestamp: Optional[datetime.datetime] = None,
         author: Optional[Union[discord.User, discord.Member]] = None,
     ) -> discord.Embed:
         """Get an instance of the bot's global :class:`discord.Embed` with the default
-        bot's color, "FurBot blue".
+        bot's color, "Fury blue".
 
         The parameters are the same as :class:`discord.Embed` except for one additional one.
 
@@ -682,11 +673,13 @@ class FuryBot(commands.Bot):
         Called when the client has hit READY. Please note this can be called more than once during the clients
         uptime.
         """
-        _log.info(f"Logged in as {self.user.name}")
-        _log.info(
-            f"Connected to {len(self.guilds)} servers total watching over {sum(list(m_count for g in self.guilds if (m_count := g.member_count))):,} members."
-        )
-        _log.info(f"Invite link: {discord.utils.oauth_url(self.user.id, permissions=discord.Permissions(0))}")
+        _log.info("Logged in as %s", self.user.name)
+
+        total_guilds = len(self.guilds)
+        _log.info("Connected to %s servers total.", total_guilds)
+
+        invite = discord.utils.oauth_url(self.user.id, permissions=discord.Permissions(0))
+        _log.info("Invite link: %s", invite)
 
     async def on_raw_member_remove(self, payload: discord.RawMemberRemoveEvent) -> None:
         """|coro|
@@ -883,11 +876,11 @@ class FuryBot(commands.Bot):
 
             member_data = practice_member_mapping.get(practice.id, {})
             for data in member_data.values():
-                member = practice._add_member(dict(data))
+                member = practice.add_member(dict(data))
 
                 member_practice_history = practice_member_history_mapping.get(practice.id, {}).get(member.member_id, [])
                 for history_entry in member_practice_history:
-                    member._add_history(dict(history_entry))
+                    member.add_history(dict(history_entry))
 
             self._team_practice_cache.setdefault(practice.guild_id, {}).setdefault(practice.team_id, {})[
                 practice.id
@@ -912,7 +905,7 @@ class FuryBot(commands.Bot):
             if getattr(item[1], "__cache_loader__", None)
         ]
 
-        _log.info(f"Loading {len(cache_loading_functions)} cache entries.")
+        _log.info("Loading %s cache entries.", len(cache_loading_functions))
 
         async def _wrapped_cache_loader(
             cache_loading_function: Callable[..., Coroutine[Any, Any, Any]],
@@ -922,7 +915,8 @@ class FuryBot(commands.Bot):
                     await cache_loading_function(connection=connection)
                 except Exception as exc:
                     _log.warning(
-                        f"Failed to load cache entry {cache_loading_function.__name__}.",
+                        "Failed to load cache entry %s.",
+                        cache_loading_function.__name__,
                         exc_info=exc,
                     )
 

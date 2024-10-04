@@ -1,25 +1,15 @@
-""" 
-The MIT License (MIT)
+"""
+Contributor-Only License v1.0
 
-Copyright (c) 2020-present NextChai
+This file is licensed under the Contributor-Only License. Usage is restricted to 
+non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+are prohibited except by the original owner.
 
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
+Modifications are allowed solely for contributing purposes and must not 
+misrepresent the original material. This license does not grant any 
+patent rights or trademark rights.
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+Full license terms are available in the LICENSE file at the root of the repository.
 """
 
 from __future__ import annotations
@@ -156,7 +146,8 @@ class Scrim:
                 status.value,
                 when,
             )
-            assert data
+            if not data:
+                raise ValueError('Failed to create scrim.')
 
             clean = dict(data)
             clean['status'] = status  # Fix the status
@@ -198,18 +189,14 @@ class Scrim:
         return scrim
 
     @property
-    def home_team(self) -> Team:
+    def home_team(self) -> Optional[Team]:
         """:class:`Team`: The home team."""
-        team = self.bot.get_team(self.home_id, guild_id=self.guild_id)
-        assert team
-        return team
+        return self.bot.get_team(self.home_id, guild_id=self.guild_id)
 
     @property
-    def away_team(self) -> Team:
+    def away_team(self) -> Optional[Team]:
         """:class:`Team`: The away team."""
-        team = self.bot.get_team(self.away_id, guild_id=self.guild_id)
-        assert team
-        return team
+        return self.bot.get_team(self.away_id, guild_id=self.guild_id)
 
     @property
     def guild(self) -> discord.Guild:
@@ -224,7 +211,11 @@ class Scrim:
         --------
         List[:class:`TeamMember`]
         """
-        members = self.home_team.team_members
+        home_team = self.home_team
+        if not home_team:
+            return []
+
+        members = home_team.team_members
         return [member for (member_id, member) in members.items() if member_id in self.home_voter_ids]
 
     @property
@@ -235,7 +226,11 @@ class Scrim:
         --------
         List[:class:`TeamMember`]
         """
-        members = self.away_team.team_members
+        away_team = self.away_team
+        if not away_team:
+            return []
+
+        members = away_team.team_members
         return [member for (member_id, member) in members.items() if member_id in self.away_voter_ids]
 
     @property
@@ -246,7 +241,11 @@ class Scrim:
         -------
         List[:class:`TeamMember`]
         """
-        members = self.away_team.team_members
+        away_team = self.away_team
+        if not away_team:
+            return []
+
+        members = away_team.team_members
         return [member for (member_id, member) in members.items() if member_id in self.away_confirm_anyways_voter_ids]
 
     @property
@@ -292,7 +291,7 @@ class Scrim:
         :class:`discord.Message`
             The message in the home team's text channel.
         """
-        channel = self.home_team.text_channel
+        channel = self.home_team and self.home_team.text_channel
         if channel is None:
             return None
 
@@ -309,7 +308,7 @@ class Scrim:
         if not self.away_message_id:
             return None
 
-        channel = self.away_team.text_channel
+        channel = self.away_team and self.away_team.text_channel
         if channel is None:
             return None
 
@@ -328,7 +327,7 @@ class Scrim:
         if not self.away_confirm_anyways_message_id:
             return
 
-        channel = self.away_team.text_channel
+        channel = self.away_team and self.away_team.text_channel
         if channel is None:
             return None
 
@@ -418,6 +417,11 @@ class Scrim:
             The created text channel. ``None`` if the home category channel has been deleted and the scrim
             has been cancelled.
         """
+        if not self.home_team or not self.away_team:
+            # One or more teams has been deleted, cancel this scrim.
+            await self.cancel(reason='One or more teams have been deleted.')
+            return
+
         overwrites: Mapping[Union[discord.Member, discord.Role], discord.PermissionOverwrite] = {
             m.member or await m.fetch_member(): discord.PermissionOverwrite(view_channel=True)
             for m in [*self.away_team.team_members.values(), *self.home_team.team_members.values()]

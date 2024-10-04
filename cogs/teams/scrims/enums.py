@@ -14,16 +14,22 @@ Full license terms are available in the LICENSE file at the root of the reposito
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import enum
+from typing import Tuple
 
-from .enums import ScrimStatus as ScrimStatus
-from .events import *
-from .persistent import *
-from .scrim import *
-
-if TYPE_CHECKING:
-    from bot import FuryBot
+__all__: Tuple[str, ...] = ('ScrimStatus',)
 
 
-async def setup(bot: FuryBot) -> None:
-    await bot.add_cog(ScrimEventListener(bot))
+# Persistent views for team scrim confirmation from both
+class ScrimStatus(enum.Enum):
+    """
+    An enum to represent the status of a scrim.
+
+    pending_away: The away team has not yet confirmed the scrim.
+    scheduled: The scrim has been scheduled.
+    pending_host: The scrim is pending confirmation from the host.
+    """
+
+    pending_away = 'pending_away'
+    scheduled = 'scheduled'
+    pending_host = 'pending_host'

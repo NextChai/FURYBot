@@ -1,25 +1,15 @@
 """
-The MIT License (MIT)
+Contributor-Only License v1.0
 
-Copyright (c) 2020-present NextChai
+This file is licensed under the Contributor-Only License. Usage is restricted to 
+non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+are prohibited except by the original owner.
 
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
+Modifications are allowed solely for contributing purposes and must not 
+misrepresent the original material. This license does not grant any 
+patent rights or trademark rights.
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+Full license terms are available in the LICENSE file at the root of the repository.
 """
 
 from __future__ import annotations
@@ -66,9 +56,9 @@ class TeamMemberView(BaseView):
         The team the member is in.
     """
 
-    def __init__(self, member: discord.Member, team: Team, **kwargs: Any) -> None:
+    def __init__(self, member: Union[discord.Member, discord.User], team: Team, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.member: discord.Member = member
+        self.member: Union[discord.Member, discord.User] = member
         self.team: Team = team
 
     @property
@@ -119,7 +109,11 @@ class TeamMemberView(BaseView):
     ) -> None:
         """View the practice statistics for this member."""
         team_member = self.team.get_member(self.member.id)
-        assert team_member
+        if not team_member:
+            # This member has been removed while the view was open.
+            return await interaction.response.send_message(
+                "This member is not on the team. Were they removed?", ephemeral=True
+            )
 
         view = self.create_child(PracticeMemberStatistics, team_member, self.member)
         await interaction.response.edit_message(view=view, embed=view.embed)
@@ -168,13 +162,11 @@ class TeamMembersView(BaseView):
         await interaction.response.defer()
 
         member = members[0]
-        assert isinstance(member, discord.Member)
 
         team_member = self.team.get_member(member.id)
         if not team_member:
             await interaction.edit_original_response(embed=self.embed, view=self)
-            await interaction.followup.send("This member is not on the team.", ephemeral=True)
-            return
+            return await interaction.followup.send("This member is not on the team.", ephemeral=True)
 
         view = self.create_child(TeamMemberView, member=member, team=self.team)
         await interaction.edit_original_response(embed=view.embed, view=view)
@@ -306,7 +298,7 @@ class TeamChannelsView(BaseView):
             "voice": category_channel.create_voice_channel,
         }
 
-        meth = meth_mapping.get(channel_type_input.value, None)
+        meth = meth_mapping.get(channel_type_input.value)
         if meth:
             channel = await meth(name=channel_name_input.value)
             await self.team.add_extra_channel(channel.id)

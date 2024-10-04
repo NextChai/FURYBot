@@ -1,25 +1,15 @@
-""" 
-The MIT License (MIT)
+"""
+Contributor-Only License v1.0
 
-Copyright (c) 2020-present NextChai
+This file is licensed under the Contributor-Only License. Usage is restricted to 
+non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+are prohibited except by the original owner.
 
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
+Modifications are allowed solely for contributing purposes and must not 
+misrepresent the original material. This license does not grant any 
+patent rights or trademark rights.
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+Full license terms are available in the LICENSE file at the root of the repository.
 """
 
 from __future__ import annotations
@@ -69,10 +59,10 @@ class DoesWantToCreateAttachmentSettings(BaseView):
                 content='Alright, no attachment settings will be created.', view=None, embed=None
             )
 
-        assert interaction.guild_id is not None
-        assert interaction.channel_id is not None
-        # TODO: Allow user to say where to create, I just don't care
+        if interaction.guild_id is None or interaction.channel_id is None:
+            raise ValueError('Guild ID or Channel ID is None when trying to create attachment settings.')
 
+        # TODO: Allow user to say where to create
         settings = await AttachmentRequestSettings.create(interaction.guild_id, interaction.channel_id, bot=self.bot)
         panel = AttachmentRequestSettingsPanel(settings, target=interaction)
         return await interaction.edit_original_response(embed=None, view=panel)
@@ -205,7 +195,8 @@ class ApproveOrDenyImage(discord.ui.View):
             content += f' Message: {request.message}'
 
         # as of right now interaction.channel includes ForumChannel and CategoryChannel - it can not resolve to this though.
-        assert not isinstance(request.channel, (discord.ForumChannel, discord.CategoryChannel))
+        if isinstance(request.channel, (discord.ForumChannel, discord.CategoryChannel)):
+            raise ValueError('The channel cannot be sent to.')
 
         message = await request.channel.send(
             file=file, content=content, allowed_mentions=discord.AllowedMentions(users=[request.requester])

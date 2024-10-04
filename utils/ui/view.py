@@ -1,25 +1,15 @@
-""" 
-The MIT License (MIT)
+"""
+Contributor-Only License v1.0
 
-Copyright (c) 2020-present NextChai
+This file is licensed under the Contributor-Only License. Usage is restricted to 
+non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+are prohibited except by the original owner.
 
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
+Modifications are allowed solely for contributing purposes and must not 
+misrepresent the original material. This license does not grant any 
+patent rights or trademark rights.
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+Full license terms are available in the LICENSE file at the root of the repository.
 """
 
 from __future__ import annotations
@@ -80,7 +70,7 @@ def _wrap_init(__init__: BaseViewInit[P, T]) -> BaseViewInit[P, T]:
     @functools.wraps(__init__)
     def wrapped(self: BaseView, *args: P.args, **kwargs: P.kwargs) -> T:
         result = __init__(self, *args, **kwargs)
-        self._add_menu_children()
+        self.add_menu_children()
         return result
 
     return wrapped
@@ -104,7 +94,7 @@ def find_home(view: BaseView) -> Optional[BaseView]:
     """A method to find the home parent from a view."""
     parents = list(walk_parents(view))
     if not parents:
-        return
+        return None
 
     return parents[-1]
 
@@ -267,7 +257,7 @@ class BaseView(discord.ui.View, abc.ABC):
         self.guild: discord.Guild = target.guild
         super().__init__(timeout=kwargs.get('timeout', 360))
 
-    def _add_menu_children(self) -> None:
+    def add_menu_children(self) -> None:
         children_cls = {type(child) for child in self.children}
         if self.parent is not None:
             if GoBack not in children_cls:  # type: ignore

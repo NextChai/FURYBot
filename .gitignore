@@ -46,3 +46,6 @@ typings/
 
 # Yarn Integrity file
 .yarn-integrity
+
+# MacOS Image metadata files
+.DS_Store

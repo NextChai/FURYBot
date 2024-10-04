@@ -1,35 +1,24 @@
-""" 
-The MIT License (MIT)
+"""
+Contributor-Only License v1.0
 
-Copyright (c) 2020-present NextChai
+This file is licensed under the Contributor-Only License. Usage is restricted to 
+non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+are prohibited except by the original owner.
 
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
+Modifications are allowed solely for contributing purposes and must not 
+misrepresent the original material. This license does not grant any 
+patent rights or trademark rights.
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+Full license terms are available in the LICENSE file at the root of the repository.
 """
 
 from __future__ import annotations
 
-import asyncio
 import datetime
 import enum
 import logging
 import math
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import discord
 
@@ -169,11 +158,10 @@ class PracticeMember(TeamMemberAble, TeamAble):
         self.reason: Optional[str] = data['reason']
 
         self._history: List[PracticeMemberHistory] = []
-        self._history_lock: asyncio.Lock = asyncio.Lock()  # Don't want to be creating and removing history at the same time.
 
     def __eq__(self, __o: object) -> bool:
         try:
-            o_member_id = getattr(__o, 'member_id')
+            o_member_id = getattr(__o, 'member_id')  # skipcq: PTC-W0034
         except AttributeError:
             return False
 
@@ -197,12 +185,12 @@ class PracticeMember(TeamMemberAble, TeamAble):
     def _get_member_id(self) -> int:
         return self.member_id
 
-    def _add_history(self, data: Dict[str, Any]) -> PracticeMemberHistory:
+    def add_history(self, data: Dict[str, Any]) -> PracticeMemberHistory:
         practice_member_history = PracticeMemberHistory(member=self, data=data)
         self._history.append(practice_member_history)
         return practice_member_history
 
-    def _remove_history(self, history: PracticeMemberHistory) -> None:
+    def remove_history(self, history: PracticeMemberHistory) -> None:
         self._history.remove(history)
 
     @property
@@ -257,7 +245,7 @@ class PracticeMember(TeamMemberAble, TeamAble):
             )
 
         # Remove from the practice's cache as well
-        self.practice._remove_member(self.member_id)
+        self.practice.remove_member(self.member_id)
 
     async def handle_join(self, *, when: Optional[datetime.datetime] = None) -> PracticeMemberHistory:
         """|coro|
@@ -277,20 +265,30 @@ class PracticeMember(TeamMemberAble, TeamAble):
         """
         _log.debug("Handling practice member join, creating new history element. %s", self.member_id)
 
-        async with self._history_lock:
-            async with self.practice.bot.safe_connection() as connection:
-                practice_member_history_data = await connection.fetchrow(
-                    "INSERT INTO teams.practice_member_history(joined_at, team_id, channel_id, guild_id, practice_id, member_id) VALUES($1, $2, $3, $4, $5, $6) RETURNING *",
-                    when,
-                    self.practice.team_id,
-                    self.practice.channel_id,
-                    self.practice.guild_id,
-                    self.practice_id,
-                    self.member_id,
-                )
-                assert practice_member_history_data
+        async with self.practice.bot.safe_connection() as connection:
+            practice_member_history_data = await connection.fetchrow(
+                """
+                INSERT INTO teams.practice_member_history(
+                    joined_at, 
+                    team_id, 
+                    channel_id, 
+                    guild_id, 
+                    practice_id, 
+                    member_id
+                ) 
+                VALUES($1, $2, $3, $4, $5, $6) 
+                RETURNING *""",
+                when,
+                self.practice.team_id,
+                self.practice.channel_id,
+                self.practice.guild_id,
+                self.practice_id,
+                self.member_id,
+            )
+            if not practice_member_history_data:
+                raise ValueError("Failed to create practice member history.")
 
-            practice_member_history = self._add_history(dict(practice_member_history_data))
+            practice_member_history = self.add_history(dict(practice_member_history_data))
 
         return practice_member_history
 
@@ -312,16 +310,16 @@ class PracticeMember(TeamMemberAble, TeamAble):
         """
         _log.debug("Handling practice member leave, updating current history element. %s", self.member_id)
 
-        async with self._history_lock:
-            current_history = self.current_history
-            assert current_history  # This can't get called unless this is not None
+        current_history = self.current_history
+        if current_history is None:
+            raise ValueError('Member never joined a voice channel and has no history, but tried to remove history.')
 
-            async with self.practice.bot.safe_connection() as connection:
-                await connection.execute(
-                    "UPDATE teams.practice_member_history SET left_at = $1 WHERE id = $2", when, current_history.id
-                )
+        async with self.practice.bot.safe_connection() as connection:
+            await connection.execute(
+                "UPDATE teams.practice_member_history SET left_at = $1 WHERE id = $2", when, current_history.id
+            )
 
-            current_history.left_at = when
+        current_history.left_at = when
 
         return current_history
 
@@ -420,20 +418,18 @@ class Practice(TeamAble):
         return self.bot
 
     # Methods to manage member cache
-    def _add_member(self, practice_member_data: Dict[str, Any]) -> PracticeMember:
+    def add_member(self, practice_member_data: Dict[str, Any]) -> PracticeMember:
         member = PracticeMember(practice=self, data=practice_member_data)
         self._members[member.member_id] = member
         return member
 
-    def _remove_member(self, member_id: int) -> Optional[PracticeMember]:
+    def remove_member(self, member_id: int) -> Optional[PracticeMember]:
         self._members.pop(member_id, None)
 
     @property
-    def team(self) -> Team:
+    def team(self) -> Optional[Team]:
         """:class:`Team`: The team this practice is for."""
-        team = self.bot.get_team(self.team_id, guild_id=self.guild_id)
-        assert team
-        return team
+        return self.bot.get_team(self.team_id, guild_id=self.guild_id)
 
     @property
     def members(self) -> List[PracticeMember]:
@@ -455,14 +451,16 @@ class Practice(TeamAble):
     def missing_members(self) -> List[TeamMember]:
         """List[:class:`TeamMember`]: A list of all members that are missing from this practice. These are the members
         have not yet joined the practice or opted-out of it."""
-        return [m for m in self.team.members if m.member_id not in self._members]
+        team = self.team
+        if not team:
+            return []
+
+        return [m for m in team.members if m.member_id not in self._members]
 
     @property
-    def started_by(self) -> PracticeMember:
+    def started_by(self) -> Optional[PracticeMember]:
         """:class:`PracticeMember`: The member that started this practice."""
-        member = self.get_member(self.started_by_id)
-        assert member
-        return member
+        return self.get_member(self.started_by_id)
 
     @property
     def ongoing(self) -> bool:
@@ -550,9 +548,16 @@ class Practice(TeamAble):
         -------
         :class:`discord.Embed`
         """
-        embed = self.team.embed(
-            title=f'{self.team.display_name} Practice Ended.',
-            description=f'This practice started by {self.started_by.mention} has come to an end.\n'
+        team = self.team
+        if not team:
+            # This team has been deleted yet the practice has still ended. It's going to fail sending anyways
+            # so we can safety return an empty embed here (this should never happen though)
+            return discord.Embed()
+
+        started_by = self.started_by and self.started_by.mention or "`<not-found>`"
+        embed = team.embed(
+            title=f'{team.display_name} Practice Ended.',
+            description=f'This practice started by {started_by} has come to an end.\n'
             f'- **Started At**: {self.format_start_time()}\n'
             f'- **Ended At**: {self.format_end_time()}\n',
         )
@@ -583,7 +588,7 @@ class Practice(TeamAble):
                 value=f'The following did not go to the practice and did not mark themselves as excused: {missing_members_mentions}',
             )
 
-        ranking = self.team.get_practice_rank()
+        ranking = team.get_practice_rank()
         embed.add_field(
             name='Practice Time Rank',
             value=f'Out of {len(self.bot.get_teams(self.guild_id))} teams, this team is ranked **#{ranking}** in practice time.',
@@ -593,7 +598,9 @@ class Practice(TeamAble):
         return embed
 
     # Methods for managing members that join and leave the voice channel for the given practice session.
-    async def handle_member_unable_to_join(self, *, member: discord.Member, reason: str) -> PracticeMember:
+    async def handle_member_unable_to_join(
+        self, *, member: Union[discord.Member, discord.User], reason: str
+    ) -> PracticeMember:
         """|coro|
 
         Called when a member is unable to join the voice channel for this practice session. This will create a new :class:`PracticeMember` and
@@ -611,7 +618,11 @@ class Practice(TeamAble):
         :class:`PracticeMember`
             The newly created practice member.
         """
-        if self.team.get_member(member.id) is None:
+        team = self.team
+        if not team:
+            raise MemberNotOnTeam(f'The member {member.id} is not on the team {self.team_id}, can not join practice.')
+
+        if team.get_member(member.id) is None:
             _log.debug("Member %s is not on the team.", member.id)
             raise MemberNotOnTeam(f'The member {member.id} is not on the team {self.team_id}, can not join practice.')
 
@@ -623,21 +634,30 @@ class Practice(TeamAble):
 
         async with self.bot.safe_connection() as connection:
             practice_member_data = await connection.fetchrow(
-                "INSERT INTO teams.practice_member (member_id, practice_id, attending, reason) VALUES ($1, $2, $3, $4) RETURNING *",
+                """
+                INSERT INTO teams.practice_member (
+                    member_id, 
+                    practice_id, 
+                    attending, 
+                    reason
+                ) 
+                VALUES ($1, $2, $3, $4) 
+                RETURNING *""",
                 member.id,
                 self.id,
                 False,
                 reason,
             )
-            assert practice_member_data
+            if not practice_member_data:
+                raise ValueError("Failed to create practice member.")
 
-        attending_member = self._add_member(dict(practice_member_data))
+        attending_member = self.add_member(dict(practice_member_data))
 
         await self.view.update_message()
         return attending_member
 
     async def handle_member_join(
-        self, *, member: discord.Member, when: Optional[datetime.datetime] = None
+        self, *, member: Union[discord.Member, discord.User], when: Optional[datetime.datetime] = None
     ) -> PracticeMember:
         """|coro|
 
@@ -670,7 +690,11 @@ class Practice(TeamAble):
 
         when = when or discord.utils.utcnow()
 
-        if self.team.get_member(member.id) is None:
+        team = self.team
+        if not team:
+            raise MemberNotOnTeam(f'The member {member.id} is not on the team {self.team_id}, can not join practice.')
+
+        if team.get_member(member.id) is None:
             _log.debug("Member %s is not on the team.", member.id)
             raise MemberNotOnTeam(f'The member {member.id} is not on the team {self.team_id}, can not join practice.')
 
@@ -685,9 +709,10 @@ class Practice(TeamAble):
                     member.id,
                     self.id,
                 )
-                assert practice_member_data
+                if not practice_member_data:
+                    raise ValueError("Failed to create practice member.")
 
-            attending_member = self._add_member(dict(practice_member_data))
+            attending_member = self.add_member(dict(practice_member_data))
         else:
             # Check if they manually selected not attending.
             if not attending_member.attending:
@@ -713,7 +738,11 @@ class Practice(TeamAble):
         _log.debug("Handling member leave voice channel")
         when = when or discord.utils.utcnow()
 
-        if self.team.get_member(member.id) is None:
+        team = self.team
+        if not team:
+            raise MemberNotOnTeam(f'The member {member.id} is not on the team {self.team_id}, can not join practice.')
+
+        if team.get_member(member.id) is None:
             _log.debug("Member %s is not on the team, can not handle leave.", member.id)
             raise MemberNotOnTeam(f'The member {member.id} is not on the team {self.team_id}, can not join practice.')
 
@@ -774,16 +803,21 @@ class Practice(TeamAble):
 
         # We can only reply to the message if the team text channel is still around.
         # In the case it's not, some muppet has deleted it.
-        team_text_channel = self.team.text_channel
-        if not team_text_channel:
+        team = self.team
+        team_text_channel = team and team.text_channel
+        if not team or not team_text_channel:
             return
 
-        message = await team_text_channel.fetch_message(self.message_id)
-        await message.reply(
-            embed=embed,
-            allowed_mentions=discord.AllowedMentions(roles=self.team.captain_roles),
-            content=', '.join(r.mention for r in self.team.captain_roles),
-        )
+        try:
+            message = await team_text_channel.fetch_message(self.message_id)
+        except discord.NotFound:
+            pass
+        else:
+            await message.reply(
+                embed=embed,
+                allowed_mentions=discord.AllowedMentions(roles=team.captain_roles),
+                content=', '.join(r.mention for r in team.captain_roles),
+            )
 
     async def delete(self) -> None:
         """|coro|
@@ -793,4 +827,5 @@ class Practice(TeamAble):
         async with self.bot.safe_connection() as connection:
             await connection.execute("DELETE FROM teams.practice WHERE id = $1", self.id)
         # Delete this practice from the bot's cache as well
-        self.bot._team_practice_cache.get(self.guild_id, {}).get(self.team_id, {}).pop(self.id, None)
+
+        self.bot.remove_practice(self.id, self.team_id, self.guild_id)

@@ -1,25 +1,15 @@
-""" 
-The MIT License (MIT)
+"""
+Contributor-Only License v1.0
 
-Copyright (c) 2020-present NextChai
+This file is licensed under the Contributor-Only License. Usage is restricted to 
+non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+are prohibited except by the original owner.
 
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
+Modifications are allowed solely for contributing purposes and must not 
+misrepresent the original material. This license does not grant any 
+patent rights or trademark rights.
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+Full license terms are available in the LICENSE file at the root of the repository.
 """
 
 from __future__ import annotations
@@ -28,12 +18,13 @@ import abc
 from typing import TYPE_CHECKING, Generic, List, Optional, Union
 
 import discord
-from discord.ext import commands
 from typing_extensions import Self, TypeAlias, TypeVar, Unpack
 
 from .view import BaseView
 
 if TYPE_CHECKING:
+    from discord.ext import commands
+
     from bot import FuryBot
 
     from .view import BaseViewKwargs
@@ -127,7 +118,7 @@ class BaseButtonPaginator(Generic[T], BaseView, abc.ABC):
         """
         return self.format_page(self.pages[self._current_page_index])
 
-    async def interaction_check(self, interaction: discord.Interaction[FuryBot], /) -> Optional[bool]:
+    async def interaction_check(self, interaction: discord.Interaction[FuryBot]) -> Optional[bool]:
         """|coro|
 
         The base interaction check for the given view.
@@ -151,7 +142,8 @@ class BaseButtonPaginator(Generic[T], BaseView, abc.ABC):
             # Manual override so the owner can interact with **every** paginator.
             return True
 
-        assert self.author
+        if not self.author:
+            raise ValueError('The author must be set for the paginator to work.')
 
         # Ensure this is the correct invoker
         if self.author.id != interaction.user.id:

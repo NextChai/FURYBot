@@ -1,25 +1,15 @@
 """
-The MIT License (MIT)
+Contributor-Only License v1.0
 
-Copyright (c) 2020-present NextChai
+This file is licensed under the Contributor-Only License. Usage is restricted to 
+non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+are prohibited except by the original owner.
 
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
+Modifications are allowed solely for contributing purposes and must not 
+misrepresent the original material. This license does not grant any 
+patent rights or trademark rights.
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+Full license terms are available in the LICENSE file at the root of the repository.
 """
 
 from __future__ import annotations
@@ -65,17 +55,23 @@ class PracticeMemberStatistics(BaseView):
     def __init__(
         self,
         member: TeamMember,
-        discord_member: discord.Member,
+        discord_member: Union[discord.Member, discord.User],
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self.member: TeamMember = member
-        self.discord_member: discord.Member = discord_member
+        self.discord_member: Union[discord.Member, discord.User] = discord_member
 
     @property
     def embed(self) -> discord.Embed:
         """:class:`discord.Embed`: Generates the practice statistics for the member."""
         team = self.member.team
+        if not team:
+            return self.bot.Embed(
+                title='Practice Statistics (Member Removed from Team)',
+                description='This member has been removed from the team so there is nothing to display.',
+            )
+
         embed = team.embed(title="Practice Statistics")
 
         # Get the: total time, total amount, total started, absences
@@ -178,17 +174,25 @@ class PracticeMemberPanel(BaseView):
     def __init__(
         self,
         member: PracticeMember,
-        discord_member: discord.Member,
+        discord_member: Union[discord.Member, discord.User],
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self.member: PracticeMember = member
-        self.discord_member: discord.Member = discord_member
+        self.discord_member: Union[discord.Member, discord.User] = discord_member
 
     @property
     def embed(self) -> discord.Embed:
         """:class:`discord.Embed`: The embed representing this practice member."""
         practice = self.member.practice
+        if not practice.team:
+            # For some reason, this team was deleted while another user is using this panel.
+            # Return an embed letting them know
+            self.clear_items()
+            return self.bot.Embed(
+                title="Practice Information",
+                description="This team has been deleted, there is nothing to display.",
+            )
 
         embed = practice.team.embed(
             title="Practice Information",
@@ -258,6 +262,15 @@ class PracticePanel(BaseView):
     @property
     def embed(self) -> discord.Embed:
         """:class:`discord.Embed`: The embed representing this practice."""
+        if not self.practice.team:
+            # For some reason, this team was deleted while another user is using this panel.
+            # Return an embed letting them know
+            self.clear_items()
+            return self.bot.Embed(
+                title="Practice Information",
+                description="This team has been deleted, there is nothing to display.",
+            )
+
         embed = self.practice.team.embed(
             title="Practice Information",
             description='Below is some information for the given practice. Use the buttons below to view stats about '
@@ -312,8 +325,7 @@ class PracticePanel(BaseView):
 
         await self.practice.end()
 
-        assert interaction.message
-        await interaction.message.edit(embed=self.embed, view=self)
+        await interaction.edit_original_response(embed=self.embed, view=self)
 
     async def _manage_practice_members_after(
         self,
@@ -321,7 +333,17 @@ class PracticePanel(BaseView):
         users: List[Union[discord.Member, discord.User]],
     ) -> None:
         selected = users[0]
-        assert isinstance(selected, discord.Member)
+
+        if not self.practice.team:
+            # For some reason, this team has been deleted while another user is using this panel.
+            # Simply let them know and return
+            self.clear_items()
+            return await interaction.response.edit_message(
+                view=self,
+                embed=self.bot.Embed(
+                    title='Team has been deleted', description='This team has been deleted, there is nothing to display.'
+                ),
+            )
 
         if self.practice.team.get_member(selected.id) is None:
             await interaction.response.edit_message(view=self, embed=self.embed)
@@ -357,16 +379,32 @@ class PracticePanel(BaseView):
 
     @discord.ui.button(label="Delete Practice")
     @default_button_doc_string
-    async def delete_button(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
+    async def delete_button(
+        self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]
+    ) -> Optional[discord.InteractionMessage]:
         """Delete this practice from the database."""
+        await interaction.response.defer()
+
         if self.practice.ongoing:
-            return await interaction.response.send_message("You can't delete a practice that is ongoing.", ephemeral=True)
+            return await interaction.followup.send("You can't delete a practice that is ongoing.", ephemeral=True)
 
         await self.practice.delete()
 
         # Go back a parent view
-        view = TeamPracticesPanel(team=self.practice.team, target=interaction, parent=None)
-        await interaction.response.edit_message(view=view, embed=view.embed)
+        team = self.practice.team
+        if not team:
+            # This team was deleted while another user is using this panel.
+            # Return an embed letting them know
+            self.clear_items()
+            return await interaction.edit_original_response(
+                embed=self.bot.Embed(
+                    title="Team has been deleted",
+                    description="This team has been deleted, there is nothing to display.",
+                ),
+            )
+
+        view = TeamPracticesPanel(team=team, target=interaction, parent=None)
+        await interaction.edit_original_response(view=view, embed=view.embed)
 
 
 class TeamPracticesPanel(BaseView):

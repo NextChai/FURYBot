@@ -1,3 +1,17 @@
+"""
+Contributor-Only License v1.0
+
+This file is licensed under the Contributor-Only License. Usage is restricted to 
+non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+are prohibited except by the original owner.
+
+Modifications are allowed solely for contributing purposes and must not 
+misrepresent the original material. This license does not grant any 
+patent rights or trademark rights.
+
+Full license terms are available in the LICENSE file at the root of the repository.
+"""
+
 from __future__ import annotations
 
 import datetime
@@ -17,8 +31,6 @@ from .context import Context
 from .errors import *
 
 if TYPE_CHECKING:
-    import datetime
-
     from bot import FuryBot
 
 __all__: Tuple[str, ...] = ('ErrorHandler',)
@@ -62,7 +74,7 @@ class PacketManager:
         for i in range(0, len(iterable), chunks - code_blocker_size):
             yield self._code_blocker.format(iterable[i : i + chunks - code_blocker_size])
 
-    async def _release_error(self, traceback: str, packet: Traceback) -> None:
+    async def _release_error(self, traceback_str: str, packet: Traceback) -> None:
         _log.error('Releasing error to log', exc_info=packet['exception'])
 
         embed = discord.Embed(title=f'An error has occurred in {packet["command"]}', timestamp=packet['time'])
@@ -82,7 +94,7 @@ class PacketManager:
         if webhook.is_partial():
             self._error_webhook = webhook = await self._error_webhook.fetch()
 
-        code_chunks = list(self._yield_code_chunks(traceback))
+        code_chunks = list(self._yield_code_chunks(traceback_str))
 
         embed.description = code_chunks.pop(0)
         await webhook.send(embed=embed, **kwargs)
@@ -220,7 +232,8 @@ class ErrorHandler:
                 'Oh no! Something went wrong! I\'ve notified the developer to get this issue fixed, my apologies!',
                 ephemeral=True,
             )
-        elif isinstance(target, discord.Interaction):
+
+        if isinstance(target, discord.Interaction):
             if not target.response.is_done():
                 await target.response.defer()
 
@@ -249,66 +262,74 @@ class ErrorHandler:
             sender = partial(interaction.followup.send, ephemeral=True)
 
         while hasattr(error, 'original'):
-            error = getattr(error, 'original')
+            error = getattr(error, 'original')  # skipcq: PTC-W0034
 
         if isinstance(error, (AutocompleteValidationException, BadArgument)):
             return await sender(
                 str(error),
             )
 
-        elif isinstance(error, app_commands.CommandInvokeError):
+        if isinstance(error, app_commands.CommandInvokeError):
             # Something bad happened here, oh no!
             return await self.log_error(error.original, target=target)
-        elif isinstance(error, app_commands.TransformerError):
+
+        if isinstance(error, app_commands.TransformerError):
             await sender(
                 content=f'Failed to convert `{error.value}` to a {error.type.name.title()}!',
             )
 
             # This is a development error as well, but we don't need to pass a sender
             return await self.log_error(error, target=target)
-        elif isinstance(error, app_commands.CheckFailure):
+
+        if isinstance(error, app_commands.CheckFailure):
             if isinstance(error, app_commands.NoPrivateMessage):
                 return await sender(
                     str(error),
                 )
-            elif isinstance(error, app_commands.MissingRole):
+            if isinstance(error, app_commands.MissingRole):
                 role: str = _resolve_role_mention(error.missing_role)
                 return await sender(
                     f'You are missing the {role} role to run this command!',
                 )
-            elif isinstance(error, app_commands.MissingAnyRole):
+            if isinstance(error, app_commands.MissingAnyRole):
                 roles = (_resolve_role_mention(role) for role in error.missing_roles)
                 return await sender(
                     f'You\'re missing one of the following roles to run this command: {", ".join(roles)}',
                 )
-            elif isinstance(error, (app_commands.MissingPermissions, app_commands.BotMissingPermissions)):
+            if isinstance(error, (app_commands.MissingPermissions, app_commands.BotMissingPermissions)):
                 fmt = 'I\'m' if isinstance(error, app_commands.BotMissingPermissions) else 'You are'
                 return await sender(
                     f'{fmt} missing the following permissions to run this command: {", ".join([p.replace("_", " ").title() for p in error.missing_permissions])}',
                 )
-        elif isinstance(error, (app_commands.CommandOnCooldown, commands.CommandOnCooldown)):
+
+        if isinstance(error, (app_commands.CommandOnCooldown, commands.CommandOnCooldown)):
             retry_after = discord.utils.utcnow() + datetime.timedelta(seconds=error.retry_after)
             return await sender(
                 f'Ope! You\'ve hit this command\'s cooldown, try again in {discord.utils.format_dt(retry_after, "R")}',
             )
-        elif isinstance(error, app_commands.CommandSignatureMismatch):
+
+        if isinstance(error, app_commands.CommandSignatureMismatch):
             await self.bot.tree.sync()
             return await sender(
                 'Oh shoot! There\'s a mismatch in my commands, I\'ve synced them, try again!',
             )
-        elif isinstance(error, commands.MissingRequiredArgument):
+
+        if isinstance(error, commands.MissingRequiredArgument):
             return await sender(
                 f'Oop! You forgot to provide a value for `{error.param.name}`.',
             )
-        elif isinstance(error, commands.MissingRequiredArgument):
+
+        if isinstance(error, commands.MissingRequiredArgument):
             return await sender(
                 f'Oop! You forgot to provide a value for `{error.param.name}`.',
             )
-        elif isinstance(error, commands.TooManyArguments):
+
+        if isinstance(error, commands.TooManyArguments):
             return await sender(
-                f'Oop! You provided too many arguments for this command.',
+                'Oop! You provided too many arguments for this command.',
             )
-        elif isinstance(error, commands.BadArgument):
+
+        if isinstance(error, commands.BadArgument):
             fmt = (
                 str(error)
                 if not (argument := getattr(error, 'argument', None))
@@ -317,19 +338,23 @@ class ErrorHandler:
             return await sender(
                 f'Oop! You provided an invalid value. {fmt}',
             )
-        elif isinstance(error, commands.CommandNotFound):
+
+        if isinstance(error, commands.CommandNotFound):
             return
-        elif isinstance(error, commands.CheckFailure):
+
+        if isinstance(error, commands.CheckFailure):
             return await sender(
                 f'Ope! {error}',
             )
-        elif isinstance(error, commands.DisabledCommand):
+
+        if isinstance(error, commands.DisabledCommand):
             return await sender(
-                f'Oop! This command is disabled.',
+                'Oop! This command is disabled.',
             )
-        elif isinstance(error, commands.MaxConcurrencyReached):
+
+        if isinstance(error, commands.MaxConcurrencyReached):
             return await sender(
-                f'Oop! This command is currently running too many instances. Try again in a few minutes.',
+                'Oop! This command is currently running too many instances. Try again in a few minutes.',
             )
 
         await self.log_error(error, target=target)
@@ -358,7 +383,7 @@ class ErrorHandler:
 
         _, error, _ = sys.exc_info()
         if not error:
-            raise
+            raise RuntimeError('No error was passed to the error handler.')
 
         await self.__packet_manager.add_error(error=error, target=None, event_name=event_method)
 

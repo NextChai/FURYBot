@@ -1,25 +1,15 @@
-""" 
-The MIT License (MIT)
+"""
+Contributor-Only License v1.0
 
-Copyright (c) 2020-present NextChai
+This file is licensed under the Contributor-Only License. Usage is restricted to 
+non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+are prohibited except by the original owner.
 
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
+Modifications are allowed solely for contributing purposes and must not 
+misrepresent the original material. This license does not grant any 
+patent rights or trademark rights.
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+Full license terms are available in the LICENSE file at the root of the repository.
 """
 
 from __future__ import annotations
@@ -59,18 +49,21 @@ class ScrimEventListener(BaseCog):
         :class:`discord.Embed`
             The embed detailing that a scrim has been cancelled.
         """
+        home_team_display_name = scrim.home_team and scrim.home_team.display_name or '<Home Team Deleted>'
+        away_team_display_name = scrim.away_team and scrim.away_team.display_name or '<Away Team Deleted>'
+
         home_embed = bot.Embed(
             title='This scrim has been cancelled.',
             description='There were not enough votes to start the scrim.\n\n'
-            f'**Votes Needed from {scrim.home_team.display_name,}**: {scrim.per_team - len(scrim.home_voter_ids)}\n'
-            f'**Votes Needed from {scrim.away_team.display_name}**: {scrim.per_team - len(scrim.away_voter_ids)}',
+            f'**Votes Needed from {home_team_display_name}**: {scrim.per_team - len(scrim.home_voter_ids)}\n'
+            f'**Votes Needed from {away_team_display_name}**: {scrim.per_team - len(scrim.away_voter_ids)}',
         )
         home_embed.add_field(
-            name=f'{scrim.home_team.display_name} Team Votes',
+            name=f'{home_team_display_name} Team Votes',
             value=', '.join(m.mention for m in scrim.home_voters) or 'No members have voted.',
         )
         home_embed.add_field(
-            name=f'{scrim.away_team.display_name} Team Votes',
+            name=f'{away_team_display_name} Team Votes',
             value=', '.join(m.mention for m in scrim.away_voters) or 'No members have voted.',
         )
 
@@ -94,6 +87,12 @@ class ScrimEventListener(BaseCog):
         scrim = self.bot.get_scrim(scrim_id, guild_id)
         if scrim is None:
             return
+
+        home_team = scrim.home_team
+        away_team = scrim.away_team
+        if not home_team or not away_team:
+            # One of these teams has been deleted, we must cancel this scrim
+            return await scrim.cancel(reason='One of the teams has been deleted.')
 
         # If the scrim isn't scheduled we want to edit the messages and say that the scrim didn't start
         if scrim.status is not ScrimStatus.scheduled:
@@ -130,11 +129,11 @@ class ScrimEventListener(BaseCog):
             return
 
         embed = self.bot.Embed(
-            title=f'{scrim.home_team.display_name} vs {scrim.away_team.display_name}',
+            title=f'{home_team.display_name} vs {away_team.display_name}',
             description=f'Scrim has been scheduled and confirmed for {scrim.scheduled_for_formatted()}',
         )
-        embed.add_field(name=scrim.home_team.display_name, value=', '.join(m.mention for m in scrim.home_voters))
-        embed.add_field(name=scrim.away_team.display_name, value=', '.join(m.mention for m in scrim.away_voters))
+        embed.add_field(name=home_team.display_name, value=', '.join(m.mention for m in scrim.home_voters))
+        embed.add_field(name=away_team.display_name, value=', '.join(m.mention for m in scrim.away_voters))
         embed.set_footer(text='This channel will automatically delete in 4 hours.')
         await scrim_chat.send(embed=embed)
 
@@ -190,6 +189,12 @@ class ScrimEventListener(BaseCog):
         if not scrim:
             return
 
+        home_team = scrim.home_team
+        away_team = scrim.away_team
+        if not home_team or not away_team:
+            # One of these teams has been deleted, we must cancel this scrim
+            return await scrim.cancel(reason='One of the teams has been deleted.')
+
         home_message = await scrim.home_message()
         if scrim.status is ScrimStatus.scheduled:
             if home_message is None:
@@ -208,12 +213,16 @@ class ScrimEventListener(BaseCog):
                 # We have no home message, we must cancel this scrim
                 return await scrim.cancel(reason='The home message has been deleted.')
 
-            content = f'@everyone, this scrim is scheduled to start on {scrim.scheduled_for_formatted()} '
-            'and I do not have enough votes from this team to confirm the scrim. **I\'m going to cancel this '
-            'scrim as it\'s very unlikely the other team will confirm in time**.'
+            content = (
+                f'@everyone, this scrim is scheduled to start on {scrim.scheduled_for_formatted()} '
+                'and I do not have enough votes from this team to confirm the scrim. **I\'m going to cancel this '
+                'scrim as it\'s very unlikely the other team will confirm in time**.'
+            )
             await home_message.reply(content, allowed_mentions=discord.AllowedMentions(everyone=True))
             await scrim.cancel()
 
         elif scrim.status is ScrimStatus.pending_away:
-            content = f'@everyone, this scrim is scheduled to start on {scrim.scheduled_for_formatted()} and I\'m waiting '
-            f'on {scrim.per_team - len(scrim.away_voter_ids)} vote(s) from {scrim.away_team.display_name}.'
+            content = (
+                f'@everyone, this scrim is scheduled to start on {scrim.scheduled_for_formatted()} and I\'m waiting '
+                f'on {scrim.per_team - len(scrim.away_voter_ids)} vote(s) from {away_team.display_name}.'
+            )
