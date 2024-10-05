@@ -25,11 +25,13 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import functools
+import logging
 from typing import TYPE_CHECKING, Any, Callable, Concatenate, Coroutine, List, Optional, ParamSpec, Tuple, TypeVar
 
 import discord
+from discord.ext import commands
 
-from utils import BaseCog, human_join, human_timedelta
+from utils import RUNNING_DEVELOPMENT, BaseCog, human_join, human_timedelta
 
 T = TypeVar('T')
 P = ParamSpec('P')
@@ -38,6 +40,10 @@ if TYPE_CHECKING:
     from .settings import LoggingSettings
 
 __all__: Tuple[str, ...] = ('LoggingEventsCog', 'logging_event')
+
+_log = logging.getLogger(__name__)
+if RUNNING_DEVELOPMENT:
+    _log.setLevel(logging.DEBUG)
 
 
 def logging_event(
@@ -53,6 +59,7 @@ def logging_event(
 
     @functools.wraps(func)
     async def inner(self: LoggingEventsCog, *args: P.args, **kwargs: P.kwargs) -> None:
+        _log.debug('Invoking logging event %s', func.__name__)
         guild_id, embed = await func(self, *args, **kwargs)
         if embed is None or guild_id is None:
             return
@@ -68,13 +75,15 @@ def logging_event(
 
         logging_webhook = settings.logging_webhook
         if logging_webhook is None:
+            _log.debug('No logging webhook found for guild %s', guild_id)
             return
 
+        _log.debug('Sending logging event %s to guild %s', func.__name__, guild_id)
         await logging_webhook.send(
             embed=embed, username=self.bot.user.display_name, avatar_url=self.bot.user.display_avatar.url
         )
 
-    return inner
+    return commands.Cog.listener(func.__name__)(inner)
 
 
 class LoggingEventsCog(BaseCog):
@@ -213,36 +222,39 @@ class LoggingEventsCog(BaseCog):
 
         return (execution.guild_id, embed)
 
-    def _embed_from_guild_channel(self, channel: discord.abc.GuildChannel) -> discord.Embed:
+    @logging_event
+    async def on_guild_channel_create(
+        self,
+        channel: discord.abc.GuildChannel,
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
         embed = self.bot.Embed(
-            title=f'Channel {channel.name} {channel.type.name.title()}',
+            title='Channel Created',
+            color=discord.Color.green(),
+            description=f'Channel {channel.mention} has been created.',
         )
-
-        return embed
+        
+        return (None, embed)
 
     @logging_event
     async def on_guild_channel_delete(
         self,
         channel: discord.abc.GuildChannel,
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
-
-    @logging_event
-    async def on_guild_channel_create(
-        self,
-        channel: discord.abc.GuildChannel,
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_guild_channel_update(
         self,
         before: discord.abc.GuildChannel,
         after: discord.abc.GuildChannel,
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_guild_update(
         self, before: discord.Guild, after: discord.Guild
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_guild_emojis_update(
@@ -250,7 +262,8 @@ class LoggingEventsCog(BaseCog):
         guild: discord.Guild,
         before: List[discord.Emoji],
         after: List[discord.Emoji],
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_guild_stickers_update(
@@ -258,113 +271,124 @@ class LoggingEventsCog(BaseCog):
         guild: discord.Guild,
         before: List[discord.Sticker],
         after: List[discord.Sticker],
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
-    async def on_audit_log_entry_create(
-        self, entry: discord.AuditLogEntry
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    async def on_audit_log_entry_create(self, entry: discord.AuditLogEntry) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
-    async def on_invite_create(self, invite: discord.Invite) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    async def on_invite_create(self, invite: discord.Invite) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
-    async def on_invite_delete(self, invite: discord.Invite) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    async def on_invite_delete(self, invite: discord.Invite) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
-    async def on_member_join(self, member: discord.Member) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    async def on_member_join(self, member: discord.Member) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
-    async def on_raw_member_remove(self, member: discord.Member) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    async def on_raw_member_remove(self, member: discord.Member) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_member_update(
         self,
         before: discord.Member,
         after: discord.Member,
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_user_update(
         self,
         before: discord.User,
         after: discord.User,
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
-    async def on_member_ban(
-        self, guild: discord.Guild, user: discord.User
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    async def on_member_ban(self, guild: discord.Guild, user: discord.User) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_member_unban(
         self,
         guild: discord.Guild,
         user: discord.User,
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
-
-    @logging_event
-    async def on_presence_update(
-        self,
-        before: discord.Member,
-        after: discord.Member,
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_raw_message_edit(
         self,
         payload: discord.RawMessageUpdateEvent,
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_raw_message_delete(
         self,
         payload: discord.RawMessageDeleteEvent,
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_raw_bulk_message_delete(
         self,
         payload: discord.RawBulkMessageDeleteEvent,
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_raw_poll_vote_add(
         self, payload: discord.RawPollVoteActionEvent
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_raw_poll_vote_remove(
         self, payload: discord.RawPollVoteActionEvent
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_raw_reaction_add(
         self, payload: discord.RawReactionActionEvent
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_raw_reaction_remove(
         self, payload: discord.RawReactionActionEvent
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_raw_reaction_clear(
         self, payload: discord.RawReactionClearEvent
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
-    async def on_reaction_clear_emoji(self, reaction: discord.Reaction) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    async def on_reaction_clear_emoji(self, reaction: discord.Reaction) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
-    async def on_guild_role_create(self, role: discord.Role) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    async def on_guild_role_create(self, role: discord.Role) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
-    async def on_guild_role_delete(self, role: discord.Role) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    async def on_guild_role_delete(self, role: discord.Role) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
 
     @logging_event
     async def on_guild_role_update(
         self,
         before: discord.Role,
         after: discord.Role,
-    ) -> Tuple[Optional[int], Optional[discord.Embed]]: ...
+    ) -> Tuple[Optional[int], Optional[discord.Embed]]:
+        return (None, None)
