@@ -232,7 +232,7 @@ class LoggingEventsCog(BaseCog):
             color=discord.Color.green(),
             description=f'Channel {channel.mention} has been created.',
         )
-        
+
         return (None, embed)
 
     @logging_event

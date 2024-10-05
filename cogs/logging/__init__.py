@@ -33,8 +33,8 @@ from discord.ext import commands
 
 from utils import Context
 
-from .settings import ALL_EVENTS, LoggingEvent, LoggingSettings
 from .events import LoggingEventsCog
+from .settings import ALL_EVENTS, LoggingEvent, LoggingSettings
 
 if TYPE_CHECKING:
     from bot import FuryBot
