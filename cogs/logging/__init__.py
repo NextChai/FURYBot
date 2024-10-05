@@ -31,9 +31,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils import BaseCog, Context
+from utils import Context
 
 from .settings import ALL_EVENTS, LoggingEvent, LoggingSettings
+from .events import LoggingEventsCog
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -112,7 +113,7 @@ class LoggingEventTransverter(commands.Converter[str], app_commands.Transformer)
         return [app_commands.Choice(name=event.replace('_', ' ').title(), value=event) for event in choices]
 
 
-class Logging(BaseCog):
+class Logging(LoggingEventsCog):
 
     def _get_known_invariant_settings(self, ctx: Context) -> LoggingSettings:
         guild_id = ctx.guild and ctx.guild.id
@@ -130,21 +131,42 @@ class Logging(BaseCog):
     @commands.hybrid_group(name='logging', description='Manage your logging settings.', invoke_without_command=True)
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_channels=True)
-    @guild_has_logging_settings()
     async def logging(self, ctx: Context) -> None:
         # TODO: For now, this callback has no functionality. Look into potentially updating this such that it shows the
         # help for the command (?). Would need a default help command impl to be added back to the bot.
         ...
 
-    @logging.command(name='channel', description='View and change the current logging channel.')
+    @logging.command(name='channel', description='View or change the current logging channel.')
+    @app_commands.describe(
+        channel='The channel to set as the logging channel. If not provided, the current logging channel will be shown.'
+    )
     async def logging_channel(self, ctx: Context, channel: Optional[discord.TextChannel] = None) -> discord.Message:
+        guild_id = ctx.guild and ctx.guild.id
+        if not guild_id:
+            return await ctx.send('This command can only be used in a guild.')
+
         async with ctx.typing(ephemeral=True):
-            settings = self._get_known_invariant_settings(ctx)
-            if channel is None:
+            settings = self.bot.get_logging_settings(guild_id)
+            if not settings:
+                # This guild has no settings, we need to create them if the user is trying to set a channel.
+                if not channel:
+                    return await ctx.send(
+                        'This guild has no logging settings. Specify the `channel` parameter in this command to create them.'
+                    )
+
+                settings = await LoggingSettings.create(guild_id, channel.id, bot=self.bot)
+                return await ctx.send(
+                    (
+                        f'I have created logging settings for this guild and set the channel to {channel.mention}. '
+                        'Use `/logging events ...` to manage logging events. **No events** are enabled by default.'
+                    )
+                )
+
+            if not channel:
                 # The user is requesting to see the current logging channel.
                 logging_channel_id = settings.logging_channel_id
                 if logging_channel_id is None:
-                    return await ctx.send('No logging channel is set.')
+                    return await ctx.send('No logging channel is set. Specify one with this command to set it.')
 
                 logging_channel = settings.logging_channel
                 if logging_channel is None:
@@ -168,6 +190,8 @@ class Logging(BaseCog):
         return await ctx.send('Please specify a subcommand.')
 
     @logging_events.command(name='enable', description='Enable a logging event.')
+    @guild_has_logging_settings()
+    @app_commands.describe(event='The logging event to enable.')
     async def logging_events_enable(
         self, ctx: Context, event: Annotated[str, LoggingEventTransverter(LoggingEventFilter.DISABLED)]
     ) -> discord.Message:
@@ -177,6 +201,8 @@ class Logging(BaseCog):
             return await ctx.send(f'I have enabled logging events for **{logging_event.human_readable_event_type}**.')
 
     @logging_events.command(name='disable', description='Disable a logging event.')
+    @guild_has_logging_settings()
+    @app_commands.describe(event='The logging event to disable.')
     async def logging_events_disable(
         self, ctx: Context, event: Annotated[str, LoggingEventTransverter(LoggingEventFilter.ENABLED)]
     ) -> discord.Message:
@@ -190,6 +216,7 @@ class Logging(BaseCog):
             return await ctx.send(f'Logging events for **{event}** have been disabled.')
 
     @logging_events.command(name='enable-all', description='Enable all logging events.')
+    @guild_has_logging_settings()
     async def logging_events_enable_all(self, ctx: Context) -> discord.Message:
         async with ctx.typing():
             settings = self._get_known_invariant_settings(ctx)
@@ -197,6 +224,7 @@ class Logging(BaseCog):
             return await ctx.send('All logging events have been enabled.')
 
     @logging_events.command(name='disable-all', description='Disable all logging events.')
+    @guild_has_logging_settings()
     async def logging_events_disable_all(self, ctx: Context) -> discord.Message:
         async with ctx.typing():
             settings = self._get_known_invariant_settings(ctx)
