@@ -97,7 +97,7 @@ class LoggingSettings:
             record = await connection.fetchrow(
                 '''
                 INSERT INTO logging.settings (guild_id, logging_channel_id)
-                VALUES ($1)
+                VALUES ($1, $2)
                 ON CONFLICT (guild_id) DO UPDATE
                 SET logging_channel_id = EXCLUDED.logging_channel_id
                 RETURNING *;
