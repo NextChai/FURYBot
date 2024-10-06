@@ -79,6 +79,7 @@ class Teams(BaseCog):
         description='Manage team members.',
         guild_only=True,
         default_permissions=discord.Permissions(moderate_members=True),
+        parent=team,
     )
 
     # Management for team captains
@@ -87,6 +88,7 @@ class Teams(BaseCog):
         description='Manage team captains.',
         guild_only=True,
         default_permissions=discord.Permissions(moderate_members=True),
+        parent=team,
     )
 
     scrim = app_commands.Group(name='scrim', description='Create and manage scrims.', guild_only=True)
