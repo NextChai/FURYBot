@@ -26,6 +26,7 @@ from utils import BaseCog, TimeTransformer
 from .errors import TeamNotFound
 from .practices.panel import TeamPracticesPanel
 from .scrims import Scrim
+from .scrims.panel import TeamScrimsPanel
 from .scrims.errors import CannotCreateScrim
 from .team import Team
 from .transformers import TeamTransformer
@@ -44,12 +45,9 @@ __all__: Tuple[str, ...] = ('Teams',)
 _log = logging.getLogger(__name__)
 
 
-def _maybe_team(interaction: discord.Interaction[FuryBot], team: Optional[Team]) -> Optional[Team]:
+def _maybe_team(interaction: discord.Interaction[FuryBot]) -> Optional[Team]:
     if not interaction.guild:
         raise ValueError('This function can only be used when the interaction is in a guild.')
-
-    if team is not None:
-        return team
 
     channel = interaction.channel
     if not channel:
@@ -71,6 +69,22 @@ class Teams(BaseCog):
     team = app_commands.Group(
         name='team',
         description='Create and manage teams.',
+        guild_only=True,
+        default_permissions=discord.Permissions(moderate_members=True),
+    )
+
+    # Management for team members
+    team_members = app_commands.Group(
+        name='members',
+        description='Manage team members.',
+        guild_only=True,
+        default_permissions=discord.Permissions(moderate_members=True),
+    )
+
+    # Management for team captains
+    team_captains = app_commands.Group(
+        name='captains',
+        description='Manage team captains.',
         guild_only=True,
         default_permissions=discord.Permissions(moderate_members=True),
     )
@@ -132,7 +146,7 @@ class Teams(BaseCog):
         team: :class:`Team`
             The team you want to manage.
         """
-        team = _maybe_team(interaction, team)
+        team = team or _maybe_team(interaction)
         if team is None:
             return await interaction.response.send_message(
                 'You must be in a team channel to use this command.', ephemeral=True
@@ -151,11 +165,26 @@ class Teams(BaseCog):
     ) -> discord.InteractionMessage:
         await interaction.response.defer(ephemeral=True)
 
-        team = _maybe_team(interaction, team)
+        team = team or _maybe_team(interaction)
         if team is None:
             return await interaction.edit_original_response(content='You must be in a team channel to use this command.')
 
         view = TeamPracticesPanel(team, target=interaction)
+        return await interaction.edit_original_response(view=view, embed=view.embed)
+
+    @team.command(name='scrims', description='Manage a team\'s scrims')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(team='The team you want to manage.')
+    async def team_scrims(
+        self, interaction: discord.Interaction[FuryBot], team: Optional[TEAM_TRANSFORM]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer(ephemeral=True)
+
+        team = team or _maybe_team(interaction)
+        if team is None:
+            return await interaction.edit_original_response(content='You must be in a team channel to use this command.')
+
+        view = TeamScrimsPanel(team, target=interaction)
         return await interaction.edit_original_response(view=view, embed=view.embed)
 
     @team.command(name='delete', description='Delete a team.')
@@ -164,7 +193,7 @@ class Teams(BaseCog):
     @app_commands.checks.bot_has_permissions(manage_channels=True)
     async def team_delete(
         self, interaction: discord.Interaction[FuryBot], team: Optional[TEAM_TRANSFORM], reason: Optional[str] = None
-    ) -> Optional[discord.InteractionMessage]:
+    ) -> discord.InteractionMessage:
         """|coro|
 
         A command used to delete a team.
@@ -176,16 +205,120 @@ class Teams(BaseCog):
         """
         await interaction.response.defer()
 
-        team = _maybe_team(interaction, team)
+        team = team or _maybe_team(interaction)
         if team is None:
-            return await interaction.response.send_message(
-                'You must be in a team channel to use this command.', ephemeral=True
-            )
+            return await interaction.edit_original_response(content='You must be in a team channel to use this command.')
 
         async with self.bot.safe_connection() as connection:
             await team.delete(connection=connection, reason=f'{interaction.user} - {reason or "No reason provided."}')
 
         return await interaction.edit_original_response(content=f'{team.display_name} has been deleted.')
+
+    @team_members.command(name='add', description='Add a member to a team.')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(
+        member='The member you want to add to the team.',
+        team='The team you want to add a member to. `None` for using the team of the channel.',
+        as_sub='Whether the member is a sub or not. Defaults to `False`.',
+    )
+    async def team_members_add(
+        self,
+        interaction: discord.Interaction[FuryBot],
+        member: discord.Member,
+        team: Optional[TEAM_TRANSFORM] = None,
+        as_sub: bool = False,
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer(ephemeral=True)
+
+        team = team or _maybe_team(interaction)
+        if team is None:
+            return await interaction.edit_original_response(
+                content='You must be in a team channel to use this command, or use the `team` parameter.'
+            )
+
+        await team.add_team_member(member.id, is_sub=as_sub)
+
+        return await interaction.edit_original_response(
+            content=f'{member.mention} has been added to **{team.display_name}**.'
+        )
+
+    @team_members.command(name='remove', description='Remove a member from a team.')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(
+        team='The team you want to remove a member from. `None` for using the team of the channel.',
+        member='The member you want to remove from the team.',
+    )
+    async def team_members_remove(
+        self, interaction: discord.Interaction[FuryBot], member: discord.Member, team: Optional[TEAM_TRANSFORM]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer(ephemeral=True)
+
+        team = team or _maybe_team(interaction)
+        if team is None:
+            return await interaction.edit_original_response(
+                content='You must be in a team channel to use this command, or use the `team` parameter.'
+            )
+
+        team_member = team.get_member(member.id)
+        if team_member is None:
+            return await interaction.edit_original_response(content=f'{member.mention} is not on **{team.display_name}**.')
+
+        await team_member.remove_from_team()
+
+        return await interaction.edit_original_response(
+            content=f'{member.mention} has been removed from **{team.display_name}**.'
+        )
+
+    @team_captains.command(name='add', description='Add a captain to a team.')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(
+        target='The target to add as a captain.',
+        team='The team you want to add a captain to. `None` for using the team of the channel.',
+    )
+    async def team_captains_add(
+        self, interaction: discord.Interaction[FuryBot], target: discord.Role, team: Optional[TEAM_TRANSFORM]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer(ephemeral=True)
+
+        team = team or _maybe_team(interaction)
+        if team is None:
+            return await interaction.edit_original_response(
+                content='You must be in a team channel to use this command, or use the `team` parameter.'
+            )
+
+        await team.add_captain(target.id)
+
+        return await interaction.edit_original_response(
+            content=f'{target.mention} is now a captain of **{team.display_name}**.'
+        )
+
+    @team_captains.command(name='remove', description='Remove a captain from a team.')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(
+        target='The target to remove as a captain.',
+        team='The team you want to remove a captain from. `None` for using the team of the channel.',
+    )
+    async def team_captains_remove(
+        self, interaction: discord.Interaction[FuryBot], target: discord.Role, team: Optional[TEAM_TRANSFORM]
+    ) -> discord.InteractionMessage:
+        await interaction.response.defer(ephemeral=True)
+
+        team = team or _maybe_team(interaction)
+        if team is None:
+            return await interaction.edit_original_response(
+                content='You must be in a team channel to use this command, or use the `team` parameter.'
+            )
+
+        try:
+            await team.remove_captain(target.id)
+        except ValueError:
+            return await interaction.edit_original_response(
+                content=f'{target.mention} is not a captain of **{team.display_name}**.'
+            )
+
+        return await interaction.edit_original_response(
+            content=f'{target.mention} is no longer a captain of **{team.display_name}**.'
+        )
 
     @scrim.command(name='create', description='Create a scrim')
     @app_commands.describe(

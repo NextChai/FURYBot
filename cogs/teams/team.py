@@ -792,12 +792,12 @@ class Team:
 
         Raises
         -------
-        Exception
+        ValueError
             This role is not a captain.
         """
 
         if role_id not in self.captain_role_ids:
-            raise Exception("This role is not a captain.")
+            raise ValueError("This role is not a captain.")
 
         async with self.bot.safe_connection() as connection:
             await connection.execute(
