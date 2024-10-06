@@ -76,7 +76,7 @@ class TeamMember:
         return team
 
     @property
-    def member(self) -> Optional[discord.Member]:
+    def discord_member(self) -> Optional[discord.Member]:
         """Optional[:class:`discord.Member`]: A Discord member object."""
         guild = self.team and self.team.guild
         return guild and guild.get_member(self.member_id)
@@ -116,7 +116,6 @@ class TeamMember:
             raise Exception("Can not demote a sub.")
 
         self.is_sub = True
-
         async with self.bot.safe_connection() as connection:
             await connection.execute(
                 "UPDATE teams.members SET is_sub = True WHERE team_id = $1 AND member_id = $2",
@@ -150,7 +149,7 @@ class TeamMember:
                 self.member_id,
             )
 
-    async def fetch_member(self) -> discord.Member:
+    async def fetch_discord_member(self) -> Optional[discord.Member]:
         """|coro|
 
         A method to fetch the :class:`discord.Member` represented by this
@@ -161,11 +160,24 @@ class TeamMember:
         Exception
             The guild was not found.
         """
-        guild = self.team and self.team.guild
-        if not guild:
-            raise Exception("Guild not found.")
+        team = self.team
+        if not team:
+            return None
 
-        return await guild.fetch_member(self.member_id)
+        guild = team.guild
+        if not guild:
+            return None
+
+        try:
+            await guild.fetch_member(self.member_id)
+        except discord.NotFound:
+            # This member has been removed from the guild, we can't fetch them.
+            # Remove them from the team as well.
+            await team.remove_team_member(self)
+            return None
+
+    async def getch_discord_member(self) -> Optional[discord.Member]:
+        return self.discord_member or await self.fetch_discord_member()
 
 
 @dataclasses.dataclass(init=True, repr=True, eq=True)
@@ -672,11 +684,10 @@ class Team:
             discord.Object(guild.default_role.id, type=discord.Role): discord.PermissionOverwrite(read_messages=False)
         }
 
-        for member in self.team_members.values():
-            discord_member = member.member or await member.fetch_member()
-            overwrites[discord.Object(discord_member.id, type=discord.Member)] = discord.PermissionOverwrite(
-                view_channel=True
-            )
+        for team_member in self.team_members.values():
+            discord_member = await team_member.getch_discord_member()
+            if discord_member:
+                overwrites[[discord.Object(discord_member.id, type=discord.Member)] = discord.PermissionOverwrite(view_channel=True)
 
         for target in await self.captains():
             overwrites[discord.Object(target.id)] = discord.PermissionOverwrite(view_channel=True)
@@ -732,7 +743,6 @@ class Team:
                 raise Exception("Failed to add a new member to the team.")
 
         team_member = TeamMember(self.bot, guild_id=self.guild_id, **dict(member_record))
-
         self.team_members[team_member.member_id] = team_member
 
         # Now we can sync the permissions for this member
@@ -757,21 +767,16 @@ class Team:
                 team_member.member_id,
             )
 
-        try:
-            member = team_member.member or await team_member.fetch_member()
-        except discord.NotFound:
-            # This member has left the guild, we can not edit the channels as a result.
-            pass
-        else:
-            # Remove this member and sync the channels
-            self.team_members.pop(team_member.member_id, None)
+        # Remove this member and sync the channels
+        self.team_members.pop(team_member.member_id, None)
 
-            if member.voice and force_voice_disconnect:
-                channel = member.voice.channel
-                if channel and channel in (self.voice_channel, *self.extra_channels):
-                    await member.move_to(None, reason="Member removed from the team.")
+        discord_member = await team_member.getch_discord_member()
+        if discord_member and discord_member.voice and force_voice_disconnect:
+            channel = discord_member.voice.channel
+            if channel and channel in (self.voice_channel, *self.extra_channels):
+                await discord_member.move_to(None, reason="Member removed from the team.")
 
-            await self.sync()
+        await self.sync()
 
     async def add_captain(self, target_id: int, /) -> None:
         """|coro|
@@ -814,12 +819,11 @@ class Team:
 
         Raises
         -------
-        Exception
-            This role is not a captain.
+        ValueError
+            This role/person is not a captain.
         """
-
         if target_id not in self.captain_ids:
-            raise Exception("This role is not a captain.")
+            raise ValueError("This role/person is not a captain.")
 
         async with self.bot.safe_connection() as connection:
             await connection.execute(
@@ -952,14 +956,13 @@ class Team:
         if not role:
             return
 
-        for member in self.members:
-            try:
-                member = member.member or await member.fetch_member()
-            except discord.NotFound:
+        for team_member in self.members:
+            discord_member = await team_member.getch_discord_member()
+            if not discord_member:
                 continue
 
             try:
-                await member.remove_roles(role, reason="Team deleted, team was top practicer.")
+                await discord_member.remove_roles(role, reason="Team deleted, team was top practicer.")
             except discord.Forbidden:
                 pass
 
