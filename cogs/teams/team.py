@@ -17,7 +17,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 from collections import Counter
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union, cast
 
 import discord
 from typing_extensions import Self
@@ -205,9 +205,10 @@ class Team:
         of the teams voice channel.
     name: :class:`str`
         The name of the team.
-    captain_ids: List[:class:`int`]
-        A team always has a captain. A captain can be either
-        a role or one specific member.
+    captain_role_ids: List[:class:`int`]
+        A team always has a captain. Any captain role assigned
+        to the team will get permissions to view the channels
+        and make announcements.
     extra_channel_ids: List[:class:`int`]
         Any additional channel IDS the team may have.
     team_members: Dict[:class:`int`, :class:`TeamMember`]
@@ -221,7 +222,7 @@ class Team:
     text_channel_id: int
     voice_channel_id: int
     name: str
-    captain_ids: List[int]
+    captain_role_ids: List[int]
     extra_channel_ids: List[int]
     team_members: Dict[int, TeamMember]
     nickname: Optional[str]
@@ -349,9 +350,9 @@ class Team:
         return team
 
     @property
-    def guild(self) -> Optional[discord.Guild]:
+    def guild(self) -> discord.Guild:
         """:class:`discord.Guild`: The guild this team is bound to."""
-        return self.bot.get_guild(self.guild_id)
+        return cast(discord.Guild, self.bot.get_guild(self.guild_id))
 
     @property
     def members(self) -> List[TeamMember]:
@@ -420,9 +421,6 @@ class Team:
     def extra_channels(self) -> List[discord.abc.GuildChannel]:
         """List[:class:`discord.abc.GuildChannel`]: A list of all extra channels this team has."""
         guild = self.guild
-        if not guild:
-            return []
-
         channels: List[discord.abc.GuildChannel] = []
         for channel_id in self.extra_channel_ids:
             channel = guild.get_channel(channel_id)
@@ -445,6 +443,12 @@ class Team:
     def ongoing_practice(self) -> Optional[Practice]:
         """Optional[:class:`Practice`]: The ongoing practice for this team."""
         return discord.utils.find(lambda practice: practice.ongoing, self.practices)
+
+    @property
+    def captain_roles(self) -> List[discord.Role]:
+        """List[:class:`discord.Role`]: A list of all captain roles for this team."""
+        guild = self.guild
+        return [role for role_id in self.captain_role_ids if (role := guild.get_role(role_id))]
 
     @property
     def display_name(self) -> str:
@@ -644,53 +648,21 @@ class Team:
         team_scores = [(team, team.total_points) for team in teams]
         return sorted(team_scores, key=lambda item: item[1], reverse=True).index((self, self.total_points)) + 1
 
-    async def captains(self) -> List[Union[discord.User, discord.Member, discord.Role]]:
-        guild = self.guild
-        if guild is None:
-            return []
-
-        targets: List[Union[discord.Member, discord.User, discord.Role]] = []
-        for captain_target in self.captain_ids:
-            role = guild.get_role(captain_target)
-            if role:
-                targets.append(role)
-                continue
-
-            target = guild.get_member(captain_target) or self.bot.get_user(captain_target)
-            if target is None:
-                # Try and fetch this instead
-                try:
-                    target = await guild.fetch_member(captain_target)
-                except discord.NotFound:
-                    # This captain no longer exists
-                    await self.remove_captain(captain_target)
-                    continue
-
-            targets.append(target)
-
-        return targets
-
-    async def channel_overwrites(
-        self,
-    ) -> Dict[discord.Object, discord.PermissionOverwrite]:
+    async def channel_overwrites(self) -> Dict[Union[discord.Role, discord.Member], discord.PermissionOverwrite]:
         """Dict[Union[:class:`discord.Role`, :class:`discord.Member`], :class:`discord.PermissionOverwrite`]:
         The channel overwrites for this team.
         """
-        guild = self.guild
-        if not guild:
-            return {}
-
-        overwrites: Dict[discord.Object, discord.PermissionOverwrite] = {
-            discord.Object(guild.default_role.id, type=discord.Role): discord.PermissionOverwrite(read_messages=False)
+        overwrites: Dict[Union[discord.Role, discord.Member], discord.PermissionOverwrite] = {
+            self.guild.default_role: discord.PermissionOverwrite(read_messages=False)
         }
 
         for team_member in self.team_members.values():
             discord_member = await team_member.getch_discord_member()
             if discord_member:
-                overwrites[[discord.Object(discord_member.id, type=discord.Member)] = discord.PermissionOverwrite(view_channel=True)
+                overwrites[discord_member] = discord.PermissionOverwrite(view_channel=True)
 
-        for target in await self.captains():
-            overwrites[discord.Object(target.id)] = discord.PermissionOverwrite(view_channel=True)
+        for role in self.captain_roles:
+            overwrites[role] = discord.PermissionOverwrite(view_channel=True)
 
         return overwrites
 
@@ -778,15 +750,15 @@ class Team:
 
         await self.sync()
 
-    async def add_captain(self, target_id: int, /) -> None:
+    async def add_captain(self, role_id: int, /) -> None:
         """|coro|
 
         Add a captain role to this team.
 
         Parameters
         -----------
-        target_id: :class:`int`
-            The id of the captain to add.
+        role_id: :class:`int`
+            The id of the role to add.
 
         Raises
         -------
@@ -794,45 +766,48 @@ class Team:
             This role is already a captain.
         """
 
-        if target_id in self.captain_ids:
+        if role_id in self.captain_role_ids:
             raise Exception("This role is already a captain.")
 
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                "UPDATE teams.settings SET captain_ids = array_append(captain_ids, $1) WHERE id = $2",
-                target_id,
+                "UPDATE teams.settings SET captain_role_ids = array_append(captain_role_ids, $1) WHERE id = $2",
+                role_id,
                 self.id,
             )
 
-        self.captain_ids.append(target_id)
+        self.captain_role_ids.append(role_id)
+
         await self.sync()
 
-    async def remove_captain(self, target_id: int, /) -> None:
+    async def remove_captain(self, role_id: int, /) -> None:
         """|coro|
 
         Remove a captain role from this team.
 
         Parameters
         -----------
-        target_id: :class:`int`
+        role_id: :class:`int`
             The id of the role to remove.
 
         Raises
         -------
         ValueError
-            This role/person is not a captain.
+            This role is not a captain.
         """
-        if target_id not in self.captain_ids:
-            raise ValueError("This role/person is not a captain.")
+
+        if role_id not in self.captain_role_ids:
+            raise ValueError("This role is not a captain.")
 
         async with self.bot.safe_connection() as connection:
             await connection.execute(
-                "UPDATE teams.settings SET captain_ids = array_remove(captain_ids, $1) WHERE id = $2",
-                target_id,
+                "UPDATE teams.settings SET captain_role_ids = array_remove(captain_role_ids, $1) WHERE id = $2",
+                role_id,
                 self.id,
             )
 
-        self.captain_ids.remove(target_id)
+        self.captain_role_ids.remove(role_id)
+
         await self.sync()
 
     async def add_extra_channel(self, channel_id: int, /) -> None:
@@ -948,11 +923,7 @@ class Team:
         )
 
         # Remove the roles from the members
-        guild = self.guild
-        if not guild:
-            return
-        
-        role = guild.get_role(data['role_id'])
+        role = self.guild.get_role(data['role_id'])
         if not role:
             return
 

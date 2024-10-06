@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS teams.settings (
     nickname TEXT,
     description TEXT,
     logo TEXT,
-    captain_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT []
+    captain_role_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT []
 );
 
 CREATE TABLE IF NOT EXISTS teams.members (
