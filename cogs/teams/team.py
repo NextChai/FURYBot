@@ -687,7 +687,9 @@ class Team:
         for team_member in self.team_members.values():
             discord_member = await team_member.getch_discord_member()
             if discord_member:
-                overwrites[[discord.Object(discord_member.id, type=discord.Member)] = discord.PermissionOverwrite(view_channel=True)
+                overwrites[discord.Object(discord_member.id, type=discord.Member)] = discord.PermissionOverwrite(
+                    view_channel=True
+                )
 
         for target in await self.captains():
             overwrites[discord.Object(target.id)] = discord.PermissionOverwrite(view_channel=True)
@@ -951,7 +953,7 @@ class Team:
         guild = self.guild
         if not guild:
             return
-        
+
         role = guild.get_role(data['role_id'])
         if not role:
             return
