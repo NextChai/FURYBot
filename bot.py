@@ -636,26 +636,6 @@ class FuryBot(commands.Bot):
         invite = discord.utils.oauth_url(self.user.id, permissions=discord.Permissions(0))
         _log.info("Invite link: %s", invite)
 
-    async def on_raw_member_remove(self, payload: discord.RawMemberRemoveEvent) -> None:
-        """|coro|
-
-        Called when a member has been removed from a specific guild. This event listener will delete this member
-        from any team they're on as to not allow members not in the server to appear on teams.
-
-        Parameters
-        ----------
-        payload: :class:`discord.RawMemberRemoveEvent`
-            The payload for the event.
-        """
-        teams = self.get_teams(payload.guild_id)
-        if not teams:
-            return
-
-        for team in teams:
-            member = team.get_member(payload.user.id)
-            if member is not None:
-                await member.remove_from_team()
-
     async def get_context(
         self,
         origin: Union[discord.Message, discord.Interaction[Self]],  # cls: Type[commands.Context[Self]] = Context
@@ -776,7 +756,11 @@ class FuryBot(commands.Bot):
             return
 
         attachment_data = data['attachment_payload']
-        requester = guild.get_member(data['requester_id']) or await guild.fetch_member(data['requester_id'])
+
+        try:
+            requester = guild.get_member(data['requester_id']) or await guild.fetch_member(data['requester_id'])
+        except discord.NotFound:
+            return
 
         request = ImageRequest(
             requester=requester,

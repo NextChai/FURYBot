@@ -338,6 +338,8 @@ class Teams(BaseCog):
                 connection=connection, reason=f'Team {team.display_name} category channel was deleted, team was deleted.'
             )
 
+        self.bot.dispatch('team_delete', team)
+
     @commands.Cog.listener('on_guild_channel_delete')
     async def team_automatic_text_voice_chat_deletion_detector(self, channel: discord.abc.GuildChannel) -> None:
         """|coro|
@@ -389,6 +391,27 @@ class Teams(BaseCog):
             _log.debug('Team %s voice channel was deleted, recreating.', team.display_name)
             new_channel = await category.create_voice_channel(name='team-voice')
             return await team.edit(voice_channel_id=new_channel.id)
+
+    @commands.Cog.listener('on_raw_member_remove')
+    async def on_raw_member_remove(self, payload: discord.RawMemberRemoveEvent) -> None:
+        """|coro|
+
+        Called when a member has been removed from a specific guild. This event listener will delete this member
+        from any team they're on as to not allow members not in the server to appear on teams.
+
+        Parameters
+        ----------
+        payload: :class:`discord.RawMemberRemoveEvent`
+            The payload for the event.
+        """
+        teams = self.bot.get_teams(payload.guild_id)
+        if not teams:
+            return
+
+        for team in teams:
+            team_member = team.get_member(payload.user.id)
+            if team_member is not None:
+                await team_member.remove_from_team()
 
 
 async def setup(bot: FuryBot) -> None:

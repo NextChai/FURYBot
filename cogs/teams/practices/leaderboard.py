@@ -175,13 +175,12 @@ class PracticeLeaderboard(GuildAble):
         previous_top_team = self.bot.get_team(self.top_team_id, guild_id=team.guild_id)
         if previous_top_team:
             for team_member in previous_top_team.members:
-                try:
-                    member = team_member.member or await team_member.fetch_member()
-                except discord.NotFound:
+                discord_member = await team_member.getch_discord_member()
+                if not discord_member:
                     continue
 
                 try:
-                    await member.remove_roles(role, reason="Team member booted off leaderboard.")
+                    await discord_member.remove_roles(role, reason="Team member booted off leaderboard.")
                 except discord.Forbidden:
                     pass
 
@@ -195,13 +194,12 @@ class PracticeLeaderboard(GuildAble):
 
         # Add roles onto new team
         for team_member in team.members:
-            try:
-                member = team_member.member or await team_member.fetch_member()
-            except discord.NotFound:
+            discord_member = await team_member.getch_discord_member()
+            if not discord_member:
                 continue
 
             try:
-                await member.add_roles(role, reason="Team member booted off leaderboard.")
+                await discord_member.add_roles(role, reason="Team member booted off leaderboard.")
             except discord.Forbidden:
                 pass
 

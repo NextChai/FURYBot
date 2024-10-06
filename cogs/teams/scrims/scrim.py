@@ -422,15 +422,20 @@ class Scrim:
             await self.cancel(reason='One or more teams have been deleted.')
             return
 
-        overwrites: Mapping[Union[discord.Member, discord.Role], discord.PermissionOverwrite] = {
-            m.member or await m.fetch_member(): discord.PermissionOverwrite(view_channel=True)
-            for m in [*self.away_team.team_members.values(), *self.home_team.team_members.values()]
-        }
+        overwrites: Mapping[Union[discord.Member, discord.Role], discord.PermissionOverwrite] = {}
+        for team_member in [*self.home_team.team_members.values(), *self.away_team.team_members.values()]:
+            discord_member = await team_member.getch_discord_member()
+            if not discord_member:
+                continue
+
+            overwrites[discord_member] = discord.PermissionOverwrite(view_channel=True)
+
         overwrites[self.guild.default_role] = discord.PermissionOverwrite(view_channel=False)
 
         # Append the captains to the overwrites as well
         for captain_role in self.away_team.captain_roles:
             overwrites[captain_role] = discord.PermissionOverwrite(view_channel=True)
+
         for captain_role in self.home_team.captain_roles:
             overwrites[captain_role] = discord.PermissionOverwrite(view_channel=True)
 
