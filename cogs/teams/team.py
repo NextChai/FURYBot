@@ -435,25 +435,6 @@ class Team:
         return discord.utils.find(lambda practice: practice.ongoing, self.practices)
 
     @property
-    def captains(self) -> List[Union[discord.User, discord.Member, discord.Role]]:
-        guild = self.guild
-        if guild is None:
-            return []
-
-        targets: List[Union[discord.Member, discord.User, discord.Role]] = []
-        for captain_target in self.captain_ids:
-            role = guild.get_role(captain_target)
-            if role:
-                targets.append(role)
-                continue
-
-            target = guild.get_member(captain_target) or self.bot.get_user(captain_target)
-            if target:
-                targets.append(target)
-
-        return targets
-
-    @property
     def display_name(self) -> str:
         """:class:`str`: The display name for this team."""
         return f'{self.name} {f"({self.nickname})" if self.nickname else ""}'.strip()
@@ -651,9 +632,35 @@ class Team:
         team_scores = [(team, team.total_points) for team in teams]
         return sorted(team_scores, key=lambda item: item[1], reverse=True).index((self, self.total_points)) + 1
 
+    async def captains(self) -> List[Union[discord.User, discord.Member, discord.Role]]:
+        guild = self.guild
+        if guild is None:
+            return []
+
+        targets: List[Union[discord.Member, discord.User, discord.Role]] = []
+        for captain_target in self.captain_ids:
+            role = guild.get_role(captain_target)
+            if role:
+                targets.append(role)
+                continue
+
+            target = guild.get_member(captain_target) or self.bot.get_user(captain_target)
+            if target is None:
+                # Try and fetch this instead
+                try:
+                    target = await guild.fetch_member(captain_target)
+                except discord.NotFound:
+                    # This captain no longer exists
+                    await self.remove_captain(captain_target)
+                    continue
+
+            targets.append(target)
+
+        return targets
+
     async def channel_overwrites(
         self,
-    ) -> Dict[Union[discord.Role, discord.Member, discord.User], discord.PermissionOverwrite]:
+    ) -> Dict[discord.Object, discord.PermissionOverwrite]:
         """Dict[Union[:class:`discord.Role`, :class:`discord.Member`], :class:`discord.PermissionOverwrite`]:
         The channel overwrites for this team.
         """
@@ -661,16 +668,18 @@ class Team:
         if not guild:
             return {}
 
-        overwrites: Dict[Union[discord.Role, discord.Member, discord.User], discord.PermissionOverwrite] = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=False)
+        overwrites: Dict[discord.Object, discord.PermissionOverwrite] = {
+            discord.Object(guild.default_role.id, type=discord.Role): discord.PermissionOverwrite(read_messages=False)
         }
 
         for member in self.team_members.values():
             discord_member = member.member or await member.fetch_member()
-            overwrites[discord_member] = discord.PermissionOverwrite(view_channel=True)
+            overwrites[discord.Object(discord_member.id, type=discord.Member)] = discord.PermissionOverwrite(
+                view_channel=True
+            )
 
-        for target in self.captains:
-            overwrites[target] = discord.PermissionOverwrite(view_channel=True)
+        for target in await self.captains():
+            overwrites[discord.Object(target.id)] = discord.PermissionOverwrite(view_channel=True)
 
         return overwrites
 
@@ -935,7 +944,11 @@ class Team:
         )
 
         # Remove the roles from the members
-        role = self.guild.get_role(data['role_id'])
+        guild = self.guild
+        if not guild:
+            return
+        
+        role = guild.get_role(data['role_id'])
         if not role:
             return
 
