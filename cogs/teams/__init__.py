@@ -26,8 +26,8 @@ from utils import BaseCog, TimeTransformer
 from .errors import TeamNotFound
 from .practices.panel import TeamPracticesPanel
 from .scrims import Scrim
-from .scrims.panel import TeamScrimsPanel
 from .scrims.errors import CannotCreateScrim
+from .scrims.panel import TeamScrimsPanel
 from .team import Team
 from .transformers import TeamTransformer
 from .views import TeamView
