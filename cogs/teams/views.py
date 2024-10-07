@@ -24,10 +24,10 @@ from utils import (
     AfterModal,
     BaseView,
     BaseViewKwargs,
+    MentionableSelect,
     SelectOneOfMany,
     UserSelect,
     default_button_doc_string,
-    MentionableSelect,
 )
 
 from .practices.panel import PracticeMemberStatistics, TeamPracticesPanel

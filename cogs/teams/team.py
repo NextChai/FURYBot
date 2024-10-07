@@ -14,9 +14,9 @@ Full license terms are available in the LICENSE file at the root of the reposito
 
 from __future__ import annotations
 
-import enum
 import dataclasses
 import datetime
+import enum
 from collections import Counter
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
