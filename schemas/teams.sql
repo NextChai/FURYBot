@@ -11,7 +11,14 @@ CREATE TABLE IF NOT EXISTS teams.settings (
     nickname TEXT,
     description TEXT,
     logo TEXT,
-    captain_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT []
+);
+
+CREATE TYPE IF NOT EXISTS teams.captain_type AS ENUM ('role', 'user');
+
+CREATE TABLE IF NOT EXISTS teams.captains (
+    team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
+    captain_id BIGINT,
+    type teams.captain_type 
 );
 
 CREATE TABLE IF NOT EXISTS teams.members (

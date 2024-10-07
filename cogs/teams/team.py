@@ -14,13 +14,13 @@ Full license terms are available in the LICENSE file at the root of the reposito
 
 from __future__ import annotations
 
+import enum
 import dataclasses
 import datetime
 from collections import Counter
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
 import discord
-from typing_extensions import Self
 
 from utils import QueryBuilder, human_join
 
@@ -54,11 +54,12 @@ class TeamMember:
         Whether the member is a sub or not.
     """
 
-    bot: FuryBot
-    team_id: int
-    member_id: int
-    guild_id: int
-    is_sub: Optional[bool] = dataclasses.field(default=None)
+    def __init__(self, bot: FuryBot, *, guild_id: int, team_id: int, member_id: int, is_sub: bool) -> None:
+        self.bot: FuryBot = bot
+        self.team_id: int = team_id
+        self.member_id: int = member_id
+        self.guild_id: int = guild_id
+        self.is_sub: bool = is_sub
 
     def __eq__(self, __o: object) -> bool:
         return isinstance(__o, self.__class__) and self.member_id == __o.member_id
@@ -180,6 +181,69 @@ class TeamMember:
         return self.discord_member or await self.fetch_discord_member()
 
 
+class CaptainType(enum.Enum):
+    role = 'role'
+    user = 'user'
+
+
+class TeamCaptains:
+    """Denotes the captains of a given team."""
+
+    def __init__(self, bot: FuryBot, *, guild_id: int, team_id: int, captain_id: int, captain_type: str) -> None:
+        self.team_id: int = team_id
+        self.captain_id: int = captain_id
+        self.captain_type: CaptainType = CaptainType(captain_type)
+        self.guild_id: int = guild_id
+        self.bot = bot
+
+    @property
+    def guild(self) -> Optional[discord.Guild]:
+        return self.bot.get_guild(self.guild_id)
+
+    @property
+    def team(self) -> Optional[Team]:
+        return self.bot.get_team(self.team_id, guild_id=self.guild_id)
+
+    @property
+    def mention(self) -> str:
+        if self.captain_type is CaptainType.role:
+            return f"<@&{self.captain_id}>"
+
+        return f"<@{self.captain_id}>"
+
+    async def delete(self) -> None:
+        async with self.bot.safe_connection() as connection:
+            await connection.execute(
+                '''
+                DELETE FROM teams.captains 
+                WHERE team_id = $1 
+                AND captain_id = $2
+                ''',
+                self.team_id,
+                self.captain_id,
+            )
+
+    async def getch(self) -> Optional[Union[discord.Member, discord.Role]]:
+        guild = self.guild
+        if not guild:
+            return None
+
+        if self.captain_type is CaptainType.role:
+            return guild.get_role(self.captain_id)
+
+        member = guild.get_member(self.captain_id)
+        if member:
+            return member
+
+        try:
+            return await guild.fetch_member(self.captain_id)
+        except discord.NotFound:
+            # This member has been removed from the guild, we can't fetch them.
+            # Remove them from the team as well.
+            self.bot.create_task(self.delete())
+            return None
+
+
 @dataclasses.dataclass(init=True, repr=True, eq=True)
 class Team:
     """Represents a :class:`Team` which holds members, scrims,
@@ -221,12 +285,12 @@ class Team:
     text_channel_id: int
     voice_channel_id: int
     name: str
-    captain_ids: List[int]
     extra_channel_ids: List[int]
     team_members: Dict[int, TeamMember]
     nickname: Optional[str]
     description: Optional[str]
     logo: Optional[str]
+    captains: Dict[int, TeamCaptains] = dataclasses.field(default_factory=dict)
 
     def __eq__(self, __o: object) -> bool:
         return isinstance(__o, self.__class__) and self.id == __o.id
@@ -269,45 +333,29 @@ class Team:
         raise TeamNotFound("No team with that channel exists.")
 
     @classmethod
-    async def from_record(
-        cls: Type[Self],
-        data: Dict[str, Any],
+    def from_raw(
+        cls: Type[Team],
+        team_data: Dict[str, Any],
         member_data: List[Dict[str, Any]],
+        captain_data: List[Dict[str, Any]],
         /,
         *,
         bot: FuryBot,
-    ) -> Self:
-        """|coro|
+    ) -> Team:
+        guild_id = team_data["guild_id"]
+        team_id = team_data["id"]
+        members = {entry["member_id"]: TeamMember(bot, guild_id=guild_id, team_id=team_id, **entry) for entry in member_data}
 
-        Fetch the team from the database and return its instance. This will only be called in
-        :meth:`FuryBot.setup_hook` as all other instances should use the bots cache.
-
-        Parameters
-        ----------
-        data: :class:`dict`
-            The data returned from the database.
-        member_data: List[:class:`dict`]
-            The data returned from the database.
-        bot: :class:`FuryBot`
-            The bot instance.
-        connection: :class:`asyncpg.Connection`
-            The connection to the database.
-
-        Returns
-        -------
-        :class:`Team`
-            The fetched team.
-        """
-        members = {
-            entry["member_id"]: TeamMember(bot, guild_id=data["guild_id"], **dict(entry)) for entry in member_data or []
+        captains = {
+            entry['captain_id']: TeamCaptains(bot, guild_id=guild_id, team_id=team_id, **entry) for entry in captain_data
         }
-        team = cls(bot, **dict(data), team_members=members)
-        bot.add_team(team)
 
+        team = cls(bot, **dict(team_data), team_members=members, captains=captains)
+        bot.add_team(team)
         return team
 
     @classmethod
-    async def create(cls: Type[Self], name: str, /, *, guild: discord.Guild, bot: FuryBot) -> Self:
+    async def create(cls: Type[Team], name: str, /, *, guild: discord.Guild, bot: FuryBot) -> Team:
         """|coro|
 
         Used to create a new team.
@@ -644,31 +692,51 @@ class Team:
         team_scores = [(team, team.total_points) for team in teams]
         return sorted(team_scores, key=lambda item: item[1], reverse=True).index((self, self.total_points)) + 1
 
-    async def captains(self) -> List[Union[discord.User, discord.Member, discord.Role]]:
-        guild = self.guild
-        if guild is None:
-            return []
+    # Captain related methods
+    def has_captain(self, target_id: int, /) -> bool:
+        return bool(self.captains.get(target_id))
 
-        targets: List[Union[discord.Member, discord.User, discord.Role]] = []
-        for captain_target in self.captain_ids:
-            role = guild.get_role(captain_target)
-            if role:
-                targets.append(role)
-                continue
+    async def remove_captain(self, target_id: int, /) -> None:
+        if not self.captains.pop(target_id, None):
+            return
 
-            target = guild.get_member(captain_target) or self.bot.get_user(captain_target)
-            if target is None:
-                # Try and fetch this instead
-                try:
-                    target = await guild.fetch_member(captain_target)
-                except discord.NotFound:
-                    # This captain no longer exists
-                    await self.remove_captain(captain_target)
-                    continue
+        async with self.bot.safe_connection() as connection:
+            await connection.execute(
+                '''
+                DELETE FROM teams.captains 
+                WHERE team_id = $1 
+                AND captain_id = $2
+                ''',
+                self.id,
+                target_id,
+            )
 
-            targets.append(target)
+        await self.sync()
 
-        return targets
+    async def add_captain(self, target_id: int, captain_type: CaptainType, /) -> TeamCaptains:
+        if self.has_captain(target_id):
+            raise Exception("A captain with this ID already exists.")
+
+        async with self.bot.safe_connection() as connection:
+            data = await connection.fetchrow(
+                '''
+                INSERT INTO teams.captains (team_id, captain_id, captain_type)
+                VALUES($1, $2, $3)
+                RETURNING *
+                ''',
+                self.id,
+                target_id,
+                captain_type.value,
+            )
+
+            if not data:
+                raise Exception("Failed to add a new captain to the team.")
+
+        captain = TeamCaptains(self.bot, guild_id=self.guild_id, **dict(data))
+        self.captains[captain.captain_id] = captain
+
+        await self.sync()
+        return captain
 
     async def channel_overwrites(
         self,
@@ -691,8 +759,8 @@ class Team:
                     view_channel=True
                 )
 
-        for target in await self.captains():
-            overwrites[discord.Object(target.id)] = discord.PermissionOverwrite(view_channel=True)
+        for captain in self.captains.values():
+            overwrites[discord.Object(captain.captain_id)] = discord.PermissionOverwrite(view_channel=True)
 
         return overwrites
 
@@ -778,63 +846,6 @@ class Team:
             if channel and channel in (self.voice_channel, *self.extra_channels):
                 await discord_member.move_to(None, reason="Member removed from the team.")
 
-        await self.sync()
-
-    async def add_captain(self, target_id: int, /) -> None:
-        """|coro|
-
-        Add a captain role to this team.
-
-        Parameters
-        -----------
-        target_id: :class:`int`
-            The id of the captain to add.
-
-        Raises
-        -------
-        Exception
-            This role is already a captain.
-        """
-
-        if target_id in self.captain_ids:
-            raise Exception("This role is already a captain.")
-
-        async with self.bot.safe_connection() as connection:
-            await connection.execute(
-                "UPDATE teams.settings SET captain_ids = array_append(captain_ids, $1) WHERE id = $2",
-                target_id,
-                self.id,
-            )
-
-        self.captain_ids.append(target_id)
-        await self.sync()
-
-    async def remove_captain(self, target_id: int, /) -> None:
-        """|coro|
-
-        Remove a captain role from this team.
-
-        Parameters
-        -----------
-        target_id: :class:`int`
-            The id of the role to remove.
-
-        Raises
-        -------
-        ValueError
-            This role/person is not a captain.
-        """
-        if target_id not in self.captain_ids:
-            raise ValueError("This role/person is not a captain.")
-
-        async with self.bot.safe_connection() as connection:
-            await connection.execute(
-                "UPDATE teams.settings SET captain_ids = array_remove(captain_ids, $1) WHERE id = $2",
-                target_id,
-                self.id,
-            )
-
-        self.captain_ids.remove(target_id)
         await self.sync()
 
     async def add_extra_channel(self, channel_id: int, /) -> None:

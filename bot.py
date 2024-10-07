@@ -717,17 +717,57 @@ class FuryBot(commands.Bot):
 
     @cache_loader("TEAMS")
     async def _cache_setup_teams(self, connection: ConnectionType) -> None:
-        team_data = await connection.fetch("SELECT * FROM teams.settings")
-        team_members_data = await connection.fetch("SELECT * FROM teams.members")
+        # NOTE: Is this the best way to do this? Probably not.. but hey, it's
+        # one query which is a subtle flex.
+        data = await connection.fetch(
+            """
+            SELECT
+                t.*,
+                ARRAY_AGG(DISTINCT c.captain_id) AS captain_ids_array,
+                ARRAY_AGG(DISTINCT c.type) AS captain_types_array,
+                ARRAY_AGG(DISTINCT m.member_id) AS member_ids_array,
+                ARRAY_AGG(DISTINCT m.is_sub) AS member_sub_statuses
+            FROM
+                team.settings t
+            LEFT JOIN
+                teams.captains c ON t.id = c.team_id
+            LEFT JOIN
+                teams.members m ON t.id = m.team_id
+            GROUP BY
+                t.id
+            """
+        )
+        if not data:
+            return
 
-        team_member_mapping: Dict[int, List[Dict[Any, Any]]] = {}
-        for entry in team_members_data:
-            team_member_mapping.setdefault(entry["team_id"], []).append(dict(entry))
+        data = map(dict, data)
 
-        for row in team_data:
-            members = team_member_mapping.get(row["id"], [])
-            team = await Team.from_record(dict(row), members, bot=self)
-            self._team_cache.setdefault(team.guild_id, {})[team.id] = team
+        # Instead of complicated sorting let's just keep parallel arrays
+        # of the extra data we need to create the team.
+        captain_ids = [entry.pop("captain_ids_array", []) for entry in data]
+        captain_types = [entry.pop("captain_types_array", []) for entry in data]
+        member_ids = [entry.pop("member_ids_array", []) for entry in data]
+        member_sub_statuses = [entry.pop("member_sub_statuses", []) for entry in data]
+
+        for index, row in enumerate(data):
+            member_data = [
+                {
+                    'member_id': member_ids[index][i],
+                    'is_sub': member_sub_statuses[index][i],
+                }
+                for i in range(len(member_ids[index]))
+            ]
+
+            captain_data = [
+                {
+                    'captain_id': captain_ids[index][i],
+                    'captain_type': captain_types[index][i],
+                }
+                for i in range(len(captain_ids[index]))
+            ]
+
+            team = Team.from_raw(row, member_data, captain_data, bot=self)
+            self.add_team(team)
 
     @cache_loader("SCRIMS")
     async def _cache_setup_scrims(self, connection: ConnectionType) -> None:
