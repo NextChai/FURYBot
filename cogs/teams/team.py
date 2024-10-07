@@ -185,6 +185,13 @@ class CaptainType(enum.Enum):
     role = 'role'
     user = 'user'
 
+    @classmethod
+    def from_cls(cls: Type[CaptainType], __type: Type[Any], /) -> CaptainType:
+        if __type is discord.Role:
+            return cls.role
+
+        return cls.user
+
 
 class TeamCaptains:
     """Denotes the captains of a given team."""
@@ -698,7 +705,7 @@ class Team:
 
     async def remove_captain(self, target_id: int, /) -> None:
         if not self.captains.pop(target_id, None):
-            return
+            return None
 
         async with self.bot.safe_connection() as connection:
             await connection.execute(
@@ -715,7 +722,8 @@ class Team:
 
     async def add_captain(self, target_id: int, captain_type: CaptainType, /) -> TeamCaptains:
         if self.has_captain(target_id):
-            raise Exception("A captain with this ID already exists.")
+            # Simply return the existing captain
+            return self.captains[target_id]
 
         async with self.bot.safe_connection() as connection:
             data = await connection.fetchrow(

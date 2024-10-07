@@ -15,7 +15,7 @@ Full license terms are available in the LICENSE file at the root of the reposito
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Annotated, List, Optional, Tuple, TypeAlias
+from typing import TYPE_CHECKING, Annotated, List, Optional, Tuple, TypeAlias, Union
 
 import discord
 from discord import app_commands
@@ -28,7 +28,7 @@ from .practices.panel import TeamPracticesPanel
 from .scrims import Scrim
 from .scrims.errors import CannotCreateScrim
 from .scrims.panel import TeamScrimsPanel
-from .team import Team
+from .team import CaptainType, Team
 from .transformers import TeamTransformer
 from .views import TeamView
 
@@ -278,7 +278,10 @@ class Teams(BaseCog):
         team='The team you want to add a captain to. `None` for using the team of the channel.',
     )
     async def team_captains_add(
-        self, interaction: discord.Interaction[FuryBot], target: discord.Role, team: Optional[TEAM_TRANSFORM]
+        self,
+        interaction: discord.Interaction[FuryBot],
+        target: Union[discord.Role, discord.User],
+        team: Optional[TEAM_TRANSFORM],
     ) -> discord.InteractionMessage:
         await interaction.response.defer(ephemeral=True)
 
@@ -288,7 +291,7 @@ class Teams(BaseCog):
                 content='You must be in a team channel to use this command, or use the `team` parameter.'
             )
 
-        await team.add_captain(target.id)
+        await team.add_captain(target.id, CaptainType.from_cls(type(target)))
 
         return await interaction.edit_original_response(
             content=f'{target.mention} is now a captain of **{team.display_name}**.'
@@ -301,7 +304,10 @@ class Teams(BaseCog):
         team='The team you want to remove a captain from. `None` for using the team of the channel.',
     )
     async def team_captains_remove(
-        self, interaction: discord.Interaction[FuryBot], target: discord.Role, team: Optional[TEAM_TRANSFORM]
+        self,
+        interaction: discord.Interaction[FuryBot],
+        target: Union[discord.Role, discord.User],
+        team: Optional[TEAM_TRANSFORM],
     ) -> discord.InteractionMessage:
         await interaction.response.defer(ephemeral=True)
 

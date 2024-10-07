@@ -815,8 +815,8 @@ class Practice(TeamAble):
         else:
             await message.reply(
                 embed=embed,
-                allowed_mentions=discord.AllowedMentions(roles=team.captain_roles),
-                content=', '.join(r.mention for r in team.captain_roles),
+                allowed_mentions=discord.AllowedMentions(roles=True, users=True),
+                content=', '.join(r.mention for r in team.captains.values()),
             )
 
     async def delete(self) -> None:
