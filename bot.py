@@ -44,6 +44,7 @@ from typing_extensions import Concatenate, Self
 
 from cogs.images import ApproveOrDenyImage, AttachmentRequestSettings, ImageRequest
 from cogs.infractions import InfractionsSettings
+from cogs.logging import LoggingSettings
 from cogs.teams import Team
 from cogs.teams.practices import Practice
 from cogs.teams.scrims import Scrim, ScrimStatus
@@ -252,6 +253,9 @@ class FuryBot(commands.Bot):
         # Mapping[guild_id, InfractionsSettings]
         self._infractions_settings: Dict[int, InfractionsSettings] = {}
 
+        # Mapping[guild_id, LoggingSettings]
+        self._logging_settings: Dict[int, LoggingSettings] = {}
+
         super().__init__(
             command_prefix=commands.when_mentioned_or("trev.", "trev", 'fury', 'fury.'),
             help_command=None,
@@ -306,8 +310,7 @@ class FuryBot(commands.Bot):
     @staticmethod
     def Embed(
         *,
-        colour: Optional[Union[int, discord.Colour]] = None,
-        color: Optional[Union[int, discord.Colour]] = None,
+        color: Optional[Union[int, discord.Color]] = None,
         title: Optional[Any] = None,
         type: EmbedType = "rich",  # skipcq: PYL-W0622
         url: Optional[Any] = None,
@@ -318,14 +321,6 @@ class FuryBot(commands.Bot):
         """Get an instance of the bot's global :class:`discord.Embed` with the default
         bot's color, "Fury blue".
 
-        The parameters are the same as :class:`discord.Embed` except for one additional one.
-
-        Parameters
-        ----------
-        author: Optional[Union[:class:`discord.User`, :class:`discord.Member`]]
-            An optional author of this embed. When passed, will call :meth:`Embed.set_author` and set
-            the author's name nad icon url.
-
         Returns
         -------
         :class:`discord.Embed`
@@ -335,18 +330,58 @@ class FuryBot(commands.Bot):
             description=description,
             url=url,
             color=color,
-            colour=colour,
             type=type,
             timestamp=timestamp,
         )
 
-        if not colour and not color:
-            embed.colour = discord.Colour.from_str("0x4EDBFC")
+        if not color:
+            embed.color = discord.Color.from_str("0x4EDBFC")
 
         if author:
             embed.set_author(name=author.name, icon_url=author.display_avatar.url)
 
         return embed
+
+    # Logging settings management
+    def get_logging_settings(self, guild_id: int, /) -> Optional[LoggingSettings]:
+        """Get the logging settings for a guild.
+
+        Parameters
+        ----------
+        guild_id: :class:`int`
+            The guild ID to get the settings for.
+
+        Returns
+        -------
+        Optional[:class:`LoggingSettings`]
+            The logging settings for the guild.
+        """
+        return self._logging_settings.get(guild_id)
+
+    def add_logging_settings(self, settings: LoggingSettings, /) -> None:
+        """Add logging settings to the cache.
+
+        Parameters
+        ----------
+        settings: :class:`LoggingSettings`
+            The settings to add.
+        """
+        self._logging_settings[settings.guild_id] = settings
+
+    def remove_logging_settings(self, guild_id: int, /) -> Optional[LoggingSettings]:
+        """Remove logging settings from the cache.
+
+        Parameters
+        ----------
+        guild_id: :class:`int`
+            The guild ID to remove the settings for.
+
+        Returns
+        -------
+        Optional[:class:`LoggingSettings`]
+            The settings that were removed, if they existed.
+        """
+        return self._logging_settings.pop(guild_id, None)
 
     # Infractions settings management
     def get_infractions_settings(self, guild_id: int, /) -> Optional[InfractionsSettings]:
@@ -706,6 +741,15 @@ class FuryBot(commands.Bot):
     @wrap_extension
     async def unload_extension(self, name: str, /, *, package: Optional[str] = None) -> None:
         return await super().unload_extension(name, package=package)
+
+    @cache_loader("LOGGING_SETTINGS")
+    async def _cache_logging_settings(self, connection: ConnectionType) -> None:
+        logging_settings = await connection.fetch("SELECT * FROM logging.settings")
+
+        for record in logging_settings:
+            settings = LoggingSettings(data=dict(record), bot=self)
+            await settings.propagate_cache(connection=connection)
+            self.add_logging_settings(settings)
 
     @cache_loader('INFRACTIONS_SETTINGS')
     async def _cache_infractions_settings(self, connection: ConnectionType) -> None:
