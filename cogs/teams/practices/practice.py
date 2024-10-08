@@ -1,12 +1,12 @@
 """
 Contributor-Only License v1.0
 
-This file is licensed under the Contributor-Only License. Usage is restricted to 
-non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+This file is licensed under the Contributor-Only License. Usage is restricted to
+non-commercial purposes. Distribution, sublicensing, and sharing of this file
 are prohibited except by the original owner.
 
-Modifications are allowed solely for contributing purposes and must not 
-misrepresent the original material. This license does not grant any 
+Modifications are allowed solely for contributing purposes and must not
+misrepresent the original material. This license does not grant any
 patent rights or trademark rights.
 
 Full license terms are available in the LICENSE file at the root of the repository.
@@ -269,14 +269,14 @@ class PracticeMember(TeamMemberAble, TeamAble):
             practice_member_history_data = await connection.fetchrow(
                 """
                 INSERT INTO teams.practice_member_history(
-                    joined_at, 
-                    team_id, 
-                    channel_id, 
-                    guild_id, 
-                    practice_id, 
+                    joined_at,
+                    team_id,
+                    channel_id,
+                    guild_id,
+                    practice_id,
                     member_id
-                ) 
-                VALUES($1, $2, $3, $4, $5, $6) 
+                )
+                VALUES($1, $2, $3, $4, $5, $6)
                 RETURNING *""",
                 when,
                 self.practice.team_id,
@@ -636,12 +636,12 @@ class Practice(TeamAble):
             practice_member_data = await connection.fetchrow(
                 """
                 INSERT INTO teams.practice_member (
-                    member_id, 
-                    practice_id, 
-                    attending, 
+                    member_id,
+                    practice_id,
+                    attending,
                     reason
-                ) 
-                VALUES ($1, $2, $3, $4) 
+                )
+                VALUES ($1, $2, $3, $4)
                 RETURNING *""",
                 member.id,
                 self.id,
@@ -815,8 +815,8 @@ class Practice(TeamAble):
         else:
             await message.reply(
                 embed=embed,
-                allowed_mentions=discord.AllowedMentions(roles=team.captain_roles),
-                content=', '.join(r.mention for r in team.captain_roles),
+                allowed_mentions=discord.AllowedMentions(roles=True, users=True),
+                content=', '.join(r.mention for r in team.captains.values()),
             )
 
     async def delete(self) -> None:

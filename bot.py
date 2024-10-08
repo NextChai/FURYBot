@@ -1,12 +1,12 @@
 """
 Contributor-Only License v1.0
 
-This file is licensed under the Contributor-Only License. Usage is restricted to 
-non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+This file is licensed under the Contributor-Only License. Usage is restricted to
+non-commercial purposes. Distribution, sublicensing, and sharing of this file
 are prohibited except by the original owner.
 
-Modifications are allowed solely for contributing purposes and must not 
-misrepresent the original material. This license does not grant any 
+Modifications are allowed solely for contributing purposes and must not
+misrepresent the original material. This license does not grant any
 patent rights or trademark rights.
 
 Full license terms are available in the LICENSE file at the root of the repository.
@@ -104,7 +104,11 @@ def cache_loader(
 
             _log.info("Loading %s cache from func %s", flag_name, func.__name__)
 
-            res = await func(self, connection, *args, **kwargs)
+            try:
+                res = await func(self, connection, *args, **kwargs)
+            except Exception as exc:
+                _log.error("Failed to load %s cache from func %s", flag_name, func.__name__, exc_info=exc)
+                return None
 
             _log.info("Finished loading %s cache from func %s", flag_name, func.__name__)
             return res
@@ -717,17 +721,20 @@ class FuryBot(commands.Bot):
 
     @cache_loader("TEAMS")
     async def _cache_setup_teams(self, connection: ConnectionType) -> None:
+        # NOTE: Look into views for this later down the road or something
         team_data = await connection.fetch("SELECT * FROM teams.settings")
-        team_members_data = await connection.fetch("SELECT * FROM teams.members")
+        if not team_data:
+            _log.debug("No teams to load.")
+            return
 
-        team_member_mapping: Dict[int, List[Dict[Any, Any]]] = {}
-        for entry in team_members_data:
-            team_member_mapping.setdefault(entry["team_id"], []).append(dict(entry))
+        for entry in team_data:
+            team_id = entry['id']
+            member_data = await connection.fetch("SELECT * FROM teams.members WHERE team_id = $1", team_id)
+            captain_data = await connection.fetch("SELECT * FROM teams.captains WHERE team_id = $1", team_id)
 
-        for row in team_data:
-            members = team_member_mapping.get(row["id"], [])
-            team = await Team.from_record(dict(row), members, bot=self)
-            self._team_cache.setdefault(team.guild_id, {})[team.id] = team
+            team = Team.from_raw(dict(entry), list(map(dict, member_data)), list(map(dict, captain_data)), bot=self)
+            self.add_team(team)
+            _log.debug('Loaded team %s (%s)', team.display_name, team.id)
 
     @cache_loader("SCRIMS")
     async def _cache_setup_scrims(self, connection: ConnectionType) -> None:

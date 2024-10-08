@@ -10,8 +10,15 @@ CREATE TABLE IF NOT EXISTS teams.settings (
     name TEXT,
     nickname TEXT,
     description TEXT,
-    logo TEXT,
-    captain_role_ids BIGINT [] DEFAULT ARRAY [] :: BIGINT []
+    logo TEXT
+);
+
+CREATE TYPE IF NOT EXISTS teams.captain_type AS ENUM ('role', 'user');
+
+CREATE TABLE IF NOT EXISTS teams.captains (
+    team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
+    captain_id BIGINT,
+    captain_type teams.captain_type 
 );
 
 CREATE TABLE IF NOT EXISTS teams.members (
@@ -85,7 +92,7 @@ CREATE TABLE IF NOT EXISTS teams.practice_leaderboards(
     channel_id BIGINT UNIQUE,
     guild_id BIGINT UNIQUE,
     message_id BIGINT,
-    top_team_id INTEGER REFERENCES teams.settings(id),
+    top_team_id INTEGER REFERENCES teams.settings(id) ON DELETE CASCADE,
     role_id BIGINT
 );
 

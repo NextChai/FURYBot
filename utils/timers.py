@@ -1,12 +1,12 @@
 """
 Contributor-Only License v1.0
 
-This file is licensed under the Contributor-Only License. Usage is restricted to 
-non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+This file is licensed under the Contributor-Only License. Usage is restricted to
+non-commercial purposes. Distribution, sublicensing, and sharing of this file
 are prohibited except by the original owner.
 
-Modifications are allowed solely for contributing purposes and must not 
-misrepresent the original material. This license does not grant any 
+Modifications are allowed solely for contributing purposes and must not
+misrepresent the original material. This license does not grant any
 patent rights or trademark rights.
 
 Full license terms are available in the LICENSE file at the root of the repository.
@@ -351,7 +351,7 @@ class TimerManager:
         except Exception as e:
             _log.exception('Exception in dispatch_timers: %s', e, exc_info=e)
 
-    async def create_timer(
+    async def create_timer(  # skipcq: PYL-W1113
         self,
         when: datetime.datetime,
         event: str = 'timer',

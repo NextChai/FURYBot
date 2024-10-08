@@ -1,12 +1,12 @@
 """
 Contributor-Only License v1.0
 
-This file is licensed under the Contributor-Only License. Usage is restricted to 
-non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+This file is licensed under the Contributor-Only License. Usage is restricted to
+non-commercial purposes. Distribution, sublicensing, and sharing of this file
 are prohibited except by the original owner.
 
-Modifications are allowed solely for contributing purposes and must not 
-misrepresent the original material. This license does not grant any 
+Modifications are allowed solely for contributing purposes and must not
+misrepresent the original material. This license does not grant any
 patent rights or trademark rights.
 
 Full license terms are available in the LICENSE file at the root of the repository.
@@ -65,7 +65,7 @@ class PracticeLeaderboard(GuildAble):
     channel_id: int
     guild_id: int
     message_id: int
-    top_team_id: int
+    top_team_id: Optional[int]
     role_id: int
     bot: FuryBot
 
@@ -172,7 +172,7 @@ class PracticeLeaderboard(GuildAble):
             # NOTE: Add exception raising here / auto removing leaderboard
             return
 
-        previous_top_team = self.bot.get_team(self.top_team_id, guild_id=team.guild_id)
+        previous_top_team = self.top_team_id and self.bot.get_team(self.top_team_id, guild_id=team.guild_id)
         if previous_top_team:
             for team_member in previous_top_team.members:
                 discord_member = await team_member.getch_discord_member()

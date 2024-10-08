@@ -1,12 +1,12 @@
 """
 Contributor-Only License v1.0
 
-This file is licensed under the Contributor-Only License. Usage is restricted to 
-non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+This file is licensed under the Contributor-Only License. Usage is restricted to
+non-commercial purposes. Distribution, sublicensing, and sharing of this file
 are prohibited except by the original owner.
 
-Modifications are allowed solely for contributing purposes and must not 
-misrepresent the original material. This license does not grant any 
+Modifications are allowed solely for contributing purposes and must not
+misrepresent the original material. This license does not grant any
 patent rights or trademark rights.
 
 Full license terms are available in the LICENSE file at the root of the repository.
@@ -20,11 +20,19 @@ from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
 import discord
 from typing_extensions import Self, Unpack
 
-from utils import AfterModal, BaseView, BaseViewKwargs, RoleSelect, SelectOneOfMany, UserSelect, default_button_doc_string
+from utils import (
+    AfterModal,
+    BaseView,
+    BaseViewKwargs,
+    MentionableSelect,
+    SelectOneOfMany,
+    UserSelect,
+    default_button_doc_string,
+)
 
 from .practices.panel import PracticeMemberStatistics, TeamPracticesPanel
 from .scrims.panel import TeamScrimsPanel
-from .team import TeamMember
+from .team import CaptainType, TeamMember
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -548,12 +556,13 @@ class TeamCaptainsView(BaseView):
     def embed(self) -> discord.Embed:
         embed = self.team.embed(
             title="Captains",
-            description="Use the buttons below to manage team captain roles. This team "
-            f"has **{len(self.team.captain_role_ids)}** captain(s).",
+            description="Use the buttons below to manage team captains. This team "
+            f"has **{len(self.team.captains)}** captain(s). A captain can be either "
+            'a role or a user.',
         )
         embed.add_field(
             name="Current Captains",
-            value="\n".join(r.mention for r in self.team.captain_roles) or "This team has no current captains.",
+            value="\n".join(r.mention for r in self.team.captains.values()) or "This team has no current captains.",
         )
 
         return embed
@@ -561,18 +570,24 @@ class TeamCaptainsView(BaseView):
     async def handle_captain_action(
         self,
         interaction: discord.Interaction[FuryBot],
-        roles: List[discord.Role],
+        targets: List[Union[discord.Role, discord.User, discord.Member]],
         *,
         add: bool = True,
     ) -> None:
         await interaction.response.defer()
 
-        meth = self.team.add_captain if add else self.team.remove_captain
-        for role in roles:
-            try:
-                await meth(role.id)
-            except Exception:
-                pass
+        captain_types = {
+            discord.Role: CaptainType.role,
+            discord.User: CaptainType.user,
+            discord.Member: CaptainType.user,
+        }
+
+        if add:
+            for target in targets:
+                await self.team.add_captain(target.id, captain_types[type(target)])
+        else:
+            for target in targets:
+                await self.team.remove_captain(target.id)
 
         await interaction.edit_original_response(embed=self.embed, view=self)
 
@@ -580,16 +595,14 @@ class TeamCaptainsView(BaseView):
     @default_button_doc_string
     async def add_captain(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Add a captain role to this team."""
-
-        RoleSelect(self.handle_captain_action, self)
-
+        MentionableSelect(self.handle_captain_action, self)
         return await interaction.response.edit_message(view=self)
 
     @discord.ui.button(label="Remove Captains")
     @default_button_doc_string
     async def remove_captain(self, interaction: discord.Interaction[FuryBot], button: discord.ui.Button[Self]) -> None:
         """Remove a captain role from this team."""
-        RoleSelect(functools.partial(self.handle_captain_action, add=False), self)
+        MentionableSelect(functools.partial(self.handle_captain_action, add=False), self)
         return await interaction.response.edit_message(view=self)
 
 
@@ -630,7 +643,7 @@ class TeamView(BaseView):
 
         embed.add_field(
             name="Captains",
-            value=", ".join(r.mention for r in self.team.captain_roles) or "Team has no captains.",
+            value=", ".join(r.mention for r in self.team.captains.values()) or "Team has no captains.",
             inline=False,
         )
 
