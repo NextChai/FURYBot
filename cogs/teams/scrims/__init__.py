@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .enums import ScrimStatus as ScrimStatus
+from .enums import *
 from .events import *
 from .persistent import *
 from .scrim import *

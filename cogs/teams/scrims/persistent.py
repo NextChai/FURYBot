@@ -22,7 +22,7 @@ from typing_extensions import Self
 
 from utils import default_button_doc_string
 
-from . import ScrimStatus
+from .enums import ScrimStatus
 
 if TYPE_CHECKING:
     from bot import FuryBot

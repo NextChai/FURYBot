@@ -24,7 +24,7 @@ from typing_extensions import Self
 
 from utils import QueryBuilder
 
-from . import ScrimStatus
+from .enums import ScrimStatus
 from .errors import NoHomeTeamTextChannel
 from .persistent import AwayConfirm, AwayForceConfirm, HomeConfirm
 
