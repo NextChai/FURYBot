@@ -1,12 +1,12 @@
 """
 Contributor-Only License v1.0
 
-This file is licensed under the Contributor-Only License. Usage is restricted to 
-non-commercial purposes. Distribution, sublicensing, and sharing of this file 
+This file is licensed under the Contributor-Only License. Usage is restricted to
+non-commercial purposes. Distribution, sublicensing, and sharing of this file
 are prohibited except by the original owner.
 
-Modifications are allowed solely for contributing purposes and must not 
-misrepresent the original material. This license does not grant any 
+Modifications are allowed solely for contributing purposes and must not
+misrepresent the original material. This license does not grant any
 patent rights or trademark rights.
 
 Full license terms are available in the LICENSE file at the root of the repository.
@@ -87,13 +87,13 @@ class ShortTime:
 
     compiled = re.compile(
         r"""
-        (?:(?P<years>[0-9])(?:\s)?(?:years?|y))?             
-        (?:(?P<months>[0-9]{1,2})(?:\s)?(?:months?|mo))?     
-        (?:(?P<weeks>[0-9]{1,4})(?:\s)?(?:weeks?|w))?        
-        (?:(?P<days>[0-9]{1,5})(?:\s)?(?:days?|d))?          
-        (?:(?P<hours>[0-9]{1,5})(?:\s)?(?:hours?|h))?        
-        (?:(?P<minutes>[0-9]{1,5})(?:\s)?(?:minutes?|m))?    
-        (?:(?P<seconds>[0-9]{1,5})(?:\s)?(?:seconds?|s))?    
+        (?:(?P<years>[0-9])(?:\s)?(?:years?|y))?
+        (?:(?P<months>[0-9]{1,2})(?:\s)?(?:months?|mo))?
+        (?:(?P<weeks>[0-9]{1,4})(?:\s)?(?:weeks?|w))?
+        (?:(?P<days>[0-9]{1,5})(?:\s)?(?:days?|d))?
+        (?:(?P<hours>[0-9]{1,5})(?:\s)?(?:hours?|h))?
+        (?:(?P<minutes>[0-9]{1,5})(?:\s)?(?:minutes?|m))?
+        (?:(?P<seconds>[0-9]{1,5})(?:\s)?(?:seconds?|s))?
         """,
         re.VERBOSE,
     )
