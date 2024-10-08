@@ -18,11 +18,12 @@ import dataclasses
 import datetime
 import enum
 from collections import Counter
+import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
 import discord
 
-from utils import QueryBuilder, human_join
+from utils import RUNNING_DEVELOPMENT, QueryBuilder, human_join
 
 from .errors import TeamNotFound
 
@@ -32,7 +33,12 @@ if TYPE_CHECKING:
     from .practices import Practice
     from .scrims import Scrim
 
+
 MISSING = discord.utils.MISSING
+
+_log = logging.getLogger(__name__)
+if RUNNING_DEVELOPMENT:
+    _log.setLevel(logging.DEBUG)
 
 
 @dataclasses.dataclass(init=True, repr=True)
@@ -192,6 +198,12 @@ class CaptainType(enum.Enum):
 
         return cls.user
 
+    def to_cls(self) -> Type[Any]:
+        if self is self.role:
+            return discord.Role
+
+        return discord.Member
+
 
 class TeamCaptains:
     """Denotes the captains of a given team."""
@@ -349,13 +361,9 @@ class Team:
         *,
         bot: FuryBot,
     ) -> Team:
-        guild_id = team_data["guild_id"]
-        team_id = team_data["id"]
-        members = {entry["member_id"]: TeamMember(bot, guild_id=guild_id, team_id=team_id, **entry) for entry in member_data}
-
-        captains = {
-            entry['captain_id']: TeamCaptains(bot, guild_id=guild_id, team_id=team_id, **entry) for entry in captain_data
-        }
+        guild_id = team_data['guild_id']
+        members = {entry["member_id"]: TeamMember(bot, guild_id=guild_id, **entry) for entry in member_data}
+        captains = {entry['captain_id']: TeamCaptains(bot, guild_id=guild_id, **entry) for entry in captain_data}
 
         team = cls(bot, **dict(team_data), team_members=members, captains=captains)
         bot.add_team(team)
@@ -723,6 +731,7 @@ class Team:
     async def add_captain(self, target_id: int, captain_type: CaptainType, /) -> TeamCaptains:
         if self.has_captain(target_id):
             # Simply return the existing captain
+            _log.debug('Captain %s exists, returning.', target_id)
             return self.captains[target_id]
 
         async with self.bot.safe_connection() as connection:
@@ -768,7 +777,9 @@ class Team:
                 )
 
         for captain in self.captains.values():
-            overwrites[discord.Object(captain.captain_id)] = discord.PermissionOverwrite(view_channel=True)
+            overwrites[discord.Object(captain.captain_id, type=captain.captain_type.to_cls())] = discord.PermissionOverwrite(
+                view_channel=True
+            )
 
         return overwrites
 
@@ -783,12 +794,15 @@ class Team:
             await self.category_channel.edit(overwrites=overwrites, name=self.name, reason='Syncing team channels.')
 
         if self.text_channel:
+            _log.debug('Syncing text channel %s for team %s', self.text_channel.id, self.id)
             await self.text_channel.edit(sync_permissions=True, name='team-chat', reason='Syncing team channels.')
 
         if self.voice_channel:
+            _log.debug('Syncing voice channel %s for team %s', self.voice_channel.id, self.id)
             await self.voice_channel.edit(sync_permissions=True, name='Voice Chat', reason='Syncing team channels.')
 
         for channel in self.extra_channels:
+            _log.debug('Syncing extra channel %s for team %s', channel.id, self)
             await channel._edit({"sync_permissions": True}, reason="Syncing team channels.")  # skipcq: PYL-W0212
 
     async def add_team_member(self, member_id: int, is_sub: bool = False) -> TeamMember:
@@ -825,7 +839,6 @@ class Team:
 
         # Now we can sync the permissions for this member
         await self.sync()
-
         return team_member
 
     async def remove_team_member(self, team_member: TeamMember, /, force_voice_disconnect: bool = False) -> None:

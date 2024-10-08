@@ -159,6 +159,30 @@ class Teams(BaseCog):
         view = TeamView(team, target=interaction)
         return await interaction.edit_original_response(embed=view.embed, view=view)
 
+    @team.command(name='sync', description='Sync a team\'s channel permissions with the team roles.')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(team='The team you want to sync the permissions of.')
+    async def team_sync(
+        self, interaction: discord.Interaction[FuryBot], team: Optional[TEAM_TRANSFORM]
+    ) -> Optional[discord.InteractionMessage]:
+        """|coro|
+
+        A command used to sync a team's channel permissions with the team roles.
+
+        Parameters
+        ----------
+        team: :class:`Team`
+            The team you want to sync the permissions of.
+        """
+        await interaction.response.defer(ephemeral=True)
+
+        team = team or _maybe_team(interaction)
+        if team is None:
+            return await interaction.followup.send('You must be in a team channel to use this command.', ephemeral=True)
+
+        await team.sync()
+        return await interaction.edit_original_response(content='Permissions have been synced.')
+
     @team.command(name='practices', description='Manage a team\'s practices')
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.describe(team='The team you want to manage.')

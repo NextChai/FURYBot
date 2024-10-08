@@ -14,22 +14,60 @@ Full license terms are available in the LICENSE file at the root of the reposito
 
 from __future__ import annotations
 
+import re
 import dataclasses
 import importlib.machinery
 import importlib.util
 import logging
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Annotated, Any, Dict, List, Optional, Sequence
 
+import asyncpg
 import discord
 from discord.ext import commands
 
-from utils import BaseCog, Context
+from utils import RUNNING_DEVELOPMENT, BaseCog, Context
 
 if TYPE_CHECKING:
     from bot import FuryBot
 
 _log = logging.getLogger(__name__)
+if RUNNING_DEVELOPMENT:
+    _log.setLevel(logging.DEBUG)
+
+
+def to_markdown_table(data: Sequence[Dict[Any, Any]], padding: int = 0) -> str:
+    # Get all the keys from the first element.
+    keys = list(data[0].keys())
+
+    # Determine the maximum length of each column.
+    col_widths = {key: max(len(str(key)), max(len(str(row.get(key, ''))) for row in data)) for key in keys}
+
+    # Adjust column widths for padding.
+    col_widths = {key: width + 2 * padding for key, width in col_widths.items()}
+
+    # Create the header row.
+    header = '|'.join(f'{" " * padding}{key:<{col_widths[key] - padding}}{" " * padding}' for key in keys)
+    header = f'|{header}|'
+
+    # Create the separator row.
+    separator = '|'.join(['-' * (col_widths[key] + 2) for key in keys])
+    separator = f'|{separator}|'
+
+    # Create the data rows.
+    rows: List[str] = []
+    for row in data:
+        row_data = '|'.join(
+            f'{" " * padding}{str(row.get(key, "")):<{col_widths[key] - padding}}{" " * padding}' for key in keys
+        )
+        row_data = f'|{row_data}|'
+        rows.append(row_data)
+
+    return '\n'.join([header, separator, *rows])
+
+
+def to_code_block(text: str, language: str = '') -> str:
+    return f'```{language}\n{text}\n```'
 
 
 @dataclasses.dataclass()
@@ -37,6 +75,18 @@ class ReloadStatus:
     module: str
     statuses: List[Any] = dataclasses.field(default_factory=list)
     exceptions: List[BaseException] = dataclasses.field(default_factory=list)
+
+
+class CodeBlockStripper(commands.Converter[str]):
+    code_block_regex = re.compile(r'\`\`\`(?:\w+)?\n?(?P<code>.+?)\n?\`\`\`', re.DOTALL)
+
+    async def convert(self, ctx: Context, argument: str) -> str:
+        # If this is some code block, grab the inner code.
+        match = self.code_block_regex.match(argument)
+        if match:
+            return match.group('code')
+
+        return argument
 
 
 class Owner(BaseCog):
@@ -120,6 +170,79 @@ class Owner(BaseCog):
                 )
 
         return await ctx.send(embed=embed)
+
+    @commands.group(invoke_without_command=True, name='sql', description='Run SQL queries.')
+    @commands.is_owner()
+    async def sql(self, ctx: Context, *, sql: Annotated[str, CodeBlockStripper]) -> Optional[discord.Message]:
+        if ctx.invoked_subcommand:
+            return None
+
+        return await ctx.invoke(self.execute, sql=sql)
+
+    @sql.command(name='fetchrow', description='Fetch a single row from the database.')
+    async def fetchrow(self, ctx: Context, *, sql: Annotated[str, CodeBlockStripper]) -> Optional[discord.Message]:
+        async with ctx.typing(), self.bot.safe_connection() as connection:
+            _log.debug('Executing SQL query: %s', sql)
+
+            try:
+                status = await connection.fetchrow(sql)
+            except asyncpg.exceptions.PostgresSyntaxError as exc:
+                return await ctx.send(to_code_block(str(exc), language='sql'))
+            except Exception as exc:
+                # If we encounter an error, the invoker has messed up. Send this to the
+                # error handler to log the error and notify the user.
+                return await self.bot.error_handler.log_error(exc, target=ctx, event_name='sql-fetchrow-fail')
+
+            if not status:
+                return await ctx.message.add_reaction('❌')
+
+            markdown = to_markdown_table([dict(status)], padding=2)
+            code_block = to_code_block(markdown, language='sql')
+            if len(code_block) > 2000:
+                # If the code block is too long, get angry at the user.
+                await ctx.message.add_reaction('❌')
+                return await ctx.send('The result is too long to display.')
+
+            return await ctx.send(code_block)
+
+    @sql.command(name='fetch', description='Fetch all rows from the database.')
+    async def fetch(self, ctx: Context, *, sql: Annotated[str, CodeBlockStripper]) -> Optional[discord.Message]:
+        async with ctx.typing(), self.bot.safe_connection() as connection:
+            _log.debug('Executing SQL query: %s', sql)
+
+            try:
+                status = await connection.fetch(sql)
+            except asyncpg.exceptions.PostgresSyntaxError as exc:
+                return await ctx.send(to_code_block(str(exc), language='sql'))
+            except Exception as exc:
+                # If we encounter an error, the invoker has messed up. Send this to the
+                # error handler to log the error and notify the user.
+                return await self.bot.error_handler.log_error(exc, target=ctx, event_name='sql-fetchrow-fail')
+            if not status:
+                return await ctx.message.add_reaction('❌')
+
+            markdown = to_markdown_table(list(map(dict, status)), padding=2)
+            code_block = to_code_block(markdown, language='sql')
+            if len(code_block) > 2000:
+                # If the code block is too long, get angry at the user.
+                await ctx.message.add_reaction('❌')
+                return await ctx.send('The result is too long to display.')
+
+            return await ctx.send(code_block)
+
+    @sql.command(name='execute', description='Execute a query without fetching any results.')
+    async def execute(self, ctx: Context, *, sql: Annotated[str, CodeBlockStripper]) -> Optional[discord.Message]:
+        async with ctx.typing(), self.bot.safe_connection() as connection:
+            _log.debug('Executing SQL query: %s', sql)
+            try:
+                status = await connection.execute(sql)
+            except asyncpg.exceptions.PostgresSyntaxError as exc:
+                return await ctx.send(to_code_block(str(exc), language='sql'))
+            except Exception as exc:
+                # If we encounter an error, the invoker has messed up. Send this to the
+                # error handler to log the error and notify the user.
+                return await self.bot.error_handler.log_error(exc, target=ctx, event_name='sql-fetchrow-fail')
+            return await ctx.send(to_code_block(str(status), language='sql'))
 
 
 async def setup(bot: FuryBot):
