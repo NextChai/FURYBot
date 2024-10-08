@@ -351,7 +351,7 @@ class TimerManager:
         except Exception as e:
             _log.exception('Exception in dispatch_timers: %s', e, exc_info=e)
 
-    async def create_timer(
+    async def create_timer(  # skipcq: PYL-W1113
         self,
         when: datetime.datetime,
         event: str = 'timer',
