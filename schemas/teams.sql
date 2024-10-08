@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS teams.settings (
     name TEXT,
     nickname TEXT,
     description TEXT,
-    logo TEXT,
+    logo TEXT
 );
 
 CREATE TYPE IF NOT EXISTS teams.captain_type AS ENUM ('role', 'user');
