@@ -45,6 +45,7 @@ class Meta(BaseCog):
     def __init__(self, bot: FuryBot) -> None:
         self.bot: FuryBot = bot
         self.process = psutil.Process()
+        super().__init__(bot)
 
     @commands.hybrid_command(name='about', description='Get some information about the bot.')
     async def about(self, ctx: Context) -> None:
