@@ -14,11 +14,11 @@ Full license terms are available in the LICENSE file at the root of the reposito
 
 from __future__ import annotations
 
-import re
 import dataclasses
 import importlib.machinery
 import importlib.util
 import logging
+import re
 from types import ModuleType
 from typing import TYPE_CHECKING, Annotated, Any, Dict, List, Optional, Sequence
 
