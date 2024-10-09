@@ -178,9 +178,6 @@ class TeamMember:
         try:
             await guild.fetch_member(self.member_id)
         except discord.NotFound:
-            # This member has been removed from the guild, we can't fetch them.
-            # Remove them from the team as well.
-            await team.remove_team_member(self)
             return None
 
     async def getch_discord_member(self) -> Optional[discord.Member]:
