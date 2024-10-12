@@ -21,10 +21,10 @@ import logging
 import re
 from types import ModuleType
 from typing import TYPE_CHECKING, Annotated, Any, Callable, Coroutine, Dict, List, Optional, Sequence, TypeVar
-from typing_extensions import ParamSpec
 
 import discord
 from discord.ext import commands
+from typing_extensions import ParamSpec
 
 from utils import RUNNING_DEVELOPMENT, BaseCog, Context, human_join
 
