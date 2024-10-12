@@ -156,7 +156,7 @@ class Tracker(BaseCog):
                 guild.id,
                 invite_codes,
             )
-            existing_timer_invite_codes = set(row['invite_code'] for row in existing_timers)
+            existing_timer_invite_codes = {row['invite_code'] for row in existing_timers}
 
             # Grab all the invite codes that are missing from the existing timers.
             missing_invite_codes = invite_codes - existing_timer_invite_codes
