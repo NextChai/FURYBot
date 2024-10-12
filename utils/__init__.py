@@ -31,6 +31,8 @@ from .timers import *
 from .types import *
 from .ui import *
 
+T = TypeVar('T')
+
 if TYPE_CHECKING:
     import datetime
 
@@ -98,7 +100,13 @@ def human_timestamp(dt: datetime.datetime) -> str:
 
 
 def human_join(
-    iterable: Iterable[Any], /, *, last: str = 'and', delimiter: str = ',', additional: Optional[str] = None
+    iterable: Iterable[T],
+    /,
+    *,
+    last: str = 'and',
+    delimiter: str = ',',
+    additional: Optional[str] = None,
+    transform: Callable[[T], str] = str,
 ) -> str:
     """Joins an iterable of strings into a human readable string.
 
@@ -122,11 +130,11 @@ def human_join(
     if len(items) == 0:
         finished = ''
     elif len(items) == 1:
-        finished = items[0]
+        finished = transform(items[0])
     elif len(items) == 2:
-        finished = f'{items[0]} {last} {items[1]}'
+        finished = f'{transform(items[0])} {last} {transform(items[1])}'
     else:
-        finished = f'{delimiter.join(items[:-1])}, {last} {items[-1]}'
+        finished = f'{delimiter.join(map(transform, items[:-1]))}, {last} {transform(items[-1])}'
 
     if additional:
         finished += f' {additional}'
