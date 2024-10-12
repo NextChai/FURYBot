@@ -114,6 +114,7 @@ def cache_loader(
             return res
 
         call_func.__cache_loader__ = True  # type: ignore
+        call_func.__cache_loader_name__ = flag_name  # type: ignore
 
         return call_func
 
@@ -351,6 +352,21 @@ class FuryBot(commands.Bot):
             embed.set_author(name=author.name, icon_url=author.display_avatar.url)
 
         return embed
+
+    # Utilities for finding cache functions
+    def get_cache_function(self, cache_flag_name: str) -> Optional[CacheFunc[[], Optional[Any]]]:
+        # Walk through all functions on the client and locate the one with
+        # "func.__cache_loader_name__" equal to the cache_flag_name
+        for _name, func in inspect.getmembers(self, predicate=inspect.iscoroutinefunction):
+            if getattr(func, "__cache_loader_name__", None) == cache_flag_name:
+                return func
+
+    def get_cache_functions(self) -> Dict[str, CacheFunc[[], Optional[Any]]]:
+        return {
+            getattr(func, '__cache_loader_name__'): func
+            for _name, func in inspect.getmembers(self, predicate=inspect.iscoroutinefunction)
+            if getattr(func, "__cache_loader__", None)
+        }
 
     # Infractions settings management
     def get_infractions_settings(self, guild_id: int, /) -> Optional[InfractionsSettings]:
