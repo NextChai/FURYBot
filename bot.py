@@ -791,9 +791,8 @@ class FuryBot(commands.Bot):
             invites = await guild.invites()
         except discord.HTTPException:
             return None
-        else:
-            fetched = {invite.code: invite for invite in invites}
 
+        fetched = {invite.code: invite for invite in invites}
         self.set_invites(guild.id, fetched or {})
 
         if 'VANITY_URL' in guild.features:
