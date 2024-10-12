@@ -35,6 +35,7 @@ if RUNNING_DEVELOPMENT:
 class Tracker(BaseCog):
     def __init__(self, bot: FuryBot) -> None:
         self.bot: FuryBot = bot
+        super().__init__(bot)
 
     @commands.Cog.listener('on_invite_expired_timer_complete')
     async def on_invite_expired_timer_complete(self, guild_id: int, invite_code: str) -> None:
