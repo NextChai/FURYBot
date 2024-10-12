@@ -13,11 +13,12 @@ Full license terms are available in the LICENSE file at the root of the reposito
 """
 
 from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING, Final
 
 import discord
 from discord.ext import commands
-from typing import TYPE_CHECKING, Final
 
 from utils import RUNNING_DEVELOPMENT, BaseCog
 
