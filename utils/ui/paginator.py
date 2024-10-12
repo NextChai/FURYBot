@@ -15,7 +15,7 @@ Full license terms are available in the LICENSE file at the root of the reposito
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING, Generic, List, Optional, Union, Tuple
+from typing import TYPE_CHECKING, Generic, List, Optional, Tuple, Union
 
 import discord
 from typing_extensions import Self, TypeAlias, TypeVar, Unpack
