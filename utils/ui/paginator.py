@@ -15,7 +15,7 @@ Full license terms are available in the LICENSE file at the root of the reposito
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING, Generic, List, Optional, Union
+from typing import TYPE_CHECKING, Generic, List, Optional, Union, Tuple
 
 import discord
 from typing_extensions import Self, TypeAlias, TypeVar, Unpack
@@ -31,6 +31,8 @@ if TYPE_CHECKING:
 
 T = TypeVar('T')
 TargetType: TypeAlias = Union['discord.Interaction[FuryBot]', 'commands.Context[FuryBot]']
+
+__all__: Tuple[str, ...] = ('BaseButtonPaginator',)
 
 
 class BaseButtonPaginator(Generic[T], BaseView, abc.ABC):
