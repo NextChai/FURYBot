@@ -26,7 +26,7 @@ import asyncpg
 import discord
 from discord.ext import commands
 
-from utils import RUNNING_DEVELOPMENT, BaseCog, Context
+from utils import RUNNING_DEVELOPMENT, BaseCog, Context, human_join
 
 if TYPE_CHECKING:
     from bot import FuryBot
@@ -243,6 +243,36 @@ class Owner(BaseCog):
                 # error handler to log the error and notify the user.
                 return await self.bot.error_handler.log_error(exc, target=ctx, event_name='sql-fetchrow-fail')
             return await ctx.send(to_code_block(str(status), language='sql'))
+
+    @commands.group(name='cache', description='Reload a cache function through the bot.', invoke_without_command=True)
+    @commands.is_owner()
+    async def cache(self, ctx: Context) -> Optional[discord.Message]:
+        if ctx.invoked_subcommand:
+            return
+
+        # Show all available cache loading functions on the bot.
+        loaders = self.bot.get_cache_functions()
+        human_loaders = human_join(loaders.keys(), transform=lambda e: f"`{e}`")
+        return await ctx.send(f'Available cache functions: {human_loaders}.')
+
+    @cache.command(name='reload', description='Reload a cache function through the bot.')
+    @commands.is_owner()
+    async def reload_cache(self, ctx: Context, *cache_names: str) -> Optional[discord.Message]:
+        statuses: List[str] = []
+        async with ctx.typing(), self.bot.safe_connection() as connection:
+            cache_functions = self.bot.get_cache_functions()
+
+            for cache_name in cache_names:
+                func = cache_functions.get(cache_name.upper())
+                if not func:
+                    statuses.append(f'Failed to find cache function `{cache_name}`.')
+                    continue
+
+                # If we have found it, call it and store it for later
+                await func(self.bot, connection)
+                statuses.append(f'Loaded cache function `{cache_name}`.')
+
+        return await ctx.send('\n'.join(statuses))
 
 
 async def setup(bot: FuryBot):
