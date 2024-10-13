@@ -156,8 +156,8 @@ class PacketManager:
                 'command': target.command and target.command.qualified_name,
                 'author': author and f'<@{author.id}> ({author.id})',
                 'guild': target.guild and f'{target.guild.name} ({target.guild.id})',
-                'channel': target.channel and f'<#{target.channel.id}>',
-            }
+                'channel': target.channel and f'<#{target.channel.id}> ({target.channel.id})',
+                }
             packet.update(addons)
 
         traceback_string = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
