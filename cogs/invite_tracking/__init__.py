@@ -36,6 +36,7 @@ if RUNNING_DEVELOPMENT:
     _log.setLevel(logging.DEBUG)
 
 
+# skipcq: PYL-E0601
 class MemberInvitesPaginator(BaseButtonPaginator[asyncpg.Record]):
     def __init__(self, data: List[asyncpg.Record], member: discord.Member, **kwargs: Unpack[BaseViewKwargs]) -> None:
         super().__init__(entries=data, per_page=3, **kwargs)
