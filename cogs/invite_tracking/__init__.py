@@ -83,12 +83,12 @@ class InviteTracker(Tracker):
             # they have invited.
             data = await connection.fetch(
                 """
-                SELECT 
+                SELECT
                     invite_code,
                     created_at,
                     expires_at,
                     uses AS invite_count
-                FROM 
+                FROM
                     invite_tracker.invites i
                 WHERE
                     i.guild_id = $1 AND i.user_id = $2
