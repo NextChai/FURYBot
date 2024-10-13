@@ -130,7 +130,10 @@ class Teams(BaseCog):
             team = await Team.create(name, guild=interaction.guild, bot=self.bot)
         except discord.Forbidden:
             return await interaction.edit_original_response(
-                content='I am missing guild permissions to create channels. Please ensure I have the `Manage Channels` permission.'
+                content=(
+                    'I am missing guild permissions to create channels. '
+                    'Please ensure I have the `Manage Channels` permission.'
+                )
             )
 
         view = TeamView(team, target=interaction)
