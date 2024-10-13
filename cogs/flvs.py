@@ -31,7 +31,7 @@ FURY_GUILD: Final[int] = 757664675864248360
 
 class FLVS(BaseCog):
     def __init__(self, bot: FuryBot) -> None:
-        self.bot: FuryBot = bot
+        super().__init__(bot)
         self.message_cache: cachetools.Cache[int, discord.Message] = cachetools.Cache(maxsize=5000)
 
         self.message_webhook_cache: cachetools.Cache[int, Union[discord.WebhookMessage, discord.Message]] = cachetools.Cache(
