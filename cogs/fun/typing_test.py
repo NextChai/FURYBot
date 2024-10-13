@@ -33,6 +33,7 @@ MISSING = discord.utils.MISSING
 # Implementation of levenshtein distance between two sentences. Returns the distance between the two sentences as a float.
 def levenshtein_distance(s1: str, s2: str) -> float:
     if len(s1) < len(s2):
+        # skipcq: PYL-W1114
         return levenshtein_distance(s2, s1)
 
     if len(s2) == 0:
