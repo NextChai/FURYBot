@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 class DmNotifications(BaseCog):
     def __init__(self, bot: FuryBot) -> None:
-        self.bot: FuryBot = bot
+        super().__init__(bot)
         self.member_notifier_task.start()
 
     async def _fetch_and_send_members(self, guild: discord.Guild, moderators: List[int]) -> List[discord.Member]:

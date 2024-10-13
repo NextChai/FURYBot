@@ -4,6 +4,7 @@
 
 [![DeepSource](https://app.deepsource.com/gh/trevorflahardy/Fury-Bot.svg/?label=active+issues&show_trend=true&token=sKhkjTpEiiYJhajP_cz0Tg0O)](https://app.deepsource.com/gh/trevorflahardy/Fury-Bot/)
 [![DeepSource](https://app.deepsource.com/gh/trevorflahardy/Fury-Bot.svg/?label=resolved+issues&show_trend=true&token=sKhkjTpEiiYJhajP_cz0Tg0O)](https://app.deepsource.com/gh/trevorflahardy/Fury-Bot/)
+[![wakatime](https://wakatime.com/badge/github/NextChai/Fury-Bot.svg)](https://wakatime.com/badge/github/NextChai/Fury-Bot)
 
 Fury, also dubbed Fury Bot, is an all-in-one moderation assistant for Discord eSports servers owned and operated by K-12 schools and higher education. Complete with team management features like practices, scrims, and activity tracking, as well as logging, moderation, and profanity detection, Fury is your solution to keeping a school-based community safe.
 

@@ -390,6 +390,8 @@ class FuryBot(commands.Bot):
             if getattr(func, "__cache_loader_name__", None) == cache_flag_name:
                 return func
 
+        return None
+
     def get_cache_functions(self) -> Dict[str, CacheFunc[[], Optional[Any]]]:
         return {
             getattr(func, '__cache_loader_name__'): func
