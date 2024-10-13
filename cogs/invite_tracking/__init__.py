@@ -15,19 +15,20 @@ Full license terms are available in the LICENSE file at the root of the reposito
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, List, Optional
+
+import discord
+from discord import app_commands
+from discord.ext import commands
 from typing_extensions import Unpack
 
-from discord import app_commands
-import discord
-from discord.ext import commands
-
-from utils import RUNNING_DEVELOPMENT, Context, BaseButtonPaginator, BaseViewKwargs, human_timestamp
+from utils import RUNNING_DEVELOPMENT, BaseButtonPaginator, BaseViewKwargs, Context, human_timestamp
 
 from .tracking import Tracker
 
 if TYPE_CHECKING:
     import asyncpg
+
     from bot import FuryBot
 
 _log = logging.getLogger(__name__)
