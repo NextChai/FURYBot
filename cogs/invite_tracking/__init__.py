@@ -105,7 +105,88 @@ class InviteTracker(Tracker):
         view = MemberInvitesPaginator(data, member, target=ctx)
         return await ctx.send(embed=view.embed, view=view)
 
-    async def _global_invites(self, ctx: Context) -> None: ...
+    async def _global_invites(self, ctx: Context) -> None:
+        guild = ctx.guild
+        if not guild:
+            await ctx.send('This command must be used in a guild.')
+            return
+
+        # Fetch some invite statistics from this guild, including the top 5 invites,
+        # the total number of invites created, and the total number of members invited.
+        async with self.bot.safe_connection() as connection:
+            data = await connection.fetch(
+                """
+                SELECT
+                    invite_code,
+                    created_at,
+                    expires_at,
+                    uses AS invite_count
+                FROM
+                    invite_tracker.invites i
+                WHERE
+                    i.guild_id = $1
+                ORDER BY
+                    invite_count DESC
+                LIMIT 5;
+                """,
+                guild.id,
+            )
+
+            total_invites = await connection.fetchval(
+                """
+                SELECT
+                    SUM(uses)
+                FROM
+                    invite_tracker.invites i
+                WHERE
+                    i.guild_id = $1;
+                """,
+                guild.id,
+            )
+
+            total_members_invited = await connection.fetchval(
+                """
+                SELECT
+                    COUNT(DISTINCT user_id)
+                FROM
+                    invite_tracker.invite_users iu
+                JOIN
+                    invite_tracker.invites i
+                ON
+                    i.id = iu.invite_id
+                WHERE
+                    i.guild_id = $1;
+                """,
+                guild.id,
+            )
+
+        if not data:
+            await ctx.send('No invites have been created in this server.')
+            return
+
+        embed = self.bot.Embed(
+            title='Global Invite Stats',
+            description=(
+                f'This server has a total of **{total_invites:,} invites** '
+                f'and has invited **{total_members_invited:,} members**.'
+            ),
+        )
+
+        for invite in data:
+            expires_at = invite['expires_at']
+            expires_at_fmt = human_timestamp(expires_at) if expires_at else 'Does not expire.'
+            embed.add_field(
+                name=invite['invite_code'],
+                value='\n'.join(
+                    [
+                        f'Created At: {human_timestamp(invite["created_at"])}.',
+                        expires_at_fmt,
+                        f'Uses: **{invite["invite_count"]} total uses**.',
+                    ]
+                ),
+            )
+
+        await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="invites", description='See stats about the invites in the server.')
     @commands.guild_only()
