@@ -859,10 +859,16 @@ class Team:
         self.team_members.pop(team_member.member_id, None)
 
         discord_member = await team_member.getch_discord_member()
-        if discord_member and discord_member.voice and force_voice_disconnect:
-            channel = discord_member.voice.channel
-            if channel and channel in (self.voice_channel, *self.extra_channels):
-                await discord_member.move_to(None, reason="Member removed from the team.")
+
+        voice = discord_member and discord_member.voice
+        connected_voice_channel = voice and voice.channel
+        member_in_team_voice = connected_voice_channel and connected_voice_channel in (
+            self.voice_channel,
+            *self.extra_channels,
+        )
+
+        if discord_member and member_in_team_voice and force_voice_disconnect:
+            await discord_member.move_to(None, reason="Member removed from the team.")
 
         await self.sync()
 
